@@ -30,6 +30,8 @@
 - **화면설계서 (Figma)**  
   https://www.figma.com/design/KFWHtTRfOvJ7kE1tsQruIg/Care-up?node-id=0-1&p=f&t=gtd3O7evry5yZZHQ-0
 
+---
+
 ## 🗂️ 프로젝트 디렉토리 구조
 
 | 디렉토리명 | 설명                                                                 |
