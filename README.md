@@ -44,7 +44,7 @@
 | hooks      | 커스텀 React 훅들을 관리 (비즈니스 로직 재사용)                      |
 | layout     | 페이지 레이아웃 컴포넌트들을 관리 (Header, Footer, Sidebar 등)       |
 | pages      | 라우팅되는 페이지 컴포넌트들을 관리                                  |
-| service    | API 호출, 외부 서비스 연동 등 서비스 레이어를 관리                   |
+| service    | API 호출, 외부 서비스 연동 등 서비스 레이어를 관리 (= 백엔드의 Controller와 유사) |
 | stores     | 전역 상태 관리 (Redux 등)를 위한 스토어들을 관리                     |
 | styles     | 전역 스타일, 테마, CSS 모듈 등 스타일 관련 파일들을 관리             |
 | tests      | 테스트 파일들과 테스트 유틸리티들을 관리                             |
