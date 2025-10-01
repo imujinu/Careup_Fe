@@ -42,6 +42,7 @@
 <a href="https://eslint.org/" target="_blank"><img src="https://img.shields.io/badge/ESLint-4B3263?style=for-the-badge&logo=eslint&logoColor=white" alt="ESLint"></a>
 <a href="https://prettier.io/" target="_blank"><img src="https://img.shields.io/badge/prettier-%23F7B93E.svg?style=for-the-badge&logo=prettier&logoColor=black" alt="Prettier"></a>
 <a href="https://styled-components.com/" target="_blank"><img src="https://img.shields.io/badge/styled--components-DB7093?style=for-the-badge&logo=styled-components&logoColor=white" alt="Styled Components"></a>
+<a href="https://axios-http.com/kr/" target="_blank"><img src="https://img.shields.io/badge/axios-5A29E4?style=for-the-badge&logo=axios&logoColor=white" alt="axios"></a>
 
 ---
 
@@ -57,6 +58,7 @@
 | hooks      | 커스텀 React 훅들을 관리 (비즈니스 로직 재사용)                      |
 | layout     | 페이지 레이아웃 컴포넌트들을 관리 (Header, Footer, Sidebar 등)       |
 | pages      | 라우팅되는 페이지 컴포넌트들을 관리                                  |
+| routes      | 라우팅 정보를 저장하는 폴더                                  |
 | service    | API 호출, 외부 서비스 연동 등 서비스 레이어를 관리 (= 백엔드의 Controller와 유사) |
 | stores     | 전역 상태 관리 (Redux 등)를 위한 스토어들을 관리                     |
 | styles     | 전역 스타일, 테마, CSS 모듈 등 스타일 관련 파일들을 관리             |
