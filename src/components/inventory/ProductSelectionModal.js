@@ -12,7 +12,7 @@ const ModalOverlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10001;
 `;
 
 const ModalContainer = styled.div`
@@ -178,7 +178,7 @@ const NextButton = styled.button`
   }
 `;
 
-function ProductSelectionModal({ isOpen, onClose, onNext }) {
+function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] }) {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -194,7 +194,7 @@ function ProductSelectionModal({ isOpen, onClose, onNext }) {
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm, categoryFilter]);
+  }, [products, searchTerm, categoryFilter, existingProducts]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -212,6 +212,12 @@ function ProductSelectionModal({ isOpen, onClose, onNext }) {
 
   const filterProducts = () => {
     let filtered = products;
+
+    // 이미 등록된 상품 제외
+    const existingProductIds = existingProducts.map(item => item.product?.id || item.productId);
+    filtered = filtered.filter(product => 
+      !existingProductIds.includes(product.productId)
+    );
 
     if (searchTerm) {
       filtered = filtered.filter(product => 
@@ -274,21 +280,33 @@ function ProductSelectionModal({ isOpen, onClose, onNext }) {
         ),
         loading ? 
           React.createElement('div', { style: { textAlign: 'center', padding: '40px' } }, '로딩 중...') :
-          React.createElement(ProductGrid, null,
-            filteredProducts.map((product) =>
-              React.createElement(ProductCard, {
-                key: product.productId,
-                $selected: selectedProduct?.productId === product.productId,
-                onClick: () => handleProductSelect(product)
-              },
-                React.createElement(ProductName, null, product.productName || '알 수 없음'),
-                React.createElement(ProductInfo, null, `ID: ${product.productId}`),
-                React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
-                React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`),
-                React.createElement(ProductPrice, null, `공급가: ₩${product.price?.toLocaleString() || 0}`)
+          filteredProducts.length === 0 ?
+            React.createElement('div', { 
+              style: { 
+                textAlign: 'center', 
+                padding: '40px',
+                color: '#6b7280'
+              } 
+            }, 
+              React.createElement('div', { style: { fontSize: '18px', marginBottom: '8px' } }, '📦'),
+              React.createElement('div', { style: { fontSize: '16px', fontWeight: '600', marginBottom: '4px' } }, '등록 가능한 상품이 없습니다'),
+              React.createElement('div', { style: { fontSize: '14px' } }, '모든 상품이 이미 등록되었거나 검색 조건에 맞는 상품이 없습니다.')
+            ) :
+            React.createElement(ProductGrid, null,
+              filteredProducts.map((product) =>
+                React.createElement(ProductCard, {
+                  key: product.productId,
+                  $selected: selectedProduct?.productId === product.productId,
+                  onClick: () => handleProductSelect(product)
+                },
+                  React.createElement(ProductName, null, product.productName || '알 수 없음'),
+                  React.createElement(ProductInfo, null, `ID: ${product.productId}`),
+                  React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
+                  React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`),
+                  React.createElement(ProductPrice, null, `공급가: ₩${product.price?.toLocaleString() || 0}`)
+                )
               )
-            )
-          ),
+            ),
         React.createElement(ButtonGroup, null,
           React.createElement(CancelButton, { onClick: handleClose }, '취소'),
           React.createElement(NextButton, {

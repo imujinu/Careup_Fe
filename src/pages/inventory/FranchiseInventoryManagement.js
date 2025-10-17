@@ -248,7 +248,8 @@ function FranchiseInventoryManagement() {
     React.createElement(ProductSelectionModal, {
       isOpen: isProductSelectionModalOpen,
       onClose: handleCloseProductSelectionModal,
-      onNext: handleProductSelect
+      onNext: handleProductSelect,
+      existingProducts: inventoryItems
     }),
     React.createElement(ProductSetupModal, {
       isOpen: isProductSetupModalOpen,
