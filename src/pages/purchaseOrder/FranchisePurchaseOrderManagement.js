@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import SummaryCards from '../components/franchise/purchaseOrder/SummaryCards';
-import SearchAndFilter from '../components/franchise/purchaseOrder/SearchAndFilter';
-import PurchaseOrderTable from '../components/franchise/purchaseOrder/PurchaseOrderTable';
-import FranchisePurchaseOrderDetailModal from '../components/franchise/purchaseOrder/FranchisePurchaseOrderDetailModal';
-import OrderRequestModal from '../components/franchise/purchaseOrder/OrderRequestModal';
-import OrderRecommendationModal from '../components/franchise/purchaseOrder/OrderRecommendationModal';
-import OrderAutomationModal from '../components/franchise/purchaseOrder/OrderAutomationModal';
+import SummaryCards from '../../components/franchise/purchaseOrder/SummaryCards';
+import SearchAndFilter from '../../components/franchise/purchaseOrder/SearchAndFilter';
+import PurchaseOrderTable from '../../components/franchise/purchaseOrder/PurchaseOrderTable';
+import FranchisePurchaseOrderDetailModal from '../../components/franchise/purchaseOrder/FranchisePurchaseOrderDetailModal';
+import OrderRequestModal from '../../components/franchise/purchaseOrder/OrderRequestModal';
+import OrderRecommendationModal from '../../components/franchise/purchaseOrder/OrderRecommendationModal';
+import OrderAutomationModal from '../../components/franchise/purchaseOrder/OrderAutomationModal';
 
 const PageContainer = styled.div`
   max-width: 1200px;

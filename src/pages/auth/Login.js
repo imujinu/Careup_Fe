@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { authService } from '../service/authService';
+import { useAppDispatch, useAppSelector } from '../../stores/hooks';
+import { loginUser, clearError } from '../../stores/slices/authSlice';
 
 const LoginContainer = styled.div`
   display: flex;
@@ -123,21 +124,19 @@ function Login({ onLoginSuccess }) {
     password: '',
     rememberMe: false
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const dispatch = useAppDispatch();
+  const { loading, error } = useAppSelector(state => state.auth);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
-      setLoading(true);
-      setError('');
-      
-      const result = await authService.login({
+      dispatch(clearError());
+      const result = await dispatch(loginUser({
         email: formData.email,
         password: formData.password,
         rememberMe: formData.rememberMe
-      });
+      })).unwrap();
       
       console.log('로그인 성공:', result.userInfo);
       
@@ -149,9 +148,6 @@ function Login({ onLoginSuccess }) {
       }
     } catch (err) {
       console.error('로그인 실패:', err);
-      setError(err.response?.data?.status_message || '로그인에 실패했습니다.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -159,14 +155,12 @@ function Login({ onLoginSuccess }) {
     setFormData({ email, password, rememberMe: true });
     
     try {
-      setLoading(true);
-      setError('');
-      
-      const result = await authService.login({
+      dispatch(clearError());
+      const result = await dispatch(loginUser({
         email,
         password,
         rememberMe: true
-      });
+      })).unwrap();
       
       console.log('로그인 성공:', result.userInfo);
       
@@ -177,9 +171,6 @@ function Login({ onLoginSuccess }) {
       }
     } catch (err) {
       console.error('로그인 실패:', err);
-      setError(err.response?.data?.status_message || '로그인에 실패했습니다.');
-    } finally {
-      setLoading(false);
     }
   };
 

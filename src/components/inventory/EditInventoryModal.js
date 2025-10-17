@@ -178,8 +178,19 @@ const SaveButton = styled(Button)`
 
 function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   const [formData, setFormData] = useState({
-    safetyStock: item?.safetyStock || 0
+    safetyStock: 0,
+    unitPrice: 0
   });
+
+  // 모달이 열릴 때마다 item 데이터로 formData 초기화
+  React.useEffect(() => {
+    if (item && isOpen) {
+      setFormData({
+        safetyStock: item.safetyStock || 0,
+        unitPrice: item.unitPrice || 0
+      });
+    }
+  }, [item, isOpen]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -238,11 +249,14 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               })
             ),
             React.createElement(FormGroup, null,
-              React.createElement(Label, null, '단가'),
+              React.createElement(Label, null, 
+                '단가 ',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
               React.createElement(Input, {
                 type: 'number',
-                value: item?.unitPrice || 0,
-                disabled: true
+                value: formData.unitPrice,
+                onChange: (e) => handleInputChange('unitPrice', parseInt(e.target.value) || 0)
               })
             )
           )

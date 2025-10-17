@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 const ModalOverlay = styled.div`
@@ -207,12 +207,26 @@ const SaveButton = styled(Button)`
 
 function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   const [formData, setFormData] = useState({
-    currentStock: item?.currentStock || 0,
-    safetyStock: item?.safetyStock || 0,
-    unitPrice: item?.unitPrice || 0,
-    category: item?.category || '',
+    currentStock: 0,
+    safetyStock: 0,
+    unitPrice: 0,
+    category: '',
     notes: ''
   });
+
+  // item이 변경될 때 formData 초기화
+  useEffect(() => {
+    if (item) {
+      console.log('EditInventoryModal에서 받은 item:', item); // 디버깅용
+      setFormData({
+        currentStock: item.currentStock || item.stockQuantity || 0,
+        safetyStock: item.safetyStock || 0,
+        unitPrice: item.unitPrice || item.price || 0,
+        category: item.category || item.categoryName || '',
+        notes: ''
+      });
+    }
+  }, [item]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -222,7 +236,14 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   };
 
   const handleSave = () => {
-    onSave(formData);
+    // 현재고는 제외하고 안전재고와 단가만 전송
+    const saveData = {
+      safetyStock: formData.safetyStock,
+      unitPrice: formData.unitPrice,
+      category: formData.category,
+      notes: formData.notes
+    };
+    onSave(saveData);
     onClose();
   };
 
@@ -235,7 +256,7 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   return React.createElement(ModalOverlay, { onClick: onClose },
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
-        React.createElement(ModalTitle, null, `재고 수정 - ${item.name}`),
+        React.createElement(ModalTitle, null, `재고 수정 - ${item.product?.name || item.productName || item.name || '상품명 없음'}`),
         React.createElement(CloseButton, { onClick: onClose }, '×')
       ),
       React.createElement(ModalBody, null,
@@ -244,19 +265,19 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           React.createElement(InfoCard, null,
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '상품명:'),
-              React.createElement(InfoValue, null, item.name)
+              React.createElement(InfoValue, null, item.product?.name || item.productName || item.name || '-')
             ),
             React.createElement(InfoRow, null,
-              React.createElement(InfoLabel, null, 'SKU:'),
-              React.createElement(InfoValue, null, item.id)
+              React.createElement(InfoLabel, null, '현재 재고:'),
+              React.createElement(InfoValue, null, `${item.currentStock || 0}개`)
             ),
             React.createElement(InfoRow, null,
-              React.createElement(InfoLabel, null, '단위:'),
-              React.createElement(InfoValue, null, item.unit)
+              React.createElement(InfoLabel, null, '안전 재고:'),
+              React.createElement(InfoValue, null, `${item.safetyStock || 0}개`)
             ),
             React.createElement(InfoRow, null,
-              React.createElement(InfoLabel, null, '마지막 입고:'),
-              React.createElement(InfoValue, null, item.lastReceived)
+              React.createElement(InfoLabel, null, '상품 ID:'),
+              React.createElement(InfoValue, null, item.product?.id || item.id || '-')
             )
           )
         ),
@@ -264,15 +285,16 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           React.createElement(SectionTitle, null, '재고 정보 수정'),
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
-              React.createElement(Label, null,
-                '현재고 ',
-                React.createElement('span', { className: 'required' }, '*')
-              ),
+              React.createElement(Label, null, '현 재고'),
               React.createElement(Input, {
                 type: 'number',
                 value: formData.currentStock,
-                onChange: (e) => handleInputChange('currentStock', parseInt(e.target.value) || 0),
-                min: 0
+                disabled: true,
+                style: { 
+                  backgroundColor: '#f3f4f6', 
+                  color: '#6b7280',
+                  cursor: 'not-allowed'
+                }
               })
             ),
             React.createElement(FormGroup, null,
@@ -326,6 +348,17 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
         ),
         React.createElement(Section, null,
           React.createElement(SectionTitle, null, '수정 후 예상 정보'),
+          React.createElement('div', { style: { 
+            fontSize: '12px', 
+            color: '#6b7280', 
+            marginBottom: '12px',
+            padding: '8px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '4px',
+            border: '1px solid #e5e7eb'
+          }}, 
+            '💡 현재고는 발주나 입출고를 통해서만 변경됩니다. 여기서는 안전재고와 단가만 수정할 수 있습니다.'
+          ),
           React.createElement(InfoCard, null,
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '총 가치:'),

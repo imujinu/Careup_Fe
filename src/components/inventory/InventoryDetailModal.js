@@ -232,7 +232,9 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
     
     setLoading(true);
     try {
-      const data = await inventoryService.getInventoryFlows(item.branchId || 1, item.product?.id);
+      console.log('상세보기 - 상품 정보:', item); // 디버깅용
+      const data = await inventoryService.getInventoryFlows(item.branchId || 1, item.productId);
+      console.log('상세보기 - 입출고 내역 데이터:', data); // 디버깅용
       setHistoryData(data || []);
     } catch (error) {
       console.error('입출고 내역 조회 실패:', error);
@@ -340,9 +342,24 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                     React.createElement(TableCell, { colSpan: 6, style: { textAlign: 'center', padding: '20px' } }, '입출고 내역이 없습니다.')
                   ) :
                   historyData.map((history, index) => {
-                    const type = history.inQuantity > 0 ? '입고' : history.outQuantity > 0 ? '출고' : '조정';
-                    const quantity = history.inQuantity > 0 ? `+${history.inQuantity}` : 
-                                   history.outQuantity > 0 ? `-${history.outQuantity}` : '0';
+                    const inQty = history.inQuantity || 0;
+                    const outQty = history.outQuantity || 0;
+                    const netChange = inQty - outQty;
+                    
+                    let type, quantity;
+                    if (netChange > 0) {
+                      type = '입고';
+                      quantity = `+${netChange}`;
+                    } else if (netChange < 0) {
+                      type = '출고';
+                      quantity = `${netChange}`;
+                    } else if (inQty > 0 && outQty > 0) {
+                      type = '조정';
+                      quantity = `입${inQty}/출${outQty}`;
+                    } else {
+                      type = '조정';
+                      quantity = '0';
+                    }
                     const date = new Date(history.createdAt).toLocaleString('ko-KR');
                     
                     return React.createElement(TableRow, { key: index },
@@ -352,7 +369,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                       ),
                       React.createElement(TableCell, null, quantity),
                       React.createElement(TableCell, null, history.reason || '-'),
-                      React.createElement(TableCell, null, history.createdBy || '시스템'),
+                      React.createElement(TableCell, null, '시스템'),
                       React.createElement(TableCell, null, history.remark || '-')
                     );
                   })

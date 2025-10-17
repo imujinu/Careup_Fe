@@ -60,6 +60,15 @@ export const inventoryService = {
     });
   },
 
+  // 재고 정보 수정 (안전재고, 단가)
+  updateInventoryInfo: async (branchProductId, safetyStock, unitPrice) => {
+    await inventoryApi.post(`${API_BASE_URL}/inventory/update`, {
+      branchProductId,
+      safetyStock,
+      unitPrice
+    });
+  },
+
   // 재고 증감
   adjustStock: async (data) => {
     await inventoryApi.post(`${API_BASE_URL}/inventory/adjust`, data);

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import SummaryCards from '../components/franchise/SummaryCards';
-import SearchAndFilter from '../components/franchise/SearchAndFilter';
-import FranchiseInventoryTable from '../components/inventory/FranchiseInventoryTable';
-import EditInventoryModal from '../components/franchise/EditInventoryModal';
-import ProductSelectionModal from '../components/inventory/ProductSelectionModal';
-import ProductSetupModal from '../components/inventory/ProductSetupModal';
-import { inventoryService } from '../service/inventoryService';
-import { authService } from '../service/authService';
+import SummaryCards from '../../components/franchise/SummaryCards';
+import SearchAndFilter from '../../components/franchise/SearchAndFilter';
+import FranchiseInventoryTable from '../../components/inventory/FranchiseInventoryTable';
+import EditInventoryModal from '../../components/franchise/EditInventoryModal';
+import ProductSelectionModal from '../../components/inventory/ProductSelectionModal';
+import ProductSetupModal from '../../components/inventory/ProductSetupModal';
+import { inventoryService } from '../../service/inventoryService';
+import { authService } from '../../service/authService';
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -125,6 +125,7 @@ function FranchiseInventoryManagement() {
   };
 
   const handleModify = (item) => {
+    console.log('수정할 상품 데이터:', item); // 디버깅용
     setSelectedItem(item);
     setIsEditModalOpen(true);
   };
