@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import { getBranchName } from '../utils/branchUtils';
 
 const HeaderContainer = styled.header`
   position: fixed;
@@ -218,7 +219,7 @@ function Header({ onToggleSidebar, sidebarVisible, userType, branchId }) {
           React.createElement(Greeting, null,
             '안녕하세요, ',
             React.createElement('span', { className: 'highlight' }, 
-              userType === 'headquarters' ? '이승지 대표님' : '이승지 점장님'
+              userType === 'headquarters' ? '이승지 대표님' : `이승지 점장님 (${getBranchName(branchId)})`
             )
           ),
           React.createElement(DateInfo, null, '2025년 09월 20일 토요일')
