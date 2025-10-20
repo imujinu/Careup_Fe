@@ -7,6 +7,8 @@ import FranchisePurchaseOrderDetailModal from '../../components/franchise/purcha
 import OrderRequestModal from '../../components/franchise/purchaseOrder/OrderRequestModal';
 import OrderRecommendationModal from '../../components/franchise/purchaseOrder/OrderRecommendationModal';
 import OrderAutomationModal from '../../components/franchise/purchaseOrder/OrderAutomationModal';
+import { authService } from '../../service/authService';
+import { getBranchName } from '../../utils/branchUtils';
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -31,6 +33,8 @@ const PageSubtitle = styled.p`
 `;
 
 function FranchisePurchaseOrderManagement() {
+  const branchId = authService.getCurrentUser()?.branchId || 2;
+  
   const [summary, setSummary] = useState({
     totalOrders: 3,
     pending: 1,
@@ -162,7 +166,7 @@ function FranchisePurchaseOrderManagement() {
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
-      React.createElement(PageTitle, null, '발주관리'),
+      React.createElement(PageTitle, null, `발주관리 - ${getBranchName(branchId)}`),
       React.createElement(PageSubtitle, null, '가맹점 발주 내역 조회 및 발주 요청')
     ),
     React.createElement(SummaryCards, { summary }),

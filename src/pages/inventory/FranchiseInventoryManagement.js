@@ -8,6 +8,7 @@ import ProductSelectionModal from '../../components/inventory/ProductSelectionMo
 import ProductSetupModal from '../../components/inventory/ProductSetupModal';
 import { inventoryService } from '../../service/inventoryService';
 import { authService } from '../../service/authService';
+import { getBranchName } from '../../utils/branchUtils';
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -32,6 +33,8 @@ const PageSubtitle = styled.p`
 `;
 
 function FranchiseInventoryManagement() {
+  const branchId = authService.getCurrentUser()?.branchId || 2;
+  
   const [summary, setSummary] = useState({
     totalItems: 0,
     lowStock: 0,
@@ -221,7 +224,7 @@ function FranchiseInventoryManagement() {
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
-      React.createElement(PageTitle, null, '재고관리'),
+      React.createElement(PageTitle, null, `재고관리 - ${getBranchName(branchId)}`),
       React.createElement(PageSubtitle, null, '가맹점 재고 조회, 수정 및 발주 추천')
     ),
     React.createElement(SummaryCards, { summary }),
@@ -248,7 +251,8 @@ function FranchiseInventoryManagement() {
     React.createElement(ProductSelectionModal, {
       isOpen: isProductSelectionModalOpen,
       onClose: handleCloseProductSelectionModal,
-      onNext: handleProductSelect
+      onNext: handleProductSelect,
+      existingProducts: inventoryItems
     }),
     React.createElement(ProductSetupModal, {
       isOpen: isProductSetupModalOpen,
