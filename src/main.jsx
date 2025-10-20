@@ -1,10 +1,10 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { Provider } from 'react-redux'
-import { store } from './stores'
-import './index.css'
-import App from './App.js'
-import './utils/axiosConfig' // Axios Interceptor 설정
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Provider } from 'react-redux';
+import { store } from './stores/index.js';
+import './index.css';
+import App from './App.jsx';
+import './utils/axiosConfig.js';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -12,4 +12,4 @@ createRoot(document.getElementById('root')).render(
       <App />
     </Provider>
   </StrictMode>,
-)
+);

@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authSlice from './slices/authSlice';
 import inventorySlice from './slices/inventorySlice';
+import customerAuthReducer from './slices/customerAuthSlice';
 
 export const store = configureStore({
   reducer: {
-    auth: authSlice,
+    auth: authSlice,               // 직원용
+    customerAuth: customerAuthReducer, // 고객용
     inventory: inventorySlice,
   },
   middleware: (getDefaultMiddleware) =>
