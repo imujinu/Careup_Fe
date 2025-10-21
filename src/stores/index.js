@@ -3,6 +3,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authSlice from './slices/authSlice';
 import inventorySlice from './slices/inventorySlice';
+import branchSlice from './slices/branchSlice';
 import customerAuthReducer from './slices/customerAuthSlice';
 
 export const store = configureStore({
@@ -10,6 +11,7 @@ export const store = configureStore({
     auth: authSlice,               // 직원용
     customerAuth: customerAuthReducer, // 고객용
     inventory: inventorySlice,
+    branch: branchSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

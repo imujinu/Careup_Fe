@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import styled from 'styled-components';
+import { useAppSelector } from '../stores/hooks';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
@@ -18,8 +20,9 @@ const MainContent = styled.main`
   transition: margin-left 0.3s ease;
 `;
 
-function Layout({ children, currentPage, onPageChange, userType, branchId }) {
+function Layout() {
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const { userType, branchId } = useAppSelector(state => state.auth);
 
   const handleToggleSidebar = () => {
     setSidebarVisible(!sidebarVisible);
@@ -34,12 +37,12 @@ function Layout({ children, currentPage, onPageChange, userType, branchId }) {
     }),
     React.createElement(Sidebar, { 
       isVisible: sidebarVisible,
-      currentPage,
-      onPageChange,
       userType,
       branchId
     }),
-    React.createElement(MainContent, { sidebarVisible }, children),
+    React.createElement(MainContent, { sidebarVisible }, 
+      React.createElement(Outlet, null)
+    ),
     React.createElement(Footer, { sidebarVisible })
   );
 }
