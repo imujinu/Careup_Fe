@@ -2,7 +2,7 @@
 name: Bug report
 about: '버그 이슈 템플릿 '
 title: "[Bug] bug title"
-labels: ''
+labels: "\U0001F41E BugFix"
 assignees: ''
 
 ---

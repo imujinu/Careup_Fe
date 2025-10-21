@@ -2,7 +2,7 @@
 name: Feature request
 about: 기능 개발 이슈 템플릿
 title: "[Feature] feature name"
-labels: ''
+labels: "✨ Feature"
 assignees: ''
 
 ---
