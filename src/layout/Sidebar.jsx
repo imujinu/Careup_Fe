@@ -4,11 +4,13 @@ import styled from 'styled-components';
 import { useAppDispatch } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
 import { MENU_PATH_MAP } from '../routes/routePaths';
+import { getBranchName } from '../utils/branchUtils';
 
 const SidebarContainer = styled.aside`
   position: fixed;
   top: 0;
-  left: ${props => props.isVisible ? '0' : '-240px'};
+
+  left: ${props => props.$isVisible ? '0' : '-240px'};
   width: 240px;
   height: 100vh;
   background: #ffffff;
@@ -159,10 +161,20 @@ function Sidebar({ isVisible, userType, branchId }) {
     navigate('/');
   };
 
-  return React.createElement(SidebarContainer, { isVisible },
+  return React.createElement(SidebarContainer, { $isVisible: isVisible },
     React.createElement(SidebarHeader, null,
       React.createElement(Logo, null, 'H'),
-      React.createElement(AppTitle, null, '한솔도시락')
+      React.createElement(AppTitle, null, 
+        '한솔도시락',
+        userType === 'franchise' && React.createElement('div', { 
+          style: { 
+            fontSize: '12px', 
+            color: '#6b7280', 
+            marginTop: '4px',
+            fontWeight: '400'
+          } 
+        }, getBranchName(branchId))
+      )
     ),
     React.createElement(MenuSection, null,
       React.createElement(MenuList, null,

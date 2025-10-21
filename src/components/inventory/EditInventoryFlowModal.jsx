@@ -11,7 +11,7 @@ const ModalOverlay = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 10001;
 `;
 
 const ModalContent = styled.div`
@@ -60,22 +60,6 @@ const Label = styled.label`
   font-weight: 500;
   color: #374151;
   margin-bottom: 8px;
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
-  background: white;
-  
-  &:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
 `;
 
 const Input = styled.input`
@@ -150,15 +134,27 @@ const Button = styled.button`
   }
 `;
 
-const HelpText = styled.div`
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 4px;
+const ReadOnlyInfo = styled.div`
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
 `;
 
-function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] }) {
+const ReadOnlyLabel = styled.div`
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+`;
+
+const ReadOnlyValue = styled.div`
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 500;
+`;
+
+function EditInventoryFlowModal({ isOpen, onClose, item, onSave }) {
   const [formData, setFormData] = useState({
-    branchProductId: '',
     inQuantity: '',
     outQuantity: '',
     remark: ''
@@ -166,23 +162,17 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (item && isOpen) {
       setFormData({
-        branchProductId: '',
-        inQuantity: '',
-        outQuantity: '',
-        remark: ''
+        inQuantity: item.inQuantity || '',
+        outQuantity: item.outQuantity || '',
+        remark: item.remark || ''
       });
     }
-  }, [isOpen]);
+  }, [item, isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!formData.branchProductId) {
-      alert('상품을 선택해주세요.');
-      return;
-    }
     
     if (!formData.inQuantity && !formData.outQuantity) {
       alert('입고수량 또는 출고수량 중 하나는 입력해야 합니다.');
@@ -198,7 +188,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       });
       onClose();
     } catch (error) {
-      console.error('입출고 기록 등록 실패:', error);
+      console.error('입출고 기록 수정 실패:', error);
     } finally {
       setLoading(false);
     }
@@ -211,30 +201,20 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     }));
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !item) return null;
 
   return React.createElement(ModalOverlay, { onClick: onClose },
     React.createElement(ModalContent, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
-        React.createElement(ModalTitle, null, '입출고 기록 등록'),
+        React.createElement(ModalTitle, null, '입출고 기록 수정'),
         React.createElement(CloseButton, { onClick: onClose }, '×')
       ),
       React.createElement('form', { onSubmit: handleSubmit },
-        React.createElement(FormGroup, null,
-          React.createElement(Label, null, '상품 *'),
-          React.createElement(Select, {
-            value: formData.branchProductId,
-            onChange: (e) => handleChange('branchProductId', e.target.value),
-            required: true
-          },
-            React.createElement('option', { value: '' }, '상품을 선택하세요'),
-            branchProducts.map(product => 
-              React.createElement('option', { 
-                key: product.id, 
-                value: product.id 
-              }, `${product.productName} (${product.branchId === 1 ? '본사' : `지점-${product.branchId}`})`)
-            )
-          )
+        React.createElement(ReadOnlyInfo, null,
+          React.createElement(ReadOnlyLabel, null, '상품명'),
+          React.createElement(ReadOnlyValue, null, item.productName || '-'),
+          React.createElement(ReadOnlyLabel, { style: { marginTop: '8px' } }, '지점'),
+          React.createElement(ReadOnlyValue, null, item.branchId === 1 ? '본사' : `지점-${item.branchId}`)
         ),
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '입고수량'),
@@ -244,8 +224,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
             value: formData.inQuantity,
             onChange: (e) => handleChange('inQuantity', e.target.value),
             placeholder: '입고수량을 입력하세요'
-          }),
-          React.createElement(HelpText, null, '새 상품 입고, 반품 등록 등')
+          })
         ),
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '출고수량'),
@@ -255,15 +234,14 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
             value: formData.outQuantity,
             onChange: (e) => handleChange('outQuantity', e.target.value),
             placeholder: '출고수량을 입력하세요'
-          }),
-          React.createElement(HelpText, null, '불량품 폐기, 재고손실, 조정 등 (주문 출고는 자동 처리됨)')
+          })
         ),
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '비고'),
           React.createElement(TextArea, {
             value: formData.remark,
             onChange: (e) => handleChange('remark', e.target.value),
-            placeholder: '비고를 입력하세요 (예: 불량품 폐기, 재고조정, 손실 등)'
+            placeholder: '비고를 입력하세요'
           })
         ),
         React.createElement(ButtonGroup, null,
@@ -283,4 +261,4 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
   );
 }
 
-export default AddInventoryFlowModal;
+export default EditInventoryFlowModal;

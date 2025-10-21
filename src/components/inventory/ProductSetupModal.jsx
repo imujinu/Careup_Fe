@@ -11,7 +11,7 @@ const ModalOverlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10001;
 `;
 
 const ModalContainer = styled.div`
@@ -19,9 +19,11 @@ const ModalContainer = styled.div`
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
-  max-height: 80vh;
-  overflow: hidden;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
 `;
 
 const ModalHeader = styled.div`
@@ -54,6 +56,8 @@ const CloseButton = styled.button`
 
 const ModalBody = styled.div`
   padding: 24px;
+  flex: 1;
+  overflow-y: auto;
 `;
 
 const ProductInfo = styled.div`
@@ -106,9 +110,10 @@ const ButtonGroup = styled.div`
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
-  padding-top: 24px;
+  padding: 24px;
   border-top: 1px solid #e5e7eb;
+  background: white;
+  flex-shrink: 0;
 `;
 
 const CancelButton = styled.button`
@@ -249,11 +254,11 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
             value: formData.price,
             onChange: (e) => handleInputChange('price', e.target.value)
           })
-        ),
-        React.createElement(ButtonGroup, null,
-          React.createElement(CancelButton, { onClick: handleClose }, '취소'),
-          React.createElement(AddButton, { onClick: handleSave }, '추가')
         )
+      ),
+      React.createElement(ButtonGroup, null,
+        React.createElement(CancelButton, { onClick: handleClose }, '취소'),
+        React.createElement(AddButton, { onClick: handleSave }, '추가')
       )
     )
   );

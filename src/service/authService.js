@@ -1,4 +1,7 @@
+/// src/service/authService.js
+/// 직원용
 import axios from 'axios';
+import { decodeToken } from '../utils/jwt';
 
 const AUTH_API_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
 
@@ -23,24 +26,6 @@ export const tokenStorage = {
   },
   setUserInfo: (userInfo) => {
     localStorage.setItem('userInfo', JSON.stringify(userInfo));
-  }
-};
-
-// JWT 디코딩 함수
-export const decodeToken = (token) => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (error) {
-    console.error('Token decode failed:', error);
-    return null;
   }
 };
 
@@ -71,7 +56,7 @@ export const authService = {
       });
 
       // 백엔드 응답 구조: { result: { accessToken, refreshToken, ... }, status_code, status_message }
-      const { accessToken, refreshToken, branchId, role, employeeId } = response.data.result;
+      const { accessToken, refreshToken } = response.data.result;
 
       // 토큰 저장
       tokenStorage.setTokens(accessToken, refreshToken);
@@ -154,4 +139,3 @@ export const authService = {
 };
 
 export default authService;
-
