@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { loginUser, clearError } from '../../stores/slices/authSlice';
@@ -125,7 +126,15 @@ function Login({ onLoginSuccess }) {
     rememberMe: false
   });
   const dispatch = useAppDispatch();
-  const { loading, error } = useAppSelector(state => state.auth);
+  const navigate = useNavigate();
+  const { loading, error, isAuthenticated } = useAppSelector(state => state.auth);
+
+  // 이미 로그인되어 있으면 dashboard로 리다이렉트
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -142,10 +151,10 @@ function Login({ onLoginSuccess }) {
       
       if (onLoginSuccess) {
         onLoginSuccess(result.userInfo);
-      } else {
-        // 페이지 새로고침으로 App.tsx에서 자동으로 사용자 정보 로드
-        window.location.reload();
       }
+      
+      // 로그인 성공 후 dashboard로 이동
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('로그인 실패:', err);
     }
@@ -166,9 +175,10 @@ function Login({ onLoginSuccess }) {
       
       if (onLoginSuccess) {
         onLoginSuccess(result.userInfo);
-      } else {
-        window.location.reload();
       }
+      
+      // 로그인 성공 후 dashboard로 이동
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('로그인 실패:', err);
     }
