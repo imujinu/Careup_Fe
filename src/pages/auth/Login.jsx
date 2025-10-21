@@ -1,3 +1,6 @@
+/// Login.jsx
+/// src/pages/auth/Login.jsx
+/// 직원용
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';

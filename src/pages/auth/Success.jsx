@@ -1,4 +1,6 @@
-// /src/pages/auth/Success.jsx
+/// Success.jsx
+/// src/pages/auth/Success.jsx
+/// 고객용 oauth 임시 성공 페이지
 import React from "react";
 
 export default function Success() {

@@ -1,4 +1,3 @@
-// /src/App.jsx
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
@@ -18,6 +17,7 @@ import OAuthCallbackGoogle from './pages/auth/OauthCallbackGoogle';
 import OAuthCallbackKakao from './pages/auth/OauthCallbackKakao';
 import AdditionalInfo from './pages/auth/AdditionalInfo';
 import SuccessPage from './pages/auth/Success';
+import CustomerHome from './pages/customer/CustomerHome';
 
 function EmployeeApp() {
   const [currentPage, setCurrentPage] = useState("inventory");
@@ -82,6 +82,7 @@ export default function App() {
         <Route path="/oauth/kakao/callback" element={<OAuthCallbackKakao />} />
         <Route path="/customer/oauth/additional-info" element={<AdditionalInfo />} />
         <Route path="/customer/success" element={<SuccessPage />} />
+        <Route path="/customer/home" element={<CustomerHome />} />
 
         {/* 알 수 없는 경로 → 루트로 이동 */}
         <Route path="*" element={<Navigate to="/" replace />} />

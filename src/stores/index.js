@@ -1,3 +1,5 @@
+/// index.js
+/// src/stores/index.js
 import { configureStore } from '@reduxjs/toolkit';
 import authSlice from './slices/authSlice';
 import inventorySlice from './slices/inventorySlice';

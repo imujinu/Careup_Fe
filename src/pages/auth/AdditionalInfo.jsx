@@ -1,35 +1,29 @@
-// /src/pages/auth/AdditionalInfo.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { customerTokenStorage } from "../../service/customerAuthService";
-
-const AUTH_BASE = import.meta.env.VITE_CUSTOMER_AUTH_URL || "http://localhost:8080";
+import customerAxios from "../../utils/customerAxios";
 
 export default function AdditionalInfo() {
-  const [oauthTempToken, setOauthTempToken] = useState("");
-  const [form, setForm] = useState({
-    name: "",
-    nickname: "",
-    birthday: "",
-    phone: "",
-    gender: "M", // M | W
+  // 토큰/프리필을 초기 상태에서 즉시 로드 → 렌더 깜빡임 제거
+  const [oauthTempToken] = useState(() => sessionStorage.getItem("oauth_temp_token") || "");
+  const [form, setForm] = useState(() => {
+    const prefillRaw = sessionStorage.getItem("oauth_prefill");
+    if (prefillRaw) {
+      try {
+        const p = JSON.parse(prefillRaw);
+        return {
+          name: p.name || "",
+          nickname: p.nickname || "",
+          birthday: "",
+          phone: "",
+          gender: "M",
+        };
+      } catch {
+        // 무시하고 초기화
+      }
+    }
+    return { name: "", nickname: "", birthday: "", phone: "", gender: "M" };
   });
   const [msg, setMsg] = useState("");
-
-  useEffect(() => {
-    const t = sessionStorage.getItem("oauth_temp_token");
-    const prefill = sessionStorage.getItem("oauth_prefill");
-    if (t) setOauthTempToken(t);
-    if (prefill) {
-      try {
-        const p = JSON.parse(prefill);
-        setForm((f) => ({
-          ...f,
-          name: p.name || f.name,
-          nickname: p.nickname || f.nickname || "",
-        }));
-      } catch {}
-    }
-  }, []);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -45,22 +39,20 @@ export default function AdditionalInfo() {
     setMsg("제출 중...");
 
     try {
-      const res = await fetch(`${AUTH_BASE}/auth/customers/oauth/update`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { data } = await customerAxios.post(
+        `/auth/customers/oauth/update`,
+        {
           oauthTempToken,
           name: form.name.trim(),
           nickname: form.nickname.trim(),
           birthday: form.birthday,
           phone: form.phone.trim(),
           gender: form.gender,
-        }),
-      });
+        },
+        { __skipAuthRefresh: true } // 루프 방지
+      );
 
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.status_message || "서버 오류");
-      const r = j?.result;
+      const r = data?.result;
       if (r?.status !== "COMPLETE") throw new Error("완료 상태가 아닙니다.");
 
       if (r.accessToken) customerTokenStorage.setTokens(r.accessToken, r.refreshToken);
@@ -76,9 +68,10 @@ export default function AdditionalInfo() {
       sessionStorage.removeItem("oauth_temp_token");
       sessionStorage.removeItem("oauth_prefill");
 
-      window.location.replace("/customer/success");
+      window.location.replace("/customer/home");
     } catch (e) {
-      setMsg(e.message || "추가정보 처리 실패");
+      const serverMsg = e?.response?.data?.status_message;
+      setMsg(serverMsg || e.message || "추가정보 처리 실패");
     }
   };
 

@@ -1,6 +1,11 @@
+// src/service/customerAuthService.js
+import axios from 'axios';
 import customerAxios from '../utils/customerAxios';
+import { decodeToken } from '../utils/jwt';
 
-// 고객 토큰/유저 저장소 (직원용과 key 분리)
+const CUSTOMER_API_BASE = import.meta.env.VITE_CUSTOMER_API_URL || 'http://localhost:8080';
+
+// 고객 토큰/유저 저장소
 export const customerTokenStorage = {
   getAccessToken: () => localStorage.getItem('cust_accessToken'),
   getRefreshToken: () => localStorage.getItem('cust_refreshToken'),
@@ -20,23 +25,6 @@ export const customerTokenStorage = {
   setUserInfo: (info) => localStorage.setItem('cust_userInfo', JSON.stringify(info)),
 };
 
-// JWT 디코더
-const decodeToken = (token) => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-};
-
 // 토큰 클레임 → 유저정보
 const getUserInfoFromToken = (accessToken) => {
   const d = decodeToken(accessToken);
@@ -48,6 +36,12 @@ const getUserInfoFromToken = (accessToken) => {
     sub: d.sub,
   };
 };
+
+// 인터셉터 없는 raw axios (무한루프 방지용)
+const raw = axios.create({
+  baseURL: CUSTOMER_API_BASE,
+  withCredentials: true,
+});
 
 export const customerAuthService = {
   // id = 이메일 또는 휴대폰번호
@@ -82,12 +76,13 @@ export const customerAuthService = {
     return { accessToken, refreshToken, userInfo };
   },
 
+  // **raw axios 사용**: 인터셉터 안 타게
   refreshToken: async () => {
     const rt = customerTokenStorage.getRefreshToken();
     if (!rt) throw new Error('No customer refresh token');
 
-    const res = await customerAxios.post('/auth/customers/refresh', { refreshToken: rt });
-    const { accessToken, role, memberId } = res.data.result; // refresh는 access만 내려오는 스펙
+    const res = await raw.post('/auth/customers/refresh', { refreshToken: rt });
+    const { accessToken, role, memberId } = res.data.result; // refresh는 access만 내려오는 스펙(백엔드 기준)
 
     customerTokenStorage.setTokens(accessToken); // refreshToken 갱신 없음
     const t = getUserInfoFromToken(accessToken) || {};
@@ -102,10 +97,13 @@ export const customerAuthService = {
     return accessToken;
   },
 
+  // **raw axios 사용**: 로그아웃 중 401이 와도 인터셉터가 또 리프레시 안 걸리게
   logout: async () => {
     const rt = customerTokenStorage.getRefreshToken();
     try {
-      if (rt) await customerAxios.post('/auth/customers/logout', { refreshToken: rt });
+      if (rt) await raw.post('/auth/customers/logout', { refreshToken: rt });
+    } catch {
+      // 무시: RT가 이미 무효이면 여기서 실패할 수 있음
     } finally {
       customerTokenStorage.clear();
     }

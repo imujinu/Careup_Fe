@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { customerTokenStorage } from "../../service/customerAuthService";
-
-const AUTH_BASE = import.meta.env.VITE_CUSTOMER_AUTH_URL || "http://localhost:8080";
+import customerAxios from "../../utils/customerAxios";
 
 export default function OAuthCallbackGoogle() {
   const [msg, setMsg] = useState("처리 중...");
-  const ranRef = useRef(false); // StrictMode 중복 실행 가드
+  const ranRef = useRef(false);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -13,24 +12,38 @@ export default function OAuthCallbackGoogle() {
 
     const run = async () => {
       const p = new URLSearchParams(window.location.search);
+
+      const errorParam = p.get("error");
+      if (errorParam) {
+        setMsg(`로그인 취소/오류: ${errorParam}`);
+        return;
+      }
+
       const code = p.get("code");
       const state = p.get("state");
-
       if (!code) {
         setMsg("코드가 없습니다.");
         return;
       }
 
-      try {
-        const r = await fetch(`${AUTH_BASE}/auth/customers/oauth/google`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, state }),
-        });
+      const localState = sessionStorage.getItem("oauth_state");
+      if (localState && state !== localState) {
+        setMsg("요청이 만료되었거나 위조되었습니다. 처음부터 다시 진행해 주세요.");
+        return;
+      }
 
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.status_message || "서버 오류");
-        const res = j?.result;
+      try {
+        const codeVerifier = sessionStorage.getItem("pkce_verifier") || undefined;
+
+        const { data } = await customerAxios.post(
+          "/auth/customers/oauth/google",
+          { code, state, codeVerifier },
+          { __skipAuthRefresh: true }
+        );
+        const res = data?.result;
+
+        sessionStorage.removeItem("oauth_state");
+        sessionStorage.removeItem("pkce_verifier");
 
         if (res?.status === "COMPLETE") {
           if (res.accessToken) customerTokenStorage.setTokens(res.accessToken, res.refreshToken);
@@ -42,7 +55,7 @@ export default function OAuthCallbackGoogle() {
             nickname: res.nickname,
             phone: res.phone,
           });
-          window.location.replace("/customer/success");
+          window.location.replace("/customer/home");
           return;
         }
 
@@ -59,7 +72,8 @@ export default function OAuthCallbackGoogle() {
         setMsg("알 수 없는 상태입니다.");
       } catch (e) {
         console.error(e);
-        setMsg(e.message || "로그인 처리 실패");
+        const serverMsg = e?.response?.data?.status_message;
+        setMsg(serverMsg || e.message || "로그인 처리 실패");
       }
     };
 

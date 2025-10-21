@@ -1,3 +1,4 @@
+// src/stores/slices/customerAuthSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { customerAuthService } from '../../service/customerAuthService';
 
