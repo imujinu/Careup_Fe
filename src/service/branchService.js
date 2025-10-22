@@ -15,6 +15,34 @@ export const branchService = {
   },
 };
 
+// 지점 등록 서비스
+export const createBranch = async (branchData, profileImage) => {
+  const url = `${BASE_URL}/branch/register`;
+  
+  // FormData 객체 생성
+  const formData = new FormData();
+  
+  // 텍스트 데이터 추가
+  Object.keys(branchData).forEach(key => {
+    if (branchData[key] !== null && branchData[key] !== undefined && branchData[key] !== '') {
+      formData.append(key, branchData[key]);
+    }
+  });
+  
+  // 프로필 이미지 파일 추가
+  if (profileImage) {
+    formData.append('profileImage', profileImage);
+  }
+  
+  const response = await axios.post(url, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  
+  return response.data;
+};
+
 export default branchService;
 
 

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import HeadquartersBranchList from '../pages/branch/HeadquartersBranchList';
+import BranchRegistration from '../pages/branch/BranchRegistration';
+import TestBranchRegistration from '../pages/branch/TestBranchRegistration';
 import InventoryManagement from '../pages/inventory/InventoryManagement';
 import PurchaseOrderManagement from '../pages/purchaseOrder/PurchaseOrderManagement';
 
@@ -20,6 +22,14 @@ export const headquartersRoutes = [
   {
     path: 'branch',
     element: <HeadquartersBranchList />,
+  },
+  {
+    path: 'branch/register',
+    element: <BranchRegistration />,
+  },
+  {
+    path: 'branch/test-register',
+    element: <TestBranchRegistration />,
   },
   {
     path: 'client',

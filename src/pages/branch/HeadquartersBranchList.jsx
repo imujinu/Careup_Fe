@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { fetchBranchList, setParams } from '../../stores/slices/branchSlice';
 import BranchTable from '../../components/branch/BranchTable';
@@ -7,6 +8,7 @@ import Pagination from '../../components/branch/Pagination';
 import styled from 'styled-components';
 
 function HeadquartersBranchList() {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { list, pagination, loading, error, params } = useAppSelector((s) => s.branch);
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,6 +53,18 @@ function HeadquartersBranchList() {
     setSearchTerm(e.target.value);
   };
 
+  const handleRegisterClick = () => {
+    console.log('등록 버튼 클릭됨 - 지점 등록 페이지로 이동');
+    console.log('현재 경로:', window.location.pathname);
+    console.log('이동할 경로: /branch/register');
+    navigate('/branch/register');
+  };
+
+  const handleTestClick = () => {
+    console.log('테스트 버튼 클릭됨');
+    navigate('/branch/test-register');
+  };
+
   return (
     <Wrap>
       <HeaderRow>
@@ -61,7 +75,20 @@ function HeadquartersBranchList() {
             value={searchTerm}
             onChange={handleSearch}
           />
-          <PrimaryButton>등록</PrimaryButton>
+          <PrimaryButton 
+            type="button"
+            onClick={handleRegisterClick}
+            title="지점 등록"
+          >
+            등록
+          </PrimaryButton>
+          <TestButton 
+            type="button"
+            onClick={handleTestClick}
+            title="테스트 페이지"
+          >
+            테스트
+          </TestButton>
         </Right>
       </HeaderRow>
 
@@ -121,8 +148,60 @@ const PrimaryButton = styled.button`
   background: #6d28d9;
   color: #fff;
   border: none;
-  padding: 8px 12px;
+  padding: 12px 24px;
   border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+  &:hover {
+    background: #5b21b6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:active {
+    background: #4c1d95;
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.3);
+  }
+`;
+
+const TestButton = styled.button`
+  background: #10b981;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+  &:hover {
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:active {
+    background: #047857;
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+  }
 `;
 
 const ErrorMsg = styled.div`
