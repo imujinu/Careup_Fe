@@ -65,6 +65,11 @@ function HeadquartersBranchList() {
     navigate('/branch/test-register');
   };
 
+  const handleEditBranch = (branch) => {
+    console.log('지점 수정 버튼 클릭됨:', branch);
+    navigate(`/branch/edit/${branch.id}`);
+  };
+
   return (
     <Wrap>
       <HeaderRow>
@@ -101,6 +106,7 @@ function HeadquartersBranchList() {
           branches={filteredList} 
           onSort={handleSort}
           currentSort={currentSort}
+          onEdit={handleEditBranch}
         />
       )}
 

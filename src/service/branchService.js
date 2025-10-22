@@ -43,6 +43,42 @@ export const createBranch = async (branchData, profileImage) => {
   return response.data;
 };
 
+// 지점 상세 조회 서비스
+export const getBranchDetail = async (branchId) => {
+  const url = `${BASE_URL}/branch/${branchId}`;
+  const response = await axios.get(url);
+  // 백엔드 통합 응답 구조에 맞게 데이터 추출
+  return response.data?.result || response.data;
+};
+
+// 지점 수정 서비스
+export const updateBranch = async (branchId, branchData, profileImage) => {
+  const url = `${BASE_URL}/branch/${branchId}`;
+  
+  // FormData 객체 생성
+  const formData = new FormData();
+  
+  // 텍스트 데이터 추가
+  Object.keys(branchData).forEach(key => {
+    if (branchData[key] !== null && branchData[key] !== undefined && branchData[key] !== '') {
+      formData.append(key, branchData[key]);
+    }
+  });
+  
+  // 프로필 이미지 파일 추가
+  if (profileImage) {
+    formData.append('profileImage', profileImage);
+  }
+  
+  const response = await axios.patch(url, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  
+  return response.data;
+};
+
 export default branchService;
 
 
