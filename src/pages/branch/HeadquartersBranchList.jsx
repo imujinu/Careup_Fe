@@ -1,17 +1,21 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
-import { fetchBranchList, setParams } from '../../stores/slices/branchSlice';
+import { fetchBranchList, setParams, deleteBranchAction } from '../../stores/slices/branchSlice';
 import BranchTable from '../../components/branch/BranchTable';
 import BranchTableSkeleton from '../../components/branch/BranchTableSkeleton';
 import Pagination from '../../components/branch/Pagination';
+import DeleteConfirmModal from '../../components/common/DeleteConfirmModal';
+import { useToast } from '../../components/common/Toast';
 import styled from 'styled-components';
 
 function HeadquartersBranchList() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { list, pagination, loading, error, params } = useAppSelector((s) => s.branch);
+  const { addToast } = useToast();
+  const { list, pagination, loading, error, params, deleteLoading, deleteError } = useAppSelector((s) => s.branch);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, branch: null });
 
   useEffect(() => {
     dispatch(fetchBranchList(params));
@@ -70,6 +74,42 @@ function HeadquartersBranchList() {
     navigate(`/branch/edit/${branch.id}`);
   };
 
+  const handleDeleteBranch = (branch) => {
+    console.log('지점 삭제 버튼 클릭됨:', branch);
+    setDeleteModal({ isOpen: true, branch });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.branch) return;
+    
+    try {
+      await dispatch(deleteBranchAction(deleteModal.branch.id)).unwrap();
+      setDeleteModal({ isOpen: false, branch: null });
+      
+      // 성공 토스트 알림
+      addToast({
+        type: 'success',
+        title: '지점 삭제 완료',
+        message: `${deleteModal.branch.name} 지점이 성공적으로 삭제되었습니다.`,
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('지점 삭제 실패:', error);
+      
+      // 실패 토스트 알림
+      addToast({
+        type: 'error',
+        title: '지점 삭제 실패',
+        message: error || '지점 삭제 중 오류가 발생했습니다.',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteModal({ isOpen: false, branch: null });
+  };
+
   return (
     <Wrap>
       <HeaderRow>
@@ -107,6 +147,7 @@ function HeadquartersBranchList() {
           onSort={handleSort}
           currentSort={currentSort}
           onEdit={handleEditBranch}
+          onDelete={handleDeleteBranch}
         />
       )}
 
@@ -117,6 +158,17 @@ function HeadquartersBranchList() {
           onChange={handleChangePage}
         />
       )}
+
+      {/* 삭제 확인 모달 */}
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="지점 삭제"
+        message="해당 지점을 영구히 삭제하시겠습니까?"
+        itemName={deleteModal.branch?.name}
+        isLoading={deleteLoading}
+      />
     </Wrap>
   );
 }

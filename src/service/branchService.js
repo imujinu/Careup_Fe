@@ -79,6 +79,13 @@ export const updateBranch = async (branchId, branchData, profileImage) => {
   return response.data;
 };
 
+// 지점 삭제 서비스
+export const deleteBranch = async (branchId) => {
+  const url = `${BASE_URL}/branch/${branchId}`;
+  const response = await axios.delete(url);
+  return response.data;
+};
+
 export default branchService;
 
 

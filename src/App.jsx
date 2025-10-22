@@ -6,6 +6,7 @@ import { checkAuthStatus } from "./stores/slices/authSlice";
 
 import Layout from "./layout/Layout";
 import Login from "./pages/auth/Login";
+import { ToastProvider } from "./components/common/Toast";
 
 // 본사 및 가맹점 라우트
 import { headquartersRoutes } from "./routes/headquartersRoutes";
@@ -73,8 +74,9 @@ export default function App() {
   );
 
   return (
-    <Router>
-      <Routes>
+    <ToastProvider>
+      <Router>
+        <Routes>
         {/* 로그인 페이지 */}
         <Route path="/login" element={<Login />} />
 
@@ -111,7 +113,8 @@ export default function App() {
 
         {/* 알 수 없는 경로 → 로그인으로 이동 */}
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </ToastProvider>
   );
 }
