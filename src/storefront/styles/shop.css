@@ -1588,3 +1588,803 @@ img {
     overflow-x: auto;
   }
 }
+
+/* 주문 페이지 */
+.order-page {
+  padding: 20px 0;
+  min-height: 60vh;
+}
+
+.order-header {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.order-header h1 {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #111;
+}
+
+.order-info {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.order-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 40px;
+  margin-top: 20px;
+}
+
+.order-items {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.order-items-header h3 {
+  font-size: 20px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 20px;
+}
+
+.order-item {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.order-item:last-child {
+  border-bottom: none;
+}
+
+.order-item .item-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.order-item .item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.order-item .item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-item .item-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111;
+  margin: 0;
+}
+
+.order-item .item-price {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.order-item .item-quantity {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.order-item .item-total {
+  display: flex;
+  align-items: center;
+}
+
+.order-item .total-price {
+  font-size: 18px;
+  font-weight: bold;
+  color: #111;
+}
+
+.order-summary {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+}
+
+.order-summary .summary-header h3 {
+  font-size: 20px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 20px;
+}
+
+.order-summary .summary-content {
+  margin-bottom: 20px;
+}
+
+.order-summary .summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.order-summary .summary-row.total {
+  border-bottom: none;
+  font-size: 18px;
+  font-weight: bold;
+  color: #111;
+  margin-top: 10px;
+  padding-top: 20px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.order-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.order-btn {
+  width: 100%;
+  background: #111;
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 20px;
+}
+
+.order-btn:hover:not(:disabled) {
+  background: #333;
+}
+
+.order-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* 결제 페이지 */
+.payment-page {
+  padding: 20px 0;
+  min-height: 60vh;
+}
+
+.payment-header {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.payment-header h1 {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #111;
+}
+
+.payment-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 40px;
+  margin-top: 20px;
+}
+
+.payment-items {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.payment-items-header h3 {
+  font-size: 20px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 20px;
+}
+
+.payment-item {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 15px;
+  padding: 15px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.payment-item:last-child {
+  border-bottom: none;
+}
+
+.payment-item .item-image {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.payment-item .item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.payment-item .item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payment-item .item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+  margin: 0;
+}
+
+.payment-item .item-price {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.payment-item .item-total {
+  display: flex;
+  align-items: center;
+}
+
+.payment-item .total-price {
+  font-size: 16px;
+  font-weight: bold;
+  color: #111;
+}
+
+.payment-summary {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+}
+
+.payment-methods {
+  margin-bottom: 20px;
+}
+
+.payment-methods h4 {
+  font-size: 16px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 15px;
+}
+
+.payment-method-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.payment-method-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-method-option:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.payment-method-option input[type="radio"] {
+  margin: 0;
+}
+
+.payment-method-option span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.payment-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.payment-btn {
+  width: 100%;
+  background: #111;
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 20px;
+}
+
+.payment-btn:hover:not(:disabled) {
+  background: #333;
+}
+
+.payment-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* 주문 완료 페이지 */
+.order-complete-page {
+  padding: 40px 0;
+  min-height: 60vh;
+}
+
+.complete-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.success-icon {
+  color: #10b981;
+  margin-bottom: 20px;
+}
+
+.complete-header h1 {
+  font-size: 32px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 15px;
+}
+
+.complete-message {
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.order-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.detail-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.detail-section h3 {
+  font-size: 18px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-row .label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-row .value {
+  font-size: 14px;
+  color: #111;
+  font-weight: 600;
+}
+
+.detail-row .value.amount {
+  font-size: 16px;
+  color: #111;
+  font-weight: bold;
+}
+
+.detail-row .value.status-pending {
+  color: #f59e0b;
+}
+
+.detail-row .value.status-complete {
+  color: #10b981;
+}
+
+.next-steps {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+}
+
+.next-steps h3 {
+  font-size: 20px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  background: #111;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.step-content h4 {
+  font-size: 16px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 5px;
+}
+
+.step-content p {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.complete-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.help-section {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+}
+
+.help-section h4 {
+  font-size: 18px;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 10px;
+}
+
+.help-section p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 15px;
+}
+
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 14px;
+  color: #374151;
+}
+
+/* BranchSelector Styles */
+.branch-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.branch-selector-modal {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.branch-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.branch-selector-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.branch-selector-search {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.branch-selector-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.loading, .error, .no-results {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.error {
+  color: #ef4444;
+}
+
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.branch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.branch-item:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.branch-info {
+  flex: 1;
+}
+
+.branch-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 4px;
+}
+
+.branch-address {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.branch-contact {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.branch-status {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.branch-status.open {
+  color: #059669;
+}
+
+.branch-status.closed {
+  color: #dc2626;
+}
+
+.branch-action {
+  color: #9ca3af;
+  transition: color 0.2s;
+}
+
+.branch-item:hover .branch-action {
+  color: #3b82f6;
+}
+
+/* Branch Select Button in Header */
+.branch-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.branch-select-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.branch-select-btn svg {
+  color: #64748b;
+}
+
+/* Branch Warning in Cart */
+.branch-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #fef3cd;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.warning-text {
+  flex: 1;
+}
+
+.warning-text strong {
+  display: block;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.warning-text p {
+  margin: 0;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.warning-text p + p {
+  margin-top: 4px;
+}
+
+/* 반응형 디자인 - 주문/결제 페이지 */
+@media (max-width: 768px) {
+  .order-content,
+  .payment-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .order-item,
+  .payment-item {
+    grid-template-columns: 60px 1fr auto;
+    gap: 15px;
+    padding: 15px 0;
+  }
+  
+  .order-item .item-image,
+  .payment-item .item-image {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .order-summary,
+  .payment-summary {
+    position: static;
+  }
+  
+  .order-details {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .complete-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .complete-actions .btn-primary,
+  .complete-actions .btn-secondary {
+    width: 100%;
+    max-width: 300px;
+  }
+}

@@ -7,11 +7,16 @@ import LoginPage from "../components/LoginPage";
 import MyPage from "../components/MyPage";
 import ProductsPage from "../components/ProductsPage";
 import CartPage from "./CartPage";
+import OrderPage from "./OrderPage";
+import PaymentPage from "./PaymentPage";
+import OrderCompletePage from "./OrderCompletePage";
+import BranchSelector from "../components/BranchSelector";
 import ChatBot from "../components/ChatBot";
 import "../styles/shop.css";
 import axios from "axios";
 import { authService } from "../../service/authService";
 import { addToCart, clearCart } from "../../store/slices/cartSlice";
+import { setSelectedBranch } from "../../store/slices/branchSlice";
 import { cartService } from "../../service/cartService";
 import { customerAuthService } from "../../service/customerAuthService";
 
@@ -25,9 +30,10 @@ function ShopApp() {
 
 function ShopLayout() {
   const dispatch = useDispatch();
-  const { items: cartItems } = useSelector(state => state.cart);
+  const { items: cartItems, branchId } = useSelector(state => state.cart);
+  const selectedBranch = useSelector(state => state.branch.selectedBranch);
   const [activeTab, setActiveTab] = useState("전체");
-  const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | admin-sales | admin-sales-detail
+  const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | order | payment | order-complete
   const [activeCategoryPage, setActiveCategoryPage] = useState("의류");
   const [favorites, setFavorites] = useState(new Set());
   const [products, setProducts] = useState([]);
@@ -40,6 +46,9 @@ function ShopLayout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [orderData, setOrderData] = useState(null);
+  const [paymentData, setPaymentData] = useState(null);
+  const [showBranchSelector, setShowBranchSelector] = useState(false);
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
@@ -95,15 +104,31 @@ function ShopLayout() {
     loadCategories();
   }, []);
 
+  // 지점 변경 시 장바구니 초기화
+  useEffect(() => {
+    const currentBranchId = selectedBranch?.branchId;
+    const cartBranchId = branchId;
+    
+    if (currentBranchId && cartBranchId && currentBranchId !== cartBranchId) {
+      dispatch(clearCart());
+    }
+  }, [selectedBranch, branchId, dispatch]);
+
   useEffect(() => {
     async function loadBranchProducts() {
       try {
         setLoadingProducts(true);
         setProductsError(null);
-        const user = authService?.getCurrentUser?.();
-        const branchId = user?.branchId || 1;
         
-        console.log('🔍 상품 로딩 시작:', { user, branchId });
+        // 선택된 지점이 없으면 상품을 로드하지 않음
+        if (!selectedBranch?.branchId) {
+          setProducts([]);
+          setLoadingProducts(false);
+          return;
+        }
+        
+        const branchId = selectedBranch.branchId;
+        console.log('🔍 상품 로딩 시작:', { selectedBranch, branchId });
         
         // 새로운 API 엔드포인트 사용
         const res = await shopApi.get(`/inventory/branch-products/branch/${branchId}`);
@@ -225,7 +250,7 @@ function ShopLayout() {
       }
     }
     loadBranchProducts();
-  }, []);
+  }, [selectedBranch]);
   
   const toggleFavorite = (id) => {
     setFavorites((prev) => {
@@ -307,6 +332,30 @@ function ShopLayout() {
       dispatch(clearCart());
       setPage("home");
     }
+  };
+
+  // 주문 페이지로 이동
+  const handleProceedToOrder = () => {
+    setPage("order");
+  };
+
+  // 결제 페이지로 이동
+  const handleProceedToPayment = (order) => {
+    setOrderData(order);
+    setPage("payment");
+  };
+
+  // 주문 완료 페이지로 이동
+  const handlePaymentSuccess = (payment) => {
+    setPaymentData(payment);
+    setPage("order-complete");
+  };
+
+  // 홈으로 돌아가기
+  const handleBackToHome = () => {
+    setOrderData(null);
+    setPaymentData(null);
+    setPage("home");
   };
 
   const handleSearch = async (query) => {
@@ -468,6 +517,20 @@ function ShopLayout() {
               >
                 SHOP
               </a>
+              <button
+                className="branch-select-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowBranchSelector(true);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                {selectedBranch?.branchName || '지점 선택'}
+              </button>
               
             </nav>
             <div className="actions">
@@ -576,26 +639,73 @@ function ShopLayout() {
                </button>
              </div>
            ) : (
-             <CartPage onBack={() => setPage("home")} currentUser={currentUser} />
+             <CartPage onBack={() => setPage("home")} currentUser={currentUser} onProceedToOrder={handleProceedToOrder} />
            )
+         ) : page === "order" ? (
+           !isLoggedIn ? (
+             <div className="container" style={{ textAlign: "center", padding: "40px 0" }}>
+               <h2>로그인이 필요합니다</h2>
+               <p>주문을 하려면 로그인해주세요.</p>
+               <button 
+                 className="btn-primary"
+                 onClick={() => setPage("login")}
+                 style={{ marginTop: "20px" }}
+               >
+                 로그인하기
+               </button>
+             </div>
+           ) : (
+             <OrderPage 
+               onBack={() => setPage("cart")} 
+               onProceedToPayment={handleProceedToPayment}
+               currentUser={currentUser}
+             />
+           )
+         ) : page === "payment" ? (
+           !isLoggedIn ? (
+             <div className="container" style={{ textAlign: "center", padding: "40px 0" }}>
+               <h2>로그인이 필요합니다</h2>
+               <p>결제를 하려면 로그인해주세요.</p>
+               <button 
+                 className="btn-primary"
+                 onClick={() => setPage("login")}
+                 style={{ marginTop: "20px" }}
+               >
+                 로그인하기
+               </button>
+             </div>
+           ) : (
+             <PaymentPage 
+               orderData={orderData}
+               onBack={() => setPage("order")} 
+               onPaymentSuccess={handlePaymentSuccess}
+               currentUser={currentUser}
+             />
+           )
+         ) : page === "order-complete" ? (
+           <OrderCompletePage 
+             orderData={orderData}
+             paymentData={paymentData}
+             onBackToHome={handleBackToHome}
+           />
          ) : page === "category" ? (
-          <CategoryPage
-            active={activeCategoryPage}
-            onChangeCategory={(c) => setActiveCategoryPage(c)}
-            favorites={favorites}
-            onToggleFavorite={toggleFavorite}
-            onOpenDetail={(p) => setDetailProduct(p)}
-            products={products}
-          />
-        ) : (
-          <>
-            <section className="hero">
-              <div className="container hero-inner">
-                <div className="hero-box">
-                  <HeroSlider />
-                </div>
-              </div>
-            </section>
+           <CategoryPage
+             active={activeCategoryPage}
+             onChangeCategory={(c) => setActiveCategoryPage(c)}
+             favorites={favorites}
+             onToggleFavorite={toggleFavorite}
+             onOpenDetail={(p) => setDetailProduct(p)}
+             products={products}
+           />
+         ) : (
+           <>
+             <section className="hero">
+               <div className="container hero-inner">
+                 <div className="hero-box">
+                   <HeroSlider />
+                 </div>
+               </div>
+             </section>
 
             <div className="container">
               <section className="cat-row">
@@ -820,6 +930,26 @@ function ShopLayout() {
           </div>
         </div>
       </footer>
+      
+      {showBranchSelector && (
+        <BranchSelector
+          onClose={() => setShowBranchSelector(false)}
+          onBranchSelected={(branch) => {
+            dispatch(setSelectedBranch({
+              branchId: branch.branchId,
+              branchName: branch.branchName,
+              address: branch.address,
+              addressDetail: branch.addressDetail,
+              phone: branch.phone,
+              email: branch.email,
+              latitude: branch.latitude,
+              longitude: branch.longitude,
+              isOpen: branch.isOpen
+            }));
+            setShowBranchSelector(false);
+          }}
+        />
+      )}
     </div>
   );
 }

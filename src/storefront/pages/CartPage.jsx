@@ -7,7 +7,7 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
-const CartPage = ({ onBack, currentUser }) => {
+const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const dispatch = useDispatch();
   const { items, branchId, totalAmount } = useSelector(state => state.cart);
   const selectedBranch = useSelector(state => state.branch.selectedBranch);
@@ -207,13 +207,13 @@ const CartPage = ({ onBack, currentUser }) => {
             </div>
           )}
           
-          <button 
-            className="order-btn"
-            onClick={handleOrder}
-            disabled={orderLoading || items.length === 0}
-          >
-            {orderLoading ? '주문 처리 중...' : '주문하기'}
-          </button>
+              <button 
+                className="order-btn" 
+                onClick={() => onProceedToOrder && onProceedToOrder()} 
+                disabled={orderLoading || items.length === 0}
+              >
+                {orderLoading ? '주문 처리 중...' : '주문하기'}
+              </button>
           
           <div className="cart-actions">
             <button 
@@ -222,12 +222,15 @@ const CartPage = ({ onBack, currentUser }) => {
             >
               계속 쇼핑하기
             </button>
-            <button 
-              className="btn-secondary"
-              onClick={() => onBack && onBack()}
-            >
-              지점 변경
-            </button>
+          </div>
+          
+          <div className="branch-warning">
+            <div className="warning-icon">⚠️</div>
+            <div className="warning-text">
+              <strong>지점 변경 안내</strong>
+              <p>장바구니에 상품이 담겨있는 동안에는 지점을 변경할 수 없습니다.</p>
+              <p>다른 지점의 상품을 주문하려면 장바구니를 비운 후 지점을 변경해주세요.</p>
+            </div>
           </div>
         </div>
       </div>

@@ -159,7 +159,7 @@ export const cartService = {
   // 결제 처리
   processPayment: async (orderId, paymentData) => {
     try {
-      const response = await customerAxios.post(`/api/orders/${orderId}/payment`, paymentData);
+      const response = await customerAxios.post('/api/payments/confirm', paymentData);
       return response.data;
     } catch (error) {
       console.error('결제 처리 실패:', error);
