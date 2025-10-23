@@ -256,7 +256,7 @@ export default function CustomerLogin() {
 
   useEffect(() => {
     if (customerAuthService.isAuthenticated()) {
-      window.location.replace("/customer/home");
+      window.location.replace("/shop");
     }
   }, []);
 
@@ -349,7 +349,7 @@ export default function CustomerLogin() {
         password: password.trim(),
         rememberMe, // 자동로그인 플래그 전달
       });
-      window.location.replace("/customer/home");
+      window.location.replace("/shop");
     } catch (err) {
       const serverMsg = err?.response?.data?.status_message;
       setMsg(serverMsg || err.message || "로그인 실패");

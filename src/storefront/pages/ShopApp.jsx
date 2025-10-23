@@ -3,7 +3,6 @@ import { Provider, useSelector, useDispatch } from "react-redux";
 import { store } from "../../store";
 import SharkLogo from "../components/SharkLogo";
 import HeroSlider from "../components/HeroSlider";
-import LoginPage from "../components/LoginPage";
 import MyPage from "../components/MyPage";
 import ProductsPage from "../components/ProductsPage";
 import CartPage from "./CartPage";
@@ -12,6 +11,7 @@ import PaymentPage from "./PaymentPage";
 import OrderCompletePage from "./OrderCompletePage";
 import BranchSelector from "../components/BranchSelector";
 import ChatBot from "../components/ChatBot";
+import CustomerLogin from "../../pages/auth/CustomerLogin";
 import "../styles/shop.css";
 import axios from "axios";
 import { authService } from "../../service/authService";
@@ -303,18 +303,6 @@ function ShopLayout() {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
-  const handleLogin = async (loginData) => {
-    try {
-      const { userInfo } = await customerAuthService.login(loginData);
-      setIsLoggedIn(true);
-      setCurrentUser(userInfo);
-      setPage("home");
-      alert('로그인되었습니다!');
-    } catch (error) {
-      console.error('로그인 실패:', error);
-      alert(error.response?.data?.message || error.message || '로그인에 실패했습니다.');
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -610,10 +598,7 @@ function ShopLayout() {
             onBuy={() => setCheckoutProduct(detailProduct)}
           />
          ) : page === "login" ? (
-           <LoginPage
-             onLogin={handleLogin}
-             onBack={() => setPage("home")}
-           />
+           <CustomerLogin />
         ) : page === "mypage" ? (
           <MyPage onBack={() => setPage("home")} />
          ) : page === "products" ? (
