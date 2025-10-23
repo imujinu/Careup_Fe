@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import SummaryCards from '../../components/franchise/SummaryCards';
-import SearchAndFilter from '../../components/franchise/SearchAndFilter';
-import FranchiseInventoryTable from '../../components/inventory/FranchiseInventoryTable';
-import EditInventoryModal from '../../components/franchise/EditInventoryModal';
-import ProductSelectionModal from '../../components/inventory/ProductSelectionModal';
-import ProductSetupModal from '../../components/inventory/ProductSetupModal';
+import SummaryCards from '../../components/inventory/common/SummaryCards';
+import SearchAndFilter from '../../components/inventory/common/SearchAndFilter';
+import FranchiseInventoryTable from '../../components/inventory/franchise/FranchiseInventoryTable';
+import EditInventoryModal from '../../components/inventory/franchise/EditInventoryModal';
+import ProductSelectionModal from '../../components/inventory/common/ProductSelectionModal';
+import ProductSetupModal from '../../components/inventory/common/ProductSetupModal';
 import { inventoryService } from '../../service/inventoryService';
 import { authService } from '../../service/authService';
 import { getBranchName } from '../../utils/branchUtils';

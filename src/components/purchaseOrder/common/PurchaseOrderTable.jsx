@@ -207,10 +207,14 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
           onClick: () => onPageChange(currentPage - 1),
           disabled: currentPage === 1
         }, '<'),
-        React.createElement(PaginationButton, {
-          active: true,
-          onClick: () => onPageChange(1)
-        }, '1'),
+        // 모든 페이지 번호 표시
+        ...Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum =>
+          React.createElement(PaginationButton, {
+            key: pageNum,
+            active: pageNum === currentPage,
+            onClick: () => onPageChange(pageNum)
+          }, pageNum)
+        ),
         React.createElement(PaginationButton, {
           onClick: () => onPageChange(currentPage + 1),
           disabled: currentPage === totalPages

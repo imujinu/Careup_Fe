@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { inventoryService } from '../../service/inventoryService';
+import { inventoryService } from '../../../service/inventoryService';
 
 const ModalOverlay = styled.div`
   position: fixed;

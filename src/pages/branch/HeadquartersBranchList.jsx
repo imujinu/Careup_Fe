@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { fetchBranchList, setParams } from '../../stores/slices/branchSlice';
-import BranchTable from '../../components/branch/BranchTable';
-import BranchTableSkeleton from '../../components/branch/BranchTableSkeleton';
-import Pagination from '../../components/branch/Pagination';
+import BranchTable from '../../components/branchManagement/BranchTable';
+import BranchTableSkeleton from '../../components/branchManagement/BranchTableSkeleton';
+import Pagination from '../../components/branchManagement/Pagination';
 import styled from 'styled-components';
 
 function HeadquartersBranchList() {

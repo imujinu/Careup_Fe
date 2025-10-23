@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { inventoryService } from '../../service/inventoryService';
+import { inventoryService } from '../../../service/inventoryService';
 import AddCategoryModal from './AddCategoryModal';
 
 const ModalOverlay = styled.div`
@@ -337,28 +337,17 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
       React.createElement(ModalBody, null,
         React.createElement(Section, null,
           React.createElement(SectionTitle, null, '기본 정보'),
-          React.createElement(FormRow, null,
-            React.createElement(FormGroup, null,
-              React.createElement(Label, null,
-                '상품명 ',
-                React.createElement('span', { className: 'required' }, '*')
-              ),
-              React.createElement(Input, {
-                type: 'text',
-                placeholder: '예: 원두, 설탕, 우유 등',
-                value: formData.name,
-                onChange: (e) => handleInputChange('name', e.target.value)
-              })
+          React.createElement(FormGroup, null,
+            React.createElement(Label, null,
+              '상품명 ',
+              React.createElement('span', { className: 'required' }, '*')
             ),
-            React.createElement(FormGroup, null,
-              React.createElement(Label, null, '상품 설명'),
-              React.createElement(Input, {
-                type: 'text',
-                placeholder: '상품에 대한 간단한 설명',
-                value: formData.description,
-                onChange: (e) => handleInputChange('description', e.target.value)
-              })
-            )
+            React.createElement(Input, {
+              type: 'text',
+              placeholder: '예: 원두, 설탕, 우유 등',
+              value: formData.name,
+              onChange: (e) => handleInputChange('name', e.target.value)
+            })
           ),
           React.createElement(FormGroup, null,
             React.createElement(Label, null,

@@ -77,6 +77,7 @@ const ActionLink = styled.button`
   border: none;
   color: #6b46c1;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
   
@@ -85,7 +86,7 @@ const ActionLink = styled.button`
   }
 `;
 
-const TableFooter = styled.div`
+const PaginationContainer = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -102,39 +103,34 @@ const PageSizeSelect = styled.select`
   background: #ffffff;
 `;
 
-const Pagination = styled.div`
-  display: flex;
-  gap: 8px;
-  align-items: center;
-`;
-
 const PageButton = styled.button`
-  width: 32px;
-  height: 32px;
+  padding: 8px 12px;
+  margin: 0 4px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   background: ${props => props.$isActive ? '#6b46c1' : '#ffffff'};
   color: ${props => props.$isActive ? '#ffffff' : '#374151'};
   font-size: 14px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   
   &:hover {
     background: ${props => props.$isActive ? '#553c9a' : '#f9fafb'};
   }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
-function InventoryTable({
+function FranchiseInventoryTable({
   data,
   currentPage,
   totalPages,
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onModify,
-  onDetail
+  onModify
 }) {
   return React.createElement(TableContainer, null,
     React.createElement(Table, null,
@@ -142,7 +138,6 @@ function InventoryTable({
         React.createElement('tr', null,
           React.createElement(TableHeaderCell, null, '상품'),
           React.createElement(TableHeaderCell, null, '카테고리'),
-          React.createElement(TableHeaderCell, null, '지점'),
           React.createElement(TableHeaderCell, null, '현재고'),
           React.createElement(TableHeaderCell, null, '안전재고'),
           React.createElement(TableHeaderCell, null, '상태'),
@@ -161,7 +156,6 @@ function InventoryTable({
               )
             ),
             React.createElement(TableCell, null, item.category || '미분류'),
-            React.createElement(TableCell, null, item.branch),
             React.createElement(TableCell, null, `${item.currentStock}개`),
             React.createElement(TableCell, null, `${item.safetyStock}개`),
             React.createElement(TableCell, null,
@@ -173,30 +167,39 @@ function InventoryTable({
             React.createElement(TableCell, null, `₩${item.totalValue.toLocaleString()}`),
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,
-                React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정'),
-                React.createElement(ActionLink, { onClick: () => onDetail(item) }, '상세')
+                React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정')
               )
             )
           )
         )
       )
     ),
-    React.createElement(TableFooter, null,
-      React.createElement(PageSizeSelect, {
-        value: pageSize,
-        onChange: (e) => onPageSizeChange(Number(e.target.value))
-      },
-        React.createElement('option', { value: 10 }, '페이지당 표시: 10'),
-        React.createElement('option', { value: 20 }, '페이지당 표시: 20'),
-        React.createElement('option', { value: 50 }, '페이지당 표시: 50')
+    React.createElement(PaginationContainer, null,
+      React.createElement('div', null,
+        React.createElement('span', { style: { marginRight: '8px', fontSize: '14px', color: '#6b7280' } }, '페이지당 표시'),
+        React.createElement(PageSizeSelect, {
+          value: pageSize,
+          onChange: (e) => onPageSizeChange(parseInt(e.target.value))
+        },
+          React.createElement('option', { value: 10 }, '10'),
+          React.createElement('option', { value: 20 }, '20'),
+          React.createElement('option', { value: 50 }, '50')
+        )
       ),
-      React.createElement(Pagination, null,
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         React.createElement(PageButton, {
           onClick: () => onPageChange(currentPage - 1),
           disabled: currentPage === 1,
           $isActive: false
         }, '<'),
-        React.createElement(PageButton, { $isActive: true }, currentPage),
+        // 모든 페이지 번호 표시
+        ...Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum =>
+          React.createElement(PageButton, {
+            key: pageNum,
+            onClick: () => onPageChange(pageNum),
+            $isActive: pageNum === currentPage
+          }, pageNum)
+        ),
         React.createElement(PageButton, {
           onClick: () => onPageChange(currentPage + 1),
           disabled: currentPage === totalPages,
@@ -207,6 +210,4 @@ function InventoryTable({
   );
 }
 
-export default InventoryTable;
-
-
+export default FranchiseInventoryTable;

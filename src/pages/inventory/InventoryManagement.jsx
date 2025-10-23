@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import SummaryCards from '../../components/inventory/SummaryCards';
-import SearchAndFilter from '../../components/inventory/SearchAndFilter';
-import InventoryTable from '../../components/inventory/InventoryTable';
-import EditInventoryModal from '../../components/inventory/EditInventoryModal';
-import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
-import AddInventoryModal from '../../components/inventory/AddInventoryModal';
-import InventoryFlowTable from '../../components/inventory/InventoryFlowTable';
-import EditInventoryFlowModal from '../../components/inventory/EditInventoryFlowModal';
-import AddInventoryFlowModal from '../../components/inventory/AddInventoryFlowModal';
+import SummaryCards from '../../components/inventory/common/SummaryCards';
+import SearchAndFilter from '../../components/inventory/common/SearchAndFilter';
+import InventoryTable from '../../components/inventory/common/InventoryTable';
+import EditInventoryModal from '../../components/inventory/common/EditInventoryModal';
+import InventoryDetailModal from '../../components/inventory/common/InventoryDetailModal';
+import AddInventoryModal from '../../components/inventory/common/AddInventoryModal';
+import InventoryFlowTable from '../../components/inventory/common/InventoryFlowTable';
+import EditInventoryFlowModal from '../../components/inventory/common/EditInventoryFlowModal';
+import AddInventoryFlowModal from '../../components/inventory/common/AddInventoryFlowModal';
 import { inventoryService } from '../../service/inventoryService';
 import { authService } from '../../service/authService';
 
@@ -118,23 +118,25 @@ function InventoryManagement() {
       const userInfo = authService.getCurrentUser();
       const targetBranchId = branchId || userInfo?.branchId || 1;
       
-      const data = await inventoryService.getBranchProducts(targetBranchId);
+      // 본사는 전체 상품 목록을 조회
+      const data = await inventoryService.getAllProducts();
+      console.log('API 응답 데이터:', data);
       
-      // 데이터 변환
+      // 데이터 변환 (Product 엔티티 구조에 맞게)
       const formattedData = data.map(item => ({
-        id: item.branchProductId,
+        id: item.productId,
         product: { 
-          name: item.productName || '알 수 없음', 
+          name: item.name || '알 수 없음', 
           id: item.productId || 'N/A'
         },
         category: item.categoryName || '미분류',
-        branchId: item.branchId,
-        branch: item.branchId === 1 ? '본사' : `지점-${item.branchId}`,
-        currentStock: item.stockQuantity || 0,
-        safetyStock: item.safetyStock || 0,
-        status: (item.stockQuantity || 0) < (item.safetyStock || 0) ? 'low' : 'normal',
-        unitPrice: item.price || 0,
-        totalValue: (item.stockQuantity || 0) * (item.price || 0)
+        branchId: 1, // 본사
+        branch: '본사',
+        currentStock: 0, // 상품 마스터에는 재고 정보가 없음
+        safetyStock: 0,
+        status: 'normal',
+        unitPrice: item.supplyPrice || 0,
+        totalValue: 0
       }));
       
       setInventoryData(formattedData);

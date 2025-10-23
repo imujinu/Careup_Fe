@@ -33,12 +33,28 @@ function Pagination({ currentPage = 0, totalPages = 0, onChange }) {
   const canNext = currentPage < (totalPages || 1) - 1;
   const goto = (p) => onChange && onChange(Math.max(0, Math.min(p, (totalPages || 1) - 1)));
 
+  // 모든 페이지 번호 생성
+  const pageNumbers = [];
+  for (let i = 0; i < totalPages; i++) {
+    pageNumbers.push(i);
+  }
+
   return (
     <Wrap>
       <PagerBtn disabled={!canPrev} onClick={() => goto(0)}>{'<<'}</PagerBtn>
       <PagerBtn disabled={!canPrev} onClick={() => goto(currentPage - 1)}>{'<'}</PagerBtn>
-      <Current>{currentPage + 1}</Current>
-      <span>/ {totalPages || 1}</span>
+      
+      {/* 모든 페이지 번호 표시 */}
+      {pageNumbers.map(pageNum => (
+        pageNum === currentPage ? (
+          <Current key={pageNum}>{pageNum + 1}</Current>
+        ) : (
+          <PagerBtn key={pageNum} onClick={() => goto(pageNum)}>
+            {pageNum + 1}
+          </PagerBtn>
+        )
+      ))}
+      
       <PagerBtn disabled={!canNext} onClick={() => goto(currentPage + 1)}>{'>'}</PagerBtn>
       <PagerBtn disabled={!canNext} onClick={() => goto((totalPages || 1) - 1)}>{'>>'}</PagerBtn>
     </Wrap>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import SummaryCards from '../../components/purchaseOrder/SummaryCards';
-import SearchAndFilter from '../../components/purchaseOrder/SearchAndFilter';
-import PurchaseOrderTable from '../../components/purchaseOrder/PurchaseOrderTable';
-import PurchaseOrderDetailModal from '../../components/purchaseOrder/PurchaseOrderDetailModal';
+import SummaryCards from '../../components/purchaseOrder/common/SummaryCards';
+import SearchAndFilter from '../../components/purchaseOrder/common/SearchAndFilter';
+import PurchaseOrderTable from '../../components/purchaseOrder/common/PurchaseOrderTable';
+import PurchaseOrderDetailModal from '../../components/purchaseOrder/common/PurchaseOrderDetailModal';
 
 const PageContainer = styled.div`
   max-width: 1200px;

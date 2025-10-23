@@ -31,6 +31,8 @@ export const inventoryService = {
   // 전체 상품 목록 조회 (본사 상품 마스터)
   getAllProducts: async () => {
     const response = await inventoryApi.get(`${API_BASE_URL}/api/products`);
+    console.log('getAllProducts API 전체 응답:', response);
+    console.log('getAllProducts API 응답 데이터:', response.data);
     return response.data;
   },
 
