@@ -6,6 +6,7 @@ import { checkAuthStatus } from "./stores/slices/authSlice";
 
 import Layout from "./layout/Layout";
 import Login from "./pages/auth/Login";
+import ShopApp from "./storefront/pages/ShopApp";
 
 // 본사 및 가맹점 라우트
 import { headquartersRoutes } from "./routes/headquartersRoutes";
@@ -75,6 +76,9 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        {/* 쇼핑몰 - 인증 불필요 */}
+        <Route path="/shop/*" element={<ShopApp />} />
+
         {/* 로그인 페이지 */}
         <Route path="/login" element={<Login />} />
 

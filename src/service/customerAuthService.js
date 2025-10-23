@@ -45,7 +45,13 @@ const raw = axios.create({
 
 export const customerAuthService = {
   // id = 이메일 또는 휴대폰번호
-  login: async ({ id, password, rememberMe = false }) => {
+  login: async (loginData) => {
+    const { id, password, rememberMe = false } = loginData || {};
+    
+    if (!id || !password) {
+      throw new Error('이메일과 비밀번호를 입력해주세요.');
+    }
+    
     const res = await customerAxios.post('/auth/customers/login', { id, password, rememberMe });
 
     const {
