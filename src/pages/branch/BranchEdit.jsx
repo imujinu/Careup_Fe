@@ -157,7 +157,10 @@ const BranchEdit = () => {
     }
   };
 
-  // 전화번호 포맷팅 함수 (010-1234-5678, 02-123-4567, 031-123-4567 등)
+  // 전화번호 포맷팅 함수
+  // 휴대폰: 0XX-XXXX-XXXX
+  // 서울: 02-XXXX-XXXX 또는 02-XXX-XXXX
+  // 서울 이외 전 지역: 0XX-XXXX-XXXX 또는 0XX-XXX-XXXX
   const formatPhoneNumber = (value) => {
     // 숫자만 추출
     const numbers = value.replace(/\D/g, '');
@@ -173,18 +176,33 @@ const BranchEdit = () => {
     } else if (numbers.length <= 3) {
       return numbers;
     } else if (numbers.length <= 7) {
-      // 02-123-4567, 031-123-4567 등
+      // 중간 단계 포맷팅
       if (numbers.startsWith('02')) {
         return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
       } else {
         return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
       }
     } else if (numbers.length <= 11) {
-      // 010-1234-5678, 02-1234-5678, 031-1234-5678 등
+      // 최종 포맷팅
       if (numbers.startsWith('02')) {
-        return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6)}`;
-      } else {
+        // 서울: 02-XXXX-XXXX 또는 02-XXX-XXXX
+        const middleLength = numbers.length - 6; // 02(2자리) + 마지막4자리 = 6자리 제외
+        if (middleLength === 3) {
+          return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
+        } else {
+          return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+        }
+      } else if (numbers.startsWith('01')) {
+        // 휴대폰: 0XX-XXXX-XXXX
         return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+      } else {
+        // 서울 이외 전 지역: 0XX-XXXX-XXXX 또는 0XX-XXX-XXXX
+        const middleLength = numbers.length - 7; // 0XX(3자리) + 마지막4자리 = 7자리 제외
+        if (middleLength === 3) {
+          return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+        } else {
+          return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+        }
       }
     }
     
@@ -342,8 +360,9 @@ const BranchEdit = () => {
     }
     
     // 전화번호 형식 검증
-    if (formData.phone && !/^(\d{2,3})-(\d{3,4})-(\d{4})$/.test(formData.phone)) {
-      newErrors.phone = '올바른 전화번호 형식이 아닙니다. (예: 010-1234-5678, 02-123-4567)';
+    // 휴대폰: 0XX-XXXX-XXXX, 서울: 02-XXX-XXXX 또는 02-XXXX-XXXX, 지역: 0XX-XXX-XXXX 또는 0XX-XXXX-XXXX
+    if (formData.phone && !/^(02-\d{3,4}-\d{4}|0\d{2}-\d{3,4}-\d{4})$/.test(formData.phone)) {
+      newErrors.phone = '올바른 전화번호 형식이 아닙니다. (예: 010-1234-5678, 02-123-4567, 02-1234-5678, 031-123-4567, 031-1234-5678)';
     }
     
     // 위도/경도 범위 검증
