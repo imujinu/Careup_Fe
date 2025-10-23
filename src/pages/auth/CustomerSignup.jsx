@@ -8,6 +8,7 @@ import { customerTokenStorage, customerAuthService } from "../../service/custome
 const CONTROL_HEIGHT = 54;
 const CONTROL_RADIUS = 10;
 
+/* ====== UI (원본 디자인 유지, 카드 폭만 2열에 맞게 확장) ====== */
 const Page = styled.div`
   min-height: 100vh;
   display: grid;
@@ -17,8 +18,8 @@ const Page = styled.div`
 `;
 
 const Card = styled.div`
-  width: 520px;
-  max-width: 92vw;
+  width: 720px;            /* ← 2열 레이아웃을 위해 520 → 720으로 확장 */
+  max-width: 94vw;         /* ← 반응형 */
   background: #fff;
   border-radius: 22px;
   box-shadow:
@@ -50,11 +51,21 @@ const Title = styled.h2`
   font-weight: 800;
   color: #111827;
   margin: 2px 0 16px;
+  text-align: left;
 `;
 
 const Form = styled.form`
   display: grid;
   gap: 16px;
+`;
+
+const Row = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* ← 2열 */
+  gap: 12px;
+  @media (max-width: 640px){
+    grid-template-columns: 1fr;   /* ← 모바일에서 1열 */
+  }
 `;
 
 const Label = styled.label`
@@ -93,6 +104,7 @@ const Select = styled.select`
 `;
 
 const PwdWrap = styled.div`position: relative;`;
+
 const IconBtn = styled.button`
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   width: 36px; height: 36px; border-radius: 8px; border: 1px solid transparent;
@@ -107,6 +119,7 @@ const ZipRow = styled.div`
   grid-template-columns: 1fr 120px;
   gap: 10px;
 `;
+
 const ZipBtn = styled.button`
   height: ${CONTROL_HEIGHT}px;
   border-radius: ${CONTROL_RADIUS}px;
@@ -122,6 +135,7 @@ const ButtonRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  @media (max-width: 640px){ grid-template-columns: 1fr; } /* 모바일 대응 */
 `;
 
 const SubmitBtn = styled.button`
@@ -133,6 +147,7 @@ const SubmitBtn = styled.button`
   &:active { transform: translateY(1px); }
   &:hover  { background: ${p => p.disabled ? "#e5e7eb" : "#0f1628"}; }
 `;
+
 const CancelBtn = styled.button`
   height: ${CONTROL_HEIGHT}px; border-radius: ${CONTROL_RADIUS}px; border: 1px solid #e5e7eb;
   font-weight: 700; font-size: 15px; color: #111827; background: #f3f4f6; cursor: pointer;
@@ -149,6 +164,7 @@ const Msg = styled.p`
   margin-top: 12px; color: #dc2626; font-size: 13px; min-height: 18px;
 `;
 
+/* ====== Icons (원본 그대로) ====== */
 const EyeIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
     <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
@@ -157,11 +173,14 @@ const EyeIcon = (props) => (
 );
 const EyeOffIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82M1 1l22 22"/>
-    <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24"/>
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0  0 1 5.06-5.94" />
+    <path d="M9.9 4.24A10.94 10.94 0  0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82" />
+    <path d="M1 1l22 22" />
+    <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
   </svg>
 );
 
+/* ====== Component (원본 기능 그대로) ====== */
 export default function CustomerSignup() {
   const [form, setForm] = useState({
     name: "",
@@ -245,7 +264,7 @@ export default function CustomerSignup() {
 
       const r = data?.result;
 
-      // 1) 백엔드가 가입 응답에 토큰을 주는 경우 → 그대로 저장 후 홈으로
+      // 1) 백엔드가 가입 응답에 토큰을 주는 경우 → 그대로 저장 후 /shop
       if (r?.accessToken) {
         customerTokenStorage.setTokens(r.accessToken, r.refreshToken);
         customerTokenStorage.setUserInfo({
@@ -256,15 +275,15 @@ export default function CustomerSignup() {
           nickname: r.nickname,
           phone: r.phone,
         });
-        window.location.replace("/customer/home");
+        window.location.replace("/shop");
         return;
       }
 
-      // 2) 토큰이 없는 가입 응답 → 같은 자격으로 즉시 자동 로그인 후 홈으로
+      // 2) 토큰이 없는 가입 응답 → 같은 자격으로 즉시 자동 로그인 후 /shop
       try {
         const loginId = (form.email && form.email.trim()) || (form.phone && form.phone.trim());
         await customerAuthService.login({ id: loginId, password: form.password, rememberMe: true });
-        window.location.replace("/customer/home");
+        window.location.replace("/shop");
       } catch {
         // 자동 로그인 실패 시 로그인 화면으로 폴백
         alert("회원가입은 완료되었습니다. 로그인해 주세요.");
@@ -285,78 +304,181 @@ export default function CustomerSignup() {
         <Title>회원가입</Title>
 
         <Form onSubmit={onSubmit}>
-          <div>
-            <Label htmlFor="name">성함</Label>
-            <Input id="name" name="name" value={form.name} onChange={onChange} placeholder="고객님의 성함을 입력해주세요." required />
-          </div>
+          {/* 2열: 이름 / 닉네임 */}
+          <Row>
+            <div>
+              <Label htmlFor="name">성함</Label>
+              <Input
+                id="name"
+                name="name"
+                value={form.name}
+                onChange={onChange}
+                placeholder="고객님의 성함을 입력해주세요."
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="nickname">닉네임</Label>
+              <Input
+                id="nickname"
+                name="nickname"
+                value={form.nickname}
+                onChange={onChange}
+                placeholder="고객님께서 사용하실 닉네임을 입력해주세요."
+                required
+              />
+              <Hint>닉네임은 2~10자이며, 다른 사용자와 중복될 수 없습니다.</Hint>
+            </div>
+          </Row>
 
-          <div>
-            <Label htmlFor="email">이메일</Label>
-            <Input id="email" type="email" name="email" value={form.email} onChange={onChange} placeholder="이메일을 입력해주세요." required />
-          </div>
+          {/* 2열: 이메일 / 휴대폰 */}
+          <Row>
+            <div>
+              <Label htmlFor="email">이메일</Label>
+              <Input
+                id="email"
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={onChange}
+                placeholder="이메일을 입력해주세요."
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone">휴대폰</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={form.phone}
+                onChange={onChange}
+                placeholder="휴대전화 번호를 입력해주세요."
+                required
+              />
+            </div>
+          </Row>
 
-          <div>
-            <Label htmlFor="phone">휴대폰</Label>
-            <Input id="phone" name="phone" value={form.phone} onChange={onChange} placeholder="휴대전화 번호를 입력해주세요." required />
-          </div>
+          {/* 2열: 비밀번호 / 비밀번호 확인 */}
+          <Row>
+            <div>
+              <Label htmlFor="password">비밀번호</Label>
+              <PwdWrap>
+                <PwdInput
+                  id="password"
+                  type={showPwd ? "text" : "password"}
+                  name="password"
+                  value={form.password}
+                  onChange={onChange}
+                  placeholder="비밀번호는 최소 8자리여야합니다."
+                  required
+                />
+                <IconBtn
+                  type="button"
+                  aria-label={showPwd ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  onClick={() => setShowPwd(v => !v)}
+                  title={showPwd ? "비밀번호 숨기기" : "비밀번호 보기"}
+                >
+                  {showPwd ? <EyeOffIcon/> : <EyeIcon/>}
+                </IconBtn>
+              </PwdWrap>
+              <Hint>비밀번호는 최소 8자 이상을 권장합니다.</Hint>
+            </div>
 
-          <div>
-            <Label htmlFor="password">비밀번호</Label>
-            <PwdWrap>
-              <PwdInput id="password" type={showPwd ? "text" : "password"} name="password" value={form.password} onChange={onChange} placeholder="비밀번호는 최소 8자리여야합니다." required />
-              <IconBtn type="button" aria-label={showPwd ? "비밀번호 숨기기" : "비밀번호 보기"} onClick={() => setShowPwd(v => !v)}>
-                {showPwd ? <EyeOffIcon/> : <EyeIcon/>}
-              </IconBtn>
-            </PwdWrap>
-          </div>
+            <div>
+              <Label htmlFor="passwordConfirm">비밀번호 확인</Label>
+              <PwdWrap>
+                <PwdInput
+                  id="passwordConfirm"
+                  type={showPwd2 ? "text" : "password"}
+                  name="passwordConfirm"
+                  value={form.passwordConfirm}
+                  onChange={onChange}
+                  placeholder="비밀번호를 한번 더 입력해주세요."
+                  required
+                />
+                <IconBtn
+                  type="button"
+                  aria-label={showPwd2 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  onClick={() => setShowPwd2(v => !v)}
+                  title={showPwd2 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                >
+                  {showPwd2 ? <EyeOffIcon/> : <EyeIcon/>}
+                </IconBtn>
+              </PwdWrap>
+            </div>
+          </Row>
 
-          <div>
-            <Label htmlFor="passwordConfirm">비밀번호 확인</Label>
-            <PwdWrap>
-              <PwdInput id="passwordConfirm" type={showPwd2 ? "text" : "password"} name="passwordConfirm" value={form.passwordConfirm} onChange={onChange} placeholder="비밀번호를 한번 더 입력해주세요." required />
-              <IconBtn type="button" aria-label={showPwd2 ? "비밀번호 숨기기" : "비밀번호 보기"} onClick={() => setShowPwd2(v => !v)}>
-                {showPwd2 ? <EyeOffIcon/> : <EyeIcon/>}
-              </IconBtn>
-            </PwdWrap>
-            <Hint>비밀번호는 최소 8자 이상을 권장합니다.</Hint>
-          </div>
+          {/* 2열: 생년월일 / 성별 */}
+          <Row>
+            <div>
+              <Label htmlFor="birthday">생년월일</Label>
+              <Input
+                id="birthday"
+                type="date"
+                name="birthday"
+                value={form.birthday}
+                onChange={onChange}
+                placeholder="고객님의 생년월일을 입력해주세요."
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="gender">성별</Label>
+              <Select
+                id="gender"
+                name="gender"
+                value={form.gender}
+                onChange={onChange}
+                required
+              >
+                <option value="M">남</option>
+                <option value="W">여</option>
+              </Select>
+            </div>
+          </Row>
 
+          {/* 주소: 우편번호 + 버튼, 그 아래 2열로 기본/상세 */}
           <div>
             <Label htmlFor="zipcode">우편번호</Label>
             <ZipRow>
-              <Input id="zipcode" name="zipcode" value={form.zipcode} onChange={onChange} placeholder="우편번호로 주소찾기" required />
+              <Input
+                id="zipcode"
+                name="zipcode"
+                value={form.zipcode}
+                onChange={onChange}
+                placeholder="우편번호로 주소찾기"
+                required
+              />
               <ZipBtn type="button" onClick={openZipSearch}>주소찾기</ZipBtn>
             </ZipRow>
           </div>
 
-          <div>
-            <Label htmlFor="address">주소</Label>
-            <Input id="address" name="address" value={form.address} onChange={onChange} placeholder="주소를 입력해주세요." required />
-          </div>
+          <Row>
+            <div>
+              <Label htmlFor="address">주소</Label>
+              <Input
+                id="address"
+                name="address"
+                value={form.address}
+                onChange={onChange}
+                placeholder="주소를 입력해주세요."
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="addressDetail">상세주소</Label>
+              <Input
+                id="addressDetail"
+                name="addressDetail"
+                value={form.addressDetail}
+                onChange={onChange}
+                placeholder="상세주소를 입력해주세요."
+                required
+              />
+            </div>
+          </Row>
 
-          <div>
-            <Label htmlFor="addressDetail">상세주소</Label>
-            <Input id="addressDetail" name="addressDetail" value={form.addressDetail} onChange={onChange} placeholder="상세주소를 입력해주세요." required />
-          </div>
-
-          <div>
-            <Label htmlFor="birthday">생년월일</Label>
-            <Input id="birthday" type="date" name="birthday" value={form.birthday} onChange={onChange} placeholder="고객님의 생년월일을 입력해주세요." required />
-          </div>
-
-          <div>
-            <Label htmlFor="gender">성별</Label>
-            <Select id="gender" name="gender" value={form.gender} onChange={onChange} required>
-              <option value="M">남</option>
-              <option value="W">여</option>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="nickname">닉네임</Label>
-            <Input id="nickname" name="nickname" value={form.nickname} onChange={onChange} placeholder="고객님께서 사용하실 닉네임을 입력해주세요." required />
-            <Hint>닉네임은 2~10자이며, 다른 사용자와 중복될 수 없습니다.</Hint>
-          </div>
+          <Msg>{msg}</Msg>
 
           <ButtonRow>
             <CancelBtn type="button" onClick={onCancel} disabled={submitting}>취소</CancelBtn>
@@ -365,8 +487,6 @@ export default function CustomerSignup() {
             </SubmitBtn>
           </ButtonRow>
         </Form>
-
-        <Msg>{msg}</Msg>
       </Card>
     </Page>
   );

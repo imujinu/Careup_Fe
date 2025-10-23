@@ -53,7 +53,7 @@ export default function OauthCallbackKakao() {
             nickname: res.nickname,
             phone: res.phone,
           });
-          window.location.replace("/customer/home");
+          window.location.replace("/shop");
           return;
         }
 

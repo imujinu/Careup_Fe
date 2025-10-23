@@ -1,6 +1,7 @@
 // src/pages/auth/PasswordReset.jsx
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
+import { useNavigate } from "react-router-dom";
 import publicAxios from "../../utils/publicAxios";
 
 const CONTROL_HEIGHT = 54;
@@ -107,7 +108,7 @@ const SubmitBtn = styled.button`
 const Msg = styled.p`
   margin-top: 12px; font-size: 13px; min-height: 18px;
   color: ${p => p.$ok ? "#059669" : "#dc2626"};
-  white-space: pre-line; /* 줄바꿈 표시 */
+  white-space: pre-line;
 `;
 
 /* Icons */
@@ -121,7 +122,7 @@ const EyeIcon = (props) => (
 const EyeOffIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
     <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94" />
-    <path d="M9.9 4.24A10.94 10.94 0  0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82" />
+    <path d="M9.9 4.24A10.94 10.94 0  0 1 12 5c7 0 11 7 11 7a21.86 21.86 0  0 1-4.87 5.82" />
     <path d="M1 1l22 22" />
     <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
   </svg>
@@ -131,6 +132,7 @@ const EyeOffIcon = (props) => (
  * Component
  * ======================== */
 export default function PasswordReset() {
+  const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialEmail = params.get("email") || "";
   const token = params.get("token") || "";
@@ -161,12 +163,15 @@ export default function PasswordReset() {
         confirmPassword: pw2,
       });
       setOk(true);
-      setMsg("비밀번호가 변경되었어요. 새 비밀번호로 로그인해 주세요.");
+      setMsg("비밀번호가 변경되었어요. 홈으로 이동합니다...");
+      // 성공 메시지를 1.2초 보여준 뒤 홈으로 이동
+      setTimeout(() => {
+        navigate("/shop", { replace: true });
+      }, 1200);
     } catch (e2) {
       const serverMsg = e2?.response?.data?.status_message;
       setOk(false);
       setMsg(serverMsg || e2.message || "재설정에 실패했어요.");
-    } finally {
       setBusy(false);
     }
   };
@@ -201,6 +206,7 @@ export default function PasswordReset() {
               onChange={(e)=>setEmail(e.target.value)}
               autoComplete="email"
               required
+              disabled={busy || ok}
             />
           </div>
 
@@ -214,6 +220,7 @@ export default function PasswordReset() {
                 onChange={(e)=>setPw1(e.target.value)}
                 autoComplete="new-password"
                 required
+                disabled={busy || ok}
               />
               <IconBtn
                 type="button"
@@ -221,6 +228,7 @@ export default function PasswordReset() {
                 aria-pressed={showPw1}
                 onClick={() => setShowPw1(v => !v)}
                 title={showPw1 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                disabled={busy || ok}
               >
                 {showPw1 ? <EyeOffIcon /> : <EyeIcon />}
               </IconBtn>
@@ -237,6 +245,7 @@ export default function PasswordReset() {
                 onChange={(e)=>setPw2(e.target.value)}
                 autoComplete="new-password"
                 required
+                disabled={busy || ok}
               />
               <IconBtn
                 type="button"
@@ -244,14 +253,15 @@ export default function PasswordReset() {
                 aria-pressed={showPw2}
                 onClick={() => setShowPw2(v => !v)}
                 title={showPw2 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                disabled={busy || ok}
               >
                 {showPw2 ? <EyeOffIcon /> : <EyeIcon />}
               </IconBtn>
             </PwdWrap>
           </div>
 
-          <SubmitBtn type="submit" disabled={busy || !valid}>
-            {busy ? "변경 중..." : "비밀번호 변경"}
+          <SubmitBtn type="submit" disabled={busy || ok || !valid}>
+            {ok ? "이동 중..." : busy ? "변경 중..." : "비밀번호 변경"}
           </SubmitBtn>
         </Form>
 

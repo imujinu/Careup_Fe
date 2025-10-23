@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { branchService } from '../../service/branchService';
+import { branchService, deleteBranch } from '../../service/branchService';
 
 export const fetchBranchList = createAsyncThunk(
   'branch/fetchList',
@@ -9,6 +9,19 @@ export const fetchBranchList = createAsyncThunk(
       return data;
     } catch (error) {
       const message = error.response?.data?.status_message || error.message || '지점 목록 조회 실패';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const deleteBranchAction = createAsyncThunk(
+  'branch/delete',
+  async (branchId, { rejectWithValue }) => {
+    try {
+      await deleteBranch(branchId);
+      return branchId;
+    } catch (error) {
+      const message = error.response?.data?.status_message || error.message || '지점 삭제 실패';
       return rejectWithValue(message);
     }
   }
@@ -27,6 +40,8 @@ const initialState = {
   loading: false,
   error: null,
   params: { page: 0, size: 10, sort: 'createdAt,desc' },
+  deleteLoading: false,
+  deleteError: null,
 };
 
 const branchSlice = createSlice({
@@ -59,6 +74,21 @@ const branchSlice = createSlice({
       .addCase(fetchBranchList.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(deleteBranchAction.pending, (state) => {
+        state.deleteLoading = true;
+        state.deleteError = null;
+      })
+      .addCase(deleteBranchAction.fulfilled, (state, action) => {
+        state.deleteLoading = false;
+        // 삭제된 지점을 목록에서 제거
+        state.list = state.list.filter(branch => branch.id !== action.payload);
+        // 총 요소 수 감소
+        state.pagination.totalElements = Math.max(0, state.pagination.totalElements - 1);
+      })
+      .addCase(deleteBranchAction.rejected, (state, action) => {
+        state.deleteLoading = false;
+        state.deleteError = action.payload;
       });
   },
 });

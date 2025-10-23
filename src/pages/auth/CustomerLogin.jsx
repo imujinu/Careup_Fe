@@ -1,3 +1,4 @@
+// src/pages/auth/CustomerLogin.jsx
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Link } from "react-router-dom";
@@ -7,40 +8,29 @@ import { customerAuthService } from "../../service/customerAuthService";
 import GoogleIcon from "../../assets/icons/google_icon.svg";
 import KakaoIcon from "../../assets/icons/kakao_icon.svg";
 
-/* ========================
- * ENV
- * ======================== */
+/* ENV */
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
 const GOOGLE_FORCE_CONSENT =
   String(import.meta.env.VITE_GOOGLE_FORCE_CONSENT || "").toLowerCase() === "true";
 
-/* ========================
- * PKCE Utilities (Google)
- * ======================== */
+/* PKCE utils (Google) */
 const b64url = (ab) =>
   btoa(String.fromCharCode(...new Uint8Array(ab)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
-
 const randomVerifier = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
-
 const sha256b64url = async (text) => {
   const data = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return b64url(digest);
 };
 
-/* ========================
- * UI Constants
- * ======================== */
+/* UI */
 const CONTROL_HEIGHT = 54;
 const CONTROL_RADIUS = 10;
 
-/* ========================
- * Styled Components
- * ======================== */
 const Page = styled.div`
   min-height: 100vh;
   display: grid;
@@ -48,7 +38,6 @@ const Page = styled.div`
   background: #f5f6f7;
   padding: 24px;
 `;
-
 const Card = styled.div`
   width: 520px;
   max-width: 92vw;
@@ -58,131 +47,59 @@ const Card = styled.div`
   padding: 40px 36px 32px;
   text-align: left;
 `;
-
 const Brand = styled.h1`
-  font-size: 44px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  margin: 0;
-  text-align: center;
+  font-size: 44px; font-weight: 800; letter-spacing: 2px; margin: 0; text-align: center;
   font-family: "Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
 `;
-
 const Slogan = styled.p`
-  text-align: center;
-  color: #9ca3af;
-  margin-top: 6px;
-  margin-bottom: 28px;
-  font-size: 14px;
-  letter-spacing: 1.4px;
+  text-align: center; color: #9ca3af; margin-top: 6px; margin-bottom: 28px; font-size: 14px; letter-spacing: 1.4px;
 `;
-
-const Form = styled.form`
-  display: grid;
-  gap: 14px;
-`;
-
-const Label = styled.label`
-  font-size: 13px;
-  color: #374151;
-  display: block;
-  margin-bottom: 6px;
-`;
-
+const Form = styled.form`display: grid; gap: 14px;`;
+const Label = styled.label`font-size: 13px; color: #374151; display: block; margin-bottom: 6px;`;
 const Input = styled.input`
-  width: 100%;
-  height: ${CONTROL_HEIGHT}px;
-  border: 1px solid #e5e7eb;
-  border-radius: ${CONTROL_RADIUS}px;
-  padding: 0 14px;
-  outline: none;
-  font-size: 14px;
-  background: #fff;
-  transition: box-shadow .15s ease, border-color .15s ease;
-
-  &:focus {
-    border-color: #6b7280;
-    box-shadow: 0 0 0 4px rgba(107,114,128,0.12);
-  }
+  width: 100%; height: ${CONTROL_HEIGHT}px; border: 1px solid #e5e7eb; border-radius: ${CONTROL_RADIUS}px;
+  padding: 0 14px; outline: none; font-size: 14px; background: #fff; transition: box-shadow .15s ease, border-color .15s ease;
+  &:focus { border-color: #6b7280; box-shadow: 0 0 0 4px rgba(107,114,128,0.12); }
 `;
-
 const PwdInput = styled(Input)`padding-right: 48px;`;
 const PwdWrap = styled.div`position: relative;`;
-
 const IconBtn = styled.button`
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 36px; height: 36px;
-  border-radius: 8px; border: 1px solid transparent;
-  background: transparent; color: #6b7280;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px;
+  border-radius: 8px; border: 1px solid transparent; background: transparent; color: #6b7280; display: flex; align-items: center; justify-content: center; cursor: pointer;
   transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
-
   &:hover  { background: #f3f4f6; border-color: #e5e7eb; }
   &:active { transform: translateY(calc(-50% + 1px)); }
   &:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(107,114,128,0.18); }
 `;
-
-const RememberRow = styled.div`
-  display: flex; align-items: center; justify-content: flex-start;
-  margin: 2px 0 0;
-`;
-
+const RememberRow = styled.div`display: flex; align-items: center; margin: 2px 0 0;`;
 const RememberLabel = styled.label`
-  display: inline-flex; align-items: center; gap: 10px;
-  font-size: 13px; color: #374151; user-select: none;
-
-  input[type="checkbox"] {
-    width: 18px; height: 18px; margin: 0; accent-color: #111827; cursor: pointer;
-  }
+  display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: #374151; user-select: none;
+  input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: #111827; cursor: pointer; }
 `;
-
 const LoginBtn = styled.button`
-  height: ${CONTROL_HEIGHT}px; border-radius: ${CONTROL_RADIUS}px; border: none;
-  font-weight: 700; font-size: 15px; color: #fff;
-  background: ${p => p.disabled ? "#e5e7eb" : "#111827"};
-  cursor: ${p => p.disabled ? "not-allowed" : "pointer"};
+  height: ${CONTROL_HEIGHT}px; border-radius: ${CONTROL_RADIUS}px; border: none; font-weight: 700; font-size: 15px; color: #fff;
+  background: ${p => p.disabled ? "#e5e7eb" : "#111827"}; cursor: ${p => p.disabled ? "not-allowed" : "pointer"};
   transition: transform .02s ease, background-color .15s ease, filter .1s ease;
-
   &:active { transform: translateY(1px); }
   &:hover  { background: ${p => p.disabled ? "#e5e7eb" : "#0f1628"}; }
 `;
-
 const HelpRow = styled.div`
-  display: flex; justify-content: center; gap: 18px;
-  font-size: 13px; color: #6b7280; margin: 16px 0 6px;
-
-  a { color: #6b7280; }
-  .sep { color: #d1d5db; }
+  display: flex; justify-content: center; gap: 18px; font-size: 13px; color: #6b7280; margin: 16px 0 6px;
+  a { color: #6b7280; } .sep { color: #d1d5db; }
 `;
-
 const StyledLink = styled(Link)`color: #6b7280; text-decoration: none;`;
-
 const SocialCol = styled.div`margin-top: 14px; display: grid; gap: 12px;`;
-
-/** transient prop 사용으로 DOM 경고 제거 */
 const SocialBtn = styled.button`
-  position: relative; width: 100%; height: ${CONTROL_HEIGHT}px;
-  border-radius: ${CONTROL_RADIUS}px; border: none; font-weight: 700; font-size: 16px;
-  padding: 0 16px; cursor: pointer;
-  transition: transform .02s ease, filter .1s ease, background-color .15s ease;
+  position: relative; width: 100%; height: ${CONTROL_HEIGHT}px; border-radius: ${CONTROL_RADIUS}px; border: none; font-weight: 700; font-size: 16px;
+  padding: 0 16px; cursor: pointer; transition: transform .02s ease, filter .1s ease, background-color .15s ease;
   color: ${p => p.$variant === "kakao" ? "#111" : "#fff"};
   background: ${p => p.$variant === "google" ? "#EA4335" : "#FEE500"};
-
   &:active { transform: translateY(1px); }
   &:hover  { background: ${p => p.$variant === "google" ? "#d93d31" : "#f0d600"}; }
   &:disabled { filter: grayscale(.35); cursor: not-allowed; }
 `;
-
-const SocialIcon = styled.img`
-  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-  width: 28px; height: 28px;
-`;
+const SocialIcon = styled.img`position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px;`;
 const SocialText = styled.div`text-align: center; width: 100%; pointer-events: none;`;
-
 const Msg = styled.p`margin-top: 10px; color: #dc2626; font-size: 13px; min-height: 18px;`;
 const Hint = styled.p`margin-top: 6px; margin-bottom: 0; font-size: 12px; color: #9ca3af;`;
 
@@ -193,7 +110,6 @@ const EyeIcon = (props) => (
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
-
 const EyeOffIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
     <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94" />
@@ -203,9 +119,6 @@ const EyeOffIcon = (props) => (
   </svg>
 );
 
-/* ========================
- * Component
- * ======================== */
 export default function CustomerLogin() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -216,7 +129,7 @@ export default function CustomerLogin() {
 
   useEffect(() => {
     if (customerAuthService.isAuthenticated()) {
-      window.location.replace("/customer/home");
+      window.location.replace("/shop");
     }
   }, []);
 
@@ -283,7 +196,6 @@ export default function CustomerLogin() {
       url.searchParams.set("redirect_uri", redirectUri);
       url.searchParams.set("response_type", "code");
       url.searchParams.set("state", state);
-      // ★ talk_message + account_email
       url.searchParams.set("scope", "account_email talk_message");
 
       window.location.href = url.toString();
@@ -305,7 +217,7 @@ export default function CustomerLogin() {
 
     try {
       await customerAuthService.login({ id, password: pw, rememberMe });
-      window.location.replace("/customer/home");
+      window.location.replace("/shop");
     } catch (err) {
       const serverMsg = err?.response?.data?.status_message;
       setMsg(serverMsg || err.message || "로그인 실패");
@@ -383,7 +295,6 @@ export default function CustomerLogin() {
           <span className="sep">|</span>
           <a href="#">아이디 찾기</a>
           <span className="sep">|</span>
-          {/* 비밀번호 찾기 라우트 연결 */}
           <StyledLink to="/customer/password/forgot">비밀번호 찾기</StyledLink>
         </HelpRow>
 

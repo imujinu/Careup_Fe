@@ -8,6 +8,7 @@ export const PATHS = {
   ROOT: '/',
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
+  SHOP: '/shop',
 };
 
 // 본사 전용 경로
@@ -40,6 +41,7 @@ export const MENU_PATH_MAP = {
   inventory: '/inventory',
   purchaseOrder: '/purchase-order',
   settings: '/settings',
+  shop: '/shop',
   logout: '/logout',
 };
 
