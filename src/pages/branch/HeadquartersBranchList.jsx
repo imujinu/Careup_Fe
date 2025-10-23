@@ -127,13 +127,6 @@ function HeadquartersBranchList() {
           >
             등록
           </PrimaryButton>
-          <TestButton 
-            type="button"
-            onClick={handleTestClick}
-            title="테스트 페이지"
-          >
-            테스트
-          </TestButton>
         </Right>
       </HeaderRow>
 
@@ -229,36 +222,6 @@ const PrimaryButton = styled.button`
   &:focus {
     outline: none;
     box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.3);
-  }
-`;
-
-const TestButton = styled.button`
-  background: #10b981;
-  color: #fff;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  
-  &:hover {
-    background: #059669;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  }
-  
-  &:active {
-    background: #047857;
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
   }
 `;
 

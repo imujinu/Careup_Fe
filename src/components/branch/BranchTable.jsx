@@ -192,6 +192,51 @@ const Tooltip = styled.div`
   transition: all 0.2s;
 `;
 
+// 상태 배지 스타일
+const StatusBadge = styled.span`
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  min-width: 60px;
+  background-color: ${props => props.$bgColor};
+  color: ${props => props.$textColor};
+  border: 1px solid ${props => props.$borderColor};
+`;
+
+// 상태별 한글 텍스트와 색상 매핑
+const getStatusInfo = (status) => {
+  const statusMap = {
+    'OPENED': {
+      text: '운영 중',
+      bgColor: '#dcfce7',
+      textColor: '#166534',
+      borderColor: '#bbf7d0'
+    },
+    'CLOSED': {
+      text: '폐점',
+      bgColor: '#fee2e2',
+      textColor: '#991b1b',
+      borderColor: '#fecaca'
+    },
+    'SUSPENDED': {
+      text: '운영 중지',
+      bgColor: '#fef3c7',
+      textColor: '#92400e',
+      borderColor: '#fde68a'
+    }
+  };
+  
+  return statusMap[status] || {
+    text: status || '-',
+    bgColor: '#f3f4f6',
+    textColor: '#6b7280',
+    borderColor: '#d1d5db'
+  };
+};
+
 // 정렬 가능한 컬럼 정의
 const SORTABLE_COLUMNS = {
   id: 'id',
@@ -251,6 +296,39 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
   const formatAddress = (address, addressDetail) => {
     const fullAddress = [address, addressDetail].filter(Boolean).join(' ');
     return fullAddress || '-';
+  };
+
+  // 전화번호 포맷팅 함수 (표시용)
+  const formatPhoneDisplay = (phone) => {
+    if (!phone) return '-';
+    
+    // 이미 포맷팅된 전화번호인지 확인
+    if (/^(\d{2,3})-(\d{3,4})-(\d{4})$/.test(phone)) {
+      return phone;
+    }
+    
+    // 숫자만 추출하여 포맷팅
+    const numbers = phone.replace(/\D/g, '');
+    
+    if (numbers.length === 0) return '-';
+    
+    if (numbers.length <= 3) {
+      return numbers;
+    } else if (numbers.length <= 7) {
+      if (numbers.startsWith('02')) {
+        return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+      } else {
+        return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+      }
+    } else if (numbers.length <= 11) {
+      if (numbers.startsWith('02')) {
+        return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+      } else {
+        return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+      }
+    }
+    
+    return phone;
   };
 
   return (
@@ -347,9 +425,17 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
                 >
                   {b.businessDomain}
                 </Td>
-                <Td $maxWidth="80px">{b.status}</Td>
+                <Td $maxWidth="80px">
+                  <StatusBadge
+                    $bgColor={getStatusInfo(b.status).bgColor}
+                    $textColor={getStatusInfo(b.status).textColor}
+                    $borderColor={getStatusInfo(b.status).borderColor}
+                  >
+                    {getStatusInfo(b.status).text}
+                  </StatusBadge>
+                </Td>
                 <Td $maxWidth="100px">{b.openDate || '-'}</Td>
-                <Td $maxWidth="120px">{b.phone || '-'}</Td>
+                <Td $maxWidth="120px">{formatPhoneDisplay(b.phone)}</Td>
                 <Td $maxWidth="140px">{b.businessNumber || '-'}</Td>
                 <Td $maxWidth="140px">{b.corporationNumber || '-'}</Td>
                 <Td $maxWidth="100px">{b.zipcode || '-'}</Td>
@@ -384,7 +470,15 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
             <MobileCardContent>
               <MobileCardField>
                 <MobileCardLabel>지점상태</MobileCardLabel>
-                <MobileCardValue>{b.status}</MobileCardValue>
+                <MobileCardValue>
+                  <StatusBadge
+                    $bgColor={getStatusInfo(b.status).bgColor}
+                    $textColor={getStatusInfo(b.status).textColor}
+                    $borderColor={getStatusInfo(b.status).borderColor}
+                  >
+                    {getStatusInfo(b.status).text}
+                  </StatusBadge>
+                </MobileCardValue>
               </MobileCardField>
               <MobileCardField>
                 <MobileCardLabel>개업일</MobileCardLabel>
@@ -392,7 +486,7 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
               </MobileCardField>
               <MobileCardField>
                 <MobileCardLabel>전화번호</MobileCardLabel>
-                <MobileCardValue>{b.phone || '-'}</MobileCardValue>
+                <MobileCardValue>{formatPhoneDisplay(b.phone)}</MobileCardValue>
               </MobileCardField>
               <MobileCardField>
                 <MobileCardLabel>사업자등록번호</MobileCardLabel>

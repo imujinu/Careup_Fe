@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import InfoModal from '../../components/common/InfoModal';
+import { useToast } from '../../components/common/Toast';
 import { createBranch } from '../../service/branchService';
+import InfoModal from '../../components/common/InfoModal';
 
 const BranchRegistration = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     businessDomain: '',
@@ -26,9 +28,9 @@ const BranchRegistration = () => {
   
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
+  const [useAddressForCommute, setUseAddressForCommute] = useState(false);
 
   const businessDomains = [
     '카페', '음식점', '편의점', '마트', '서점', '미용실', '헬스장', '기타'
@@ -85,6 +87,40 @@ const BranchRegistration = () => {
     }
   };
 
+  // 전화번호 포맷팅 함수 (010-1234-5678, 02-123-4567, 031-123-4567 등)
+  const formatPhoneNumber = (value) => {
+    // 숫자만 추출
+    const numbers = value.replace(/\D/g, '');
+    
+    // 11자리 제한 (휴대폰 번호 기준)
+    if (numbers.length > 11) {
+      return numbers.slice(0, 11);
+    }
+    
+    // 포맷팅 적용
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 3) {
+      return numbers;
+    } else if (numbers.length <= 7) {
+      // 02-123-4567, 031-123-4567 등
+      if (numbers.startsWith('02')) {
+        return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+      } else {
+        return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+      }
+    } else if (numbers.length <= 11) {
+      // 010-1234-5678, 02-1234-5678, 031-1234-5678 등
+      if (numbers.startsWith('02')) {
+        return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+      } else {
+        return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+      }
+    }
+    
+    return numbers;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     let formattedValue = value;
@@ -99,10 +135,27 @@ const BranchRegistration = () => {
       formattedValue = formatCorporationNumber(value);
     }
     
-    setFormData(prev => ({
-      ...prev,
-      [name]: formattedValue
-    }));
+    // 전화번호 포맷팅 적용
+    if (name === 'phone') {
+      formattedValue = formatPhoneNumber(value);
+    }
+    
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        [name]: formattedValue
+      };
+      
+      // 주소나 상세주소가 변경되고 체크박스가 활성화되어 있으면 출퇴근 위치 업데이트
+      if ((name === 'address' || name === 'addressDetail') && useAddressForCommute) {
+        const fullAddress = [name === 'address' ? formattedValue : newFormData.address, 
+                            name === 'addressDetail' ? formattedValue : newFormData.addressDetail]
+                            .filter(Boolean).join(' ');
+        newFormData.commuteLocation = fullAddress;
+      }
+      
+      return newFormData;
+    });
     
     // 에러 메시지 제거
     if (errors[name]) {
@@ -116,6 +169,26 @@ const BranchRegistration = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     setProfileImage(file);
+  };
+
+  const handleCommuteLocationCheckboxChange = (e) => {
+    const isChecked = e.target.checked;
+    setUseAddressForCommute(isChecked);
+    
+    if (isChecked) {
+      // 주소와 일치 체크시 주소 정보를 출퇴근 위치에 복사
+      const fullAddress = [formData.address, formData.addressDetail].filter(Boolean).join(' ');
+      setFormData(prev => ({
+        ...prev,
+        commuteLocation: fullAddress
+      }));
+    } else {
+      // 체크 해제시 출퇴근 위치 초기화
+      setFormData(prev => ({
+        ...prev,
+        commuteLocation: ''
+      }));
+    }
   };
 
   const handlePostcodeSearch = () => {
@@ -198,6 +271,11 @@ const BranchRegistration = () => {
       newErrors.corporationNumber = '법인등록번호는 nnnn-nn-nnnnnn-n 형식이어야 합니다.';
     }
     
+    // 전화번호 형식 검증
+    if (formData.phone && !/^(\d{2,3})-(\d{3,4})-(\d{4})$/.test(formData.phone)) {
+      newErrors.phone = '올바른 전화번호 형식이 아닙니다. (예: 010-1234-5678, 02-123-4567)';
+    }
+    
     // 위도/경도 범위 검증
     if (formData.latitude && (formData.latitude < -90 || formData.latitude > 90)) {
       newErrors.latitude = '위도는 -90 ~ 90 범위여야 합니다.';
@@ -232,10 +310,21 @@ const BranchRegistration = () => {
       };
 
       await createBranch(submitData, profileImage);
-      setShowSuccessModal(true);
+      addToast({
+        type: 'success',
+        title: '지점 등록 완료',
+        message: `${formData.name} 등록이 완료되었습니다.`,
+        duration: 3000
+      });
+      navigate('/branch');
     } catch (error) {
       console.error('지점 등록 실패:', error);
-      setErrors({ submit: '지점 등록에 실패했습니다. 다시 시도해주세요.' });
+      addToast({
+        type: 'error',
+        title: '지점 등록 실패',
+        message: '지점 등록에 실패했습니다. 다시 시도해주세요.',
+        duration: 3000
+      });
     } finally {
       setIsLoading(false);
     }
@@ -246,10 +335,6 @@ const BranchRegistration = () => {
   };
 
   const handleConfirmCancel = () => {
-    navigate('/branch');
-  };
-
-  const handleSuccessConfirm = () => {
     navigate('/branch');
   };
 
@@ -451,8 +536,22 @@ const BranchRegistration = () => {
             <Input
               type="text"
               name="commuteLocation"
+              value={formData.commuteLocation || ''}
+              onChange={handleInputChange}
               placeholder="출퇴근 가능한 위치를 선택해주세요."
+              disabled={useAddressForCommute}
             />
+            <CheckboxContainer>
+              <Checkbox
+                type="checkbox"
+                id="useAddressForCommute"
+                checked={useAddressForCommute}
+                onChange={handleCommuteLocationCheckboxChange}
+              />
+              <CheckboxLabel htmlFor="useAddressForCommute">
+                주소와 일치
+              </CheckboxLabel>
+            </CheckboxContainer>
           </FormField>
 
           <FormField>
@@ -523,16 +622,6 @@ const BranchRegistration = () => {
           </SubmitButton>
         </ButtonGroup>
       </Form>
-
-      {/* 성공 모달 */}
-      <InfoModal
-        isOpen={showSuccessModal}
-        onClose={handleSuccessConfirm}
-        title="안내"
-        message={`${formData.name} 등록이 완료되었습니다.`}
-        buttonText="확인"
-        buttonColor="#A87C7C"
-      />
 
       {/* 취소 확인 모달 */}
       <InfoModal
@@ -813,6 +902,26 @@ const LocationLabel = styled.label`
   margin-bottom: 8px;
   color: #374151;
   font-size: 14px;
+`;
+
+const CheckboxContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+`;
+
+const Checkbox = styled.input`
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+`;
+
+const CheckboxLabel = styled.label`
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
 `;
 
 export default BranchRegistration;
