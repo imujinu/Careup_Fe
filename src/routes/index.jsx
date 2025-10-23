@@ -2,6 +2,7 @@ import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import Login from '../pages/auth/Login';
+import ShopApp from '../storefront/pages/ShopApp';
 import { headquartersRoutes } from './headquartersRoutes';
 import { franchiseRoutes } from './franchiseRoutes';
 
@@ -16,6 +17,10 @@ export const createAppRouter = (authState) => {
   // 인증되지 않은 경우 로그인 페이지만 표시
   if (!isAuthenticated) {
     return createBrowserRouter([
+      {
+        path: '/shop',
+        element: <ShopApp />,
+      },
       {
         path: '/login',
         element: <Login />,
@@ -33,6 +38,10 @@ export const createAppRouter = (authState) => {
     : franchiseRoutes;
 
   return createBrowserRouter([
+    {
+      path: '/shop',
+      element: <ShopApp />,
+    },
     {
       path: '/',
       element: <Layout />,

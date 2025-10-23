@@ -218,7 +218,7 @@ export default function AdditionalInfo() {
       sessionStorage.removeItem("oauth_temp_token");
       sessionStorage.removeItem("oauth_prefill");
     } catch {}
-    window.location.replace("/customer/login");
+    window.location.replace("/shop");
   };
 
   const onSubmit = async (e) => {
@@ -260,7 +260,7 @@ export default function AdditionalInfo() {
       sessionStorage.removeItem("oauth_temp_token");
       sessionStorage.removeItem("oauth_prefill");
 
-      window.location.replace("/customer/home");
+      window.location.replace("/shop");
     } catch (e2) {
       const serverMsg = e2?.response?.data?.status_message;
       setMsg(serverMsg || e2.message || "추가정보 처리 실패");
@@ -277,8 +277,8 @@ export default function AdditionalInfo() {
           <Center>
             <Title>추가 정보 입력</Title>
             <p style={{ color: "#6b7280" }}>임시 토큰이 없습니다. 다시 로그인해 주세요.</p>
-            <SmallBtn onClick={() => window.location.replace("/customer/login")}>
-              고객 로그인으로 이동
+            <SmallBtn onClick={() => window.location.replace("/shop")}>
+              홈으로 이동
             </SmallBtn>
           </Center>
         </Card>
