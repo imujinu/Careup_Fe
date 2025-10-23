@@ -13,6 +13,7 @@ export const PATHS = {
 // 본사 전용 경로
 export const HEADQUARTERS_PATHS = {
   BRANCH: '/branch',
+  BRANCH_DETAIL: '/branch/detail',
   CLIENT: '/client',
   TASK: '/task',
   ATTENDANCE: '/attendance',
