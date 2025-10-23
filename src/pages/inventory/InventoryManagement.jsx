@@ -6,9 +6,9 @@ import InventoryTable from '../../components/inventory/common/InventoryTable';
 import EditInventoryModal from '../../components/inventory/common/EditInventoryModal';
 import InventoryDetailModal from '../../components/inventory/common/InventoryDetailModal';
 import AddInventoryModal from '../../components/inventory/common/AddInventoryModal';
-import InventoryFlowTable from '../../components/inventory/common/InventoryFlowTable';
-import EditInventoryFlowModal from '../../components/inventory/common/EditInventoryFlowModal';
-import AddInventoryFlowModal from '../../components/inventory/common/AddInventoryFlowModal';
+import InventoryFlowTable from '../../components/inventory/headquarters/InventoryFlowTable';
+import EditInventoryFlowModal from '../../components/inventory/headquarters/EditInventoryFlowModal';
+import AddInventoryFlowModal from '../../components/inventory/headquarters/AddInventoryFlowModal';
 import { inventoryService } from '../../service/inventoryService';
 import { authService } from '../../service/authService';
 
