@@ -6,6 +6,7 @@ import { checkAuthStatus } from "./stores/slices/authSlice";
 
 import Layout from "./layout/Layout";
 import Login from "./pages/auth/Login";
+import { ToastProvider } from "./components/common/Toast";
 import ShopApp from "./storefront/pages/ShopApp";
 
 // 본사 및 가맹점 라우트
@@ -74,8 +75,9 @@ export default function App() {
   );
 
   return (
-    <Router>
-      <Routes>
+    <ToastProvider>
+      <Router>
+        <Routes>
         {/* 쇼핑몰 - 인증 불필요 */}
         <Route path="/shop/*" element={<ShopApp />} />
 
@@ -115,7 +117,8 @@ export default function App() {
 
         {/* 알 수 없는 경로 → 로그인으로 이동 */}
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </ToastProvider>
   );
 }

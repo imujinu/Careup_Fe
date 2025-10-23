@@ -2,16 +2,13 @@ import React from 'react';
 import styled from 'styled-components';
 
 const FooterContainer = styled.footer`
-  position: fixed;
-  bottom: 0;
-  left: ${props => props.sidebarVisible ? '240px' : '0'};
-  right: 0;
+  position: relative;
+  width: 100%;
   height: 100px;
   background: #ffffff;
   border-top: 1px solid #e5e5e5;
   padding: 20px 32px;
-  z-index: 1000;
-  transition: left 0.3s ease;
+  margin-top: auto;
 `;
 
 const FooterContent = styled.div`
@@ -47,8 +44,8 @@ const InfoSection = styled.div`
   line-height: 1.4;
 `;
 
-function Footer({ sidebarVisible }) {
-  return React.createElement(FooterContainer, { sidebarVisible },
+function Footer() {
+  return React.createElement(FooterContainer, null,
     React.createElement(FooterContent, null,
       React.createElement(LinksSection, null,
         React.createElement(FooterLink, { href: '/company-info' }, '기업정보'),
