@@ -1,8 +1,8 @@
-// src/pages/auth/PasswordReset.jsx
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import publicAxios from "../../utils/publicAxios";
+import PasswordChangeModal from "../../components/common/PasswordChangeModal";
 
 const CONTROL_HEIGHT = 54;
 const CONTROL_RADIUS = 10;
@@ -146,6 +146,9 @@ export default function PasswordReset() {
   const [msg, setMsg] = useState("");
   const [ok, setOk] = useState(false);
 
+  // 비밀번호 변경 완료 모달 상태
+  const [modalOpen, setModalOpen] = useState(false);
+
   const valid = email.trim() && token && pw1.length >= 8 && pw1 === pw2;
 
   const onSubmit = async (e) => {
@@ -162,12 +165,12 @@ export default function PasswordReset() {
         newPassword: pw1,
         confirmPassword: pw2,
       });
+
+      // 성공 처리: 폼 비활성 + 메시지 + 모달 노출
       setOk(true);
-      setMsg("비밀번호가 변경되었어요. 홈으로 이동합니다...");
-      // 성공 메시지를 1.2초 보여준 뒤 홈으로 이동
-      setTimeout(() => {
-        navigate("/shop", { replace: true });
-      }, 1200);
+      setBusy(false);
+      setMsg("비밀번호가 변경되었습니다.");
+      setModalOpen(true);
     } catch (e2) {
       const serverMsg = e2?.response?.data?.status_message;
       setOk(false);
@@ -261,12 +264,20 @@ export default function PasswordReset() {
           </div>
 
           <SubmitBtn type="submit" disabled={busy || ok || !valid}>
-            {ok ? "이동 중..." : busy ? "변경 중..." : "비밀번호 변경"}
+            {ok ? "변경 완료" : busy ? "변경 중..." : "비밀번호 변경"}
           </SubmitBtn>
         </Form>
 
         <Msg $ok={ok}>{msg}</Msg>
       </Card>
+
+      {/* 변경 완료 모달 — 로그인하기 → CustomerLogin.jsx 라우트로 이동 */}
+      <PasswordChangeModal
+        open={modalOpen}
+        onPrimary={() => navigate("/shop", { replace: true })}
+        onSecondary={() => navigate("/customer/login", { replace: true })}
+        onClose={() => setModalOpen(false)}
+      />
     </Page>
   );
 }

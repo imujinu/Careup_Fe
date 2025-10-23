@@ -1,14 +1,13 @@
-// src/pages/auth/AdditionalInfo.jsx
 import React, { useState } from "react";
 import styled, { css } from "styled-components";
 import { customerTokenStorage } from "../../service/customerAuthService";
 import customerAxios from "../../utils/customerAxios";
 import { openKakaoPostcodePopup } from "../../utils/kakaoPostCode";
+import WelcomeModal from "../../components/common/WelcomeModal";
 
 const CONTROL_HEIGHT = 54;
 const CONTROL_RADIUS = 10;
 
-/* ===== Styled ===== */
 const Page = styled.div`
   min-height: 100vh;
   display: grid;
@@ -76,7 +75,6 @@ const ZipBtn = styled.button`
   &:hover  { background: #e5e7eb; border-color: #d1d5db; }
 `;
 
-/* 누락 보완 */
 const Center = styled.div`text-align: center;`;
 const SmallBtn = styled.button`
   margin-top: 12px; height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid #e5e7eb;
@@ -114,6 +112,10 @@ export default function AdditionalInfo() {
 
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
+
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+  const [welcomeNick, setWelcomeNick] = useState("");
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -197,7 +199,11 @@ export default function AdditionalInfo() {
 
       sessionStorage.removeItem("oauth_temp_token");
       sessionStorage.removeItem("oauth_prefill");
-      window.location.replace("/shop");
+
+      setWelcomeName(r.name || form.name);
+      setWelcomeNick(r.nickname || form.nickname);
+      setWelcomeOpen(true);
+      setSubmitting(false);
     } catch (e2) {
       const serverMsg = e2?.response?.data?.status_message;
       setMsg(serverMsg || e2.message || "추가정보 처리 실패");
@@ -303,6 +309,18 @@ export default function AdditionalInfo() {
 
         <Msg>{msg}</Msg>
       </Card>
+
+      <WelcomeModal
+        open={welcomeOpen}
+        name={welcomeName}
+        nickname={welcomeNick}
+        primaryLabel="쇼핑 시작하기"
+        onPrimary={() => {
+          setWelcomeOpen(false);
+          window.location.replace("/shop");
+        }}
+        onClose={() => setWelcomeOpen(false)}
+      />
     </Page>
   );
 }

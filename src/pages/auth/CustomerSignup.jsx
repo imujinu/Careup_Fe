@@ -1,14 +1,14 @@
-// src/pages/auth/CustomerSignup.jsx
 import React, { useState } from "react";
 import styled, { css } from "styled-components";
 import { openKakaoPostcodePopup } from "../../utils/kakaoPostCode";
 import customerAxios from "../../utils/customerAxios";
 import { customerTokenStorage, customerAuthService } from "../../service/customerAuthService";
+import WelcomeModal from "../../components/common/WelcomeModal";
+import { markWelcomeSeen } from "../../utils/welcomeSeen";
 
 const CONTROL_HEIGHT = 54;
 const CONTROL_RADIUS = 10;
 
-/* ====== UI (원본 디자인 유지, 카드 폭만 2열에 맞게 확장) ====== */
 const Page = styled.div`
   min-height: 100vh;
   display: grid;
@@ -18,8 +18,8 @@ const Page = styled.div`
 `;
 
 const Card = styled.div`
-  width: 720px;            /* ← 2열 레이아웃을 위해 520 → 720으로 확장 */
-  max-width: 94vw;         /* ← 반응형 */
+  width: 720px;
+  max-width: 94vw;
   background: #fff;
   border-radius: 22px;
   box-shadow:
@@ -61,10 +61,10 @@ const Form = styled.form`
 
 const Row = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr; /* ← 2열 */
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   @media (max-width: 640px){
-    grid-template-columns: 1fr;   /* ← 모바일에서 1열 */
+    grid-template-columns: 1fr;
   }
 `;
 
@@ -85,7 +85,6 @@ const baseControl = css`
   font-size: 14px;
   background: #fff;
   transition: box-shadow .15s ease, border-color .15s ease;
-
   &:focus {
     border-color: #6b7280;
     box-shadow: 0 0 0 4px rgba(107,114,128,0.12);
@@ -135,7 +134,7 @@ const ButtonRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  @media (max-width: 640px){ grid-template-columns: 1fr; } /* 모바일 대응 */
+  @media (max-width: 640px){ grid-template-columns: 1fr; }
 `;
 
 const SubmitBtn = styled.button`
@@ -164,7 +163,6 @@ const Msg = styled.p`
   margin-top: 12px; color: #dc2626; font-size: 13px; min-height: 18px;
 `;
 
-/* ====== Icons (원본 그대로) ====== */
 const EyeIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
     <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
@@ -180,7 +178,6 @@ const EyeOffIcon = (props) => (
   </svg>
 );
 
-/* ====== Component (원본 기능 그대로) ====== */
 export default function CustomerSignup() {
   const [form, setForm] = useState({
     name: "",
@@ -199,6 +196,11 @@ export default function CustomerSignup() {
   const [showPwd2, setShowPwd2] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
+
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+  const [welcomeNick, setWelcomeNick] = useState("");
+  const [welcomeScenario, setWelcomeScenario] = useState("logged-in");
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -256,7 +258,7 @@ export default function CustomerSignup() {
           address: form.address.trim(),
           addressDetail: form.addressDetail.trim(),
           birthday: form.birthday,
-          gender: form.gender, // 'M' | 'W'
+          gender: form.gender,
           nickname: form.nickname.trim(),
         },
         { __skipAuthRefresh: true }
@@ -264,8 +266,8 @@ export default function CustomerSignup() {
 
       const r = data?.result;
 
-      // 1) 백엔드가 가입 응답에 토큰을 주는 경우 → 그대로 저장 후 /shop
       if (r?.accessToken) {
+        // 회원가입 응답에 토큰이 포함되어 즉시 로그인된 경우 = "최초 로그인"
         customerTokenStorage.setTokens(r.accessToken, r.refreshToken);
         customerTokenStorage.setUserInfo({
           memberId: r.memberId,
@@ -275,19 +277,40 @@ export default function CustomerSignup() {
           nickname: r.nickname,
           phone: r.phone,
         });
-        window.location.replace("/shop");
+
+        // 최초 로그인 시점에 바로 '환영 봤음' 기록 (이후부터는 로그인 모달만)
+        try { if (r.memberId) markWelcomeSeen(r.memberId); } catch {}
+
+        setWelcomeName(r.name || form.name);
+        setWelcomeNick(r.nickname || form.nickname);
+        setWelcomeScenario("logged-in");
+        setWelcomeOpen(true);
+        setSubmitting(false);
         return;
       }
 
-      // 2) 토큰이 없는 가입 응답 → 같은 자격으로 즉시 자동 로그인 후 /shop
+      // 일부 서버는 회원가입 직후 토큰을 주지 않음 → 즉시 로그인 시도
       try {
         const loginId = (form.email && form.email.trim()) || (form.phone && form.phone.trim());
         await customerAuthService.login({ id: loginId, password: form.password, rememberMe: true });
-        window.location.replace("/shop");
+
+        const ui = customerTokenStorage.getUserInfo() || {};
+        setWelcomeName(ui.name || form.name);
+        setWelcomeNick(ui.nickname || form.nickname);
+        setWelcomeScenario("logged-in");
+        setWelcomeOpen(true);
+
+        // 즉시 로그인 성공 역시 "최초 로그인"이므로 기록
+        try { if (ui.memberId) markWelcomeSeen(ui.memberId); } catch {}
+
+        setSubmitting(false);
       } catch {
-        // 자동 로그인 실패 시 로그인 화면으로 폴백
-        alert("회원가입은 완료되었습니다. 로그인해 주세요.");
-        window.location.replace("/customer/login");
+        // 로그인은 아직 안 됨 → 최초 로그인 전이므로 기록하지 않음
+        setWelcomeName(form.name);
+        setWelcomeNick(form.nickname);
+        setWelcomeScenario("need-login");
+        setWelcomeOpen(true);
+        setSubmitting(false);
       }
     } catch (e2) {
       const serverMsg = e2?.response?.data?.status_message;
@@ -304,7 +327,6 @@ export default function CustomerSignup() {
         <Title>회원가입</Title>
 
         <Form onSubmit={onSubmit}>
-          {/* 2열: 이름 / 닉네임 */}
           <Row>
             <div>
               <Label htmlFor="name">성함</Label>
@@ -331,7 +353,6 @@ export default function CustomerSignup() {
             </div>
           </Row>
 
-          {/* 2열: 이메일 / 휴대폰 */}
           <Row>
             <div>
               <Label htmlFor="email">이메일</Label>
@@ -358,7 +379,6 @@ export default function CustomerSignup() {
             </div>
           </Row>
 
-          {/* 2열: 비밀번호 / 비밀번호 확인 */}
           <Row>
             <div>
               <Label htmlFor="password">비밀번호</Label>
@@ -408,7 +428,6 @@ export default function CustomerSignup() {
             </div>
           </Row>
 
-          {/* 2열: 생년월일 / 성별 */}
           <Row>
             <div>
               <Label htmlFor="birthday">생년월일</Label>
@@ -437,7 +456,6 @@ export default function CustomerSignup() {
             </div>
           </Row>
 
-          {/* 주소: 우편번호 + 버튼, 그 아래 2열로 기본/상세 */}
           <div>
             <Label htmlFor="zipcode">우편번호</Label>
             <ZipRow>
@@ -488,6 +506,24 @@ export default function CustomerSignup() {
           </ButtonRow>
         </Form>
       </Card>
+
+      <WelcomeModal
+        open={welcomeOpen}
+        name={welcomeName}
+        nickname={welcomeNick}
+        primaryLabel={welcomeScenario === "need-login" ? "로그인 하기" : "쇼핑 시작하기"}
+        onPrimary={() => {
+          setWelcomeOpen(false);
+          if (welcomeScenario === "need-login") window.location.replace("/customer/login");
+          else window.location.replace("/shop");
+        }}
+        secondaryLabel={welcomeScenario === "need-login" ? "홈으로 가기" : undefined}
+        onSecondary={welcomeScenario === "need-login" ? () => {
+          setWelcomeOpen(false);
+          window.location.replace("/shop");
+        } : undefined}
+        onClose={() => setWelcomeOpen(false)}
+      />
     </Page>
   );
 }

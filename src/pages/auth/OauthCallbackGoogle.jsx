@@ -1,11 +1,18 @@
-// src/pages/auth/OauthCallbackGoogle.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { customerTokenStorage } from "../../service/customerAuthService";
 import customerAxios from "../../utils/customerAxios";
+import WelcomeModal from "../../components/common/WelcomeModal";
+import LoginSuccessModal from "../../components/common/LoginSuccessModal";
+import { hasSeenWelcome, markWelcomeSeen } from "../../utils/welcomeSeen";
 
 export default function OauthCallbackGoogle() {
   const [msg, setMsg] = useState("처리 중...");
   const ranRef = useRef(false);
+
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+  const [welcomeNick, setWelcomeNick] = useState("");
+  const [loginSuccessOpen, setLoginSuccessOpen] = useState(false);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -43,10 +50,12 @@ export default function OauthCallbackGoogle() {
         );
         const res = data?.result;
 
+        // 상태 정리
         sessionStorage.removeItem("oauth_state");
         sessionStorage.removeItem("pkce_verifier");
 
         if (res?.status === "COMPLETE") {
+          // 토큰/유저 저장
           if (res.accessToken) customerTokenStorage.setTokens(res.accessToken, res.refreshToken);
           customerTokenStorage.setUserInfo({
             memberId: res.memberId,
@@ -56,7 +65,22 @@ export default function OauthCallbackGoogle() {
             nickname: res.nickname,
             phone: res.phone,
           });
-          window.location.replace("/shop");
+
+          // 최초 여부는 "로컬 플래그"만 신뢰
+          const memberId = res.memberId;
+          const isFirst = !hasSeenWelcome(memberId);
+
+          setWelcomeName(res.name || "");
+          setWelcomeNick(res.nickname || "");
+
+          if (isFirst) {
+            // 모달을 띄우는 동시에 즉시 기록하여 다음 로그인부터는 재표시 안됨
+            markWelcomeSeen(memberId);
+            setWelcomeOpen(true);
+          } else {
+            setLoginSuccessOpen(true);
+          }
+          setMsg("");
           return;
         }
 
@@ -85,5 +109,41 @@ export default function OauthCallbackGoogle() {
     run();
   }, []);
 
-  return <div style={{ padding: 24 }}>{msg}</div>;
+  const goShop = () => window.location.replace("/shop");
+
+  return (
+    <div style={{ padding: 24 }}>
+      {msg}
+
+      {/* 최초 로그인(가입 직후) */}
+      <WelcomeModal
+        open={welcomeOpen}
+        name={welcomeName}
+        nickname={welcomeNick}
+        primaryLabel="쇼핑 시작하기"
+        onPrimary={() => {
+          setWelcomeOpen(false);
+          goShop();
+        }}
+        onClose={() => {
+          setWelcomeOpen(false);
+          goShop();
+        }}
+      />
+
+      {/* 재로그인 */}
+      <LoginSuccessModal
+        open={loginSuccessOpen}
+        primaryLabel="쇼핑 시작하기"
+        onPrimary={() => {
+          setLoginSuccessOpen(false);
+          goShop();
+        }}
+        onClose={() => {
+          setLoginSuccessOpen(false);
+          goShop();
+        }}
+      />
+    </div>
+  );
 }

@@ -1,11 +1,18 @@
-// src/pages/auth/OauthCallbackKakao.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { customerTokenStorage } from "../../service/customerAuthService";
 import customerAxios from "../../utils/customerAxios";
+import WelcomeModal from "../../components/common/WelcomeModal";
+import LoginSuccessModal from "../../components/common/LoginSuccessModal";
+import { hasSeenWelcome, markWelcomeSeen } from "../../utils/welcomeSeen";
 
 export default function OauthCallbackKakao() {
   const [msg, setMsg] = useState("처리 중...");
   const ranRef = useRef(false);
+
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+  const [welcomeNick, setWelcomeNick] = useState("");
+  const [loginSuccessOpen, setLoginSuccessOpen] = useState(false);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -41,9 +48,11 @@ export default function OauthCallbackKakao() {
         );
         const res = data?.result;
 
+        // 상태 정리
         sessionStorage.removeItem("oauth_state");
 
         if (res?.status === "COMPLETE") {
+          // 토큰/유저 저장
           if (res.accessToken) customerTokenStorage.setTokens(res.accessToken, res.refreshToken);
           customerTokenStorage.setUserInfo({
             memberId: res.memberId,
@@ -53,7 +62,21 @@ export default function OauthCallbackKakao() {
             nickname: res.nickname,
             phone: res.phone,
           });
-          window.location.replace("/shop");
+
+          // 최초 여부 = 로컬 플래그 기준
+          const memberId = res.memberId;
+          const isFirst = !hasSeenWelcome(memberId);
+
+          setWelcomeName(res.name || "");
+          setWelcomeNick(res.nickname || "");
+
+          if (isFirst) {
+            markWelcomeSeen(memberId);
+            setWelcomeOpen(true);
+          } else {
+            setLoginSuccessOpen(true);
+          }
+          setMsg("");
           return;
         }
 
@@ -82,5 +105,41 @@ export default function OauthCallbackKakao() {
     run();
   }, []);
 
-  return <div style={{ padding: 24 }}>{msg}</div>;
+  const goShop = () => window.location.replace("/shop");
+
+  return (
+    <div style={{ padding: 24 }}>
+      {msg}
+
+      {/* 최초 로그인(가입 직후) */}
+      <WelcomeModal
+        open={welcomeOpen}
+        name={welcomeName}
+        nickname={welcomeNick}
+        primaryLabel="쇼핑 시작하기"
+        onPrimary={() => {
+          setWelcomeOpen(false);
+          goShop();
+        }}
+        onClose={() => {
+          setWelcomeOpen(false);
+          goShop();
+        }}
+      />
+
+      {/* 재로그인 */}
+      <LoginSuccessModal
+        open={loginSuccessOpen}
+        primaryLabel="쇼핑 시작하기"
+        onPrimary={() => {
+          setLoginSuccessOpen(false);
+          goShop();
+        }}
+        onClose={() => {
+          setLoginSuccessOpen(false);
+          goShop();
+        }}
+      />
+    </div>
+  );
 }

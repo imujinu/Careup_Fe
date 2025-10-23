@@ -1,9 +1,9 @@
-// src/pages/auth/CustomerLogin.jsx
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Link } from "react-router-dom";
 import customerAxios from "../../utils/customerAxios";
 import { customerAuthService } from "../../service/customerAuthService";
+import { markJustLoggedIn } from "../../utils/loginSignals"; // ✅ 추가
 
 import GoogleIcon from "../../assets/icons/google_icon.svg";
 import KakaoIcon from "../../assets/icons/kakao_icon.svg";
@@ -217,6 +217,7 @@ export default function CustomerLogin() {
 
     try {
       await customerAuthService.login({ id, password: pw, rememberMe });
+      markJustLoggedIn();
       window.location.replace("/shop");
     } catch (err) {
       const serverMsg = err?.response?.data?.status_message;
