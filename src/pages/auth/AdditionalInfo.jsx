@@ -3,10 +3,11 @@ import React, { useState } from "react";
 import styled, { css } from "styled-components";
 import { customerTokenStorage } from "../../service/customerAuthService";
 import customerAxios from "../../utils/customerAxios";
+import { openKakaoPostcodePopup } from "../../utils/kakaoPostCode";
 
-// ==== 공통 규격 (CustomerLogin과 동일) ====
-const CONTROL_HEIGHT = 54;   // 인풋/버튼 동일 높이
-const CONTROL_RADIUS = 10;   // 동일 라운드
+// ==== 공통 규격 ====
+const CONTROL_HEIGHT = 54;
+const CONTROL_RADIUS = 10;
 
 // ==== Styled ====
 const Page = styled.div`
@@ -57,14 +58,14 @@ const Title = styled.h2`
 
 const Form = styled.form`
   display: grid;
-  gap: 16px; /* 살짝 넓힘 */
+  gap: 16px;
 `;
 
 const Label = styled.label`
   font-size: 13px;
   color: #374151;
   display: block;
-  margin-bottom: 8px; /* 살짝 넓힘 */
+  margin-bottom: 8px;
 `;
 
 const baseControl = css`
@@ -84,16 +85,22 @@ const baseControl = css`
   }
 `;
 
-const Input = styled.input`${baseControl}`;
+const Input = styled.input`
+  ${baseControl};
+  &:disabled {
+    background: #f9fafb;
+    color: #6b7280;
+    cursor: not-allowed;
+  }
+`;
 
-/* 더 자연스러운 드롭다운: 기본 화살표 제거 + 커스텀 캐럿 + 패딩 보정 */
 const Select = styled.select`
   ${baseControl};
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   cursor: pointer;
-  padding-right: 44px; /* 캐럿 영역 확보 */
+  padding-right: 44px;
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 10l5 5 5-5" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   background-repeat: no-repeat;
   background-position: right 14px center;
@@ -111,9 +118,8 @@ const Grid2 = styled.div`
 
 const Row = styled.div``;
 
-/* 힌트 간격 "아주 약간" 넓힘 */
 const Hint = styled.p`
-  margin-top: 8px;   /* 기존보다 살짝 넓힘 */
+  margin-top: 8px;
   margin-bottom: 6px;
   font-size: 12px;
   color: #9ca3af;
@@ -125,7 +131,6 @@ const ButtonRow = styled.div`
   gap: 12px;
 `;
 
-/* 로그인 버튼과 동일한 이펙트(hover 진해짐 + active 살짝 눌림) */
 const SubmitBtn = styled.button`
   height: ${CONTROL_HEIGHT}px;
   border-radius: ${CONTROL_RADIUS}px;
@@ -136,12 +141,10 @@ const SubmitBtn = styled.button`
   background: ${p => p.disabled ? "#e5e7eb" : "#111827"};
   cursor: ${p => p.disabled ? "not-allowed" : "pointer"};
   transition: transform .02s ease, background-color .15s ease, filter .1s ease;
-
   &:active { transform: translateY(1px); }
   &:hover  { background: ${p => p.disabled ? "#e5e7eb" : "#0f1628"}; }
 `;
 
-/* 취소 버튼도 같은 규격/이펙트 + 연한 톤 → hover 시 약간 진하게 */
 const CancelBtn = styled.button`
   height: ${CONTROL_HEIGHT}px;
   border-radius: ${CONTROL_RADIUS}px;
@@ -152,59 +155,67 @@ const CancelBtn = styled.button`
   background: #f3f4f6;
   cursor: pointer;
   transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
-
   &:active { transform: translateY(1px); }
   &:hover  { background: #e5e7eb; border-color: #d1d5db; }
 `;
 
 const Msg = styled.p`
-  margin-top: 12px; /* 살짝 넓힘 */
+  margin-top: 12px;
   color: #dc2626;
   font-size: 13px;
   min-height: 18px;
 `;
 
-const Center = styled.div`
+// 우편번호 행: 인풋 + 버튼
+const ZipRow = styled.div`
   display: grid;
-  place-items: center;
+  grid-template-columns: 1fr 120px;
   gap: 10px;
-  text-align: center;
 `;
 
-const SmallBtn = styled.button`
-  height: 42px;
-  padding: 0 16px;
+const ZipBtn = styled.button`
+  height: ${CONTROL_HEIGHT}px;
   border-radius: ${CONTROL_RADIUS}px;
-  border: none;
+  border: 1px solid #e5e7eb;
   font-weight: 700;
   font-size: 14px;
-  color: #fff;
-  background: #111827;
+  color: #111827;
+  background: #f3f4f6;
   cursor: pointer;
-  transition: transform .02s ease, background-color .15s ease;
+  transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
   &:active { transform: translateY(1px); }
-  &:hover { background: #0f1628; }
+  &:hover  { background: #e5e7eb; border-color: #d1d5db; }
 `;
 
 export default function AdditionalInfo() {
-  // 토큰/프리필 초기 로드(깜빡임 방지)
   const [oauthTempToken] = useState(() => sessionStorage.getItem("oauth_temp_token") || "");
-  const [form, setForm] = useState(() => {
-    const prefillRaw = sessionStorage.getItem("oauth_prefill");
-    if (prefillRaw) {
-      try {
-        const p = JSON.parse(prefillRaw);
-        return {
-          name: p.name || "",
-          nickname: p.nickname || "",
-          birthday: "",
-          phone: "",
-          gender: "M",
-        };
-      } catch {}
-    }
-    return { name: "", nickname: "", birthday: "", phone: "", gender: "M" };
+
+  const prefill = (() => {
+    try {
+      const raw = sessionStorage.getItem("oauth_prefill");
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  })();
+
+  // 소셜(구글/카카오) 공통 처리
+  const provider = prefill.provider || ""; // "GOOGLE" | "KAKAO" | ""
+  const social = provider === "GOOGLE" || provider === "KAKAO";
+  const providerEmailProvided = !!(prefill.email && String(prefill.email).trim());
+  const emailDisabled = social && providerEmailProvided; // 소셜이 제공한 이메일은 수정 불가
+  const emailRequired = social && !providerEmailProvided; // 소셜이 이메일 안 주면 필수
+
+  const [form, setForm] = useState({
+    email: prefill.email || "",
+    name: prefill.name || "",
+    nickname: prefill.nickname || "",
+    birthday: "",
+    phone: "",
+    gender: "M",
+    zipcode: "",
+    address: "",
+    addressDetail: "",
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -221,10 +232,37 @@ export default function AdditionalInfo() {
     window.location.replace("/customer/login");
   };
 
+  const isFilled =
+    (!emailRequired || (form.email && form.email.trim())) &&
+    form.name.trim() &&
+    form.nickname.trim() &&
+    form.birthday &&
+    form.phone.trim() &&
+    form.gender &&
+    form.zipcode.trim() &&
+    form.address.trim() &&
+    form.addressDetail.trim();
+
+  const openZipSearch = async () => {
+    try {
+      await openKakaoPostcodePopup({
+        onComplete: ({ zipcode, address }) => {
+          setForm((f) => ({ ...f, zipcode, address }));
+        },
+      });
+    } catch {
+      alert("우편번호 검색 로딩 실패");
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!oauthTempToken) {
       setMsg("임시 토큰이 없습니다. 처음부터 다시 시도해 주세요.");
+      return;
+    }
+    if (!isFilled) {
+      setMsg(emailRequired ? "이메일을 포함해 필수 항목을 모두 입력해 주세요." : "필수 항목을 모두 입력해 주세요.");
       return;
     }
     setMsg("");
@@ -235,11 +273,15 @@ export default function AdditionalInfo() {
         `/auth/customers/oauth/update`,
         {
           oauthTempToken,
+          email: form.email?.trim() || null, // 소셜 미제공 시만 서버 사용
           name: form.name.trim(),
           nickname: form.nickname.trim(),
           birthday: form.birthday,
           phone: form.phone.trim(),
           gender: form.gender,
+          zipcode: form.zipcode.trim(),
+          address: form.address.trim(),
+          addressDetail: form.addressDetail.trim(),
         },
         { __skipAuthRefresh: true }
       );
@@ -274,13 +316,11 @@ export default function AdditionalInfo() {
         <Card>
           <Brand>Shark</Brand>
           <Slogan>KICKS RULE EVERYTHING AROUND ME</Slogan>
-          <Center>
+          <div style={{ textAlign: "center" }}>
             <Title>추가 정보 입력</Title>
             <p style={{ color: "#6b7280" }}>임시 토큰이 없습니다. 다시 로그인해 주세요.</p>
-            <SmallBtn onClick={() => window.location.replace("/customer/login")}>
-              고객 로그인으로 이동
-            </SmallBtn>
-          </Center>
+            <ZipBtn onClick={() => window.location.replace("/customer/login")}>고객 로그인으로 이동</ZipBtn>
+          </div>
         </Card>
       </Page>
     );
@@ -295,6 +335,22 @@ export default function AdditionalInfo() {
         <Title>추가 정보 입력</Title>
 
         <Form onSubmit={onSubmit}>
+          {/* 이메일: 소셜 제공 → 비활성(회색), 소셜 미제공 → 필수 */}
+          <Row>
+            <Label htmlFor="email">이메일{emailRequired ? " (필수)" : ""}</Label>
+            <Input
+              id="email"
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={onChange}
+              placeholder={emailRequired ? "예) user@example.com" : "이메일"}
+              required={emailRequired}
+              disabled={emailDisabled}
+            />
+            {emailDisabled && <Hint>{provider}에서 제공한 이메일은 수정할 수 없습니다.</Hint>}
+          </Row>
+
           <Row>
             <Label htmlFor="name">이름</Label>
             <Input id="name" name="name" value={form.name} onChange={onChange} required />
@@ -341,11 +397,53 @@ export default function AdditionalInfo() {
             <Hint>하이픈은 있어도 되고 없어도 됩니다.</Hint>
           </Row>
 
+          {/* 주소 */}
+          <Row>
+            <Label htmlFor="zipcode">우편번호</Label>
+            <ZipRow>
+              <Input
+                id="zipcode"
+                name="zipcode"
+                value={form.zipcode}
+                onChange={onChange}
+                placeholder="예) 06236"
+                maxLength={10}
+                required
+              />
+              <ZipBtn type="button" onClick={openZipSearch}>주소찾기</ZipBtn>
+            </ZipRow>
+          </Row>
+
+          <Row>
+            <Label htmlFor="address">주소</Label>
+            <Input
+              id="address"
+              name="address"
+              value={form.address}
+              onChange={onChange}
+              placeholder="예) 서울특별시 강남구 테헤란로 000"
+              maxLength={200}
+              required
+            />
+          </Row>
+
+          <Row>
+            <Label htmlFor="addressDetail">상세주소</Label>
+            <Input
+              id="addressDetail"
+              name="addressDetail"
+              value={form.addressDetail}
+              onChange={onChange}
+              placeholder="예) 00동 000호"
+              maxLength={200}
+              required
+            />
+            <Hint>주소는 배송/정산 등에 사용될 수 있으니 정확히 입력해 주세요.</Hint>
+          </Row>
+
           <ButtonRow>
-            <CancelBtn type="button" onClick={onCancel} disabled={submitting}>
-              취소
-            </CancelBtn>
-            <SubmitBtn type="submit" disabled={submitting}>
+            <CancelBtn type="button" onClick={onCancel} disabled={submitting}>취소</CancelBtn>
+            <SubmitBtn type="submit" disabled={submitting || !isFilled}>
               {submitting ? "제출 중..." : "제출"}
             </SubmitBtn>
           </ButtonRow>
@@ -356,4 +454,3 @@ export default function AdditionalInfo() {
     </Page>
   );
 }
-  

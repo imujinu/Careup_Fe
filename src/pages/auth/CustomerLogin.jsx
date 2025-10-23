@@ -1,37 +1,46 @@
-// src/pages/auth/CustomerLogin.jsx
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
+import { Link } from "react-router-dom";
 import customerAxios from "../../utils/customerAxios";
 import { customerAuthService } from "../../service/customerAuthService";
 
-// === 아이콘 ===
 import GoogleIcon from "../../assets/icons/google_icon.svg";
-import KakaoIcon  from "../../assets/icons/kakao_icon.svg";
+import KakaoIcon from "../../assets/icons/kakao_icon.svg";
 
-// ==== ENV ====
+/* ========================
+ * ENV
+ * ======================== */
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const KAKAO_CLIENT_ID  = import.meta.env.VITE_KAKAO_CLIENT_ID;
+const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
 const GOOGLE_FORCE_CONSENT =
   String(import.meta.env.VITE_GOOGLE_FORCE_CONSENT || "").toLowerCase() === "true";
 
-// ==== PKCE (Google) ====
+/* ========================
+ * PKCE Utilities (Google)
+ * ======================== */
 const b64url = (ab) =>
   btoa(String.fromCharCode(...new Uint8Array(ab)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
-const rand = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
-const sha256b64url = async (txt) => {
-  const data = new TextEncoder().encode(txt);
+
+const randomVerifier = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+
+const sha256b64url = async (text) => {
+  const data = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return b64url(digest);
 };
 
-// ==== 공통 규격 ====
-const CONTROL_HEIGHT = 54;  // 인풋/로그인/소셜 버튼 동일 높이
-const CONTROL_RADIUS = 10;  // 동일 라운드
+/* ========================
+ * UI Constants
+ * ======================== */
+const CONTROL_HEIGHT = 54;
+const CONTROL_RADIUS = 10;
 
-// ==== Styled ====
+/* ========================
+ * Styled Components
+ * ======================== */
 const Page = styled.div`
   min-height: 100vh;
   display: grid;
@@ -45,9 +54,7 @@ const Card = styled.div`
   max-width: 92vw;
   background: #fff;
   border-radius: 22px;
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.06),
-    0 16px 40px rgba(0,0,0,0.12);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.12);
   padding: 40px 36px 32px;
   text-align: left;
 `;
@@ -99,31 +106,18 @@ const Input = styled.input`
   }
 `;
 
-/* 비번 입력 전용: 아이콘 자리 확보 */
-const PwdInput = styled(Input)`
-  padding-right: 48px;
-`;
+const PwdInput = styled(Input)`padding-right: 48px;`;
+const PwdWrap = styled.div`position: relative;`;
 
-/* 비번 아이콘 버튼 래퍼 */
-const PwdWrap = styled.div`
-  position: relative;
-`;
-
-/* 눈 아이콘 버튼 */
 const IconBtn = styled.button`
   position: absolute;
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: 8px; border: 1px solid transparent;
+  background: transparent; color: #6b7280;
+  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
 
@@ -133,126 +127,92 @@ const IconBtn = styled.button`
 `;
 
 const RememberRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  display: flex; align-items: center; justify-content: flex-start;
   margin: 2px 0 0;
 `;
 
 const RememberLabel = styled.label`
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: #374151;
-  user-select: none;
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #374151; user-select: none;
 
   input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    accent-color: #111827;
-    cursor: pointer;
+    width: 18px; height: 18px; margin: 0; accent-color: #111827; cursor: pointer;
   }
 `;
 
 const LoginBtn = styled.button`
-  height: ${CONTROL_HEIGHT}px;
-  border-radius: ${CONTROL_RADIUS}px;
-  border: none;
-  font-weight: 700;
-  font-size: 15px;
-  color: #fff;
+  height: ${CONTROL_HEIGHT}px; border-radius: ${CONTROL_RADIUS}px; border: none;
+  font-weight: 700; font-size: 15px; color: #fff;
   background: ${p => p.disabled ? "#e5e7eb" : "#111827"};
   cursor: ${p => p.disabled ? "not-allowed" : "pointer"};
   transition: transform .02s ease, background-color .15s ease, filter .1s ease;
 
   &:active { transform: translateY(1px); }
-  &:hover { background: ${p => p.disabled ? "#e5e7eb" : "#0f1628"}; }
+  &:hover  { background: ${p => p.disabled ? "#e5e7eb" : "#0f1628"}; }
 `;
 
 const HelpRow = styled.div`
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  font-size: 13px;
-  color: #6b7280;
-  margin: 16px 0 6px;
+  display: flex; justify-content: center; gap: 18px;
+  font-size: 13px; color: #6b7280; margin: 16px 0 6px;
 
   a { color: #6b7280; }
-  span.sep { color: #d1d5db; }
+  .sep { color: #d1d5db; }
 `;
 
-const SocialCol = styled.div`
-  margin-top: 14px;
-  display: grid;
-  gap: 12px;
-`;
+const StyledLink = styled(Link)`color: #6b7280; text-decoration: none;`;
 
-/* 텍스트 중앙, 아이콘 왼쪽 고정 */
+const SocialCol = styled.div`margin-top: 14px; display: grid; gap: 12px;`;
+
+/** transient prop 사용으로 DOM 경고 제거 */
 const SocialBtn = styled.button`
-  position: relative;
-  width: 100%;
-  height: ${CONTROL_HEIGHT}px;
-  border-radius: ${CONTROL_RADIUS}px;
-  border: none;
-  font-weight: 700;
-  font-size: 16px;
-  padding: 0 16px;
-  cursor: pointer;
+  position: relative; width: 100%; height: ${CONTROL_HEIGHT}px;
+  border-radius: ${CONTROL_RADIUS}px; border: none; font-weight: 700; font-size: 16px;
+  padding: 0 16px; cursor: pointer;
   transition: transform .02s ease, filter .1s ease, background-color .15s ease;
-  color: ${p => p.variant === 'kakao' ? "#111" : "#fff"};
-  background: ${p => p.variant === 'google' ? "#EA4335" : "#FEE500"};
+  color: ${p => p.$variant === "kakao" ? "#111" : "#fff"};
+  background: ${p => p.$variant === "google" ? "#EA4335" : "#FEE500"};
 
   &:active { transform: translateY(1px); }
-  &:hover  { background: ${p => p.variant === 'google' ? "#d93d31" : "#f0d600"}; }
+  &:hover  { background: ${p => p.$variant === "google" ? "#d93d31" : "#f0d600"}; }
   &:disabled { filter: grayscale(.35); cursor: not-allowed; }
 `;
 
 const SocialIcon = styled.img`
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px;
 `;
+const SocialText = styled.div`text-align: center; width: 100%; pointer-events: none;`;
 
-const SocialText = styled.div`
-  text-align: center;
-  width: 100%;
-  pointer-events: none;
-`;
+const Msg = styled.p`margin-top: 10px; color: #dc2626; font-size: 13px; min-height: 18px;`;
+const Hint = styled.p`margin-top: 6px; margin-bottom: 0; font-size: 12px; color: #9ca3af;`;
 
-const Msg = styled.p`
-  margin-top: 10px;
-  color: #dc2626;
-  font-size: 13px;
-  min-height: 18px;
-`;
-
-/* === 아이콘 SVG 컴포넌트 (외부 에셋 불필요) === */
+/* Icons */
 const EyeIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
-    <circle cx="12" cy="12" r="3"/>
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+    <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
 const EyeOffIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82M1 1l22 22"/>
-    <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24"/>
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A10.94 10.94 0  0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82" />
+    <path d="M1 1l22 22" />
+    <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
   </svg>
 );
 
+/* ========================
+ * Component
+ * ======================== */
 export default function CustomerLogin() {
-  const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(null); // 'google' | 'kakao' | 'form' | null
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false); // 자동로그인 상태
-  const [showPwd, setShowPwd] = useState(false);       // 비번 표시 토글
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(null); // 'google' | 'kakao' | 'form' | null
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
     if (customerAuthService.isAuthenticated()) {
@@ -269,9 +229,7 @@ export default function CustomerLogin() {
 
   const issueStateOrThrow = async () => {
     setMsg("");
-    const { data } = await customerAxios.get("/auth/customers/oauth/state", {
-      __skipAuthRefresh: true,
-    });
+    const { data } = await customerAxios.get("/auth/customers/oauth/state", { __skipAuthRefresh: true });
     const state = data?.result?.state;
     if (!state) throw new Error("state 발급 실패");
     sessionStorage.setItem("oauth_state", state);
@@ -286,14 +244,11 @@ export default function CustomerLogin() {
     try {
       setLoading("google");
       const state = await issueStateOrThrow();
-
-      // PKCE
-      const verifier = rand();
+      const verifier = randomVerifier();
       sessionStorage.setItem("pkce_verifier", verifier);
       const challenge = await sha256b64url(verifier);
 
       const redirectUri = `${window.location.origin}/oauth/google/callback`;
-
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.searchParams.set("client_id", GOOGLE_CLIENT_ID);
       url.searchParams.set("redirect_uri", redirectUri);
@@ -321,13 +276,15 @@ export default function CustomerLogin() {
     try {
       setLoading("kakao");
       const state = await issueStateOrThrow();
-
       const redirectUri = `${window.location.origin}/oauth/kakao/callback`;
+
       const url = new URL("https://kauth.kakao.com/oauth/authorize");
       url.searchParams.set("client_id", KAKAO_CLIENT_ID);
       url.searchParams.set("redirect_uri", redirectUri);
       url.searchParams.set("response_type", "code");
       url.searchParams.set("state", state);
+      // ★ talk_message + account_email
+      url.searchParams.set("scope", "account_email talk_message");
 
       window.location.href = url.toString();
     } catch (e) {
@@ -339,16 +296,15 @@ export default function CustomerLogin() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    const id = loginId.trim();
+    const pw = password.trim();
+    if (!id || !pw) return;
+
     setLoading("form");
     setMsg("");
 
     try {
-      await customerAuthService.login({
-        id: email.trim(),
-        password: password.trim(),
-        rememberMe, // 자동로그인 플래그 전달
-      });
+      await customerAuthService.login({ id, password: pw, rememberMe });
       window.location.replace("/customer/home");
     } catch (err) {
       const serverMsg = err?.response?.data?.status_message;
@@ -358,6 +314,8 @@ export default function CustomerLogin() {
     }
   };
 
+  const submitDisabled = !loginId.trim() || !password.trim() || loading === "form";
+
   return (
     <Page>
       <Card>
@@ -366,15 +324,18 @@ export default function CustomerLogin() {
 
         <Form onSubmit={onSubmit}>
           <div>
-            <Label htmlFor="email">이메일 주소</Label>
+            <Label htmlFor="loginId">아이디</Label>
             <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="loginId"
+              type="text"
+              inputMode="text"
+              placeholder="이메일 또는 휴대폰 번호"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
               autoComplete="username"
               required
             />
+            <Hint>전화번호는 하이픈 없이도 입력 가능합니다.</Hint>
           </div>
 
           <div>
@@ -400,7 +361,6 @@ export default function CustomerLogin() {
             </PwdWrap>
           </div>
 
-          {/* 자동로그인 체크박스 */}
           <RememberRow>
             <RememberLabel htmlFor="rememberMe">
               <input
@@ -413,45 +373,29 @@ export default function CustomerLogin() {
             </RememberLabel>
           </RememberRow>
 
-          <LoginBtn
-            type="submit"
-            disabled={!email.trim() || !password.trim() || loading === "form"}
-          >
+          <LoginBtn type="submit" disabled={submitDisabled}>
             {loading === "form" ? "로그인 중..." : "로그인"}
           </LoginBtn>
         </Form>
 
         <HelpRow>
-          <a href="#">회원가입</a>
+          <StyledLink to="/customer/signup">회원가입</StyledLink>
           <span className="sep">|</span>
           <a href="#">아이디 찾기</a>
           <span className="sep">|</span>
-          <a href="#">비밀번호 찾기</a>
+          {/* 비밀번호 찾기 라우트 연결 */}
+          <StyledLink to="/customer/password/forgot">비밀번호 찾기</StyledLink>
         </HelpRow>
 
         <SocialCol>
-          <SocialBtn
-            type="button"
-            variant="google"
-            onClick={startGoogle}
-            disabled={loading === "google"}
-          >
+          <SocialBtn type="button" $variant="google" onClick={startGoogle} disabled={loading === "google"}>
             <SocialIcon src={GoogleIcon} alt="Google" />
-            <SocialText>
-              {loading === "google" ? "구글로 이동 중..." : "구글 로그인"}
-            </SocialText>
+            <SocialText>{loading === "google" ? "구글로 이동 중..." : "구글 로그인"}</SocialText>
           </SocialBtn>
 
-          <SocialBtn
-            type="button"
-            variant="kakao"
-            onClick={startKakao}
-            disabled={loading === "kakao"}
-          >
+          <SocialBtn type="button" $variant="kakao" onClick={startKakao} disabled={loading === "kakao"}>
             <SocialIcon src={KakaoIcon} alt="Kakao" />
-            <SocialText>
-              {loading === "kakao" ? "카카오로 이동 중..." : "카카오 로그인"}
-            </SocialText>
+            <SocialText>{loading === "kakao" ? "카카오로 이동 중..." : "카카오 로그인"}</SocialText>
           </SocialBtn>
         </SocialCol>
 

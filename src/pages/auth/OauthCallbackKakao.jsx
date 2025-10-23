@@ -1,8 +1,9 @@
+// src/pages/auth/OauthCallbackKakao.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { customerTokenStorage } from "../../service/customerAuthService";
 import customerAxios from "../../utils/customerAxios";
 
-export default function OAuthCallbackKakao() {
+export default function OauthCallbackKakao() {
   const [msg, setMsg] = useState("처리 중...");
   const ranRef = useRef(false);
 
@@ -60,7 +61,12 @@ export default function OAuthCallbackKakao() {
           sessionStorage.setItem("oauth_temp_token", res.oauthTempToken);
           sessionStorage.setItem(
             "oauth_prefill",
-            JSON.stringify({ email: res.email || "", name: res.name || "", nickname: "" })
+            JSON.stringify({
+              provider: res.provider || "KAKAO",
+              email: res.email || "",
+              name: res.name || "",
+              nickname: "",
+            })
           );
           window.location.replace("/customer/oauth/additional-info");
           return;
@@ -68,7 +74,6 @@ export default function OAuthCallbackKakao() {
 
         setMsg("알 수 없는 상태입니다.");
       } catch (e) {
-        console.error(e);
         const serverMsg = e?.response?.data?.status_message;
         setMsg(serverMsg || e.message || "로그인 처리 실패");
       }
