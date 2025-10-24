@@ -6,6 +6,7 @@ import { tokenStorage, authService } from '../service/authService';
 // ---- 단일 비행 리프레시 상태 ----
 let refreshPromise = null;
 const REFRESH_PATH = '/auth/refresh';
+export const SKIP_FLAG = '__skipAuthRefresh'; // 개별 요청에서 리프레시 스킵하기 위한 플래그
 
 // Request Interceptor - 모든 요청에 Authorization 헤더 추가
 axios.interceptors.request.use(
@@ -36,6 +37,11 @@ axios.interceptors.response.use(
 
     // 401이 아니면 그대로
     if (status !== 401) {
+      return Promise.reject(error);
+    }
+
+    // 로그인/형식검증 등: 리프레시 스킵 지정된 요청
+    if (originalRequest[SKIP_FLAG]) {
       return Promise.reject(error);
     }
 

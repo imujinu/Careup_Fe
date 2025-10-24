@@ -396,6 +396,17 @@ function ShopLayout() {
     }
   };
 
+  // ✅ 관리자 링크 클릭 핸들러 (직원 인증 여부에 따라 이동)
+  const handleAdminClick = (e) => {
+    e.preventDefault();
+    try {
+      const staffAuthed = authService?.isAuthenticated?.();
+      window.location.href = staffAuthed ? "/dashboard" : "/login";
+    } catch {
+      window.location.href = "/login";
+    }
+  };
+
   const filteredProducts = useMemo(() => {
     if (activeTab === "전체") return products;
     return products.filter((p) => p.category === activeTab);
@@ -429,6 +440,15 @@ function ShopLayout() {
               </a>
             )}
             <a href="#">관심</a>
+            <a href="#" onClick={handleAdminClick}>관리자</a>
+            {isLoggedIn && (
+              <a
+                href="#"
+                onClick={handleAdminClick}
+              >
+                관리자
+              </a>
+            )}
             {isLoggedIn && (
               <a
                 href="#"
@@ -514,7 +534,7 @@ function ShopLayout() {
               {!showSearch && (
                 <button className="icon-btn" aria-label="검색" onClick={() => setShowSearch(true)}>
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0-2C6.582 2 3 5.582 3 10s3.582 8 8 8a7.96 7.96 0 0 0 4.9-1.692l4.396 4.396a1 1 0 0 0 1.414-1.414l-4.396-4.396A7.96 7.96 0  0 0 19 10c0-4.418-3.582-8-8-8Z" />
+                    <path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0-2C6.582 2 3 5.582 3 10s3.582 8 8 8a7.96 7.96 0  0 0 4.9-1.692l4.396 4.396a1 1 0  0 0 1.414-1.414l-4.396-4.396A7.96 7.96 0  0 0 19 10c0-4.418-3.582-8-8-8Z" />
                   </svg>
                 </button>
               )}

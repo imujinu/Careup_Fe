@@ -1,0 +1,28 @@
+@font-face {
+  font-family: "GmarketSans";
+  src: url("/fonts/GmarketSansTTFLight.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  font-synthesis: none;
+}
+@font-face {
+  font-family: "GmarketSans";
+  src: url("/fonts/GmarketSansTTFMedium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  font-synthesis: none;
+}
+@font-face {
+  font-family: "GmarketSans";
+  src: url("/fonts/GmarketSansTTFBold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  font-synthesis: none;
+}
+
+/* 전역 적용 예시 */
+:root { --font-sans: "GmarketSans", system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans KR", sans-serif; }
+html, body { font-family: var(--font-sans); }
