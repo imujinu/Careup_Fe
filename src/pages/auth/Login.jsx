@@ -1,10 +1,14 @@
 // src/pages/auth/Login.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 import { useAppDispatch, useAppSelector } from "../../stores/hooks";
 import { loginUser, clearError } from "../../stores/slices/authSlice";
 import careUpLogo from "../../assets/logos/care-up_logo.svg";
+import Icon from "@mdi/react";
+import { mdiLogout } from "@mdi/js";
+import LoginSuccessModal from "../../components/common/LoginSuccessModal";
+import LogoutModal from "../../components/common/LogoutModal";
 
 const fadeIn = keyframes`from{opacity:.0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)}`;
 
@@ -153,7 +157,6 @@ const IconBtn = styled.button`
   &:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(107,114,128,0.18); }
 `;
 
-/* 한 줄 영역을 고정해 '힌트 ↔ 에러'를 교체 렌더링 */
 const FieldNote = styled.p`
   margin: 6px 0 0;
   font-size: 12px;
@@ -190,13 +193,14 @@ const Submit = styled.button`
   font-weight: 800;
   font-size: 15px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform .04s ease, filter .12s ease, background-color .15s ease;
   &:hover { filter: brightness(.98); }
   &:active { transform: translateY(1px); }
   &:disabled { background: #d1d5db; cursor: not-allowed; }
 `;
-
-const Arrow = styled.span`display:inline-block;margin-right:6px;transform:translateY(-1px);`;
 
 const LinksRow = styled.div`
   margin-top: 14px;
@@ -218,7 +222,7 @@ const EyeIcon = (props) => (
 );
 const EyeOffIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94" />
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0  0 1 5.06-5.94" />
     <path d="M9.9 4.24A10.94 10.94 0  0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82" />
     <path d="M1 1l22 22" />
     <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
@@ -228,6 +232,7 @@ const EyeOffIcon = (props) => (
 export default function Login({ onLoginSuccess }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { loading, isAuthenticated } = useAppSelector((s) => s.auth);
 
   const [email, setEmail] = useState("");
@@ -243,6 +248,13 @@ export default function Login({ onLoginSuccess }) {
   const emailRef = useRef(null);
   const pwRef = useRef(null);
 
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successName, setSuccessName] = useState("");
+  const [successNick, setSuccessNick] = useState("");
+  const [skipAutoNav, setSkipAutoNav] = useState(false);
+
+  const [logoutOpen, setLogoutOpen] = useState(false);
+
   useEffect(() => {
     const savedId = localStorage.getItem("remembered_id");
     if (savedId) {
@@ -252,8 +264,29 @@ export default function Login({ onLoginSuccess }) {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) navigate("/dashboard", { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (location.state && location.state.justLoggedOut) {
+      setLogoutOpen(true);
+      navigate("/login", { replace: true, state: {} });
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("loggedout") === "1") {
+      setLogoutOpen(true);
+      params.delete("loggedout");
+      const next = window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState({}, "", next);
+    }
+    const flag = sessionStorage.getItem("staff_just_logged_out");
+    if (flag) {
+      setLogoutOpen(true);
+      sessionStorage.removeItem("staff_just_logged_out");
+    }
+  }, [location, navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated && !successOpen && !skipAutoNav) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate, successOpen, skipAutoNav]);
 
   const validateFields = () => {
     const next = { email: "", password: "" };
@@ -275,6 +308,9 @@ export default function Login({ onLoginSuccess }) {
 
     if (!validateFields()) return;
 
+    // 레이스 방지: 인증 상태가 true로 바뀌기 전에 자동 네비게이션을 막는다.
+    setSkipAutoNav(true);
+
     try {
       const result = await dispatch(
         loginUser({ email, password, rememberMe })
@@ -283,10 +319,13 @@ export default function Login({ onLoginSuccess }) {
       if (rememberId) localStorage.setItem("remembered_id", email);
       else localStorage.removeItem("remembered_id");
 
+      const ui = result?.userInfo || {};
+      setSuccessName(ui.name || "");
+      setSuccessNick(ui.nickname || "");
+      setSuccessOpen(true);
+
       if (onLoginSuccess) onLoginSuccess(result.userInfo);
-      navigate("/dashboard", { replace: true });
     } catch (err) {
-      // rejectWithValue payload 형태: { status, code, message }
       const status = err?.status;
       const code = err?.code;
       const message = err?.message || "로그인에 실패했습니다.";
@@ -304,7 +343,6 @@ export default function Login({ onLoginSuccess }) {
           globalMsg = message;
         }
       } else if (status === 401) {
-        // 백엔드에서 인증 실패 통합코드 사용
         globalMsg = message || "아이디 또는 비밀번호가 올바르지 않습니다.";
       } else if (status === 403) {
         globalMsg = message || "접근 권한이 없습니다.";
@@ -313,11 +351,13 @@ export default function Login({ onLoginSuccess }) {
       }
 
       setLocalError(globalMsg);
+      // 실패했으니 자동 네비게이션 가드를 해제
+      setSkipAutoNav(false);
     }
   };
 
   const onBlurValidate = (name) => {
-    if (!submitted) return; // 로그인 버튼을 눌러본 이후에만 필드 에러 표시
+    if (!submitted) return;
     setFieldErrors((prev) => {
       const next = { ...prev };
       if (name === "email") next.email = email.trim() ? "" : "아이디를 입력해 주세요.";
@@ -346,7 +386,6 @@ export default function Login({ onLoginSuccess }) {
           <CardTitle id="login-title">로그인</CardTitle>
 
           <Form noValidate onSubmit={handleSubmit}>
-            {/* 아이디 */}
             <div>
               <Label htmlFor="emp-id">아이디</Label>
               <Input
@@ -373,7 +412,6 @@ export default function Login({ onLoginSuccess }) {
               </FieldNote>
             </div>
 
-            {/* 비밀번호 */}
             <div>
               <Label htmlFor="emp-pw">비밀번호</Label>
               <PwdWrap>
@@ -412,7 +450,6 @@ export default function Login({ onLoginSuccess }) {
               )}
             </div>
 
-            {/* 옵션 */}
             <OptionsRow>
               <Check>
                 <input
@@ -432,22 +469,42 @@ export default function Login({ onLoginSuccess }) {
               </Check>
             </OptionsRow>
 
-            {/* 제출 */}
             <Submit type="submit" disabled={loading}>
-              <Arrow>→</Arrow> {loading ? "로그인 중..." : "로그인"}
+              <Icon path={mdiLogout} size={0.9} style={{ marginRight: 8 }} aria-hidden />
+              {loading ? "로그인 중..." : "로그인"}
             </Submit>
 
-            {/* 보조 링크 + 서버 에러 */}
             <LinksRow>
               <a href="#" onClick={(e) => e.preventDefault()}>아이디 찾기</a>
               <span className="dot">·</span>
-              <a href="/password/reset">비밀번호 찾기</a>
+              <a href="/password/forgot">비밀번호 찾기</a>
             </LinksRow>
 
             <Msg>{localError}</Msg>
           </Form>
         </Card>
       </Grid>
+
+      <LoginSuccessModal
+        open={successOpen}
+        name={successName}
+        nickname={successNick}
+        onPrimary={() => navigate("/dashboard", { replace: true })}
+        onClose={() => {
+          setSuccessOpen(false);
+          navigate("/dashboard", { replace: true });
+        }}
+        variant="employee"
+        primaryLabel="대시보드로 이동"
+      />
+
+      <LogoutModal
+        open={logoutOpen}
+        onPrimary={() => setLogoutOpen(false)}
+        onClose={() => setLogoutOpen(false)}
+        variant="employee"
+        primaryLabel="닫기"
+      />
     </Screen>
   );
 }

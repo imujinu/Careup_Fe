@@ -11,6 +11,7 @@ export default function PasswordChangeModal({
   title = "비밀번호 변경 완료",
   subtitle = "비밀번호가 안전하게 변경되었습니다.",
   hideName = true,
+  variant = "customer"
 }) {
   const handleClose = () => {
     if (onClose) onClose();
@@ -28,6 +29,7 @@ export default function PasswordChangeModal({
       onPrimary={onPrimary}
       onSecondary={onSecondary}
       onClose={handleClose}
+      variant={variant}
     />
   );
 }

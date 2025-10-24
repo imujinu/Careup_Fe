@@ -19,8 +19,6 @@ import { setSelectedBranch } from "../../store/slices/branchSlice";
 import { cartService } from "../../service/cartService";
 import { customerAuthService } from "../../service/customerAuthService";
 import LogoutModal from "../../components/common/LogoutModal";
-import LoginSuccessModal from "../../components/common/LoginSuccessModal"; // 변경: 로그인 성공 모달 사용
-import { consumeJustLoggedIn } from "../../utils/loginSignals";
 
 function ShopApp() {
   return (
@@ -54,23 +52,8 @@ function ShopLayout() {
   const [showBranchSelector, setShowBranchSelector] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  // 일반 로그인 성공 모달 상태
-  const [loginSuccessOpen, setLoginSuccessOpen] = useState(false);
-  const [welcomeName, setWelcomeName] = useState(currentUser?.name || "");
-  const [welcomeNick, setWelcomeNick] = useState(currentUser?.nickname || "");
-
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
-
-  // /shop 진입 시 1회성 플래그를 소비하고 모달 오픈
-  useEffect(() => {
-    if (consumeJustLoggedIn()) {
-      const ui = customerAuthService.getCurrentUser();
-      setWelcomeName(ui?.name || "");
-      setWelcomeNick(ui?.nickname || "");
-      setLoginSuccessOpen(true);
-    }
-  }, []);
 
   useEffect(() => {
     const categoryImageMap = {
@@ -396,7 +379,6 @@ function ShopLayout() {
     }
   };
 
-  // ✅ 관리자 링크 클릭 핸들러 (직원 인증 여부에 따라 이동)
   const handleAdminClick = (e) => {
     e.preventDefault();
     try {
@@ -441,14 +423,6 @@ function ShopLayout() {
             )}
             <a href="#">관심</a>
             <a href="#" onClick={handleAdminClick}>관리자</a>
-            {isLoggedIn && (
-              <a
-                href="#"
-                onClick={handleAdminClick}
-              >
-                관리자
-              </a>
-            )}
             {isLoggedIn && (
               <a
                 href="#"
@@ -865,22 +839,6 @@ function ShopLayout() {
           setLogoutOpen(false);
           setPage("home");
         }}
-      />
-
-      {/* 일반 로그인 성공 모달: 로그인 문구로 명시 */}
-      <LoginSuccessModal
-        open={loginSuccessOpen}
-        name={welcomeName}
-        nickname={welcomeNick}
-        title="다시 오신 것을 환영합니다."
-        subtitle="로그인이 완료되었습니다."
-        hideName={true}
-        primaryLabel="쇼핑 시작하기"
-        onPrimary={() => {
-          setLoginSuccessOpen(false);
-          setPage("home");
-        }}
-        onClose={() => setLoginSuccessOpen(false)}
       />
     </div>
   );

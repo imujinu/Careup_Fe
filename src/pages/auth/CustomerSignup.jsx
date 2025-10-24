@@ -110,7 +110,7 @@ const IconBtn = styled.button`
   background: transparent; color: #6b7280; display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
   &:hover  { background: #f3f4f6; border-color: #e5e7eb; }
-  &:active { transform: translateY(calc(-50% + 1px)); }
+  &:active { transform: translateY(1px); }
 `;
 
 const ZipRow = styled.div`
@@ -267,7 +267,6 @@ export default function CustomerSignup() {
       const r = data?.result;
 
       if (r?.accessToken) {
-        // 회원가입 응답에 토큰이 포함되어 즉시 로그인된 경우 = "최초 로그인"
         customerTokenStorage.setTokens(r.accessToken, r.refreshToken);
         customerTokenStorage.setUserInfo({
           memberId: r.memberId,
@@ -278,7 +277,6 @@ export default function CustomerSignup() {
           phone: r.phone,
         });
 
-        // 최초 로그인 시점에 바로 '환영 봤음' 기록 (이후부터는 로그인 모달만)
         try { if (r.memberId) markWelcomeSeen(r.memberId); } catch {}
 
         setWelcomeName(r.name || form.name);
@@ -289,7 +287,6 @@ export default function CustomerSignup() {
         return;
       }
 
-      // 일부 서버는 회원가입 직후 토큰을 주지 않음 → 즉시 로그인 시도
       try {
         const loginId = (form.email && form.email.trim()) || (form.phone && form.phone.trim());
         await customerAuthService.login({ id: loginId, password: form.password, rememberMe: true });
@@ -300,12 +297,10 @@ export default function CustomerSignup() {
         setWelcomeScenario("logged-in");
         setWelcomeOpen(true);
 
-        // 즉시 로그인 성공 역시 "최초 로그인"이므로 기록
         try { if (ui.memberId) markWelcomeSeen(ui.memberId); } catch {}
 
         setSubmitting(false);
       } catch {
-        // 로그인은 아직 안 됨 → 최초 로그인 전이므로 기록하지 않음
         setWelcomeName(form.name);
         setWelcomeNick(form.nickname);
         setWelcomeScenario("need-login");
@@ -523,6 +518,7 @@ export default function CustomerSignup() {
           window.location.replace("/shop");
         } : undefined}
         onClose={() => setWelcomeOpen(false)}
+        brand="shark"
       />
     </Page>
   );
