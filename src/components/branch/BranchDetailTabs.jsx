@@ -9,6 +9,7 @@ import {
   mdiAccount
 } from '@mdi/js';
 import EmployeeManagement from './EmployeeManagement';
+import DocumentManagement from './DocumentManagement';
 
 function BranchDetailTabs({ branchId }) {
   const [activeTab, setActiveTab] = useState('owner');
@@ -36,7 +37,7 @@ function BranchDetailTabs({ branchId }) {
       id: 'contract',
       label: '계약 서류',
       icon: mdiFileDocument,
-      component: <ContractContent branchId={branchId} />
+      component: <DocumentManagement branchId={branchId} />
     },
     {
       id: 'customer',
@@ -110,21 +111,6 @@ function KPIContent({ branchId }) {
 }
 
 
-function ContractContent({ branchId }) {
-  return (
-    <PlaceholderContent>
-      <PlaceholderIcon>
-        <Icon path={mdiFileDocument} size={3} />
-      </PlaceholderIcon>
-      <PlaceholderTitle>계약 서류</PlaceholderTitle>
-      <PlaceholderText>
-        지점 {branchId}의 계약 서류 정보가 여기에 표시됩니다.
-        <br />
-        계약서, 갱신 정보, 서류 업로드 등을 관리할 수 있습니다.
-      </PlaceholderText>
-    </PlaceholderContent>
-  );
-}
 
 function CustomerContent({ branchId }) {
   return (
