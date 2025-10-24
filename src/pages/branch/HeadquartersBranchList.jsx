@@ -74,6 +74,11 @@ function HeadquartersBranchList() {
     navigate(`/branch/edit/${branch.id}`);
   };
 
+  const handleViewBranchDetail = (branch) => {
+    console.log('지점 상세 보기 클릭됨:', branch);
+    navigate(`/branch/detail/${branch.id}`);
+  };
+
   const handleDeleteBranch = (branch) => {
     console.log('지점 삭제 버튼 클릭됨:', branch);
     setDeleteModal({ isOpen: true, branch });
@@ -141,6 +146,7 @@ function HeadquartersBranchList() {
           currentSort={currentSort}
           onEdit={handleEditBranch}
           onDelete={handleDeleteBranch}
+          onViewDetail={handleViewBranchDetail}
         />
       )}
 

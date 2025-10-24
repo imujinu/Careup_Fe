@@ -77,6 +77,11 @@ const Avatar = styled.img`
 const NameCell = styled(Td)`
   color: #6d28d9;
   font-weight: 600;
+  cursor: pointer;
+  
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 const ActionButton = styled.button`
@@ -136,6 +141,11 @@ const MobileCardTitle = styled.h3`
   color: #6d28d9;
   font-size: 16px;
   font-weight: 600;
+  cursor: pointer;
+  
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 const MobileCardSubtitle = styled.p`
@@ -250,7 +260,7 @@ const SORTABLE_COLUMNS = {
   zipcode: 'zipcode',
 };
 
-function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
+function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onViewDetail }) {
   const [tooltip, setTooltip] = useState({ visible: false, content: '', x: 0, y: 0 });
 
   const handleSort = (field) => {
@@ -433,9 +443,11 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
                   <Avatar src={b.profileImageUrl || '/vite.svg'} alt={b.name} />
                 </Td>
                 <Td $maxWidth="60px">{b.id}</Td>
-                <NameCell $maxWidth="100px" 
+                <NameCell 
+                  $maxWidth="100px" 
                   onMouseEnter={(e) => handleCellHover(e, b.name)}
                   onMouseLeave={handleCellLeave}
+                  onClick={() => onViewDetail && onViewDetail(b)}
                 >
                   {b.name}
                 </NameCell>
@@ -482,7 +494,7 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort }) {
             <MobileCardHeader>
               <MobileCardAvatar src={b.profileImageUrl || '/vite.svg'} alt={b.name} />
               <MobileCardInfo>
-                <MobileCardTitle>{b.name}</MobileCardTitle>
+                <MobileCardTitle onClick={() => onViewDetail && onViewDetail(b)}>{b.name}</MobileCardTitle>
                 <MobileCardSubtitle>ID: {b.id} | {b.businessDomain}</MobileCardSubtitle>
               </MobileCardInfo>
             </MobileCardHeader>
