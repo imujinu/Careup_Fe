@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState} from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -17,6 +17,8 @@ import Layout from "./layout/Layout";
 import Login from "./pages/auth/Login";
 import { ToastProvider } from "./components/common/Toast";
 import ShopApp from "./storefront/pages/ShopApp";
+import ChatBot from "./components/chatbot/ChatBot";
+import "./components/chatbot/ChatBot.css";
 
 import { headquartersRoutes } from "./routes/headquartersRoutes";
 import { franchiseRoutes } from "./routes/franchiseRoutes";
@@ -53,7 +55,9 @@ function ProtectedRoute() {
 
 function RouteWrapper({ headquartersComponent, franchiseComponent }) {
   const { userType } = useAppSelector((state) => state.auth);
-  return userType === "headquarters" ? headquartersComponent : franchiseComponent;
+  return userType === "headquarters"
+    ? headquartersComponent
+    : franchiseComponent;
 }
 
 function StaffLogoutWatcher() {
@@ -73,6 +77,9 @@ function StaffLogoutWatcher() {
 }
 
 export default function App() {
+  const [showChatBot, setShowChatBot] = useState(true);
+  const { isAuthenticated, userType } = useAppSelector((state) => state.auth);
+
   const getRouteElement = (path) => {
     const hqRoute = headquartersRoutes.find((r) => r.path === path);
     const frRoute = franchiseRoutes.find((r) => r.path === path);
@@ -112,9 +119,18 @@ export default function App() {
             ))}
           </Route>
           <Route path="/customer/login" element={<CustomerLogin />} />
-          <Route path="/oauth/google/callback" element={<OauthCallbackGoogle />} />
-          <Route path="/oauth/kakao/callback" element={<OauthCallbackKakao />} />
-          <Route path="/customer/oauth/additional-info" element={<AdditionalInfo />} />
+          <Route
+            path="/oauth/google/callback"
+            element={<OauthCallbackGoogle />}
+          />
+          <Route
+            path="/oauth/kakao/callback"
+            element={<OauthCallbackKakao />}
+          />
+          <Route
+            path="/customer/oauth/additional-info"
+            element={<AdditionalInfo />}
+          />
           <Route path="/customer/signup" element={<CustomerSignup />} />
           <Route path="/customer/password/forgot" element={<PasswordResetRequest />} />
           <Route path="/customer/password/reset" element={<PasswordReset />} />
@@ -123,6 +139,32 @@ export default function App() {
           <Route path="/" element={<Navigate to="/shop" replace />} />
           <Route path="*" element={<Navigate to="/shop" replace />} />
         </Routes>
+
+        {/* 챗봇 - 관리자(본사)일 때만 표시 */}
+        {/* {isAuthenticated && userType !== "headquarters" && showChatBot && (
+          <ChatBot onClose={() => setShowChatBot(false)} />
+        )} */}
+
+        {showChatBot && <ChatBot onClose={() => setShowChatBot(false)} />}
+
+        {/* 챗봇 토글 버튼 - 관리자(본사)일 때만 표시 */}
+        {/* {isAuthenticated && userType !== "headquarters" && (
+          <button
+            onClick={() => setShowChatBot(!showChatBot)}
+            className="chatbot-toggle-btn"
+            title="챗봇 열기"
+          >
+            🤖
+          </button>
+        )} */}
+
+        <button
+          onClick={() => setShowChatBot(!showChatBot)}
+          className="chatbot-toggle-btn"
+          title="챗봇 열기"
+        >
+          🤖
+        </button>
       </Router>
     </ToastProvider>
   );
