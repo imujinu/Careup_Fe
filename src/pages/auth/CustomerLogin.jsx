@@ -2,11 +2,12 @@ import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Link } from "react-router-dom";
 import customerAxios from "../../utils/customerAxios";
-import { customerAuthService } from "../../service/customerAuthService";
-import { markJustLoggedIn } from "../../utils/loginSignals"; // ✅ 추가
+import { customerAuthService, customerTokenStorage } from "../../service/customerAuthService";
+import { markJustLoggedIn } from "../../utils/loginSignals"; // ✅ 유지
 
 import GoogleIcon from "../../assets/icons/google_icon.svg";
 import KakaoIcon from "../../assets/icons/kakao_icon.svg";
+import LoginSuccessModal from "../../components/common/LoginSuccessModal";
 
 /* ENV */
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -127,6 +128,11 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(null); // 'google' | 'kakao' | 'form' | null
   const [msg, setMsg] = useState("");
 
+  // ✅ 로그인 성공 모달
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successName, setSuccessName] = useState("");
+  const [successNick, setSuccessNick] = useState("");
+
   useEffect(() => {
     if (customerAuthService.isAuthenticated()) {
       window.location.replace("/shop");
@@ -218,7 +224,12 @@ export default function CustomerLogin() {
     try {
       await customerAuthService.login({ id, password: pw, rememberMe });
       markJustLoggedIn();
-      window.location.replace("/shop");
+
+      // ✅ 로그인 성공 모달 오픈 (바로 이동 X)
+      const ui = customerTokenStorage.getUserInfo() || {};
+      setSuccessName(ui.name || "");
+      setSuccessNick(ui.nickname || "");
+      setSuccessOpen(true);
     } catch (err) {
       const serverMsg = err?.response?.data?.status_message;
       setMsg(serverMsg || err.message || "로그인 실패");
@@ -259,6 +270,7 @@ export default function CustomerLogin() {
                 type={showPwd ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호를 입력하세요."
                 autoComplete="current-password"
                 required
               />
@@ -313,6 +325,19 @@ export default function CustomerLogin() {
 
         <Msg>{msg}</Msg>
       </Card>
+
+      {/* ✅ 로그인 성공 모달 */}
+      <LoginSuccessModal
+        open={successOpen}
+        name={successName}
+        nickname={successNick}
+        primaryLabel="쇼핑 시작하기"
+        onPrimary={() => window.location.replace("/shop")}
+        onClose={() => {
+          setSuccessOpen(false);
+          window.location.replace("/shop");
+        }}
+      />
     </Page>
   );
 }
