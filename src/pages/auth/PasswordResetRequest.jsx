@@ -1,7 +1,8 @@
-// src/pages/auth/PasswordResetRequest.jsx
 import React, { useState } from "react";
 import styled from "styled-components";
+import { useNavigate } from "react-router-dom";
 import publicAxios from "../../utils/publicAxios";
+import WelcomeModal from "../../components/common/WelcomeModal";
 
 const CONTROL_HEIGHT = 54;
 const CONTROL_RADIUS = 10;
@@ -108,10 +109,12 @@ const Hint = styled.p`
 `;
 
 export default function PasswordResetRequest() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", mobile: "" });
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
   const [ok, setOk] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const isFilled = form.email.trim() && form.mobile.trim();
 
@@ -134,6 +137,7 @@ export default function PasswordResetRequest() {
       });
       setOk(true);
       setMsg("비밀번호 재설정 링크를 이메일로 전송했어요. 메일함을 확인해 주세요.\n(15분 유효)");
+      setModalOpen(true);
       // 성공/실패 모두 이 화면에 머무름
     } catch (e2) {
       const serverMsg = e2?.response?.data?.status_message;
@@ -185,6 +189,18 @@ export default function PasswordResetRequest() {
 
         <Msg $ok={ok}>{msg}</Msg>
       </Card>
+
+      <WelcomeModal
+        open={modalOpen}
+        title="메일을 보냈어요"
+        subtitle="비밀번호 재설정 링크를 이메일로 전송했습니다. 15분 내에 진행해 주세요."
+        hideName
+        primaryLabel="로그인으로 가기"
+        onPrimary={() => navigate("/customer/login", { replace: true })}
+        secondaryLabel="홈으로 가기"
+        onSecondary={() => navigate("/shop", { replace: true })}
+        onClose={() => setModalOpen(false)}
+      />
     </Page>
   );
 }

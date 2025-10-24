@@ -19,8 +19,6 @@ import { setSelectedBranch } from "../../store/slices/branchSlice";
 import { cartService } from "../../service/cartService";
 import { customerAuthService } from "../../service/customerAuthService";
 import LogoutModal from "../../components/common/LogoutModal";
-import LoginSuccessModal from "../../components/common/LoginSuccessModal"; // 변경: 로그인 성공 모달 사용
-import { consumeJustLoggedIn } from "../../utils/loginSignals";
 
 function ShopApp() {
   return (
@@ -54,23 +52,8 @@ function ShopLayout() {
   const [showBranchSelector, setShowBranchSelector] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  // 일반 로그인 성공 모달 상태
-  const [loginSuccessOpen, setLoginSuccessOpen] = useState(false);
-  const [welcomeName, setWelcomeName] = useState(currentUser?.name || "");
-  const [welcomeNick, setWelcomeNick] = useState(currentUser?.nickname || "");
-
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
-
-  // /shop 진입 시 1회성 플래그를 소비하고 모달 오픈
-  useEffect(() => {
-    if (consumeJustLoggedIn()) {
-      const ui = customerAuthService.getCurrentUser();
-      setWelcomeName(ui?.name || "");
-      setWelcomeNick(ui?.nickname || "");
-      setLoginSuccessOpen(true);
-    }
-  }, []);
 
   useEffect(() => {
     const categoryImageMap = {
@@ -396,6 +379,16 @@ function ShopLayout() {
     }
   };
 
+  const handleAdminClick = (e) => {
+    e.preventDefault();
+    try {
+      const staffAuthed = authService?.isAuthenticated?.();
+      window.location.href = staffAuthed ? "/dashboard" : "/login";
+    } catch {
+      window.location.href = "/login";
+    }
+  };
+
   const filteredProducts = useMemo(() => {
     if (activeTab === "전체") return products;
     return products.filter((p) => p.category === activeTab);
@@ -429,6 +422,7 @@ function ShopLayout() {
               </a>
             )}
             <a href="#">관심</a>
+            <a href="#" onClick={handleAdminClick}>관리자</a>
             {isLoggedIn && (
               <a
                 href="#"
@@ -514,7 +508,7 @@ function ShopLayout() {
               {!showSearch && (
                 <button className="icon-btn" aria-label="검색" onClick={() => setShowSearch(true)}>
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0-2C6.582 2 3 5.582 3 10s3.582 8 8 8a7.96 7.96 0 0 0 4.9-1.692l4.396 4.396a1 1 0 0 0 1.414-1.414l-4.396-4.396A7.96 7.96 0  0 0 19 10c0-4.418-3.582-8-8-8Z" />
+                    <path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0-2C6.582 2 3 5.582 3 10s3.582 8 8 8a7.96 7.96 0  0 0 4.9-1.692l4.396 4.396a1 1 0  0 0 1.414-1.414l-4.396-4.396A7.96 7.96 0  0 0 19 10c0-4.418-3.582-8-8-8Z" />
                   </svg>
                 </button>
               )}
@@ -845,22 +839,6 @@ function ShopLayout() {
           setLogoutOpen(false);
           setPage("home");
         }}
-      />
-
-      {/* 일반 로그인 성공 모달: 로그인 문구로 명시 */}
-      <LoginSuccessModal
-        open={loginSuccessOpen}
-        name={welcomeName}
-        nickname={welcomeNick}
-        title="다시 오신 것을 환영합니다."
-        subtitle="로그인이 완료되었습니다."
-        hideName={true}
-        primaryLabel="쇼핑 시작하기"
-        onPrimary={() => {
-          setLoginSuccessOpen(false);
-          setPage("home");
-        }}
-        onClose={() => setLoginSuccessOpen(false)}
       />
     </div>
   );
