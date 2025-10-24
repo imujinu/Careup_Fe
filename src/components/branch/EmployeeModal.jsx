@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
-import { mdiClose, mdiUpload, mdiCalendar } from '@mdi/js';
+import { mdiClose, mdiUpload, mdiCalendar, mdiMagnify, mdiEye, mdiEyeOff } from '@mdi/js';
 
 function EmployeeModal({ 
   isOpen, 
@@ -39,8 +39,21 @@ function EmployeeModal({
   const [profileImage, setProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(null);
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const isEdit = !!employee;
+
+  // 카카오 주소 API 로드
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+    script.async = true;
+    document.head.appendChild(script);
+    
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -130,6 +143,39 @@ function EmployeeModal({
     }
   };
 
+  const handleAddressSearch = () => {
+    if (window.daum && window.daum.Postcode) {
+      new window.daum.Postcode({
+        oncomplete: function(data) {
+          // 우편번호와 주소 정보를 해당 필드에 넣는다.
+          setFormData(prev => ({
+            ...prev,
+            zipcode: data.zonecode,
+            address: data.address
+          }));
+          
+          // 에러 제거
+          if (errors.zipcode) {
+            setErrors(prev => ({
+              ...prev,
+              zipcode: null
+            }));
+          }
+          if (errors.address) {
+            setErrors(prev => ({
+              ...prev,
+              address: null
+            }));
+          }
+        }
+      }).open();
+    }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -145,6 +191,14 @@ function EmployeeModal({
     if (!formData.emergencyName.trim()) newErrors.emergencyName = '비상연락처 이름을 입력하세요';
     if (!formData.hireDate) newErrors.hireDate = '입사일을 입력하세요';
     if (!isEdit && !formData.rawPassword.trim()) newErrors.rawPassword = '비밀번호를 입력하세요';
+    
+    // dispatches 유효성 검사
+    if (!formData.dispatches || formData.dispatches.length === 0) {
+      newErrors.dispatches = '지점 배치 정보가 필요합니다';
+    } else {
+      const dispatch = formData.dispatches[0];
+      if (!dispatch.assignedFrom) newErrors.assignedFrom = '배치 시작일을 입력하세요';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -163,6 +217,15 @@ function EmployeeModal({
     if (isEdit && !submitData.rawPassword) {
       delete submitData.rawPassword;
     }
+
+    console.log('=== EmployeeModal 데이터 전송 준비 ===');
+    console.log('모드:', isEdit ? '수정' : '등록');
+    console.log('전송할 데이터:', submitData);
+    console.log('프로필 이미지:', profileImage);
+    console.log('이미지 파일명:', profileImage?.name);
+    console.log('이미지 파일 크기:', profileImage?.size);
+    console.log('이미지 파일 타입:', profileImage?.type);
+    console.log('=== EmployeeModal 데이터 전송 시작 ===');
 
     onSave(submitData, profileImage);
   };
@@ -215,8 +278,43 @@ function EmployeeModal({
 
         <Form onSubmit={handleSubmit}>
           <FormSection>
+            <SectionTitle>프로필 이미지</SectionTitle>
+            <ProfileImageSection>
+              <ImageUploadContainer>
+                <ImagePreview>
+                  {profileImagePreview ? (
+                    <img src={profileImagePreview} alt="프로필 미리보기" />
+                  ) : (
+                    <UploadPlaceholder>
+                      <Icon path={mdiUpload} size={2} />
+                      <span>이미지 업로드</span>
+                    </UploadPlaceholder>
+                  )}
+                </ImagePreview>
+                <ImageInput
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                />
+              </ImageUploadContainer>
+            </ProfileImageSection>
+          </FormSection>
+
+          <FormSection>
             <SectionTitle>기본 정보</SectionTitle>
             <FormRow>
+              <FormGroup>
+                <Label required>사번</Label>
+                <Input
+                  type="text"
+                  placeholder="사번을 입력하세요"
+                  value={formData.employeeNumber}
+                  onChange={(e) => handleInputChange('employeeNumber', e.target.value)}
+                  error={errors.employeeNumber}
+                />
+                {errors.employeeNumber && <ErrorText>{errors.employeeNumber}</ErrorText>}
+              </FormGroup>
+              
               <FormGroup>
                 <Label required>점주명</Label>
                 <Input
@@ -240,7 +338,9 @@ function EmployeeModal({
                 />
                 {errors.dateOfBirth && <ErrorText>{errors.dateOfBirth}</ErrorText>}
               </FormGroup>
-              
+            </FormRow>
+            
+            <FormRow>
               <FormGroup>
                 <Label required>성별</Label>
                 <Select
@@ -250,52 +350,6 @@ function EmployeeModal({
                   <option value="MALE">남성</option>
                   <option value="FEMALE">여성</option>
                 </Select>
-              </FormGroup>
-            </FormRow>
-
-            <FormGroup>
-              <Label>프로필 이미지</Label>
-              <ImageUploadContainer>
-                <ImagePreview>
-                  {profileImagePreview ? (
-                    <img src={profileImagePreview} alt="프로필 미리보기" />
-                  ) : (
-                    <UploadPlaceholder>
-                      <Icon path={mdiUpload} size={2} />
-                      <span>이미지 업로드</span>
-                    </UploadPlaceholder>
-                  )}
-                </ImagePreview>
-                <ImageInput
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                />
-              </ImageUploadContainer>
-            </FormGroup>
-          </FormSection>
-
-          <FormSection>
-            <SectionTitle>사업자 정보</SectionTitle>
-            <FormRow>
-              <FormGroup>
-                <Label required>사업자등록번호</Label>
-                <Input
-                  type="text"
-                  placeholder="123-45-67890"
-                  value={formData.employeeNumber}
-                  onChange={(e) => handleInputChange('employeeNumber', e.target.value)}
-                  error={errors.employeeNumber}
-                />
-                {errors.employeeNumber && <ErrorText>{errors.employeeNumber}</ErrorText>}
-              </FormGroup>
-              
-              <FormGroup>
-                <Label>법인등록번호</Label>
-                <Input
-                  type="text"
-                  placeholder="123456-1234567"
-                />
               </FormGroup>
             </FormRow>
           </FormSection>
@@ -327,6 +381,48 @@ function EmployeeModal({
                 {errors.mobile && <ErrorText>{errors.mobile}</ErrorText>}
               </FormGroup>
             </FormRow>
+            
+            <FormRow>
+              <FormGroup>
+                <Label required>비상연락처</Label>
+                <Input
+                  type="tel"
+                  placeholder="010-9876-5432"
+                  value={formData.emergencyTel}
+                  onChange={(e) => handleInputChange('emergencyTel', e.target.value)}
+                  error={errors.emergencyTel}
+                />
+                {errors.emergencyTel && <ErrorText>{errors.emergencyTel}</ErrorText>}
+              </FormGroup>
+              
+              <FormGroup>
+                <Label required>비상연락처 이름</Label>
+                <Input
+                  type="text"
+                  placeholder="비상연락처 이름을 입력하세요"
+                  value={formData.emergencyName}
+                  onChange={(e) => handleInputChange('emergencyName', e.target.value)}
+                  error={errors.emergencyName}
+                />
+                {errors.emergencyName && <ErrorText>{errors.emergencyName}</ErrorText>}
+              </FormGroup>
+              
+              <FormGroup>
+                <Label required>관계</Label>
+                <Select
+                  value={formData.relationship}
+                  onChange={(e) => handleInputChange('relationship', e.target.value)}
+                >
+                  <option value="PARENT">부모</option>
+                  <option value="SIBLING">형제자매</option>
+                  <option value="SPOUSE">배우자</option>
+                  <option value="CHILD">자녀</option>
+                  <option value="FRIEND">친구</option>
+                  <option value="NEIGHBOR">이웃</option>
+                  <option value="OTHER">기타</option>
+                </Select>
+              </FormGroup>
+            </FormRow>
           </FormSection>
 
           <FormSection>
@@ -334,13 +430,19 @@ function EmployeeModal({
             <FormRow>
               <FormGroup>
                 <Label required>우편번호</Label>
-                <Input
-                  type="text"
-                  placeholder="06292"
-                  value={formData.zipcode}
-                  onChange={(e) => handleInputChange('zipcode', e.target.value)}
-                  error={errors.zipcode}
-                />
+                <AddressInputContainer>
+                  <Input
+                    type="text"
+                    placeholder="06292"
+                    value={formData.zipcode}
+                    readOnly
+                    error={errors.zipcode}
+                  />
+                  <AddressSearchButton type="button" onClick={handleAddressSearch}>
+                    <Icon path={mdiMagnify} size={1} />
+                    주소 검색
+                  </AddressSearchButton>
+                </AddressInputContainer>
                 {errors.zipcode && <ErrorText>{errors.zipcode}</ErrorText>}
               </FormGroup>
             </FormRow>
@@ -351,7 +453,7 @@ function EmployeeModal({
                 type="text"
                 placeholder="서울특별시 강남구 테헤란로 123"
                 value={formData.address}
-                onChange={(e) => handleInputChange('address', e.target.value)}
+                readOnly
                 error={errors.address}
               />
               {errors.address && <ErrorText>{errors.address}</ErrorText>}
@@ -371,24 +473,142 @@ function EmployeeModal({
           </FormSection>
 
           <FormSection>
-            <SectionTitle>대리인 정보 (선택사항)</SectionTitle>
+            <SectionTitle>고용 정보</SectionTitle>
             <FormRow>
               <FormGroup>
-                <Label>대리인명</Label>
+                <Label required>입사일</Label>
                 <Input
-                  type="text"
-                  placeholder="대리인명을 입력하세요"
+                  type="date"
+                  placeholder="연도-월-일"
+                  value={formData.hireDate}
+                  onChange={(e) => handleInputChange('hireDate', e.target.value)}
+                  error={errors.hireDate}
                 />
+                {errors.hireDate && <ErrorText>{errors.hireDate}</ErrorText>}
               </FormGroup>
               
               <FormGroup>
-                <Label>대리인 연락처</Label>
+                <Label>퇴사일</Label>
                 <Input
-                  type="tel"
-                  placeholder="010-9876-5432"
+                  type="date"
+                  placeholder="연도-월-일"
+                  value={formData.terminateDate}
+                  onChange={(e) => handleInputChange('terminateDate', e.target.value)}
                 />
               </FormGroup>
             </FormRow>
+            
+            <FormRow>
+              <FormGroup>
+                <Label required>권한 유형</Label>
+                <Select
+                  value={formData.authorityType}
+                  onChange={(e) => handleInputChange('authorityType', e.target.value)}
+                >
+                  <option value="HQ_ADMIN">본점(본사) 관리자</option>
+                  <option value="BRANCH_ADMIN">지점(직영점) 관리자</option>
+                  <option value="FRANCHISE_OWNER">가맹점주 (관리자)</option>
+                  <option value="STAFF">직원</option>
+                </Select>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label required>고용 상태</Label>
+                <Select
+                  value={formData.employmentStatus}
+                  onChange={(e) => handleInputChange('employmentStatus', e.target.value)}
+                >
+                  <option value="ACTIVE">재직</option>
+                  <option value="ON_LEAVE">휴직</option>
+                  <option value="TERMINATED">퇴사</option>
+                </Select>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label required>고용 유형</Label>
+                <Select
+                  value={formData.employmentType}
+                  onChange={(e) => handleInputChange('employmentType', e.target.value)}
+                >
+                  <option value="FULL_TIME">정규직</option>
+                  <option value="PART_TIME">계약직</option>
+                </Select>
+              </FormGroup>
+            </FormRow>
+          </FormSection>
+
+          <FormSection>
+            <SectionTitle>지점 배치 정보</SectionTitle>
+            <FormRow>
+              <FormGroup>
+                <Label required>배치 시작일</Label>
+                <Input
+                  type="date"
+                  placeholder="연도-월-일"
+                  value={formData.dispatches[0]?.assignedFrom || ''}
+                  onChange={(e) => handleInputChange('dispatches', [{
+                    ...formData.dispatches[0],
+                    assignedFrom: e.target.value
+                  }])}
+                  error={errors.assignedFrom}
+                />
+                {errors.assignedFrom && <ErrorText>{errors.assignedFrom}</ErrorText>}
+              </FormGroup>
+              
+              <FormGroup>
+                <Label>배치 종료일</Label>
+                <Input
+                  type="date"
+                  placeholder="연도-월-일"
+                  value={formData.dispatches[0]?.assignedTo || ''}
+                  onChange={(e) => handleInputChange('dispatches', [{
+                    ...formData.dispatches[0],
+                    assignedTo: e.target.value
+                  }])}
+                  error={errors.assignedTo}
+                />
+                {errors.assignedTo && <ErrorText>{errors.assignedTo}</ErrorText>}
+              </FormGroup>
+            </FormRow>
+          </FormSection>
+
+          <FormSection>
+            <SectionTitle>계정 정보</SectionTitle>
+            {!isEdit && (
+              <FormGroup>
+                <Label required>비밀번호</Label>
+                <PasswordInputContainer>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="8자 이상 입력하세요"
+                    value={formData.rawPassword}
+                    onChange={(e) => handleInputChange('rawPassword', e.target.value)}
+                    error={errors.rawPassword}
+                  />
+                  <PasswordToggleButton type="button" onClick={togglePasswordVisibility}>
+                    <Icon path={showPassword ? mdiEyeOff : mdiEye} size={1} />
+                  </PasswordToggleButton>
+                </PasswordInputContainer>
+                {errors.rawPassword && <ErrorText>{errors.rawPassword}</ErrorText>}
+              </FormGroup>
+            )}
+            
+            {isEdit && (
+              <FormGroup>
+                <Label>비밀번호 변경 (선택사항)</Label>
+                <PasswordInputContainer>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="새 비밀번호를 입력하세요 (8자 이상)"
+                    value={formData.rawPassword}
+                    onChange={(e) => handleInputChange('rawPassword', e.target.value)}
+                  />
+                  <PasswordToggleButton type="button" onClick={togglePasswordVisibility}>
+                    <Icon path={showPassword ? mdiEyeOff : mdiEye} size={1} />
+                  </PasswordToggleButton>
+                </PasswordInputContainer>
+              </FormGroup>
+            )}
           </FormSection>
 
           <FormSection>
@@ -531,6 +751,7 @@ const Input = styled.input`
   border-radius: 8px;
   font-size: 14px;
   transition: all 0.2s;
+  width: 100%;
 
   &:focus {
     outline: none;
@@ -585,10 +806,10 @@ const ImageUploadContainer = styled.div`
 `;
 
 const ImagePreview = styled.div`
-  width: 120px;
-  height: 120px;
+  width: 150px;
+  height: 150px;
   border: 2px dashed #d1d5db;
-  border-radius: 8px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -678,5 +899,75 @@ const SubmitButton = styled.button`
   &:disabled {
     background: #9ca3af;
     cursor: not-allowed;
+  }
+`;
+
+const AddressInputContainer = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+`;
+
+const AddressSearchButton = styled.button`
+  padding: 12px 16px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+  }
+`;
+
+const ProfileImageSection = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+`;
+
+const PasswordInputContainer = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  input {
+    padding-right: 48px;
+  }
+`;
+
+const PasswordToggleButton = styled.button`
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: #374151;
+    background: #f3f4f6;
+  }
+
+  &:focus {
+    outline: none;
+    color: #8b5cf6;
   }
 `;

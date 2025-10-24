@@ -215,7 +215,7 @@ function EmployeeTable({
                 danger
               >
                 <Icon path={mdiDelete} size={1} />
-                삭제
+                퇴사 처리
               </ContextMenuItem>
             )}
           </ContextMenu>

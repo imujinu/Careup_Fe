@@ -42,6 +42,7 @@ function EmployeeManagement({ branchId }) {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState(null);
+  const [modalAction, setModalAction] = useState('terminate'); // 'terminate' or 'rehire'
 
   useEffect(() => {
     if (branchId) {
@@ -183,24 +184,34 @@ function EmployeeManagement({ branchId }) {
     console.log('View detail:', employee);
   };
 
-  const handleDeleteEmployee = (employee) => {
+  const handleTerminateEmployee = (employee) => {
     setDeletingEmployee(employee);
+    setModalAction('terminate');
     setShowDeleteModal(true);
   };
 
   const handleRehireEmployee = (employee) => {
-    dispatch(rehireEmployeeAction(employee.id));
+    setDeletingEmployee(employee);
+    setModalAction('rehire');
+    setShowDeleteModal(true);
   };
 
   const handleSaveEmployee = async (employeeData, profileImage) => {
+    console.log('=== EmployeeManagement 데이터 처리 시작 ===');
+    console.log('편집 중인 직원:', editingEmployee);
+    console.log('받은 직원 데이터:', employeeData);
+    console.log('받은 프로필 이미지:', profileImage);
+    
     try {
       if (editingEmployee) {
+        console.log('직원 수정 모드 - Redux Action 호출');
         await dispatch(updateEmployeeAction({
           employeeId: editingEmployee.id,
           employeeData,
           profileImage
         })).unwrap();
         
+        console.log('직원 수정 성공');
         addToast({
           type: 'success',
           title: '수정 완료',
@@ -208,11 +219,13 @@ function EmployeeManagement({ branchId }) {
           duration: 3000
         });
       } else {
+        console.log('직원 등록 모드 - Redux Action 호출');
         await dispatch(createEmployeeAction({
           employeeData,
           profileImage
         })).unwrap();
         
+        console.log('직원 등록 성공');
         addToast({
           type: 'success',
           title: '등록 완료',
@@ -224,6 +237,7 @@ function EmployeeManagement({ branchId }) {
       setShowModal(false);
       setEditingEmployee(null);
       
+      console.log('목록 새로고침 시작');
       // 목록 새로고침
       dispatch(fetchEmployeeListByBranchAction({ 
         branchId, 
@@ -233,25 +247,39 @@ function EmployeeManagement({ branchId }) {
           sort: 'employmentStatus,asc' 
         } 
       }));
+      console.log('=== EmployeeManagement 데이터 처리 완료 ===');
     } catch (error) {
+      console.error('직원 저장 중 오류 발생:', error);
       // 에러는 useEffect에서 처리됨
     }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmAction = async () => {
     if (deletingEmployee) {
       try {
-        await dispatch(deactivateEmployeeAction(deletingEmployee.id)).unwrap();
-        
-        addToast({
-          type: 'success',
-          title: '삭제 완료',
-          message: '점주가 성공적으로 비활성화되었습니다.',
-          duration: 3000
-        });
+        if (modalAction === 'terminate') {
+          await dispatch(deactivateEmployeeAction(deletingEmployee.id)).unwrap();
+          
+          addToast({
+            type: 'success',
+            title: '퇴사 처리 완료',
+            message: `${deletingEmployee.name} 점주가 성공적으로 퇴사 처리되었습니다.`,
+            duration: 3000
+          });
+        } else if (modalAction === 'rehire') {
+          await dispatch(rehireEmployeeAction(deletingEmployee.id)).unwrap();
+          
+          addToast({
+            type: 'success',
+            title: '재입사 처리 완료',
+            message: `${deletingEmployee.name} 점주가 성공적으로 재입사 처리되었습니다.`,
+            duration: 3000
+          });
+        }
         
         setShowDeleteModal(false);
         setDeletingEmployee(null);
+        setModalAction('terminate');
         
         // 목록 새로고침
         dispatch(fetchEmployeeListByBranchAction({ 
@@ -276,6 +304,7 @@ function EmployeeManagement({ branchId }) {
   const handleCloseDeleteModal = () => {
     setShowDeleteModal(false);
     setDeletingEmployee(null);
+    setModalAction('terminate');
   };
 
   // 백엔드에서 필터링된 직원 목록을 그대로 사용
@@ -302,7 +331,7 @@ function EmployeeManagement({ branchId }) {
         loading={loading}
         onViewDetail={handleViewDetail}
         onEdit={handleEditEmployee}
-        onDelete={handleDeleteEmployee}
+        onDelete={handleTerminateEmployee}
         onRehire={handleRehireEmployee}
       />
 
@@ -321,11 +350,14 @@ function EmployeeManagement({ branchId }) {
         <DeleteConfirmModal
           isOpen={showDeleteModal}
           onClose={handleCloseDeleteModal}
-          onConfirm={handleConfirmDelete}
-          title="점주 비활성화"
-          message={`${deletingEmployee.name} 점주를 비활성화하시겠습니까?`}
-          confirmText="비활성화"
-          loading={deactivateLoading}
+          onConfirm={handleConfirmAction}
+          title={modalAction === 'terminate' ? '점주 퇴사 처리' : '점주 재입사 처리'}
+          message={modalAction === 'terminate' 
+            ? `${deletingEmployee.name} 점주를 퇴사 처리하시겠습니까?`
+            : `${deletingEmployee.name} 점주를 재입사 처리하시겠습니까?`
+          }
+          confirmText={modalAction === 'terminate' ? '퇴사 처리' : '재입사 처리'}
+          loading={modalAction === 'terminate' ? deactivateLoading : rehireLoading}
         />
       )}
     </Container>
