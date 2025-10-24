@@ -164,7 +164,9 @@ const BranchName = styled.h1`
   margin: 0;
 `;
 
-const StatusBadge = styled.div`
+const StatusBadge = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'statusColor',
+})`
   background: ${props => props.statusColor};
   color: white;
   padding: 6px 16px;

@@ -397,7 +397,9 @@ const StatusSection = styled.div`
   margin-top: 8px;
 `;
 
-const StatusBadge = styled.span`
+const StatusBadge = styled.span.withConfig({
+  shouldForwardProp: (prop) => prop !== 'status',
+})`
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 12px;
@@ -468,7 +470,9 @@ const ContextMenu = styled.div`
   z-index: 1001;
 `;
 
-const ContextMenuItem = styled.div`
+const ContextMenuItem = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'danger',
+})`
   display: flex;
   align-items: center;
   gap: 8px;

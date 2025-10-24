@@ -33,7 +33,9 @@ const ToastContainer = styled.div`
   gap: 12px;
 `;
 
-const Toast = styled.div`
+const Toast = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isVisible' && prop !== 'type',
+})`
   background: ${props => {
     switch (props.type) {
       case 'success': return '#10b981';
