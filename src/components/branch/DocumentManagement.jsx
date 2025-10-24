@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import DocumentSearchAndFilter from './DocumentSearchAndFilter';
 import DocumentTable from './DocumentTable';
 import DocumentUploadModal from './DocumentUploadModal';
+import DocumentEditModal from './DocumentEditModal';
 import DeleteConfirmModal from '../common/DeleteConfirmModal';
 import { documentService } from '../../service/documentService';
 import { useToast } from '../common/Toast';
@@ -25,6 +26,7 @@ function DocumentManagement({ branchId }) {
   
   // 모달 상태
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   
@@ -68,6 +70,24 @@ function DocumentManagement({ branchId }) {
       type: 'success',
       title: '성공',
       message: '문서가 성공적으로 업로드되었습니다.',
+      duration: 3000
+    });
+  };
+
+  const handleEditClick = (document) => {
+    setSelectedDocument(document);
+    setShowEditModal(true);
+  };
+
+  const handleEditSuccess = () => {
+    setShowEditModal(false);
+    setSelectedDocument(null);
+    fetchDocuments();
+    
+    addToast({
+      type: 'success',
+      title: '성공',
+      message: '문서가 성공적으로 수정되었습니다.',
       duration: 3000
     });
   };
@@ -197,6 +217,7 @@ function DocumentManagement({ branchId }) {
       <DocumentTable
         documents={filteredDocuments}
         onDownload={handleDownload}
+        onEdit={handleEditClick}
         onDelete={handleDeleteClick}
         loading={loading}
       />
@@ -207,6 +228,19 @@ function DocumentManagement({ branchId }) {
           onClose={() => setShowUploadModal(false)}
           employeeId={employeeId}
           onSuccess={handleUploadSuccess}
+        />
+      )}
+
+      {showEditModal && (
+        <DocumentEditModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedDocument(null);
+          }}
+          employeeId={employeeId}
+          document={selectedDocument}
+          onSuccess={handleEditSuccess}
         />
       )}
 

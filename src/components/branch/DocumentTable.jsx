@@ -1,10 +1,11 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
-import { mdiDownload, mdiDelete, mdiFileDocument } from '@mdi/js';
+import { mdiDownload, mdiDelete, mdiFileDocument, mdiPencil } from '@mdi/js';
 import { DOCUMENT_TYPES } from '../../service/documentService';
+import Tooltip from '../common/Tooltip';
 
-function DocumentTable({ documents, onDownload, onDelete, loading }) {
+function DocumentTable({ documents, onDownload, onDelete, onEdit, loading }) {
   const getDocumentTypeLabel = (type) => {
     return DOCUMENT_TYPES[type] || type;
   };
@@ -132,20 +133,30 @@ function DocumentTable({ documents, onDownload, onDelete, loading }) {
               </CardContent>
               
               <CardActions>
-                <ActionButton 
-                  onClick={() => onDownload(document)}
-                  variant="primary"
-                >
-                  <Icon path={mdiDownload} size={1} />
-                  다운로드
-                </ActionButton>
-                <ActionButton 
-                  onClick={() => onDelete(document)}
-                  variant="danger"
-                >
-                  <Icon path={mdiDelete} size={1} />
-                  삭제
-                </ActionButton>
+                <Tooltip content="다운로드" position="top">
+                  <ActionButton 
+                    onClick={() => onDownload(document)}
+                    variant="primary"
+                  >
+                    <Icon path={mdiDownload} size={1.2} />
+                  </ActionButton>
+                </Tooltip>
+                <Tooltip content="수정" position="top">
+                  <ActionButton 
+                    onClick={() => onEdit(document)}
+                    variant="secondary"
+                  >
+                    <Icon path={mdiPencil} size={1.2} />
+                  </ActionButton>
+                </Tooltip>
+                <Tooltip content="삭제" position="top">
+                  <ActionButton 
+                    onClick={() => onDelete(document)}
+                    variant="danger"
+                  >
+                    <Icon path={mdiDelete} size={1.2} />
+                  </ActionButton>
+                </Tooltip>
               </CardActions>
             </DocumentCard>
           );
@@ -289,25 +300,24 @@ const DetailValue = styled.span`
 
 const CardActions = styled.div`
   display: flex;
-  gap: 8px;
+  gap: 12px;
   padding: 16px 20px 20px 20px;
+  justify-content: center;
 `;
 
 const ActionButton = styled.button.withConfig({
   shouldForwardProp: (prop) => prop !== 'variant',
 })`
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
   
   ${props => props.variant === 'primary' && `
     background: #3b82f6;
@@ -315,6 +325,19 @@ const ActionButton = styled.button.withConfig({
     
     &:hover {
       background: #2563eb;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    }
+  `}
+  
+  ${props => props.variant === 'secondary' && `
+    background: #6b7280;
+    color: white;
+    
+    &:hover {
+      background: #4b5563;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
     }
   `}
   
@@ -324,6 +347,8 @@ const ActionButton = styled.button.withConfig({
     
     &:hover {
       background: #b91c1c;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
     }
   `}
 `;
