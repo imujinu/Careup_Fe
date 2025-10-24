@@ -226,7 +226,9 @@ const CardHeader = styled.div`
   justify-content: flex-end;
 `;
 
-const StatusBadge = styled.span`
+const StatusBadge = styled.span.withConfig({
+  shouldForwardProp: (prop) => prop !== 'color',
+})`
   background: ${props => props.color};
   color: white;
   padding: 4px 12px;
@@ -291,7 +293,9 @@ const CardActions = styled.div`
   padding: 16px 20px 20px 20px;
 `;
 
-const ActionButton = styled.button`
+const ActionButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => prop !== 'variant',
+})`
   flex: 1;
   display: flex;
   align-items: center;

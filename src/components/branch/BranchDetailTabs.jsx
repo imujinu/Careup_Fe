@@ -144,7 +144,9 @@ const TabsHeader = styled.div`
   border-bottom: 1px solid #e5e7eb;
 `;
 
-const TabButton = styled.button`
+const TabButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isActive',
+})`
   flex: 1;
   display: flex;
   flex-direction: column;

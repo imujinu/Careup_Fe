@@ -734,7 +734,9 @@ const FormGroup = styled.div`
   gap: 8px;
 `;
 
-const Label = styled.label`
+const Label = styled.label.withConfig({
+  shouldForwardProp: (prop) => prop !== 'required',
+})`
   font-size: 14px;
   font-weight: 500;
   color: #374151;
@@ -745,7 +747,9 @@ const Label = styled.label`
   }
 `;
 
-const Input = styled.input`
+const Input = styled.input.withConfig({
+  shouldForwardProp: (prop) => prop !== 'error',
+})`
   padding: 12px 16px;
   border: 2px solid ${props => props.error ? '#dc2626' : '#e5e7eb'};
   border-radius: 8px;
