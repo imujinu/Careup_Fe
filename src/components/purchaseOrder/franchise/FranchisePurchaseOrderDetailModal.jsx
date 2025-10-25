@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import CancelOrderModal from './CancelOrderModal';
+import { purchaseOrderService } from '../../../service/purchaseOrderService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -80,6 +81,25 @@ const CancelOrderButton = styled.button`
   
   &:hover {
     background: #dc2626;
+  }
+`;
+
+const CompleteButton = styled.button`
+  height: 36px;
+  padding: 0 16px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:hover {
+    background: #059669;
   }
 `;
 
@@ -352,58 +372,54 @@ const DeliveryAddress = styled.div`
 function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
   const [activeTab, setActiveTab] = useState('products');
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [orderDetail, setOrderDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // 발주 상세 정보 조회
+  useEffect(() => {
+    if (isOpen && item?.id) {
+      fetchOrderDetail();
+    }
+  }, [isOpen, item?.id]);
+
+  const fetchOrderDetail = async () => {
+    try {
+      setLoading(true);
+      const data = await purchaseOrderService.getPurchaseOrder(item.id);
+      console.log('발주 상세 정보:', data);
+      setOrderDetail(data);
+    } catch (error) {
+      console.error('발주 상세 정보 조회 실패:', error);
+      alert('발주 상세 정보를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen || !item) return null;
 
-  const productData = [
-    {
-      name: '원두',
-      serialNumber: '20250918001',
-      category: '자재',
-      quantity: 50,
-      unit: 'kg',
-      unitPrice: 4500,
-      amount: 225000
-    },
-    {
-      name: '설탕',
-      serialNumber: '20250918002',
-      category: '자재',
-      quantity: 30,
-      unit: 'kg',
-      unitPrice: 5500,
-      amount: 165000
-    },
-    {
-      name: '우유',
-      serialNumber: '20250918003',
-      category: '자재',
-      quantity: 20,
-      unit: 'L',
-      unitPrice: 6500,
-      amount: 130000
-    },
-    {
-      name: '종이컵',
-      serialNumber: '20250918004',
-      category: '포장재',
-      quantity: 40,
-      unit: '박스',
-      unitPrice: 5000,
-      amount: 200000
-    },
-    {
-      name: '빨대',
-      serialNumber: '20250918005',
-      category: '포장재',
-      quantity: 60,
-      unit: '봉지',
-      unitPrice: 3000,
-      amount: 180000
-    }
-  ];
+  // 로딩 중이거나 데이터가 없으면 표시
+  if (loading || !orderDetail) {
+    return React.createElement(ModalOverlay, { onClick: onClose },
+      React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
+        React.createElement('div', { style: { padding: '40px', textAlign: 'center' } }, '로딩 중...')
+      )
+    );
+  }
 
-  const totalAmount = productData.reduce((sum, product) => sum + product.amount, 0);
+  // orderDetails를 productData로 변환
+  const productData = orderDetail.orderDetails?.map(detail => ({
+    name: detail.productName || `상품 ID: ${detail.productId}`,
+    serialNumber: detail.productId, // 일련번호는 productId를 사용 (추후 serialNumber 필드 추가 가능)
+    category: detail.categoryName || '미분류',
+    quantity: detail.quantity,
+    approvedQuantity: detail.approvedQuantity,
+    unit: '개',
+    unitPrice: detail.unitPrice,
+    amount: detail.subtotalPrice
+  })) || [];
+
+  const totalAmount = orderDetail.totalPrice || productData.reduce((sum, product) => sum + product.amount, 0);
   const totalQuantity = productData.reduce((sum, product) => sum + product.quantity, 0);
 
   const formatAmount = (amount) => {
@@ -411,12 +427,23 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
   };
 
   const getStatusText = (status) => {
-    switch(status) {
+    // orderDetail이 있으면 API 상태 사용
+    const currentStatus = orderDetail?.orderStatus || status;
+    
+    switch(currentStatus) {
+      case 'PENDING': return '대기중';
+      case 'APPROVED': return '승인됨';
+      case 'REJECTED': return '반려됨';
+      case 'PARTIAL': return '부분승인';
+      case 'SHIPPED': return '배송중';
+      case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소됨';
+      // 기존 상태명 호환
       case 'pending': return '대기중';
       case 'inProgress': return '처리중';
       case 'completed': return '완료';
       case 'cancelled': return '취소됨';
-      default: return status;
+      default: return currentStatus;
     }
   };
 
@@ -428,10 +455,30 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
     setIsCancelModalOpen(false);
   };
 
-  const handleConfirmCancel = (reason) => {
-    console.log('Order cancelled:', { orderId: item.id, reason });
-    // 여기에 실제 취소 로직을 구현
-    handleCloseCancelModal();
+  const handleConfirmCancel = async (reason) => {
+    try {
+      console.log('Order cancelled:', { orderId: item.id, reason });
+      await purchaseOrderService.cancelPurchaseOrder(item.id);
+      alert('발주가 취소되었습니다.');
+      handleCloseCancelModal();
+      onClose(); // 상세 모달도 닫기
+    } catch (error) {
+      console.error('발주 취소 실패:', error);
+      alert('발주 취소에 실패했습니다: ' + (error.response?.data?.status_message || error.message));
+    }
+  };
+
+  // 입고 완료
+  const handleCompleteOrder = async () => {
+    try {
+      await purchaseOrderService.completePurchaseOrder(item.id);
+      alert('입고가 완료되었습니다.');
+      onClose(); // 모달 닫기
+      window.location.reload(); // 목록 새로고침
+    } catch (error) {
+      console.error('입고 완료 실패:', error);
+      alert('입고 완료에 실패했습니다.');
+    }
   };
 
   return React.createElement(ModalOverlay, { onClick: onClose },
@@ -443,9 +490,13 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
             React.createElement('span', null, '🖨️'),
             '인쇄'
           ),
-          React.createElement(CancelOrderButton, { onClick: handleCancelOrder },
+          (orderDetail.orderStatus === 'PENDING' || orderDetail.orderStatus === 'REJECTED') && React.createElement(CancelOrderButton, { onClick: handleCancelOrder },
             React.createElement('span', null, '×'),
             '발주취소'
+          ),
+          orderDetail.orderStatus === 'SHIPPED' && React.createElement(CompleteButton, { onClick: handleCompleteOrder },
+            React.createElement('span', null, '✅'),
+            '입고 완료'
           ),
           React.createElement(CloseButton, { onClick: onClose }, '×')
         )
@@ -488,7 +539,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '상태:'),
-                React.createElement(StatusBadge, null, getStatusText(item.status))
+                React.createElement(StatusBadge, null, getStatusText(orderDetail.orderStatus || item.status))
               )
             )
           ),
@@ -536,7 +587,6 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
                 React.createElement(ProductTableHeader, null,
                   React.createElement('tr', null,
                     React.createElement(ProductTableHeaderCell, null, '상품명'),
-                    React.createElement(ProductTableHeaderCell, null, '일련번호'),
                     React.createElement(ProductTableHeaderCell, null, '카테고리'),
                     React.createElement(ProductTableHeaderCell, null, '수량'),
                     React.createElement(ProductTableHeaderCell, null, '단가'),
@@ -550,7 +600,6 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
                         React.createElement('span', { style: { fontSize: '12px', color: '#9ca3af' } }, '📦'),
                         product.name
                       ),
-                      React.createElement(ProductTableCell, null, product.serialNumber),
                       React.createElement(ProductTableCell, null, product.category),
                       React.createElement(ProductTableCell, null, `${product.quantity}${product.unit}`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.unitPrice)}`),
@@ -560,40 +609,63 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
                 )
               ),
               React.createElement(TotalRow, null, `총 금액: ₩${formatAmount(totalAmount)}`)
-            ) : React.createElement('div', null,
-              React.createElement(StatusTracking, null,
-                React.createElement(StatusTitle, null, '발주 상태 추적'),
-                React.createElement(StatusSteps, null,
-                  React.createElement(StatusStep, { completed: true },
-                    React.createElement(StatusIcon, { completed: true }, '🚀'),
-                    React.createElement(StatusText, { completed: true }, '발주 요청'),
-                    React.createElement(StatusDate, null, '2025.09.18 14:30')
-                  ),
-                  React.createElement(StatusStep, { completed: true },
-                    React.createElement(StatusIcon, { completed: true }, '✅'),
-                    React.createElement(StatusText, { completed: true }, '발주 승인'),
-                    React.createElement(StatusDate, null, '2025.09.18 15:45')
-                  ),
-                  React.createElement(StatusStep, { current: true },
-                    React.createElement(StatusIcon, { current: true }, '🚚'),
-                    React.createElement(StatusText, { current: true }, '상품 배송'),
-                    React.createElement(StatusDate, null, '예정')
-                  ),
-                  React.createElement(StatusStep, null,
-                    React.createElement(StatusIcon, null, '🏠'),
-                    React.createElement(StatusText, null, '배송 완료'),
-                    React.createElement(StatusDate, null, '예정')
+            ) : (() => {
+              const orderStatus = orderDetail.orderStatus || 'PENDING';
+              
+              // 각 상태별로 완료 여부 결정
+              const isRequestCompleted = true; // 항상 완료 (발주 생성됨)
+              const isApprovedCompleted = ['APPROVED', 'PARTIAL', 'SHIPPED', 'COMPLETED'].includes(orderStatus);
+              const isShippedCompleted = ['SHIPPED', 'COMPLETED'].includes(orderStatus);
+              const isCompleted = orderStatus === 'COMPLETED';
+              
+              // 현재 상태 결정
+              const currentStep = orderStatus === 'PENDING' ? 'request' :
+                                  ['APPROVED', 'PARTIAL'].includes(orderStatus) ? 'approved' :
+                                  orderStatus === 'SHIPPED' ? 'shipped' :
+                                  orderStatus === 'COMPLETED' ? 'completed' : 'request';
+              
+              // 날짜 포맷
+              const formatDate = (dateString) => {
+                if (!dateString) return '예정';
+                const date = new Date(dateString);
+                return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+              };
+              
+              return React.createElement('div', null,
+                React.createElement(StatusTracking, null,
+                  React.createElement(StatusTitle, null, '발주 상태 추적'),
+                  React.createElement(StatusSteps, null,
+                    React.createElement(StatusStep, { completed: isRequestCompleted, current: currentStep === 'request' },
+                      React.createElement(StatusIcon, { completed: isRequestCompleted, current: currentStep === 'request' }, '🚀'),
+                      React.createElement(StatusText, { completed: isRequestCompleted, current: currentStep === 'request' }, '발주 요청'),
+                      React.createElement(StatusDate, null, formatDate(orderDetail.createdAt) || '예정')
+                    ),
+                    React.createElement(StatusStep, { completed: isApprovedCompleted, current: currentStep === 'approved' },
+                      React.createElement(StatusIcon, { completed: isApprovedCompleted, current: currentStep === 'approved' }, '✅'),
+                      React.createElement(StatusText, { completed: isApprovedCompleted, current: currentStep === 'approved' }, '발주 승인'),
+                      React.createElement(StatusDate, null, isApprovedCompleted ? (formatDate(orderDetail.updatedAt) || '예정') : '예정')
+                    ),
+                    React.createElement(StatusStep, { completed: isShippedCompleted, current: currentStep === 'shipped' },
+                      React.createElement(StatusIcon, { completed: isShippedCompleted, current: currentStep === 'shipped' }, '🚚'),
+                      React.createElement(StatusText, { completed: isShippedCompleted, current: currentStep === 'shipped' }, '상품 배송'),
+                      React.createElement(StatusDate, null, isShippedCompleted ? (formatDate(orderDetail.updatedAt) || '예정') : '예정')
+                    ),
+                    React.createElement(StatusStep, { completed: isCompleted, current: currentStep === 'completed' },
+                      React.createElement(StatusIcon, { completed: isCompleted, current: currentStep === 'completed' }, '🏠'),
+                      React.createElement(StatusText, { completed: isCompleted, current: currentStep === 'completed' }, '배송 완료'),
+                      React.createElement(StatusDate, null, isCompleted ? (formatDate(orderDetail.updatedAt) || '예정') : '예정')
+                    )
+                  )
+                ),
+                React.createElement(DeliveryInfo, null,
+                  React.createElement(DeliveryTitle, null, '배송 정보'),
+                  React.createElement(DeliveryAddress, null,
+                    React.createElement('span', null, '📍'),
+                    '서울시 강남구 테헤란로 123'
                   )
                 )
-              ),
-              React.createElement(DeliveryInfo, null,
-                React.createElement(DeliveryTitle, null, '배송 정보'),
-                React.createElement(DeliveryAddress, null,
-                  React.createElement('span', null, '📍'),
-                  '서울시 강남구 테헤란로 123'
-                )
-              )
-            )
+              );
+            })()
           )
         )
       ),

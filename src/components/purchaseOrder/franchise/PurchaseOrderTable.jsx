@@ -48,20 +48,30 @@ const StatusBadge = styled.span`
   font-size: 12px;
   font-weight: 600;
   background: ${props => {
-    switch(props.status) {
+    const status = props.status?.toLowerCase();
+    switch(status) {
       case 'pending': return '#fef3c7';
-      case 'inProgress': return '#dbeafe';
-      case 'completed': return '#d1fae5';
+      case 'approved': return '#d1fae5';
+      case 'rejected': return '#fee2e2';
+      case 'partial': return '#fef3c7';
+      case 'shipped': return '#e0e7ff';
+      case 'completed': return '#fef3c7';
       case 'cancelled': return '#fee2e2';
+      case 'inprogress': return '#dbeafe';
       default: return '#f3f4f6';
     }
   }};
   color: ${props => {
-    switch(props.status) {
+    const status = props.status?.toLowerCase();
+    switch(status) {
       case 'pending': return '#92400e';
-      case 'inProgress': return '#1e40af';
-      case 'completed': return '#065f46';
+      case 'approved': return '#065f46';
+      case 'rejected': return '#991b1b';
+      case 'partial': return '#d97706';
+      case 'shipped': return '#4338ca';
+      case 'completed': return '#92400e';
       case 'cancelled': return '#991b1b';
+      case 'inprogress': return '#1e40af';
       default: return '#374151';
     }
   }};
@@ -152,11 +162,18 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
   };
 
   const getStatusText = (status) => {
-    switch(status) {
-      case 'pending': return '대기 중';
-      case 'inProgress': return '처리 중';
-      case 'completed': return '완료';
-      case 'cancelled': return '취소됨';
+    if (!status) return status;
+    const upperStatus = status.toUpperCase();
+    switch(upperStatus) {
+      case 'PENDING': return '대기중';
+      case 'APPROVED': return '승인됨';
+      case 'REJECTED': return '반려됨';
+      case 'PARTIAL': return '부분승인';
+      case 'SHIPPED': return '배송중';
+      case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소됨';
+      // 기존 상태 호환
+      case 'INPROGRESS': return '처리중';
       default: return status;
     }
   };
@@ -182,7 +199,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
             React.createElement(TableCell, null, `${item.productCount}개`),
             React.createElement(TableCell, null, `₩${formatAmount(item.totalAmount)}`),
             React.createElement(TableCell, null,
-              React.createElement(StatusBadge, { status: item.status }, getStatusText(item.status))
+              React.createElement(StatusBadge, { status: (item.status || '').toLowerCase() }, getStatusText(item.status))
             ),
             React.createElement(TableCell, null, item.deliveryDate),
             React.createElement(TableCell, null,

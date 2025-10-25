@@ -7,6 +7,7 @@ import FranchisePurchaseOrderDetailModal from '../../components/purchaseOrder/fr
 import OrderRequestModal from '../../components/purchaseOrder/franchise/OrderRequestModal';
 import OrderRecommendationModal from '../../components/purchaseOrder/franchise/OrderRecommendationModal';
 import OrderAutomationModal from '../../components/purchaseOrder/franchise/OrderAutomationModal';
+import { purchaseOrderService } from '../../service/purchaseOrderService';
 import { authService } from '../../service/authService';
 import { getBranchName } from '../../utils/branchUtils';
 
@@ -36,10 +37,10 @@ function FranchisePurchaseOrderManagement() {
   const branchId = authService.getCurrentUser()?.branchId || 2;
   
   const [summary, setSummary] = useState({
-    totalOrders: 3,
-    pending: 1,
-    inProgress: 1,
-    completed: 1
+    totalOrders: 0,
+    pending: 0,
+    inProgress: 0,
+    completed: 0
   });
 
   const [filters, setFilters] = useState({
@@ -55,32 +56,74 @@ function FranchisePurchaseOrderManagement() {
   const [isOrderAutomationModalOpen, setIsOrderAutomationModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const [purchaseOrders, setPurchaseOrders] = useState([
-    {
-      id: 'ORD-2025-001',
-      orderDate: '2025.09.18',
-      productCount: 15,
-      totalAmount: 150000,
-      status: 'pending',
-      deliveryDate: '2025.09.22'
-    },
-    {
-      id: 'ORD-2025-002',
-      orderDate: '2025.09.17',
-      productCount: 12,
-      totalAmount: 650000,
-      status: 'inProgress',
-      deliveryDate: '2025.09.21'
-    },
-    {
-      id: 'ORD-2025-003',
-      orderDate: '2025.09.16',
-      productCount: 18,
-      totalAmount: 1200000,
-      status: 'completed',
-      deliveryDate: '2025.09.20'
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 가맹점용 발주 목록 조회
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const data = await purchaseOrderService.getPurchaseOrders(branchId);
+      console.log('가맹점 발주 목록 API 응답:', data);
+      
+      // 데이터 변환
+      const formattedData = data.map(item => ({
+        id: item.purchaseOrderId,
+        orderDate: item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        productCount: item.productCount || 0,
+        totalAmount: item.totalPrice || 0,
+        status: item.orderStatus || 'pending',
+        deliveryDate: '-'
+      }));
+      
+      // 중복 데이터 제거 (같은 날짜에 같은 상태인 발주 중 가장 최근 것만 유지)
+      const uniqueData = formattedData.reduce((acc, current) => {
+        const existingIndex = acc.findIndex(item => 
+          item.orderDate === current.orderDate && 
+          item.status === current.status &&
+          item.productCount === current.productCount
+        );
+        if (existingIndex === -1) {
+          acc.push(current);
+        } else {
+          // 더 최근 ID를 가진 항목으로 교체
+          if (current.id > acc[existingIndex].id) {
+            acc[existingIndex] = current;
+          }
+        }
+        return acc;
+      }, []);
+      
+      setPurchaseOrders(uniqueData);
+      
+      const totalOrders = uniqueData.length;
+      const pending = uniqueData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
+      const inProgress = uniqueData.filter(item => {
+        const status = (item.status || '').toLowerCase();
+        return status === 'approved' || status === 'shipped' || status === 'partial';
+      }).length;
+      const completed = uniqueData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
+      
+      setSummary({
+        totalOrders,
+        pending,
+        inProgress,
+        completed
+      });
+    } catch (err) {
+      console.error('가맹점 발주 목록 조회 실패:', err);
+      setError('발주 데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchPurchaseOrders();
+  }, []);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -104,6 +147,8 @@ function FranchisePurchaseOrderManagement() {
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedItem(null);
+    // 모달 닫힐 때 목록 새로고침
+    fetchPurchaseOrders();
   };
 
   const handleOrderRequest = () => {
@@ -116,7 +161,8 @@ function FranchisePurchaseOrderManagement() {
 
   const handleSubmitOrderRequest = (orderItems) => {
     console.log('Order request submitted:', orderItems);
-    // 여기에 실제 발주 요청 로직을 구현
+    // 발주 생성 후 목록 새로고침
+    fetchPurchaseOrders();
     handleCloseOrderRequestModal();
   };
 
@@ -151,9 +197,9 @@ function FranchisePurchaseOrderManagement() {
   // 필터링된 데이터
   const filteredData = purchaseOrders.filter(item => {
     const matchesSearch = !filters.searchTerm || 
-      item.id.toLowerCase().includes(filters.searchTerm.toLowerCase());
+      String(item.id).toLowerCase().includes(filters.searchTerm.toLowerCase());
     
-    const matchesStatus = !filters.statusFilter || item.status === filters.statusFilter;
+    const matchesStatus = !filters.statusFilter || (item.status || '').toLowerCase() === filters.statusFilter.toLowerCase();
     
     return matchesSearch && matchesStatus;
   });
@@ -194,7 +240,7 @@ function FranchisePurchaseOrderManagement() {
     React.createElement(OrderRequestModal, {
       isOpen: isOrderRequestModalOpen,
       onClose: handleCloseOrderRequestModal,
-      onOrderRequest: handleSubmitOrderRequest
+      onSubmitOrderRequest: handleSubmitOrderRequest
     }),
     React.createElement(OrderRecommendationModal, {
       isOpen: isOrderRecommendationModalOpen,
