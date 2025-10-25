@@ -48,17 +48,27 @@ const StatusBadge = styled.span`
   font-size: 12px;
   font-weight: 600;
   background: ${props => {
-    switch(props.status) {
+    const status = props.status?.toLowerCase();
+    switch(status) {
       case 'pending': return '#fef3c7';
-      case 'completed': return '#d1fae5';
+      case 'approved': return '#d1fae5';
+      case 'rejected': return '#fee2e2';
+      case 'partial': return '#fef3c7';
+      case 'shipped': return '#e0e7ff';
+      case 'completed': return '#fef3c7';
       case 'cancelled': return '#fee2e2';
       default: return '#f3f4f6';
     }
   }};
   color: ${props => {
-    switch(props.status) {
+    const status = props.status?.toLowerCase();
+    switch(status) {
       case 'pending': return '#92400e';
-      case 'completed': return '#065f46';
+      case 'approved': return '#065f46';
+      case 'rejected': return '#991b1b';
+      case 'partial': return '#d97706';
+      case 'shipped': return '#4338ca';
+      case 'completed': return '#92400e';
       case 'cancelled': return '#991b1b';
       default: return '#374151';
     }
@@ -119,7 +129,9 @@ const PaginationControls = styled.div`
   gap: 8px;
 `;
 
-const PaginationButton = styled.button`
+const PaginationButton = styled.button.attrs(props => ({
+  isActive: props.active ? '' : undefined
+}))`
   width: 32px;
   height: 32px;
   border: 1px solid #d1d5db;
@@ -149,10 +161,16 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
   };
 
   const getStatusText = (status) => {
-    switch(status) {
-      case 'pending': return '대기중';
-      case 'completed': return '완료';
-      case 'cancelled': return '취소됨';
+    if (!status) return status;
+    const upperStatus = status.toUpperCase();
+    switch(upperStatus) {
+      case 'PENDING': return '대기중';
+      case 'APPROVED': return '승인됨';
+      case 'REJECTED': return '반려됨';
+      case 'PARTIAL': return '부분승인';
+      case 'SHIPPED': return '배송중';
+      case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소됨';
       default: return status;
     }
   };
@@ -172,22 +190,22 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
         )
       ),
       React.createElement(TableBody, null,
-        data.map((item, index) =>
-          React.createElement(TableRow, { key: index },
+        data.map((item, index) => {
+          return React.createElement(TableRow, { key: index },
             React.createElement(TableCell, null, item.id),
             React.createElement(TableCell, null, item.branch),
             React.createElement(TableCell, null, item.orderDate),
             React.createElement(TableCell, null, `${item.productCount}개`),
             React.createElement(TableCell, null, `₩${formatAmount(item.totalAmount)}`),
-            React.createElement(TableCell, null,
-              React.createElement(StatusBadge, { status: item.status }, getStatusText(item.status))
-            ),
+                  React.createElement(TableCell, null,
+        React.createElement(StatusBadge, { status: (item.status || item.orderStatus || '').toLowerCase() }, getStatusText(item.status || item.orderStatus))
+      ),
             React.createElement(TableCell, null, item.deliveryDate),
             React.createElement(TableCell, null,
               React.createElement(DetailLink, { onClick: () => onDetail(item) }, '상세보기')
             )
-          )
-        )
+          );
+        })
       )
     ),
     React.createElement(PaginationContainer, null,

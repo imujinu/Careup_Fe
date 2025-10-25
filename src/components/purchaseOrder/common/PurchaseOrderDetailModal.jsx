@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import EditPurchaseOrderModal from './EditPurchaseOrderModal';
+import PartialApproveModal from './PartialApproveModal';
+import { purchaseOrderService } from '../../../service/purchaseOrderService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -64,6 +66,63 @@ const PrintButton = styled.button`
   }
 `;
 
+const ApproveButton = styled.button`
+  height: 36px;
+  padding: 0 16px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:hover {
+    background: #059669;
+  }
+`;
+
+const RejectButton = styled.button`
+  height: 36px;
+  padding: 0 16px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:hover {
+    background: #dc2626;
+  }
+`;
+
+const PartialApproveButton = styled.button`
+  height: 36px;
+  padding: 0 16px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:hover {
+    background: #d97706;
+  }
+`;
+
 const ModifyButton = styled.button`
   height: 36px;
   padding: 0 16px;
@@ -80,6 +139,25 @@ const ModifyButton = styled.button`
   
   &:hover {
     background: #553c9a;
+  }
+`;
+
+const ShipButton = styled.button`
+  height: 36px;
+  padding: 0 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:hover {
+    background: #2563eb;
   }
 `;
 
@@ -342,53 +420,54 @@ const DeliveryAddress = styled.div`
 function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
   const [activeTab, setActiveTab] = useState('products');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPartialApproveModalOpen, setIsPartialApproveModalOpen] = useState(false);
+  const [orderDetail, setOrderDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // 발주 상세 정보 조회
+  useEffect(() => {
+    if (isOpen && item?.id) {
+      fetchOrderDetail();
+    }
+  }, [isOpen, item?.id]);
+
+  const fetchOrderDetail = async () => {
+    try {
+      setLoading(true);
+      const data = await purchaseOrderService.getPurchaseOrder(item.id);
+      setOrderDetail(data);
+    } catch (error) {
+      console.error('발주 상세 정보 조회 실패:', error);
+      alert('발주 상세 정보를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen || !item) return null;
 
-  const productData = [
-    {
-      name: '아메리카노',
-      serialNumber: '20250918001',
-      category: '음료',
-      quantity: 50,
-      unitPrice: 4500,
-      amount: 225000
-    },
-    {
-      name: '크로와상',
-      serialNumber: '20250918002',
-      category: '베이커리',
-      quantity: 30,
-      unitPrice: 5500,
-      amount: 165000
-    },
-    {
-      name: '치즈케이크',
-      serialNumber: '20250918003',
-      category: '디저트',
-      quantity: 20,
-      unitPrice: 6500,
-      amount: 130000
-    },
-    {
-      name: '카페라떼',
-      serialNumber: '20250918004',
-      category: '음료',
-      quantity: 40,
-      unitPrice: 5000,
-      amount: 200000
-    },
-    {
-      name: '초콜릿 쿠키',
-      serialNumber: '20250918005',
-      category: '베이커리',
-      quantity: 60,
-      unitPrice: 3000,
-      amount: 180000
-    }
-  ];
+  // 로딩 중이거나 데이터가 없으면 표시
+  if (loading || !orderDetail) {
+    return React.createElement(ModalOverlay, { onClick: onClose },
+      React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
+        React.createElement('div', { style: { padding: '40px', textAlign: 'center' } }, '로딩 중...')
+      )
+    );
+  }
 
-  const totalAmount = productData.reduce((sum, product) => sum + product.amount, 0);
+  // orderDetails를 productData로 변환
+  const productData = orderDetail.orderDetails?.map(detail => ({
+    name: detail.productName || `상품 ID: ${detail.productId}`,
+    serialNumber: detail.productId,
+    category: detail.categoryName || '미분류',
+    quantity: detail.quantity,
+    approvedQuantity: detail.approvedQuantity,
+    unit: '개',
+    unitPrice: detail.unitPrice,
+    amount: detail.subtotalPrice
+  })) || [];
+
+  const totalAmount = orderDetail.totalPrice || productData.reduce((sum, product) => sum + product.amount, 0);
   const totalQuantity = productData.reduce((sum, product) => sum + product.quantity, 0);
 
   const formatAmount = (amount) => {
@@ -396,11 +475,23 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
   };
 
   const getStatusText = (status) => {
-    switch(status) {
+    // orderDetail이 있으면 API 상태 사용
+    const currentStatus = orderDetail?.orderStatus || status;
+    
+    switch(currentStatus) {
+      case 'PENDING': return '대기중';
+      case 'APPROVED': return '승인됨';
+      case 'REJECTED': return '반려됨';
+      case 'PARTIAL': return '부분승인';
+      case 'SHIPPED': return '배송중';
+      case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소됨';
+      // 기존 상태명 호환
       case 'pending': return '대기중';
+      case 'inProgress': return '처리중';
       case 'completed': return '완료';
       case 'cancelled': return '취소됨';
-      default: return status;
+      default: return currentStatus;
     }
   };
 
@@ -413,9 +504,67 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
   };
 
   const handleSaveEdit = (formData) => {
-    console.log('Saving purchase order data:', formData);
     // 여기에 실제 저장 로직을 구현
     handleCloseEditModal();
+  };
+
+  // 발주 승인 (전체 수량 승인)
+  const handleApprove = async () => {
+    try {
+      await purchaseOrderService.approvePurchaseOrder(item.id);
+      alert('발주가 승인되었습니다.');
+      onClose(); // 모달 닫기
+      window.location.reload(); // 목록 새로고침
+    } catch (error) {
+      console.error('발주 승인 실패:', error);
+      alert('발주 승인에 실패했습니다.');
+    }
+  };
+
+  // 발주 반려 (발주 거부)
+  const handleReject = async () => {
+    try {
+      await purchaseOrderService.rejectPurchaseOrder(item.id);
+      alert('발주가 반려되었습니다.');
+      onClose(); // 모달 닫기
+      window.location.reload(); // 목록 새로고침
+    } catch (error) {
+      console.error('발주 반려 실패:', error);
+      alert('발주 반려에 실패했습니다.');
+    }
+  };
+
+  // 부분승인 모달 열기
+  const handlePartialApproveClick = () => {
+    setIsPartialApproveModalOpen(true);
+  };
+
+  // 부분승인 처리
+  const handlePartialApprove = async (approvedData) => {
+    try {
+      await purchaseOrderService.partialApprovePurchaseOrder(item.id, approvedData);
+      alert('발주가 부분승인되었습니다.');
+      setIsPartialApproveModalOpen(false); // 부분승인 모달 닫기
+      onClose(); // 상세 모달 닫기
+      window.location.reload(); // 목록 새로고침
+    } catch (error) {
+      console.error('발주 부분승인 실패:', error);
+      console.error('에러 응답:', error.response?.data);
+      alert('발주 부분승인에 실패했습니다: ' + (error.response?.data?.status_message || error.message));
+    }
+  };
+
+  // 발주 배송 시작
+  const handleShip = async () => {
+    try {
+      await purchaseOrderService.shipPurchaseOrder(item.id);
+      alert('배송이 시작되었습니다.');
+      onClose(); // 모달 닫기
+      window.location.reload(); // 목록 새로고침
+    } catch (error) {
+      console.error('배송 시작 실패:', error);
+      alert('배송 시작에 실패했습니다.');
+    }
   };
 
   return React.createElement(ModalOverlay, { onClick: onClose },
@@ -427,7 +576,23 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
             React.createElement('span', null, '🖨️'),
             '인쇄'
           ),
-          React.createElement(ModifyButton, { onClick: handleModify },
+          orderDetail.orderStatus === 'PENDING' && React.createElement(ApproveButton, { onClick: handleApprove },
+            React.createElement('span', null, '✅'),
+            '승인'
+          ),
+          orderDetail.orderStatus === 'PENDING' && React.createElement(PartialApproveButton, { onClick: handlePartialApproveClick },
+            React.createElement('span', null, '⚠️'),
+            '부분승인'
+          ),
+          orderDetail.orderStatus === 'PENDING' && React.createElement(RejectButton, { onClick: handleReject },
+            React.createElement('span', null, '❌'),
+            '반려'
+          ),
+          (orderDetail.orderStatus === 'APPROVED' || orderDetail.orderStatus === 'PARTIAL') && React.createElement(ShipButton, { onClick: handleShip },
+            React.createElement('span', null, '🚚'),
+            '배송 시작'
+          ),
+          orderDetail.orderStatus !== 'PENDING' && orderDetail.orderStatus !== 'APPROVED' && orderDetail.orderStatus !== 'PARTIAL' && React.createElement(ModifyButton, { onClick: handleModify },
             React.createElement('span', null, '✏️'),
             '수정'
           ),
@@ -472,7 +637,7 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '상태:'),
-                React.createElement(StatusBadge, null, getStatusText(item.status))
+                React.createElement(StatusBadge, null, getStatusText(orderDetail.orderStatus))
               )
             )
           ),
@@ -520,7 +685,6 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
                 React.createElement(ProductTableHeader, null,
                   React.createElement('tr', null,
                     React.createElement(ProductTableHeaderCell, null, '상품명'),
-                    React.createElement(ProductTableHeaderCell, null, '일련번호'),
                     React.createElement(ProductTableHeaderCell, null, '카테고리'),
                     React.createElement(ProductTableHeaderCell, null, '수량'),
                     React.createElement(ProductTableHeaderCell, null, '단가'),
@@ -531,7 +695,6 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
                   productData.map((product, index) =>
                     React.createElement(ProductTableRow, { key: index },
                       React.createElement(ProductTableCell, null, product.name),
-                      React.createElement(ProductTableCell, null, product.serialNumber),
                       React.createElement(ProductTableCell, null, product.category),
                       React.createElement(ProductTableCell, null, `${product.quantity}개`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.unitPrice)}`),
@@ -583,6 +746,16 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
         onClose: handleCloseEditModal,
         item: item,
         onSave: handleSaveEdit
+      }),
+      React.createElement(PartialApproveModal, {
+        isOpen: isPartialApproveModalOpen,
+        onClose: () => setIsPartialApproveModalOpen(false),
+        products: productData.map(product => ({
+          id: product.serialNumber, // productId
+          name: product.name,
+          quantity: product.quantity
+        })),
+        onApprove: handlePartialApprove
       })
     )
   );
