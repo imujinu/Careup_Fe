@@ -191,6 +191,7 @@ function InventoryManagement() {
       const totalValue = formattedData.reduce((sum, item) => sum + item.totalValue, 0);
       const branches = [...new Set(formattedData.map(item => item.branch))];
       
+      
       setSummary({
         totalItems,
         lowStockItems,

@@ -18,6 +18,19 @@ const PageContainer = styled.div`
 
 const PageHeader = styled.div`
   margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+`;
+
+const HeaderLeft = styled.div`
+  flex: 1;
+`;
+
+const HeaderRight = styled.div`
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 `;
 
 const PageTitle = styled.h1`
@@ -31,6 +44,31 @@ const PageSubtitle = styled.p`
   font-size: 14px;
   color: #6b7280;
   margin: 4px 0 0 0;
+`;
+
+const ExportButton = styled.button`
+  height: 40px;
+  padding: 0 16px;
+  background: #6b46c1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  
+  &:hover {
+    background: #553c9a;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 function FranchisePurchaseOrderManagement() {
@@ -79,23 +117,8 @@ function FranchisePurchaseOrderManagement() {
         deliveryDate: '-'
       }));
       
-      // 중복 데이터 제거 (같은 날짜에 같은 상태인 발주 중 가장 최근 것만 유지)
-      const uniqueData = formattedData.reduce((acc, current) => {
-        const existingIndex = acc.findIndex(item => 
-          item.orderDate === current.orderDate && 
-          item.status === current.status &&
-          item.productCount === current.productCount
-        );
-        if (existingIndex === -1) {
-          acc.push(current);
-        } else {
-          // 더 최근 ID를 가진 항목으로 교체
-          if (current.id > acc[existingIndex].id) {
-            acc[existingIndex] = current;
-          }
-        }
-        return acc;
-      }, []);
+      // ID별로 고유하게 유지 (중복 제거 로직 제거)
+      const uniqueData = formattedData;
       
       setPurchaseOrders(uniqueData);
       
@@ -192,7 +215,16 @@ function FranchisePurchaseOrderManagement() {
     // TODO: 자동화 설정 저장 로직 구현
   };
 
-
+  // 전체 엑셀 다운로드
+  const handleExportAll = async () => {
+    try {
+      await purchaseOrderService.exportToExcel(branchId);
+      alert('전체 발주 내역 엑셀 다운로드가 완료되었습니다.');
+    } catch (error) {
+      console.error('엑셀 다운로드 실패:', error);
+      alert('엑셀 다운로드에 실패했습니다.');
+    }
+  };
 
   // 필터링된 데이터
   const filteredData = purchaseOrders.filter(item => {
@@ -212,8 +244,16 @@ function FranchisePurchaseOrderManagement() {
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
-      React.createElement(PageTitle, null, `발주관리 - ${getBranchName(branchId)}`),
-      React.createElement(PageSubtitle, null, '가맹점 발주 내역 조회 및 발주 요청')
+      React.createElement(HeaderLeft, null,
+        React.createElement(PageTitle, null, `발주관리 - ${getBranchName(branchId)}`),
+        React.createElement(PageSubtitle, null, '가맹점 발주 내역 조회 및 발주 요청')
+      ),
+      React.createElement(HeaderRight, null,
+        React.createElement(ExportButton, { onClick: handleExportAll },
+          React.createElement('span', null, '📥'),
+          '전체 엑셀 다운로드'
+        )
+      )
     ),
     React.createElement(SummaryCards, { summary }),
     React.createElement(SearchAndFilter, {

@@ -300,7 +300,6 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
                   onClick: () => handleProductSelect(product)
                 },
                   React.createElement(ProductName, null, product.productName || '알 수 없음'),
-                  React.createElement(ProductInfo, null, `ID: ${product.productId}`),
                   React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
                   React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`),
                   React.createElement(ProductPrice, null, `공급가: ₩${product.price?.toLocaleString() || 0}`)

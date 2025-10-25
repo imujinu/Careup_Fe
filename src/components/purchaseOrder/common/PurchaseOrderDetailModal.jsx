@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import EditPurchaseOrderModal from './EditPurchaseOrderModal';
 import PartialApproveModal from './PartialApproveModal';
 import { purchaseOrderService } from '../../../service/purchaseOrderService';
 
@@ -120,25 +119,6 @@ const PartialApproveButton = styled.button`
   
   &:hover {
     background: #d97706;
-  }
-`;
-
-const ModifyButton = styled.button`
-  height: 36px;
-  padding: 0 16px;
-  background: #6b46c1;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  &:hover {
-    background: #553c9a;
   }
 `;
 
@@ -417,10 +397,92 @@ const DeliveryAddress = styled.div`
   gap: 8px;
 `;
 
+const RejectModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+`;
+
+const RejectModalContainer = styled.div`
+  background: #ffffff;
+  border-radius: 12px;
+  width: 500px;
+  padding: 32px;
+  position: relative;
+`;
+
+const RejectModalTitle = styled.h3`
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+`;
+
+const RejectModalTextarea = styled.textarea`
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+  
+  &:focus {
+    border-color: #6b46c1;
+  }
+`;
+
+const RejectModalButtons = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+`;
+
+const RejectModalCancelButton = styled.button`
+  padding: 10px 20px;
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  
+  &:hover {
+    background: #e5e7eb;
+  }
+`;
+
+const RejectModalConfirmButton = styled.button`
+  padding: 10px 20px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  
+  &:hover {
+    background: #dc2626;
+  }
+`;
+
 function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
   const [activeTab, setActiveTab] = useState('products');
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPartialApproveModalOpen, setIsPartialApproveModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
   const [orderDetail, setOrderDetail] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -474,6 +536,17 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
     return new Intl.NumberFormat('ko-KR').format(amount);
   };
 
+  const handlePrint = async () => {
+    try {
+      // 현재 발주 ID를 사용하여 단일 발주 엑셀 다운로드
+      await purchaseOrderService.exportSingleOrderToExcel(item.id);
+      alert('엑셀 파일 다운로드가 완료되었습니다.');
+    } catch (error) {
+      console.error('엑셀 다운로드 실패:', error);
+      alert('엑셀 다운로드에 실패했습니다.');
+    }
+  };
+
   const getStatusText = (status) => {
     // orderDetail이 있으면 API 상태 사용
     const currentStatus = orderDetail?.orderStatus || status;
@@ -495,19 +568,6 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
     }
   };
 
-  const handleModify = () => {
-    setIsEditModalOpen(true);
-  };
-
-  const handleCloseEditModal = () => {
-    setIsEditModalOpen(false);
-  };
-
-  const handleSaveEdit = (formData) => {
-    // 여기에 실제 저장 로직을 구현
-    handleCloseEditModal();
-  };
-
   // 발주 승인 (전체 수량 승인)
   const handleApprove = async () => {
     try {
@@ -521,11 +581,23 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
     }
   };
 
+  // 발주 반려 모달 열기
+  const handleRejectClick = () => {
+    setIsRejectModalOpen(true);
+  };
+
   // 발주 반려 (발주 거부)
   const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      alert('반려 사유를 입력해주세요.');
+      return;
+    }
+
     try {
-      await purchaseOrderService.rejectPurchaseOrder(item.id);
+      await purchaseOrderService.rejectPurchaseOrder(item.id, { reason: rejectReason });
       alert('발주가 반려되었습니다.');
+      setIsRejectModalOpen(false);
+      setRejectReason('');
       onClose(); // 모달 닫기
       window.location.reload(); // 목록 새로고침
     } catch (error) {
@@ -571,11 +643,11 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, `발주 상세보기 ${item.id}`),
-        React.createElement(HeaderButtons, null,
-          React.createElement(PrintButton, null,
-            React.createElement('span', null, '🖨️'),
-            '인쇄'
-          ),
+                          React.createElement(HeaderButtons, null,
+            React.createElement(PrintButton, { onClick: handlePrint },
+              React.createElement('span', null, '📥'),
+              '엑셀 다운로드'
+            ),
           orderDetail.orderStatus === 'PENDING' && React.createElement(ApproveButton, { onClick: handleApprove },
             React.createElement('span', null, '✅'),
             '승인'
@@ -584,17 +656,13 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
             React.createElement('span', null, '⚠️'),
             '부분승인'
           ),
-          orderDetail.orderStatus === 'PENDING' && React.createElement(RejectButton, { onClick: handleReject },
+          orderDetail.orderStatus === 'PENDING' && React.createElement(RejectButton, { onClick: handleRejectClick },
             React.createElement('span', null, '❌'),
             '반려'
           ),
           (orderDetail.orderStatus === 'APPROVED' || orderDetail.orderStatus === 'PARTIAL') && React.createElement(ShipButton, { onClick: handleShip },
             React.createElement('span', null, '🚚'),
             '배송 시작'
-          ),
-          orderDetail.orderStatus !== 'PENDING' && orderDetail.orderStatus !== 'APPROVED' && orderDetail.orderStatus !== 'PARTIAL' && React.createElement(ModifyButton, { onClick: handleModify },
-            React.createElement('span', null, '✏️'),
-            '수정'
           ),
           React.createElement(CloseButton, { onClick: onClose }, '×')
         )
@@ -686,7 +754,8 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
                   React.createElement('tr', null,
                     React.createElement(ProductTableHeaderCell, null, '상품명'),
                     React.createElement(ProductTableHeaderCell, null, '카테고리'),
-                    React.createElement(ProductTableHeaderCell, null, '수량'),
+                    React.createElement(ProductTableHeaderCell, null, '신청 수량'),
+                    React.createElement(ProductTableHeaderCell, null, '승인 수량'),
                     React.createElement(ProductTableHeaderCell, null, '단가'),
                     React.createElement(ProductTableHeaderCell, null, '금액')
                   )
@@ -697,6 +766,7 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
                       React.createElement(ProductTableCell, null, product.name),
                       React.createElement(ProductTableCell, null, product.category),
                       React.createElement(ProductTableCell, null, `${product.quantity}개`),
+                      React.createElement(ProductTableCell, null, `${product.approvedQuantity || product.quantity}개`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.unitPrice)}`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.amount)}`)
                     )
@@ -711,22 +781,51 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
                   React.createElement(StatusStep, { completed: true },
                     React.createElement(StatusIcon, { completed: true }, '🚀'),
                     React.createElement(StatusText, { completed: true }, '발주 요청'),
-                    React.createElement(StatusDate, null, '2025.09.18 14:30')
+                    React.createElement(StatusDate, null, item.orderDate || '-')
                   ),
-                  React.createElement(StatusStep, { completed: true },
-                    React.createElement(StatusIcon, { completed: true }, '✅'),
-                    React.createElement(StatusText, { completed: true }, '발주 승인'),
-                    React.createElement(StatusDate, null, '2025.09.18 15:45')
+                  React.createElement(StatusStep, { 
+                    completed: ['APPROVED', 'PARTIAL', 'SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus),
+                    current: orderDetail.orderStatus === 'APPROVED' || orderDetail.orderStatus === 'PARTIAL'
+                  },
+                    React.createElement(StatusIcon, { 
+                      completed: ['APPROVED', 'PARTIAL', 'SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus),
+                      current: orderDetail.orderStatus === 'APPROVED' || orderDetail.orderStatus === 'PARTIAL'
+                    }, '✅'),
+                    React.createElement(StatusText, { 
+                      completed: ['APPROVED', 'PARTIAL', 'SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus)
+                    }, '발주 승인'),
+                    React.createElement(StatusDate, null, 
+                      ['APPROVED', 'PARTIAL', 'SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus) ? (orderDetail.updatedAt || '-') : '예정'
+                    )
                   ),
-                  React.createElement(StatusStep, { current: true },
-                    React.createElement(StatusIcon, { current: true }, '🚚'),
-                    React.createElement(StatusText, { current: true }, '상품 배송'),
-                    React.createElement(StatusDate, null, '예정')
+                  React.createElement(StatusStep, { 
+                    completed: ['SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus),
+                    current: orderDetail.orderStatus === 'SHIPPED'
+                  },
+                    React.createElement(StatusIcon, { 
+                      completed: ['SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus),
+                      current: orderDetail.orderStatus === 'SHIPPED'
+                    }, '🚚'),
+                    React.createElement(StatusText, { 
+                      completed: ['SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus)
+                    }, '상품 배송'),
+                    React.createElement(StatusDate, null, 
+                      ['SHIPPED', 'COMPLETED'].includes(orderDetail.orderStatus) ? (orderDetail.shippedAt || '-') : '예정'
+                    )
                   ),
-                  React.createElement(StatusStep, null,
-                    React.createElement(StatusIcon, null, '🏠'),
-                    React.createElement(StatusText, null, '배송 완료'),
-                    React.createElement(StatusDate, null, '예정')
+                  React.createElement(StatusStep, { 
+                    completed: orderDetail.orderStatus === 'COMPLETED',
+                    current: false
+                  },
+                    React.createElement(StatusIcon, { 
+                      completed: orderDetail.orderStatus === 'COMPLETED'
+                    }, '🏠'),
+                    React.createElement(StatusText, { 
+                      completed: orderDetail.orderStatus === 'COMPLETED'
+                    }, '배송 완료'),
+                    React.createElement(StatusDate, null, 
+                      orderDetail.orderStatus === 'COMPLETED' ? (orderDetail.completedAt || '-') : '예정'
+                    )
                   )
                 )
               ),
@@ -741,12 +840,7 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
           )
         )
       ),
-      React.createElement(EditPurchaseOrderModal, {
-        isOpen: isEditModalOpen,
-        onClose: handleCloseEditModal,
-        item: item,
-        onSave: handleSaveEdit
-      }),
+
       React.createElement(PartialApproveModal, {
         isOpen: isPartialApproveModalOpen,
         onClose: () => setIsPartialApproveModalOpen(false),
@@ -756,7 +850,21 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
           quantity: product.quantity
         })),
         onApprove: handlePartialApprove
-      })
+      }),
+      isRejectModalOpen && React.createElement(RejectModalOverlay, { onClick: () => setIsRejectModalOpen(false) },
+        React.createElement(RejectModalContainer, { onClick: (e) => e.stopPropagation() },
+          React.createElement(RejectModalTitle, null, '발주 반려'),
+          React.createElement(RejectModalTextarea, {
+            placeholder: '반려 사유를 입력해주세요.',
+            value: rejectReason,
+            onChange: (e) => setRejectReason(e.target.value)
+          }),
+          React.createElement(RejectModalButtons, null,
+            React.createElement(RejectModalCancelButton, { onClick: () => { setIsRejectModalOpen(false); setRejectReason(''); } }, '취소'),
+            React.createElement(RejectModalConfirmButton, { onClick: handleReject }, '반려')
+          )
+        )
+      )
     )
   );
 }

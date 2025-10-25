@@ -58,6 +58,14 @@ const CardValue = styled.div`
 `;
 
 function SummaryCards({ summary }) {
+  // 금액 포맷 함수
+  const formatTotalAmount = (value) => {
+    if (value === 0) return '₩0';
+    if (value < 10000) return `₩${value.toLocaleString()}`;
+    if (value < 100000000) return `₩${(value / 10000).toFixed(1)}만원`;
+    return `₩${(value / 100000000).toFixed(1)}억`;
+  };
+
   return React.createElement(CardsContainer, null,
     React.createElement(Card, null,
       React.createElement(IconContainer, { type: 'total' },
@@ -92,7 +100,7 @@ function SummaryCards({ summary }) {
       ),
       React.createElement(CardContent, null,
         React.createElement(CardTitle, null, '총 발주 금액'),
-        React.createElement(CardValue, null, `₩${(summary.totalAmount / 100000000).toFixed(1)}억`)
+        React.createElement(CardValue, null, formatTotalAmount(summary.totalAmount))
       )
     )
   );

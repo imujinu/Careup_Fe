@@ -180,7 +180,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
           React.createElement(TableHeaderCell, null, '발주번호'),
-          React.createElement(TableHeaderCell, null, '지점'),
+          React.createElement(TableHeaderCell, null, '지점명'),
           React.createElement(TableHeaderCell, null, '발주일'),
           React.createElement(TableHeaderCell, null, '상품 수'),
           React.createElement(TableHeaderCell, null, '총 금액'),

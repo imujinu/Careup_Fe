@@ -426,6 +426,17 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
     return new Intl.NumberFormat('ko-KR').format(amount);
   };
 
+  const handlePrint = async () => {
+    try {
+      // 현재 발주 ID를 사용하여 단일 발주 엑셀 다운로드
+      await purchaseOrderService.exportSingleOrderToExcel(item.id);
+      alert('엑셀 파일 다운로드가 완료되었습니다.');
+    } catch (error) {
+      console.error('엑셀 다운로드 실패:', error);
+      alert('엑셀 다운로드에 실패했습니다.');
+    }
+  };
+
   const getStatusText = (status) => {
     // orderDetail이 있으면 API 상태 사용
     const currentStatus = orderDetail?.orderStatus || status;
@@ -485,11 +496,11 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, `발주 상세보기 ${item.id}`),
-        React.createElement(HeaderButtons, null,
-          React.createElement(PrintButton, null,
-            React.createElement('span', null, '🖨️'),
-            '인쇄'
-          ),
+                          React.createElement(HeaderButtons, null,
+            React.createElement(PrintButton, { onClick: handlePrint },
+              React.createElement('span', null, '📥'),
+              '엑셀 다운로드'
+            ),
           (orderDetail.orderStatus === 'PENDING' || orderDetail.orderStatus === 'REJECTED') && React.createElement(CancelOrderButton, { onClick: handleCancelOrder },
             React.createElement('span', null, '×'),
             '발주취소'
@@ -588,7 +599,8 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
                   React.createElement('tr', null,
                     React.createElement(ProductTableHeaderCell, null, '상품명'),
                     React.createElement(ProductTableHeaderCell, null, '카테고리'),
-                    React.createElement(ProductTableHeaderCell, null, '수량'),
+                    React.createElement(ProductTableHeaderCell, null, '신청 수량'),
+                    React.createElement(ProductTableHeaderCell, null, '승인 수량'),
                     React.createElement(ProductTableHeaderCell, null, '단가'),
                     React.createElement(ProductTableHeaderCell, null, '금액')
                   )
@@ -602,6 +614,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
                       ),
                       React.createElement(ProductTableCell, null, product.category),
                       React.createElement(ProductTableCell, null, `${product.quantity}${product.unit}`),
+                      React.createElement(ProductTableCell, null, `${product.approvedQuantity || product.quantity}${product.unit}`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.unitPrice)}`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.amount)}`)
                     )

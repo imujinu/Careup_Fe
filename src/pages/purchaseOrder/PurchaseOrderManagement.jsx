@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import SummaryCards from '../../components/purchaseOrder/common/SummaryCards';
+import StatisticsChart from '../../components/purchaseOrder/common/StatisticsChart';
 import SearchAndFilter from '../../components/purchaseOrder/common/SearchAndFilter';
 import PurchaseOrderTable from '../../components/purchaseOrder/common/PurchaseOrderTable';
 import PurchaseOrderDetailModal from '../../components/purchaseOrder/common/PurchaseOrderDetailModal';
@@ -14,6 +15,19 @@ const PageContainer = styled.div`
 
 const PageHeader = styled.div`
   margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+`;
+
+const HeaderLeft = styled.div`
+  flex: 1;
+`;
+
+const HeaderRight = styled.div`
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 `;
 
 const PageTitle = styled.h1`
@@ -27,6 +41,31 @@ const PageSubtitle = styled.p`
   font-size: 14px;
   color: #6b7280;
   margin: 4px 0 0 0;
+`;
+
+const ExportButton = styled.button`
+  height: 40px;
+  padding: 0 16px;
+  background: #6b46c1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  
+  &:hover {
+    background: #553c9a;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 function PurchaseOrderManagement() {
@@ -51,6 +90,25 @@ function PurchaseOrderManagement() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [statusStatistics, setStatusStatistics] = useState([]);
+  const [branchStatistics, setBranchStatistics] = useState([]);
+  const [productStatistics, setProductStatistics] = useState([]);
+
+  // 상태 한글 변환 함수
+  const getStatusText = (status) => {
+    if (!status) return status;
+    const upperStatus = status.toUpperCase();
+    switch(upperStatus) {
+      case 'PENDING': return '대기중';
+      case 'APPROVED': return '승인됨';
+      case 'REJECTED': return '반려됨';
+      case 'PARTIAL': return '부분승인';
+      case 'SHIPPED': return '배송중';
+      case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소됨';
+      default: return status;
+    }
+  };
 
   // 본사용 발주 목록 조회 (모든 지점)
   const fetchPurchaseOrders = async () => {
@@ -62,7 +120,13 @@ function PurchaseOrderManagement() {
       const userInfo = authService.getCurrentUser();
       const branchId = userInfo?.branchId || 1; // 본사 ID
       
-      const data = await purchaseOrderService.getPurchaseOrders(branchId);
+      const [data, statistics, statusStats, branchStats, productStats] = await Promise.all([
+        purchaseOrderService.getPurchaseOrders(branchId),
+        purchaseOrderService.getHQOverallStatistics(),
+        purchaseOrderService.getHQStatusStatistics().catch(() => []),
+        purchaseOrderService.getHQBranchStatistics().catch(() => []),
+        purchaseOrderService.getHQProductStatistics().catch(() => [])
+      ]);
       
       // 데이터 변환
       const formattedData = data.map(item => ({
@@ -78,17 +142,53 @@ function PurchaseOrderManagement() {
       
       setPurchaseOrders(formattedData);
       
-      const totalOrders = formattedData.length;
-      const pending = formattedData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
-      const completed = formattedData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
-      const totalAmount = formattedData.reduce((sum, item) => sum + item.totalAmount, 0);
+      // 차트 데이터 설정
+      if (statusStats && statusStats.length > 0) {
+        const statusChartData = statusStats.map(stat => ({
+          status: getStatusText(stat.status),
+          count: stat.count
+        }));
+        setStatusStatistics(statusChartData);
+      }
+
+      if (branchStats && branchStats.length > 0) {
+        const branchChartData = branchStats.map(stat => ({
+          branchName: stat.branchName || `지점-${stat.branchId}`,
+          orderCount: stat.orderCount || 0,
+          totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
+        }));
+        setBranchStatistics(branchChartData);
+      }
+
+      if (productStats && productStats.length > 0) {
+        const productChartData = productStats.map(stat => ({
+          productName: stat.productName,
+          totalQuantity: stat.totalQuantity || 0,
+          totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
+        }));
+        setProductStatistics(productChartData);
+      }
       
-      setSummary({
-        totalOrders,
-        pending,
-        completed,
-        totalAmount
-      });
+      if (statistics) {
+        setSummary({
+          totalOrders: statistics.totalOrderCount || 0,
+          pending: statistics.pendingCount || 0,
+          completed: statistics.totalOrderCount - statistics.pendingCount || 0,  // 완료는 전체 - 대기
+          totalAmount: statistics.totalOrderAmount || 0
+        });
+      } else {
+        const totalOrders = formattedData.length;
+        const pending = formattedData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
+        const completed = formattedData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
+        const totalAmount = formattedData.reduce((sum, item) => sum + item.totalAmount, 0);
+        
+        setSummary({
+          totalOrders,
+          pending,
+          completed,
+          totalAmount
+        });
+      }
     } catch (err) {
       console.error('발주 목록 조회 실패:', err);
       setError('발주 데이터를 불러오는데 실패했습니다.');
@@ -127,6 +227,20 @@ function PurchaseOrderManagement() {
     fetchPurchaseOrders();
   };
 
+  // 전체 엑셀 다운로드
+  const handleExportAll = async () => {
+    try {
+      const userInfo = authService.getCurrentUser();
+      const branchId = userInfo?.branchId || 1; // 본사 ID
+      
+      await purchaseOrderService.exportToExcel(branchId);
+      alert('전체 발주 내역 엑셀 다운로드가 완료되었습니다.');
+    } catch (error) {
+      console.error('엑셀 다운로드 실패:', error);
+      alert('엑셀 다운로드에 실패했습니다.');
+    }
+  };
+
   // 필터링된 데이터
   const filteredData = purchaseOrders.filter(item => {
     const matchesSearch = !filters.searchTerm || 
@@ -147,10 +261,23 @@ function PurchaseOrderManagement() {
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
-      React.createElement(PageTitle, null, '발주관리'),
-      React.createElement(PageSubtitle, null, '본사 - 발주 현황을 확인하고 관리하세요')
+      React.createElement(HeaderLeft, null,
+        React.createElement(PageTitle, null, '발주관리'),
+        React.createElement(PageSubtitle, null, '본사 - 발주 현황을 확인하고 관리하세요')
+      ),
+      React.createElement(HeaderRight, null,
+        React.createElement(ExportButton, { onClick: handleExportAll },
+          React.createElement('span', null, '📥'),
+          '전체 엑셀 다운로드'
+        )
+      )
     ),
     React.createElement(SummaryCards, { summary }),
+    React.createElement(StatisticsChart, {
+      statusData: statusStatistics,
+      branchData: branchStatistics,
+      productData: productStatistics
+    }),
     React.createElement(SearchAndFilter, {
       filters,
       onFiltersChange: handleFiltersChange

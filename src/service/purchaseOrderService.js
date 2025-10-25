@@ -86,6 +86,26 @@ export const purchaseOrderService = {
     window.URL.revokeObjectURL(url);
   },
 
+  // 특정 발주 내역 엑셀 다운로드 (단일 발주)
+  exportSingleOrderToExcel: async (purchaseOrderId) => {
+    const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/${purchaseOrderId}/export/excel`, {
+      responseType: 'blob'
+    });
+    
+    // 파일 다운로드
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `purchase_order_${purchaseOrderId}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   // 본사용 발주 통계 조회 (전체)
   getHQStatistics: async (startDate = null, endDate = null) => {
     const params = new URLSearchParams();
