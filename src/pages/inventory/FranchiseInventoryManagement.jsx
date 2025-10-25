@@ -152,19 +152,63 @@ function FranchiseInventoryManagement() {
     setSelectedItem(null);
   };
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
+    // 모달을 열기 전에 최신 재고 데이터를 가져옴
+    await fetchInventoryData();
     setIsProductSelectionModalOpen(true);
   };
 
   const handleCloseProductSelectionModal = () => {
     setIsProductSelectionModalOpen(false);
-    setSelectedProduct(null);
   };
 
-  const handleProductSelect = (product) => {
-    setSelectedProduct(product);
-    setIsProductSelectionModalOpen(false);
-    setIsProductSetupModalOpen(true);
+  const handleProductSelect = async (products) => {
+    // 상품 개수에 따라 처리
+    if (products.length === 1) {
+      // 단일 상품: 설정 모달 표시
+      setSelectedProduct(products[0]);
+      setIsProductSelectionModalOpen(false);
+      setIsProductSetupModalOpen(true);
+    } else {
+      // 여러 상품: 기본값으로 일괄 등록
+      try {
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const product of products) {
+          try {
+            // 각 상품을 가맹점에 등록
+            await inventoryService.createBranchProduct({
+              branchId: branchId,
+              productId: product.productId,
+              serialNumber: `${product.productId}-${Date.now()}`, // 고유 일련번호
+              stockQuantity: 0,
+              safetyStock: 10,
+              price: product.price
+            });
+            successCount++;
+          } catch (error) {
+            console.error(`상품 ${product.productName} 등록 실패:`, error);
+            // 중복 등록 에러는 무시 (이미 등록된 것이므로)
+            if (!error.response?.data?.status_message?.includes('이미 등록된')) {
+              failCount++;
+            }
+          }
+        }
+        
+        setIsProductSelectionModalOpen(false);
+        
+        if (successCount > 0) {
+          alert(`${successCount}개 상품이 등록되었습니다.${failCount > 0 ? ` (${failCount}개 실패)` : ''}`);
+          await fetchInventoryData();
+        } else {
+          alert('상품 등록에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('상품 등록 실패:', error);
+        alert('상품 등록 중 오류가 발생했습니다.');
+      }
+    }
   };
 
   const handleCloseProductSetupModal = () => {
@@ -173,9 +217,40 @@ function FranchiseInventoryManagement() {
   };
 
   const handleProductSetup = async (setupData) => {
-    handleCloseProductSetupModal();
-    await fetchInventoryData();
+    if (!selectedProduct) return;
+    
+    setIsProductSetupModalOpen(false);
+    const currentProduct = selectedProduct;
+    setSelectedProduct(null);
+    
+    try {
+      await inventoryService.createBranchProduct({
+        branchId: branchId,
+        productId: currentProduct.productId,
+        serialNumber: setupData.serialNumber || `${currentProduct.productId}-${Date.now()}`,
+        stockQuantity: setupData.stockQuantity || 0,
+        safetyStock: setupData.safetyStock,
+        price: setupData.price || 0
+      });
+      
+      alert('상품이 등록되었습니다.');
+      await fetchInventoryData();
+    } catch (error) {
+      console.error('상품 등록 실패:', error);
+      
+      const errorMessage = error.response?.data?.status_message || error.response?.data?.message || error.message;
+      
+      // 중복 등록 에러인 경우
+      if (error.response?.data?.status_message?.includes('이미 등록된')) {
+        alert('이미 등록된 상품입니다.');
+        await fetchInventoryData();
+      } else {
+        alert('상품 등록에 실패했습니다: ' + errorMessage);
+      }
+    }
   };
+
+
 
   const handleSaveEdit = async (formData) => {
     try {

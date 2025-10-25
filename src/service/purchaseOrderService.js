@@ -155,5 +155,25 @@ export const purchaseOrderService = {
 
     const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/statistics/hq/product?${params}`);
     return response.data;
+  },
+
+  // 가맹점용 발주 통계 조회
+  getFranchiseStatistics: async (branchId, startDate = null, endDate = null) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/statistics/franchise/${branchId}?${params}`);
+    return response.data;
+  },
+
+  // 가맹점용 상품별 발주 통계 조회
+  getFranchiseProductStatistics: async (branchId, startDate = null, endDate = null) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/statistics/franchise/${branchId}/product?${params}`);
+    return response.data;
   }
 };

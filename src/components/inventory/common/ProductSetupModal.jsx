@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import { inventoryService } from '../../../service/inventoryService';
-import { authService } from '../../../service/authService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -155,7 +153,6 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
     safetyStock: 0,
     price: 0
   });
-  const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
     if (product && isOpen) {
@@ -175,48 +172,21 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
     }));
   };
 
-  const handleSave = async () => {
-    if (loading) return;
-    
+  const handleSave = () => {
     if (!formData.serialNumber || formData.safetyStock < 0 || formData.price < 0) {
       alert('모든 필드를 올바르게 입력해주세요.');
       return;
     }
 
-    try {
-      setLoading(true);
-      
-      const userInfo = authService.getCurrentUser();
-      const branchId = userInfo?.branchId || 2;
-      
-      const requestData = {
-        productId: product.productId,
-        branchId: branchId,
-        serialNumber: formData.serialNumber,
-        stockQuantity: 0, // 상품 등록 시 재고는 항상 0
-        safetyStock: parseInt(formData.safetyStock),
-        price: parseInt(formData.price)
-      };
-
-      console.log('지점 상품 등록 요청 데이터:', requestData);
-      const response = await inventoryService.createBranchProduct(requestData);
-      console.log('지점 상품 등록 응답:', response);
-
-      alert('상품이 성공적으로 등록되었습니다.');
-      onSave({
-        productId: product.productId,
-        serialNumber: formData.serialNumber,
-        stockQuantity: 0,
-        safetyStock: parseInt(formData.safetyStock),
-        price: parseInt(formData.price)
-      });
-      handleClose();
-    } catch (error) {
-      console.error('지점 상품 등록 실패:', error);
-      alert('상품 등록에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
-    }
+    onSave({
+      productId: product.productId,
+      serialNumber: formData.serialNumber,
+      stockQuantity: 0,
+      safetyStock: parseInt(formData.safetyStock),
+      price: parseInt(formData.price)
+    });
+    
+    handleClose();
   };
 
   const handleClose = () => {
@@ -289,8 +259,8 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
         )
       ),
       React.createElement(ButtonGroup, null,
-        React.createElement(CancelButton, { onClick: handleClose, disabled: loading }, '취소'),
-        React.createElement(AddButton, { onClick: handleSave, disabled: loading }, loading ? '등록 중...' : '추가')
+        React.createElement(CancelButton, { onClick: handleClose }, '취소'),
+        React.createElement(AddButton, { onClick: handleSave }, '추가')
       )
     )
   );

@@ -61,12 +61,6 @@ export const inventoryService = {
     return response.data;
   },
 
-  // 지점별 상품 등록
-  createBranchProduct: async (data) => {
-    const response = await inventoryApi.post(`${API_BASE_URL}/inventory/branch-products`, data);
-    return response.data;
-  },
-
   // 안전재고 설정
   updateSafetyStock: async (branchProductId, safetyStock) => {
     await inventoryApi.post(`${API_BASE_URL}/inventory/safety-stock`, {

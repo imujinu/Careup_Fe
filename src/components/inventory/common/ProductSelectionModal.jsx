@@ -181,7 +181,7 @@ const NextButton = styled.button`
 function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] }) {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState([]); // 여러개 선택 가능
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -235,17 +235,26 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
   };
 
   const handleProductSelect = (product) => {
-    setSelectedProduct(product);
+    setSelectedProducts(prev => {
+      const isSelected = prev.find(p => p.productId === product.productId);
+      if (isSelected) {
+        // 이미 선택된 상품이면 제거
+        return prev.filter(p => p.productId !== product.productId);
+      } else {
+        // 선택되지 않은 상품이면 추가
+        return [...prev, product];
+      }
+    });
   };
 
   const handleNext = () => {
-    if (selectedProduct) {
-      onNext(selectedProduct);
+    if (selectedProducts.length > 0) {
+      onNext(selectedProducts);
     }
   };
 
   const handleClose = () => {
-    setSelectedProduct(null);
+    setSelectedProducts([]);
     setSearchTerm('');
     setCategoryFilter('');
     onClose();
@@ -293,25 +302,26 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
               React.createElement('div', { style: { fontSize: '14px' } }, '모든 상품이 이미 등록되었거나 검색 조건에 맞는 상품이 없습니다.')
             ) :
             React.createElement(ProductGrid, null,
-              filteredProducts.map((product) =>
-                React.createElement(ProductCard, {
+              filteredProducts.map((product) => {
+                const isSelected = selectedProducts.find(p => p.productId === product.productId);
+                return React.createElement(ProductCard, {
                   key: product.productId,
-                  $selected: selectedProduct?.productId === product.productId,
+                  $selected: !!isSelected,
                   onClick: () => handleProductSelect(product)
                 },
                   React.createElement(ProductName, null, product.productName || '알 수 없음'),
                   React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
                   React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`),
                   React.createElement(ProductPrice, null, `공급가: ₩${product.price?.toLocaleString() || 0}`)
-                )
-              )
+                );
+              })
             ),
         React.createElement(ButtonGroup, null,
           React.createElement(CancelButton, { onClick: handleClose }, '취소'),
           React.createElement(NextButton, {
             onClick: handleNext,
-            disabled: !selectedProduct
-          }, '다음')
+            disabled: selectedProducts.length === 0
+          }, `등록 (${selectedProducts.length})`)
         )
       )
     )

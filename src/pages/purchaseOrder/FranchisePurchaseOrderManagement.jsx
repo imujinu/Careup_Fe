@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import SummaryCards from '../../components/purchaseOrder/franchise/SummaryCards';
 import SearchAndFilter from '../../components/purchaseOrder/franchise/SearchAndFilter';
 import PurchaseOrderTable from '../../components/purchaseOrder/franchise/PurchaseOrderTable';
@@ -71,6 +72,21 @@ const ExportButton = styled.button`
   }
 `;
 
+const ChartCard = styled.div`
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+`;
+
+const ChartTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 20px 0;
+`;
+
 function FranchisePurchaseOrderManagement() {
   const branchId = authService.getCurrentUser()?.branchId || 2;
   
@@ -97,6 +113,7 @@ function FranchisePurchaseOrderManagement() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [productStatistics, setProductStatistics] = useState([]);
 
   // 가맹점용 발주 목록 조회
   const fetchPurchaseOrders = async () => {
@@ -104,31 +121,45 @@ function FranchisePurchaseOrderManagement() {
       setLoading(true);
       setError(null);
       
-      const data = await purchaseOrderService.getPurchaseOrders(branchId);
+      const [data, productStats] = await Promise.all([
+        purchaseOrderService.getPurchaseOrders(branchId),
+        purchaseOrderService.getFranchiseProductStatistics(branchId).catch(() => [])
+      ]);
       console.log('가맹점 발주 목록 API 응답:', data);
       
       // 데이터 변환
       const formattedData = data.map(item => ({
         id: item.purchaseOrderId,
-        orderDate: item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        orderDate: item.orderDate || new Date().toISOString().split('T')[0],
         productCount: item.productCount || 0,
-        totalAmount: item.totalPrice || 0,
-        status: item.orderStatus || 'pending',
-        deliveryDate: '-'
+        totalAmount: item.totalAmount || 0,
+        status: item.status || 'pending',
+        deliveryDate: item.deliveryDate || '-'
       }));
       
-      // ID별로 고유하게 유지 (중복 제거 로직 제거)
-      const uniqueData = formattedData;
+      // 중복 데이터 제거
+      const uniqueData = formattedData.reduce((acc, current) => {
+        const existingIndex = acc.findIndex(item => 
+          item.orderDate === current.orderDate && 
+          item.status === current.status &&
+          item.productCount === current.productCount
+        );
+        if (existingIndex === -1) {
+          acc.push(current);
+        } else {
+          if (current.id > acc[existingIndex].id) {
+            acc[existingIndex] = current;
+          }
+        }
+        return acc;
+      }, []);
       
       setPurchaseOrders(uniqueData);
       
       const totalOrders = uniqueData.length;
-      const pending = uniqueData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
-      const inProgress = uniqueData.filter(item => {
-        const status = (item.status || '').toLowerCase();
-        return status === 'approved' || status === 'shipped' || status === 'partial';
-      }).length;
-      const completed = uniqueData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
+      const pending = uniqueData.filter(item => item.status === 'pending').length;
+      const inProgress = uniqueData.filter(item => item.status === 'approved' || item.status === 'shipped').length;
+      const completed = uniqueData.filter(item => item.status === 'completed').length;
       
       setSummary({
         totalOrders,
@@ -136,6 +167,10 @@ function FranchisePurchaseOrderManagement() {
         inProgress,
         completed
       });
+      
+      if (productStats && productStats.length > 0) {
+        setProductStatistics(productStats);
+      }
     } catch (err) {
       console.error('가맹점 발주 목록 조회 실패:', err);
       setError('발주 데이터를 불러오는데 실패했습니다.');
@@ -170,7 +205,6 @@ function FranchisePurchaseOrderManagement() {
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedItem(null);
-    // 모달 닫힐 때 목록 새로고침
     fetchPurchaseOrders();
   };
 
@@ -215,23 +249,14 @@ function FranchisePurchaseOrderManagement() {
     // TODO: 자동화 설정 저장 로직 구현
   };
 
-  // 전체 엑셀 다운로드
-  const handleExportAll = async () => {
-    try {
-      await purchaseOrderService.exportToExcel(branchId);
-      alert('전체 발주 내역 엑셀 다운로드가 완료되었습니다.');
-    } catch (error) {
-      console.error('엑셀 다운로드 실패:', error);
-      alert('엑셀 다운로드에 실패했습니다.');
-    }
-  };
+
 
   // 필터링된 데이터
   const filteredData = purchaseOrders.filter(item => {
     const matchesSearch = !filters.searchTerm || 
-      String(item.id).toLowerCase().includes(filters.searchTerm.toLowerCase());
+      item.id.toLowerCase().includes(filters.searchTerm.toLowerCase());
     
-    const matchesStatus = !filters.statusFilter || (item.status || '').toLowerCase() === filters.statusFilter.toLowerCase();
+    const matchesStatus = !filters.statusFilter || item.status === filters.statusFilter;
     
     return matchesSearch && matchesStatus;
   });
@@ -249,13 +274,29 @@ function FranchisePurchaseOrderManagement() {
         React.createElement(PageSubtitle, null, '가맹점 발주 내역 조회 및 발주 요청')
       ),
       React.createElement(HeaderRight, null,
-        React.createElement(ExportButton, { onClick: handleExportAll },
-          React.createElement('span', null, '📥'),
-          '전체 엑셀 다운로드'
-        )
+        React.createElement(ExportButton, null, '내보내기'),
+        React.createElement(ExportButton, null, '엑셀 다운로드')
       )
     ),
     React.createElement(SummaryCards, { summary }),
+    productStatistics.length > 0 && React.createElement(ChartCard, null,
+      React.createElement(ChartTitle, null, '상품별 발주량 TOP 10'),
+      React.createElement(ResponsiveContainer, { width: "100%", height: 300 },
+        React.createElement(BarChart, { data: productStatistics.map(stat => ({
+          productName: stat.productName,
+          totalQuantity: stat.totalQuantity,
+          approvedQuantity: stat.approvedQuantity
+        })) },
+          React.createElement(CartesianGrid, { strokeDasharray: "3 3" }),
+          React.createElement(XAxis, { dataKey: "productName", angle: -45, textAnchor: "end", height: 100 } ),
+          React.createElement(YAxis),
+          React.createElement(Tooltip),
+          React.createElement(Legend),
+          React.createElement(Bar, { dataKey: "totalQuantity", fill: "#6b46c1", name: "총 발주량" }),
+          React.createElement(Bar, { dataKey: "approvedQuantity", fill: "#10b981", name: "승인 수량" })
+        )
+      )
+    ),
     React.createElement(SearchAndFilter, {
       filters,
       onFiltersChange: handleFiltersChange,
