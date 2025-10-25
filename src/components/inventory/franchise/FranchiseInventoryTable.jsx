@@ -151,8 +151,7 @@ function FranchiseInventoryTable({
           React.createElement(TableRow, { key: index },
             React.createElement(TableCell, null,
               React.createElement(ProductInfo, null,
-                React.createElement(ProductName, null, item.product.name),
-                React.createElement(ProductSku, null, `ID: ${item.product.id}`)
+                React.createElement(ProductName, null, item.product.name)
               )
             ),
             React.createElement(TableCell, null, item.category || '미분류'),

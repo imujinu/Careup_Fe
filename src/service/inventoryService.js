@@ -36,9 +36,22 @@ export const inventoryService = {
     return response.data;
   },
 
+  // 상품 삭제
+  deleteProduct: async (productId) => {
+    const response = await inventoryApi.delete(`${API_BASE_URL}/api/products/${productId}`);
+    return response.data;
+  },
+
   // 지점별 재고 조회
   getBranchProducts: async (branchId) => {
     const response = await inventoryApi.get(`${API_BASE_URL}/inventory/branch/${branchId}`);
+    return response.data;
+  },
+
+  // 지점에 상품 등록
+  createBranchProduct: async (data) => {
+    const response = await inventoryApi.post(`${API_BASE_URL}/inventory/branch-products`, data);
+    console.log('지점 상품 등록 API 응답:', response);
     return response.data;
   },
 

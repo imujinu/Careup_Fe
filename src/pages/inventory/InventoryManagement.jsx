@@ -106,6 +106,7 @@ function InventoryManagement() {
   const [isFlowEditModalOpen, setIsFlowEditModalOpen] = useState(false);
   const [isFlowAddModalOpen, setIsFlowAddModalOpen] = useState(false);
   const [selectedFlowItem, setSelectedFlowItem] = useState(null);
+  const [branchProducts, setBranchProducts] = useState([]);
 
   // 본사: 전체 지점 재고 조회
   const fetchInventoryData = async (branchId = null) => {
@@ -118,26 +119,69 @@ function InventoryManagement() {
       const userInfo = authService.getCurrentUser();
       const targetBranchId = branchId || userInfo?.branchId || 1;
       
-      // 본사는 전체 상품 목록을 조회
-      const data = await inventoryService.getAllProducts();
-      console.log('API 응답 데이터:', data);
+      // 본사 재고 조회 (BranchProduct 데이터 가져오기)
+      const branchProducts = await inventoryService.getBranchProducts(1);
+      console.log('본사 BranchProduct 데이터:', branchProducts);
       
-      // 데이터 변환 (Product 엔티티 구조에 맞게)
-      const formattedData = data.map(item => ({
-        id: item.productId,
-        product: { 
-          name: item.name || '알 수 없음', 
-          id: item.productId || 'N/A'
-        },
-        category: item.categoryName || '미분류',
-        branchId: 1, // 본사
-        branch: '본사',
-        currentStock: 0, // 상품 마스터에는 재고 정보가 없음
-        safetyStock: 0,
-        status: 'normal',
-        unitPrice: item.supplyPrice || 0,
-        totalValue: 0
-      }));
+      // 본사가 본사 재고 관리 탭인 경우, 본사에 BranchProduct가 없는 상품도 표시
+      let allProducts = [];
+      try {
+        allProducts = await inventoryService.getAllProducts();
+        console.log('본사 전체 상품 데이터:', allProducts);
+      } catch (err) {
+        console.error('getAllProducts 실패 (서버가 꺼져있거나 엔드포인트 없음):', err);
+        // 일단 빈 배열로 진행
+      }
+      
+      // BranchProduct가 있는 상품
+      const productsWithStock = branchProducts.map(item => {
+        const currentStock = item.stockQuantity || 0;
+        const safetyStock = item.safetyStock || 0;
+        const unitPrice = item.price || 0;
+        const status = currentStock < safetyStock ? 'low' : 'normal';
+        
+        return {
+          id: item.branchProductId,
+          branchProductId: item.branchProductId,
+          product: { 
+            name: item.productName || '알 수 없음', 
+            id: item.productId || 'N/A'
+          },
+          category: item.categoryName || '미분류',
+          branchId: item.branchId,
+          branch: '본사',
+          currentStock: currentStock,
+          safetyStock: safetyStock,
+          status: status,
+          unitPrice: unitPrice,
+          totalValue: currentStock * unitPrice
+        };
+      });
+      
+      // BranchProduct가 없는 상품 찾기
+      const branchProductIds = new Set(branchProducts.map(bp => bp.productId));
+      const productsWithoutStock = allProducts
+        .filter(product => !branchProductIds.has(product.productId))
+        .map(product => ({
+          id: `product-${product.productId}`, // 임시 ID
+          branchProductId: null,
+          product: { 
+            name: product.name || '알 수 없음', 
+            id: product.productId || 'N/A'
+          },
+          category: product.categoryName || '미분류',
+          branchId: 1,
+          branch: '본사',
+          currentStock: 0,
+          safetyStock: 0,
+          status: 'normal',
+          unitPrice: product.supplyPrice || 0,
+          totalValue: 0
+        }));
+      
+      // 전체 데이터 합치기
+      const formattedData = [...productsWithStock, ...productsWithoutStock];
+      
       
       setInventoryData(formattedData);
       
@@ -245,19 +289,23 @@ function InventoryManagement() {
         
         // 재고 목록 새로고침
         await fetchInventoryData();
+        
+        // 성공 시에만 모달 닫기
+        handleCloseAddModal();
       } else {
         // 지점 관리자: 지점별 상품 추가 (추후 구현)
         alert('지점별 상품 추가 기능은 추후 구현 예정입니다.');
         return;
       }
       
-      handleCloseAddModal();
-      
-      // 데이터 새로고침
-      fetchInventoryData();
+      // 데이터 새로고침 (이미 위에서 fetchInventoryData 호출됨)
     } catch (err) {
       console.error('등록 실패:', err);
-      alert('등록에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
+      // API 에러 시에만 alert 표시 (유효성 검사는 이미 처리됨)
+      if (err.response) {
+        alert('등록에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
+      }
+      // 에러 발생 시 모달은 닫지 않고 그대로 유지
     }
   };
 
@@ -269,6 +317,36 @@ function InventoryManagement() {
   const handleDetail = (item) => {
     setSelectedItem(item);
     setIsDetailModalOpen(true);
+  };
+
+  const handleDelete = async (item) => {
+    if (window.confirm(`'${item.product.name}' 상품을 삭제하시겠습니까?\n\n주의: 삭제된 상품은 복구할 수 없습니다.`)) {
+      try {
+        console.log('삭제할 상품:', item);
+        console.log('상품 ID:', item.product.id);
+        
+        // 상품 삭제 API 호출
+        const response = await inventoryService.deleteProduct(item.product.id);
+        console.log('삭제 API 응답:', response);
+        
+        alert('상품이 성공적으로 삭제되었습니다.');
+        
+        // 데이터 새로고침
+        await fetchInventoryData();
+      } catch (err) {
+        console.error('상품 삭제 실패:', err);
+        console.error('에러 상세:', err.response);
+        
+        let errorMessage = '상품 삭제에 실패했습니다.';
+        if (err.response?.data?.status_message) {
+          errorMessage += '\n' + err.response.data.status_message;
+        } else if (err.message) {
+          errorMessage += '\n' + err.message;
+        }
+        
+        alert(errorMessage);
+      }
+    }
   };
 
   const handleCloseEditModal = () => {
@@ -286,9 +364,10 @@ function InventoryManagement() {
       console.log('Saving inventory data:', formData);
       
       // 재고 정보 업데이트 (안전재고, 단가)
-      if (selectedItem?.id) {
+      const branchProductId = selectedItem?.branchProductId || selectedItem?.id;
+      if (branchProductId) {
         await inventoryService.updateInventoryInfo(
-          selectedItem.id,
+          branchProductId,
           formData.safetyStock,
           formData.unitPrice
         );
@@ -316,8 +395,24 @@ function InventoryManagement() {
   };
 
   // 입출고 기록 관련 핸들러들
-  const handleFlowAdd = () => {
-    setIsFlowAddModalOpen(true);
+  const handleFlowAdd = async () => {
+    try {
+      // inventoryData에서 branchProductId가 있는 항목만 필터링
+      const productsWithBranchProduct = inventoryData.filter(item => item.branchProductId != null);
+      
+      // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환
+      const formattedBranchProducts = productsWithBranchProduct.map(item => ({
+        id: item.branchProductId,
+        productName: item.product.name,
+        branchId: item.branchId
+      }));
+      
+      setBranchProducts(formattedBranchProducts);
+      setIsFlowAddModalOpen(true);
+    } catch (err) {
+      console.error('상품 목록 조회 실패:', err);
+      alert('상품 목록을 불러오는데 실패했습니다: ' + (err.response?.data?.status_message || err.message));
+    }
   };
 
   const handleFlowCloseAddModal = () => {
@@ -460,7 +555,8 @@ function InventoryManagement() {
           onPageChange: handlePageChange,
           onPageSizeChange: handlePageSizeChange,
           onModify: handleModify,
-          onDetail: handleDetail
+          onDetail: handleDetail,
+          onDelete: handleDelete
         })
       ) : React.createElement(React.Fragment, null,
         React.createElement('div', { style: { marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -517,7 +613,7 @@ function InventoryManagement() {
       isOpen: isFlowAddModalOpen,
       onClose: handleFlowCloseAddModal,
       onSave: handleFlowSaveAddModal,
-      branchProducts: branchProductsForFlow
+      branchProducts: branchProducts
     })
   );
 }

@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { purchaseOrderService } from '../../../service/purchaseOrderService';
+import { inventoryService } from '../../../service/inventoryService';
+import { authService } from '../../../service/authService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -302,55 +305,57 @@ const OrderRequestButton = styled(Button)`
   }
 `;
 
-function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
+function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedProducts, setSelectedProducts] = useState({});
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const products = [
-    {
-      id: 'MATERIAL-001',
-      name: '커피원두',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 15000
-    },
-    {
-      id: 'MATERIAL-002',
-      name: '우유',
-      category: '원재료',
-      unit: 'L',
-      unitPrice: 3000
-    },
-    {
-      id: 'MATERIAL-003',
-      name: '크로와상 반죽',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 12000
-    },
-    {
-      id: 'MATERIAL-004',
-      name: '쿠키반죽',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 8000
-    },
-    {
-      id: 'MATERIAL-005',
-      name: '치즈케이크',
-      category: '원재료',
-      unit: 'ea',
-      unitPrice: 25000
-    },
-    {
-      id: 'MATERIAL-006',
-      name: '선타',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 7000
+  // 상품 목록 조회 (가맹점에 등록된 상품 목록만)
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      
+      const userInfo = authService.getCurrentUser();
+      const branchId = userInfo?.branchId || 2; // 가맹점 branchId (2번으로 가정)
+      
+      // 가맹점에 등록된 상품 목록만 조회
+      const data = await inventoryService.getBranchProducts(branchId);
+      
+      const formattedProducts = data.map(item => ({
+        id: item.branchProductId,
+        productId: item.productId, // 실제 productId 저장
+        name: item.productName || '상품명 없음',
+        category: item.categoryName || '미분류',
+        unit: '개', // 기본 단위
+        unitPrice: item.price && item.price > 0 ? item.price : 0
+      }));
+      
+      
+      setProducts(formattedProducts);
+      
+      // 상품이 하나도 없으면 경고
+      if (formattedProducts.length === 0) {
+        alert('가맹점에 등록된 상품이 없습니다. 먼저 상품을 추가해주세요.');
+      }
+    } catch (error) {
+      console.error('가맹점 상품 목록 조회 실패:', error);
+      // 실패 시 빈 배열로 설정
+      setProducts([]);
+      alert('상품 목록을 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // 모달이 열릴 때 상품 목록 조회
+  useEffect(() => {
+    if (isOpen) {
+      fetchProducts();
+      setSelectedProducts({}); // 모달이 열릴 때 선택 상태 초기화
+    }
+  }, [isOpen]);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = !searchTerm || 
@@ -384,28 +389,73 @@ function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
     }
   };
 
-  const handleOrderRequest = () => {
+  const handleOrderRequest = async () => {
+    if (loading) return; // 이미 처리 중이면 중복 실행 방지
+    
     const orderItems = Object.entries(selectedProducts)
       .filter(([_, quantity]) => quantity > 0)
       .map(([productId, quantity]) => {
-        const product = products.find(p => p.id === productId);
+        const product = products.find(p => String(p.id) === String(productId));
+        if (!product) {
+          console.error('상품을 찾을 수 없습니다:', productId);
+          console.log('선택된 productId:', productId);
+          console.log('전체 products:', products);
+          return null;
+        }
+        
+        // productId 확인
+        if (!product.productId) {
+          console.error('productId가 없습니다:', product);
+          return null;
+        }
+        
         return {
-          productId,
+          productId: product.productId, // 실제 productId 사용
           name: product.name,
           quantity,
           unit: product.unit,
           unitPrice: product.unitPrice,
           totalPrice: quantity * product.unitPrice
         };
-      });
+      })
+      .filter(item => item !== null); // null 제거
 
     if (orderItems.length === 0) {
       alert('발주할 상품을 선택해주세요.');
       return;
     }
 
-    onOrderRequest(orderItems);
+    try {
+      setLoading(true);
+      
+      // 백엔드 API 호출
+      const userInfo = authService.getCurrentUser();
+      const branchId = userInfo?.branchId || 2;
+      
+      const orderData = {
+        branchId: branchId,
+        orderDetails: orderItems.map(item => ({
+          productId: item.productId,
+          quantity: parseInt(item.quantity), // int 타입으로 변환
+          supplyPrice: parseInt(item.unitPrice) // Long 타입으로 변환
+        }))
+      };
+
+      const response = await purchaseOrderService.createPurchaseOrder(orderData);
+    
+      alert('발주가 성공적으로 생성되었습니다.');
+      onSubmitOrderRequest(orderItems); // 부모 컴포넌트에 알림
     onClose();
+    } catch (error) {
+      console.error('발주 생성 실패:', error);
+      console.error('에러 응답 데이터:', error.response?.data);
+      
+      // 에러 메시지 추출
+      const errorMessage = error.response?.data?.status_message || error.response?.data?.message || error.message;
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectedCount = Object.values(selectedProducts).filter(qty => qty > 0).length;
@@ -449,12 +499,13 @@ function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
             React.createElement(SectionTitle, null, `상품 선택 (${filteredProducts.length}개)`),
             React.createElement(SelectedCount, null, `선택된 상품: ${selectedCount}개`)
           ),
+          loading ? 
+            React.createElement('div', { style: { textAlign: 'center', padding: '40px' } }, '상품 목록을 불러오는 중...') :
           React.createElement(ProductGrid, null,
             filteredProducts.map((product) =>
               React.createElement(ProductCard, { key: product.id },
                 React.createElement(ProductHeader, null,
                   React.createElement(ProductName, null, product.name),
-                  React.createElement(ProductId, null, product.id),
                   React.createElement(ProductCategory, null, product.category)
                 ),
                 React.createElement(ProductPrice, null, `₩${product.unitPrice.toLocaleString()}/${product.unit}`),
@@ -484,8 +535,8 @@ function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
           React.createElement(CancelButton, { onClick: onClose }, '취소'),
           React.createElement(OrderRequestButton, {
             onClick: handleOrderRequest,
-            disabled: selectedCount === 0
-          }, '발주 요청')
+            disabled: selectedCount === 0 || loading
+          }, loading ? '처리 중...' : '발주 요청')
         )
       )
     )

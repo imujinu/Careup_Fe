@@ -276,10 +276,15 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     });
   };
 
-  const handleSave = () => {
-    onSave(formData);
-    onClose();
-    handleReset();
+  const handleSave = async () => {
+    try {
+      // onSave가 Promise를 반환하면 결과를 기다림
+      await onSave(formData);
+      // onSave에서 성공 시 모달을 닫아줄 것임
+    } catch (error) {
+      // 에러 발생 시 모달은 닫지 않고 그대로 유지
+      console.error('상품 등록 실패:', error);
+    }
   };
 
   const handleCategorySave = async (categoryData) => {

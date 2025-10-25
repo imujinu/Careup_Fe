@@ -86,13 +86,27 @@ function FranchiseInventoryManagement() {
         totalValue: (item.stockQuantity || 0) * (item.price || 0)
       }));
       
-      setInventoryItems(formattedData);
+      // 중복 데이터 제거
+      const uniqueData = formattedData.reduce((acc, current) => {
+        const existingIndex = acc.findIndex(item => item.product.id === current.product.id);
+        if (existingIndex === -1) {
+          acc.push(current);
+        } else {
+          // 더 최근 ID를 가진 항목으로 교체
+          if (current.id > acc[existingIndex].id) {
+            acc[existingIndex] = current;
+          }
+        }
+        return acc;
+      }, []);
+      
+      setInventoryItems(uniqueData);
       
       // Summary 계산
-      const totalItems = formattedData.length;
-      const lowStock = formattedData.filter(item => item.status === 'low').length;
-      const totalValue = formattedData.reduce((sum, item) => sum + item.totalValue, 0);
-      const categories = [...new Set(formattedData.map(item => item.category))];
+      const totalItems = uniqueData.length;
+      const lowStock = uniqueData.filter(item => item.status === 'low').length;
+      const totalValue = uniqueData.reduce((sum, item) => sum + item.totalValue, 0);
+      const categories = [...new Set(uniqueData.map(item => item.category))];
       
       setSummary({
         totalItems,
@@ -159,37 +173,20 @@ function FranchiseInventoryManagement() {
   };
 
   const handleProductSetup = async (setupData) => {
-    try {
-      const userInfo = authService.getCurrentUser();
-      const branchId = userInfo?.branchId || 2;
-
-      await inventoryService.createBranchProduct({
-        productId: setupData.productId,
-        branchId: branchId,
-        serialNumber: setupData.serialNumber,
-        stockQuantity: setupData.stockQuantity,
-        safetyStock: setupData.safetyStock,
-        price: setupData.price
-      });
-
-      alert('상품이 성공적으로 추가되었습니다.');
-      handleCloseProductSetupModal();
-      fetchInventoryData(); // 목록 새로고침
-    } catch (error) {
-      console.error('상품 추가 실패:', error);
-      alert('상품 추가에 실패했습니다: ' + (error.response?.data?.status_message || error.message));
-    }
+    handleCloseProductSetupModal();
+    await fetchInventoryData();
   };
 
   const handleSaveEdit = async (formData) => {
     try {
       console.log('Saving inventory data:', formData);
       
-      // 안전재고 업데이트
+      // 재고 정보 업데이트
       if (selectedItem?.id) {
-        await inventoryService.updateSafetyStock(
+        await inventoryService.updateInventoryInfo(
           selectedItem.id,
-          formData.safetyStock
+          formData.safetyStock,
+          formData.unitPrice
         );
         
         alert('재고 정보가 성공적으로 수정되었습니다.');
@@ -231,7 +228,8 @@ function FranchiseInventoryManagement() {
     React.createElement(SearchAndFilter, {
       filters,
       onFiltersChange: handleFiltersChange,
-      onAddProduct: handleAddProduct
+      onAddProduct: handleAddProduct,
+      userRole: 'BRANCH_MANAGER'
     }),
     React.createElement(FranchiseInventoryTable, {
       data: paginatedData,

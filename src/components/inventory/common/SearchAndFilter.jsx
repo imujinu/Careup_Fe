@@ -87,7 +87,7 @@ const AddButton = styled.button`
   }
 `;
 
-function SearchAndFilter({ filters, onFiltersChange, onAddInventory, userRole }) {
+function SearchAndFilter({ filters, onFiltersChange, onAddInventory, onAddProduct, userRole }) {
   const handleSearchChange = (value) => {
     onFiltersChange({ ...filters, searchTerm: value });
   };
@@ -149,7 +149,7 @@ function SearchAndFilter({ filters, onFiltersChange, onAddInventory, userRole })
           React.createElement('span', null, '+'),
           '상품 등록'
         ) :
-        React.createElement(AddButton, { onClick: onAddInventory },
+        React.createElement(AddButton, { onClick: onAddProduct },
           React.createElement('span', null, '+'),
           '지점에 상품 추가'
         )
