@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ChatBot.css";
 import axios from "axios";
+import AttendanceTab from "./tabs/AttendanceTab";
+import InventoryTab from "./tabs/InventoryTab";
+import OrderTab from "./tabs/OrderTab";
+import SalesTab from "./tabs/SalesTab";
 
 const ChatBot = ({ onClose }) => {
   const [messages, setMessages] = useState([
@@ -14,7 +18,7 @@ const ChatBot = ({ onClose }) => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showAttendanceTabs, setShowAttendanceTabs] = useState(false);
+  const [activeTab, setActiveTab] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
   const messagesEndRef = useRef(null);
@@ -121,40 +125,21 @@ const ChatBot = ({ onClose }) => {
     const employeeStats = {};
 
     data.forEach((record) => {
-      const employeeId = record.employeeId;
-      const employeeName = record.employeeName;
-      const branchName = record.branchName;
+      const { employeeId, employeeName, summary } = record;
+      if (!summary) return; // 요약 정보 없는 직원 제외
 
-      if (!employeeStats[employeeId]) {
-        employeeStats[employeeId] = {
-          employeeName,
-          branchName,
-          workDays: 0,
-          totalWorkMinutes: 0,
-          totalBreakMinutes: 0,
-          records: [],
-        };
-      }
-
-      employeeStats[employeeId].workDays += 1;
-      employeeStats[employeeId].totalWorkMinutes +=
-        record.totalWorkMinutes || 0;
-      employeeStats[employeeId].totalBreakMinutes +=
-        record.totalBreakMinutes || 0;
-      employeeStats[employeeId].records.push(record);
-    });
-
-    // 평균 계산
-    Object.keys(employeeStats).forEach((employeeId) => {
-      const stats = employeeStats[employeeId];
-      stats.avgWorkHours =
-        stats.workDays > 0
-          ? (stats.totalWorkMinutes / stats.workDays / 60).toFixed(1)
-          : 0;
-      stats.avgBreakMinutes =
-        stats.workDays > 0
-          ? (stats.totalBreakMinutes / stats.workDays).toFixed(0)
-          : 0;
+      employeeStats[employeeId] = {
+        employeeName,
+        workDays: summary.workDays || 0,
+        absentDays: summary.absentDays || 0,
+        leaveDays: summary.leaveDays || 0,
+        avgWorkHours: summary.averageWorkMinutes
+          ? (summary.averageWorkMinutes / 60).toFixed(1)
+          : 0,
+        avgBreakMinutes: summary.totalDays
+          ? ((summary.totalWorkMinutes / summary.totalDays) * 0.125).toFixed(0) // 예시 계산
+          : 0,
+      };
     });
 
     return employeeStats;
@@ -220,46 +205,8 @@ const ChatBot = ({ onClose }) => {
       return;
     }
 
-    if (buttonId === "attendance") {
-      setShowAttendanceTabs(true);
-      return;
-    }
-
-    const buttonLabels = {
-      inventory: "재고",
-      order: "발주",
-      sales: "매출",
-    };
-
-    const userMessage = {
-      id: Date.now(),
-      type: "user",
-      content: buttonLabels[buttonId],
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-
-    // 봇 응답 시뮬레이션
-    setTimeout(() => {
-      const botResponses = {
-        inventory:
-          "재고 현황을 조회해드리겠습니다.\n\n📦 현재 재고 상황:\n- 러닝화: 45개\n- 트레이닝복: 23개\n- 액세서리: 67개\n\n⚠️ 재고 부족 상품이 있습니다.",
-        order:
-          "발주 관련 정보입니다.\n\n📋 이번 주 발주 현황:\n- 대기중: 3건\n- 처리완료: 12건\n- 배송중: 5건\n\n새로운 발주를 원하시면 알려주세요!",
-        sales:
-          "매출 현황을 확인해드리겠습니다.\n\n💰 오늘 매출:\n- 총 매출: ₩2,450,000\n- 주문 건수: 28건\n- 평균 주문액: ₩87,500\n\n📈 전일 대비 +15.3% 증가했습니다!",
-      };
-
-      const botMessage = {
-        id: Date.now() + 1,
-        type: "bot",
-        content: botResponses[buttonId],
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
-    }, 1000);
+    // 모든 탭을 닫고 새로운 탭을 열기
+    setActiveTab(buttonId);
   };
 
   // 근태 탭 클릭 핸들러
@@ -271,8 +218,68 @@ const ChatBot = ({ onClose }) => {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setShowAttendanceTabs(false);
+    setMessages((prev) => prev.slice(0, 1));
+    setActiveTab(null);
+    if (tabType === "전체직원조회") {
+      const result = await sendChatbotRequest("전체 직원 근태 조회");
+
+      if (result && result.result && result.result.body) {
+        const employees = result.result.body.employees;
+
+        const botMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content: {
+            type: "attendance_table",
+            data: employees.map((emp) => ({
+              employeeName: emp.employeeName,
+              totalDays: emp.summary.totalDays ?? 0,
+              workDays: emp.summary.workDays ?? 0,
+              absentDays: emp.summary.absentDays ?? 0,
+              leaveDays: emp.summary.leaveDays ?? 0,
+              totalWorkMinutes: emp.summary.totalWorkMinutes ?? 0,
+              averageWorkMinutes: emp.summary.averageWorkMinutes ?? 0,
+            })),
+          },
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, botMessage]);
+      } else if (result.employees && Array.isArray(result.employees)) {
+        const employees = result.employees;
+
+        const botMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content: {
+            type: "attendance_table",
+            data: employees.map((emp) => ({
+              employeeName: emp.employeeName,
+              totalDays: emp.summary?.totalDays ?? 0,
+              workDays: emp.summary?.workDays ?? 0,
+              absentDays: emp.summary?.absentDays ?? 0,
+              leaveDays: emp.summary?.leaveDays ?? 0,
+              totalWorkMinutes: emp.summary?.totalWorkMinutes ?? 0,
+              averageWorkMinutes: emp.summary?.averageWorkMinutes ?? 0,
+            })),
+          },
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, botMessage]);
+        return; // ✅ 여기서 끝내야 아래의 '데이터 없음' 분기로 안 감
+      } else {
+        const botMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content: "근태 데이터를 불러오지 못했습니다.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+      }
+
+      return;
+    }
 
     // 각 탭별 특별 처리
     if (tabType === "상세직원조회") {
@@ -374,6 +381,150 @@ const ChatBot = ({ onClose }) => {
     setMessages((prev) => [...prev, botMessage]);
   };
 
+  // 재고 탭 클릭 핸들러
+  const handleInventoryTab = async (tabType) => {
+    setMessages((prev) => prev.slice(0, 1)); // 초기화
+    setActiveTab(null);
+
+    if (tabType === "전체조회") {
+      const result = await sendChatbotRequest("재고 전체 조회");
+
+      if (result?.result?.body && Array.isArray(result.result.body)) {
+        const stocks = result.result.body;
+
+        const botMessage = {
+          id: Date.now(),
+          type: "bot",
+          content: {
+            type: "inventory_table",
+            data: stocks.map((item) => ({
+              productName: item.productName,
+              serialNumber: item.serialNumber,
+              stockQuantity: item.stockQuantity,
+              safetyStock: item.safetyStock,
+              price: item.price,
+            })),
+          },
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, botMessage]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            content: "재고 데이터를 불러오지 못했습니다.",
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    }
+
+    if (tabType === "재고수정") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "수정할 상품명을 입력해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+
+    if (tabType === "회전율") {
+      const result = await sendChatbotRequest("재고 회전율 조회");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: result?.result?.body
+            ? JSON.stringify(result.result.body, null, 2)
+            : "회전율 데이터를 불러오지 못했습니다.",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  };
+
+  // 발주 탭 클릭 핸들러
+  const handleOrderTab = async (tabType) => {
+    setMessages((prev) => prev.slice(0, 1));
+    setActiveTab(null);
+
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: `발주 ${tabType}`,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    // 봇 응답 시뮬레이션
+    setTimeout(() => {
+      const botResponses = {
+        전체조회:
+          "발주 현황을 조회해드리겠습니다.\n\n📋 현재 발주 현황:\n- 대기중: 3건\n- 처리완료: 12건\n- 배송중: 5건",
+        발주등록:
+          "새로운 발주를 등록해드리겠습니다.\n발주할 상품을 선택해주세요.",
+        발주수정: "발주 수정이 필요한 주문번호를 입력해주세요.",
+        배송현황:
+          "배송 현황을 확인해드리겠습니다.\n\n🚚 현재 배송중인 주문: 5건\n📦 배송완료: 12건",
+      };
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: botResponses[tabType] || "발주 관련 정보를 처리하고 있습니다.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+    }, 1000);
+  };
+
+  // 매출 탭 클릭 핸들러
+  const handleSalesTab = async (tabType) => {
+    setMessages((prev) => prev.slice(0, 1));
+    setActiveTab(null);
+
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: `매출 ${tabType}`,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    // 봇 응답 시뮬레이션
+    setTimeout(() => {
+      const botResponses = {
+        일일매출:
+          "오늘의 매출 현황입니다.\n\n💰 총 매출: ₩2,450,000\n- 주문 건수: 28건\n- 평균 주문액: ₩87,500\n\n📈 전일 대비 +15.3% 증가했습니다!",
+        월별매출:
+          "이번 달 매출 현황입니다.\n\n📊 월별 매출: ₩45,200,000\n- 총 주문 건수: 520건\n- 평균 일일 매출: ₩1,460,000",
+        상품별매출:
+          "상품별 매출 현황입니다.\n\n🛍️ 인기 상품 TOP 3:\n1. 러닝화: ₩12,500,000\n2. 트레이닝복: ₩8,200,000\n3. 액세서리: ₩6,800,000",
+        매출분석:
+          "매출 분석 결과입니다.\n\n📈 성장률: +15.3%\n📊 고객 재방문율: 68%\n💰 평균 주문액: ₩87,500",
+      };
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: botResponses[tabType] || "매출 관련 정보를 처리하고 있습니다.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+    }, 1000);
+  };
+
   const handleResetChat = () => {
     setMessages([
       {
@@ -413,12 +564,26 @@ const ChatBot = ({ onClose }) => {
 
       if (result.error) {
         botContent = `오류가 발생했습니다: ${result.error}`;
-      } else {
-        // API 응답에서 근태 데이터 추출
-        let attendanceData = null;
+      } else if (isComparing) {
+        // ✅ 상세 직원 조회 처리
+        const employeeData =
+          result.result?.body?.employee || result.result?.body?.employees?.[0];
 
+        if (employeeData) {
+          botContent = {
+            type: "detail_table",
+            summary: employeeData.summary,
+            details: employeeData.details || [],
+          };
+        } else {
+          botContent = "해당 직원의 근태 정보를 찾을 수 없습니다.";
+        }
+      } else {
+        let attendanceData = null;
         if (Array.isArray(result)) {
           attendanceData = result;
+        } else if (result.employees && Array.isArray(result.employees)) {
+          attendanceData = result.employees;
         } else if (result.data && Array.isArray(result.data)) {
           attendanceData = result.data;
         } else if (
@@ -426,6 +591,11 @@ const ChatBot = ({ onClose }) => {
           Array.isArray(result.attendanceData)
         ) {
           attendanceData = result.attendanceData;
+        } else if (
+          result.result?.body?.employees &&
+          Array.isArray(result.result.body.employees)
+        ) {
+          attendanceData = result.result.body.employees;
         }
 
         if (attendanceData && attendanceData.length > 0) {
@@ -492,7 +662,8 @@ const ChatBot = ({ onClose }) => {
                   {message.content &&
                   typeof message.content === "object" &&
                   (message.content.type === "attendance_table" ||
-                    message.content.type === "today_attendance_table") ? (
+                    message.content.type === "today_attendance_table" ||
+                    message.content.type === "detail_table") ? (
                     <div className="attendance-table-container">
                       <div className="attendance-title">
                         {message.content.type === "today_attendance_table"
@@ -501,6 +672,7 @@ const ChatBot = ({ onClose }) => {
                       </div>
                       <div className="attendance-table">
                         {message.content.type === "today_attendance_table" ? (
+                          // ✅ 금일 근무 현황
                           <>
                             <div className="attendance-header">
                               <div className="attendance-cell header">이름</div>
@@ -535,7 +707,8 @@ const ChatBot = ({ onClose }) => {
                               </div>
                             ))}
                           </>
-                        ) : (
+                        ) : message.content.type === "attendance_table" ? (
+                          // ✅ 전체 직원 요약
                           <>
                             <div className="attendance-header">
                               <div className="attendance-cell header">이름</div>
@@ -543,10 +716,13 @@ const ChatBot = ({ onClose }) => {
                                 총근무일수
                               </div>
                               <div className="attendance-cell header">
-                                평균근무시간
+                                결근일수
                               </div>
                               <div className="attendance-cell header">
-                                평균휴게시간
+                                휴가일수
+                              </div>
+                              <div className="attendance-cell header">
+                                평균근무시간
                               </div>
                             </div>
                             {message.content.data.map((stats, index) => (
@@ -558,15 +734,149 @@ const ChatBot = ({ onClose }) => {
                                   {stats.workDays}일
                                 </div>
                                 <div className="attendance-cell">
-                                  {stats.avgWorkHours}시간
+                                  {stats.absentDays}일
                                 </div>
                                 <div className="attendance-cell">
-                                  {stats.avgBreakMinutes}분
+                                  {stats.leaveDays}일
+                                </div>
+                                <div className="attendance-cell">
+                                  {(
+                                    (message.content?.summary
+                                      ?.averageWorkMinutes ?? 0) / 60
+                                  ).toFixed(1)}
+                                  시간
                                 </div>
                               </div>
                             ))}
                           </>
-                        )}
+                        ) : message.content.type === "detail_table" ? (
+                          // ✅ 상세 직원 조회 (요약 + 일별 상세)
+                          <>
+                            {/* 상단 요약 */}
+                            <div className="attendance-title">
+                              👤 직원 근태 요약
+                            </div>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">이름</div>
+                              <div className="attendance-cell header">
+                                총근무일수
+                              </div>
+                              <div className="attendance-cell header">
+                                결근일수
+                              </div>
+                              <div className="attendance-cell header">
+                                휴가일수
+                              </div>
+                              <div className="attendance-cell header">
+                                평균근무시간
+                              </div>
+                            </div>
+                            <div className="attendance-row">
+                              <div className="attendance-cell">
+                                {message.content.summary.employeeName}
+                              </div>
+                              <div className="attendance-cell">
+                                {message.content.summary.workDays}일
+                              </div>
+                              <div className="attendance-cell">
+                                {message.content.summary.absentDays}일
+                              </div>
+                              <div className="attendance-cell">
+                                {message.content.summary.leaveDays}일
+                              </div>
+                              <div className="attendance-cell">
+                                {(
+                                  (message.content?.summary
+                                    ?.averageWorkMinutes ?? 0) / 60
+                                ).toFixed(1)}
+                                시간
+                              </div>
+                            </div>
+
+                            {/* 구분선 */}
+                            <div
+                              style={{
+                                margin: "10px 0",
+                                borderTop: "1px solid #e2e8f0",
+                              }}
+                            ></div>
+
+                            {/* 하단 상세 내역 */}
+                            <div className="attendance-title">
+                              📅 일별 근무 내역
+                            </div>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">날짜</div>
+                              <div className="attendance-cell header">
+                                근무유형
+                              </div>
+                              <div className="attendance-cell header">상태</div>
+                              <div className="attendance-cell header">
+                                근무시간
+                              </div>
+                              <div className="attendance-cell header">
+                                휴게시간
+                              </div>
+                            </div>
+                            {message.content.details.map((detail, index) => (
+                              <div key={index} className="attendance-row">
+                                <div className="attendance-cell">
+                                  {detail.date}
+                                </div>
+                                <div className="attendance-cell">
+                                  {detail.workType || "-"}
+                                </div>
+                                <div className="attendance-cell">
+                                  {detail.status}
+                                </div>
+                                <div className="attendance-cell">
+                                  {detail.workMinutes}분
+                                </div>
+                                <div className="attendance-cell">
+                                  {detail.breakMinutes}분
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : message.content.type === "inventory_table" ? (
+                          // ✅ 재고 조회 테이블 (새로 추가)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                상품명
+                              </div>
+                              <div className="attendance-cell header">
+                                시리얼번호
+                              </div>
+                              <div className="attendance-cell header">
+                                재고수량
+                              </div>
+                              <div className="attendance-cell header">
+                                안전재고
+                              </div>
+                              <div className="attendance-cell header">가격</div>
+                            </div>
+                            {message.content.data.map((item, index) => (
+                              <div key={index} className="attendance-row">
+                                <div className="attendance-cell">
+                                  {item.productName}
+                                </div>
+                                <div className="attendance-cell">
+                                  {item.serialNumber}
+                                </div>
+                                <div className="attendance-cell">
+                                  {item.stockQuantity}
+                                </div>
+                                <div className="attendance-cell">
+                                  {item.safetyStock}
+                                </div>
+                                <div className="attendance-cell">
+                                  {item.price.toLocaleString()}원
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : null}
                       </div>
                     </div>
                   ) : (
@@ -586,41 +896,15 @@ const ChatBot = ({ onClose }) => {
           ))}
           <div ref={messagesEndRef} />
 
-          {/* 근태 탭 표시 */}
-          {showAttendanceTabs && (
-            <div className="attendance-tabs">
-              <div className="attendance-tabs-title">
-                근태 관리 옵션을 선택해주세요
-              </div>
-              <div className="attendance-tabs-buttons">
-                <button
-                  className="attendance-tab-btn"
-                  onClick={() => handleAttendanceTab("금일근무현황")}
-                >
-                  📅 금일근무현황
-                </button>
-                <button
-                  className="attendance-tab-btn"
-                  onClick={() => handleAttendanceTab("전체직원조회")}
-                >
-                  👥 전체 직원 조회
-                </button>
-                <button
-                  className="attendance-tab-btn"
-                  onClick={() => handleAttendanceTab("상세직원조회")}
-                >
-                  🔍 상세 직원 조회
-                </button>
-                <button
-                  className="attendance-tab-btn"
-                  onClick={() => handleAttendanceTab("근태수정제안")}
-                >
-                  ✏️ 근태 수정 제안
-                </button>
-              </div>
-            </div>
+          {/* 탭 표시 */}
+          {activeTab === "attendance" && (
+            <AttendanceTab onTabClick={handleAttendanceTab} />
           )}
-
+          {activeTab === "inventory" && (
+            <InventoryTab onTabClick={handleInventoryTab} />
+          )}
+          {activeTab === "order" && <OrderTab onTabClick={handleOrderTab} />}
+          {activeTab === "sales" && <SalesTab onTabClick={handleSalesTab} />}
           {/* 로딩 표시 */}
           {isLoading && (
             <div className="loading-message">
