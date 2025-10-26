@@ -120,6 +120,9 @@ function InventoryManagement() {
       
       const data = await inventoryService.getBranchProducts(targetBranchId);
       
+      console.log('🔄 전체 데이터 응답:', data);
+      console.log('🔄 첫 번째 아이템:', data[0]);
+      
       // 데이터 변환
       const formattedData = data.map(item => ({
         id: item.branchProductId,
@@ -211,21 +214,25 @@ function InventoryManagement() {
         }
         
         // 본사 관리자: 상품 마스터 등록
-        const productResponse = await inventoryService.createProduct({
+        const productData = {
           name: formData.name,
-          description: formData.description,
+          description: formData.description || '',
           categoryId: parseInt(formData.category),
-          minPrice: formData.minPrice,
-          maxPrice: formData.maxPrice,
-          supplyPrice: formData.supplyPrice,
-          imageUrl: formData.imageUrl,
-          visibility: formData.visibility
-        });
+          minPrice: formData.minPrice || 0,
+          maxPrice: formData.maxPrice || 0,
+          supplyPrice: formData.supplyPrice || 0,
+          imageUrl: formData.imageUrl || '',
+          visibility: formData.visibility || 'ALL'
+        };
+        
+        console.log('상품 등록 데이터:', productData);
+        
+        const productResponse = await inventoryService.createProduct(productData, null);
         
         console.log('상품 등록 응답:', productResponse);
         
         // 등록된 상품의 ID 추출
-        const productId = productResponse.data?.productId || productResponse.productId;
+        const productId = productResponse?.data?.productId || productResponse?.result?.productId;
         
         if (productId) {
           // 본사 지점에 재고 추가 (초기 재고 0)

@@ -23,8 +23,23 @@ export const inventoryService = {
   },
 
   // 상품 마스터 등록
-  createProduct: async (data) => {
-    const response = await inventoryApi.post(`${API_BASE_URL}/api/products`, data);
+  createProduct: async (data, imageFile) => {
+    const formData = new FormData();
+    
+    // Product 객체를 JSON Blob으로 전환
+    const productBlob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    formData.append('product', productBlob);
+    
+    // 이미지 파일이 있으면 추가
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+    
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/products`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
     return response.data;
   },
 

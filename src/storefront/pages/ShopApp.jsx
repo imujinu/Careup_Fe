@@ -158,7 +158,7 @@ function ShopLayout() {
       const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
         id: item.productId ?? Math.random(),
         productId: item.productId,
-        name: item.productName || "상품",
+        name: item.productName || "상품", // ProductWithBranchesDto 필드명: productName
         price: Number(item.minPrice || 0),
         promotionPrice: null,
         discountRate: null,
@@ -184,9 +184,14 @@ function ShopLayout() {
         availableBranches: item.availableBranches || [],
         availableBranchCount: item.availableBranchCount || 0
       }));
+      
+      // 재고가 있는 상품만 필터링
+      const filteredMapped = mapped.filter(item => {
+        return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
+      });
 
-      console.log('✅ 검색 결과:', mapped);
-      setSearchResults(mapped);
+      console.log('✅ 검색 결과:', filteredMapped);
+      setSearchResults(filteredMapped);
       
     } catch (e) {
       console.error('❌ 상품 검색 실패:', e);
@@ -259,28 +264,26 @@ function ShopLayout() {
         
         console.log('🔍 전체 상품 로딩 시작');
         
-        // 전체 상품 조회 (고객용 API 사용)
-        const res = await shopApi.get('/api/public/products', {
-          params: { page: 0, size: 20 }
-        });
+        // 전체 상품 조회 (지점 정보 포함된 API 사용)
+        const res = await shopApi.get('/api/public/products/with-branches');
         console.log('📡 API 응답:', res);
         
-        const raw = res?.data?.data?.content ?? res?.data?.data ?? res?.data ?? [];
+        const raw = res?.data?.data ?? [];
         console.log('📦 원본 데이터:', raw);
         
         const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
           id: item.productId ?? Math.random(),
           productId: item.productId,
-          name: item.productName || "상품",
+          name: item.productName || "상품", // ProductWithBranchesDto 필드명: productName
           price: Number(item.minPrice || 0),
           promotionPrice: null,
           discountRate: null,
           imageAlt: item.productName || "상품 이미지",
           image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
           category: item.categoryName || "미분류",
-          stock: 0, // 전체 상품에서는 재고 정보 없음
+          stock: 0,
           safetyStock: 0,
-          isOutOfStock: false, // 지점별 재고는 상세에서 확인
+          isOutOfStock: false,
           isLowStock: false,
           brand: "",
           likes: 0,
@@ -299,8 +302,15 @@ function ShopLayout() {
           availableBranchCount: item.availableBranchCount || 0
         }));
         
-        console.log('✅ 매핑된 상품:', mapped);
-        setProducts(mapped);
+        // 재고가 있는 상품만 필터링 (백엔드에서 이미 필터링되어 오지만 이중 체크)
+        const filteredMapped = mapped.filter(item => {
+          // availableBranchCount가 0보다 크고, 실제로 지점 정보가 있는 경우만 표시
+          return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
+        });
+        
+        console.log('✅ 매핑된 상품:', filteredMapped);
+        console.log(`📊 총 ${mapped.length}개 상품 중 ${filteredMapped.length}개 재고 있는 상품 표시`);
+        setProducts(filteredMapped);
       } catch (e) {
         console.error('❌ 상품 로딩 실패:', e);
         console.error('❌ 에러 상세:', {
@@ -337,15 +347,40 @@ function ShopLayout() {
     }
 
     try {
+      console.log('장바구니 추가 - 상품 데이터:', product);
+      
+      // branchProductId 결정
+      // 지점이 선택된 경우 해당 지점의 branchProductId 사용, 없으면 첫 번째 지점 사용
+      let branchProductId = product.branchProductId || product.id;
+      
+      if (product.availableBranches && product.availableBranches.length > 0) {
+        if (product.selectedBranchId) {
+          // 선택된 지점의 branchProductId 사용
+          const selectedBranch = product.availableBranches.find(b => b.branchId === product.selectedBranchId);
+          if (selectedBranch && selectedBranch.branchProductId) {
+            branchProductId = selectedBranch.branchProductId;
+          }
+        } else {
+          // 지점이 선택되지 않으면 첫 번째 지점 사용
+          const firstBranch = product.availableBranches[0];
+          if (firstBranch && firstBranch.branchProductId) {
+            branchProductId = firstBranch.branchProductId;
+          }
+        }
+      }
+      
+      console.log('사용할 branchProductId:', branchProductId);
+      
       // 백엔드 API를 통한 장바구니 추가
       const cartData = {
         memberId: currentUser.memberId,
-        branchProductId: product.branchProductId || product.id,
+        branchProductId: branchProductId,
         quantity: 1,
         attributeName: null,
         attributeValue: null
       };
 
+      console.log('장바구니 추가 데이터:', cartData);
       await cartService.addToCart(cartData);
       
       // Redux 상태 업데이트

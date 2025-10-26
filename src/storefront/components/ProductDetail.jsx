@@ -9,11 +9,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [selectedBranchId, setSelectedBranchId] = useState(null);
 
   const handleAddToCart = () => {
-    if (!selectedBranchId && product?.availableBranches && product.availableBranches.length > 0) {
-      alert('구매할 지점을 선택해주세요.');
-      return;
-    }
-    
+    // 지점 선택 강제 검사 제거 - 장바구니 담을 때는 지점 확인 불필요
     setIsInCart(true);
     if (onAddToCart) {
       const productWithBranch = {

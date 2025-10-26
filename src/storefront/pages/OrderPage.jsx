@@ -32,21 +32,20 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
       setLoading(true);
       setOrderError(null);
 
-      // 주문 데이터 구성 (선택된 지점별로)
-      const orderItems = items.map(item => {
-        const branchId = selectedBranches[item.productId];
-        return {
-          productId: item.productId,
-          branchId: branchId,
-          quantity: item.quantity,
-          unitPrice: item.price
-        };
-      });
+      // 주문 데이터 구성 (백엔드 형식에 맞게)
+      const orderItems = items.map(item => ({
+        branchProductId: item.branchProductId,
+        quantity: item.quantity
+      }));
+      
+      // 첫 번째 상품의 지점 ID를 사용 (모든 상품이 같은 지점이어야 함)
+      const firstItemBranchId = selectedBranches[items[0]?.productId];
 
       const orderRequestData = {
         memberId: currentUser?.memberId || 1,
+        branchId: firstItemBranchId,
         orderType: 'ONLINE',
-        items: orderItems,
+        orderItems: orderItems,
         couponId: null
       };
 
