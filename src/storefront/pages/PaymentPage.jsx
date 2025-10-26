@@ -43,15 +43,18 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
 
       const tossPayments = window.TossPayments(clientKey);
 
+      // 토스페이먼츠용 orderId 생성 (영문 대소문자, 숫자, 특수문자(-, _)만 허용, 6자 이상 64자 이하)
+      const tossOrderId = `CAREUP_ORDER_${orderData.orderId}`;
+
       // 결제 요청
       await tossPayments.requestPayment('카드', {
         amount: totalAmount,
-        orderId: orderData.orderId.toString(),
+        orderId: tossOrderId,
         orderName: `Care Up 주문 (${items.length}개 상품)`,
         customerName: currentUser?.name || currentUser?.nickname || '고객',
         customerEmail: currentUser?.email || 'customer@example.com',
-        successUrl: `${window.location.origin}/shop/payment/success`,
-        failUrl: `${window.location.origin}/shop/payment/fail`,
+        successUrl: `${window.location.origin}/shop/payment-success`,
+        failUrl: `${window.location.origin}/shop/payment-fail`,
       });
 
     } catch (error) {
@@ -63,15 +66,15 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   };
 
   // 결제 성공 처리 (URL 파라미터에서 호출)
-  const handlePaymentSuccess = async (paymentKey, orderId, amount) => {
+  const handlePaymentSuccess = async (paymentKey, orderId, amount, tossOrderId) => {
     try {
       setLoading(true);
       setPaymentError(null);
 
-      // 결제 승인 API 호출
+      // 결제 승인 API 호출 (실제 주문 ID 사용)
       const response = await cartService.processPayment(orderId, {
         paymentKey,
-        orderId,
+        orderId: tossOrderId, // 토스페이먼츠 orderId
         amount
       });
 
@@ -82,7 +85,7 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
 
       // 주문 완료 페이지로 이동
       if (onPaymentSuccess) {
-        onPaymentSuccess(response.result);
+        onPaymentSuccess(response.data || response.result || response);
       }
 
     } catch (error) {
@@ -97,11 +100,12 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentKey = urlParams.get('paymentKey');
-    const orderId = urlParams.get('orderId');
+    const orderId = urlParams.get('orderId'); // 실제 주문 ID
+    const tossOrderId = urlParams.get('tossOrderId'); // 토스페이먼츠 orderId
     const amount = urlParams.get('amount');
 
     if (paymentKey && orderId && amount) {
-      handlePaymentSuccess(paymentKey, orderId, parseInt(amount));
+      handlePaymentSuccess(paymentKey, orderId, parseInt(amount), tossOrderId);
     }
   }, []);
 

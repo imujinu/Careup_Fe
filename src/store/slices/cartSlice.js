@@ -9,7 +9,7 @@ const cartSlice = createSlice({
   },
   reducers: {
     addToCart: (state, action) => {
-      const { branchProductId, branchId, productName, price, quantity = 1 } = action.payload;
+      const { productId, branchProductId, branchId, productName, price, quantity = 1, imageUrl } = action.payload;
       
       // 다른 지점의 상품인지 확인
       if (state.branchId && state.branchId !== branchId) {
@@ -28,11 +28,13 @@ const cartSlice = createSlice({
         existingItem.quantity += quantity;
       } else {
         state.items.push({
+          productId,
           branchProductId,
           branchId,
           productName,
           price,
           quantity,
+          imageUrl,
         });
       }
       

@@ -3,14 +3,16 @@ import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '../../store/slices/cartSlice';
 import { cartService } from '../../service/cartService';
 
-const OrderPage = ({ onBack, onProceedToPayment, currentUser }) => {
+const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
   const dispatch = useDispatch();
   const { items, branchId, totalAmount } = useSelector(state => state.cart);
-  const selectedBranch = useSelector(state => state.branch.selectedBranch);
   
   const [loading, setLoading] = useState(false);
   const [orderError, setOrderError] = useState(null);
   const [orderId, setOrderId] = useState(null);
+
+  // orderData에서 선택된 지점 정보 사용
+  const selectedBranches = orderData?.selectedBranches || {};
 
   // 주문 생성
   const handleCreateOrder = async () => {
@@ -19,8 +21,10 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser }) => {
       return;
     }
 
-    if (!selectedBranch) {
-      alert('지점을 선택해주세요.');
+    // 모든 상품의 지점이 선택되었는지 확인
+    const allSelected = items.every(item => selectedBranches[item.productId]);
+    if (!allSelected) {
+      alert('모든 상품의 구매 지점을 선택해주세요.');
       return;
     }
 
@@ -28,31 +32,38 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser }) => {
       setLoading(true);
       setOrderError(null);
 
-      // 주문 데이터 구성
-      const orderData = {
+      // 주문 데이터 구성 (선택된 지점별로)
+      const orderItems = items.map(item => {
+        const branchId = selectedBranches[item.productId];
+        return {
+          productId: item.productId,
+          branchId: branchId,
+          quantity: item.quantity,
+          unitPrice: item.price
+        };
+      });
+
+      const orderRequestData = {
         memberId: currentUser?.memberId || 1,
-        branchId: selectedBranch.branchId,
         orderType: 'ONLINE',
-        orderItems: items.map(item => ({
-          branchProductId: item.branchProductId,
-          quantity: item.quantity
-        })),
+        items: orderItems,
         couponId: null
       };
 
-      console.log('주문 데이터:', orderData);
+      console.log('주문 데이터:', orderRequestData);
 
       // 주문 생성 API 호출
-      const response = await cartService.createOrder(orderData);
+      const response = await cartService.createOrder(orderRequestData);
       
       console.log('주문 생성 성공:', response);
       
-      // 주문 ID 저장
-      setOrderId(response.result.orderId);
+      // 주문 ID 저장 (백엔드 ResponseDto 구조에 맞게 수정)
+      const orderId = response?.data?.orderId;
+      setOrderId(orderId);
       
       // 결제 페이지로 진행
       if (onProceedToPayment) {
-        onProceedToPayment(response.result);
+        onProceedToPayment(response?.data);
       }
       
     } catch (error) {
@@ -89,7 +100,7 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser }) => {
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
-            <span>{selectedBranch?.branchName || '지점 미선택'}</span>
+            <span>다중 지점 주문</span>
           </div>
           <span className="item-count">총 {items.length}개 상품</span>
         </div>
@@ -116,6 +127,9 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser }) => {
                 <p className="item-price">{item.price.toLocaleString()}원</p>
                 <div className="item-quantity">
                   <span>수량: {item.quantity}개</span>
+                </div>
+                <div className="item-branch">
+                  <span>구매 지점: 지점 {selectedBranches[item.productId]}</span>
                 </div>
               </div>
               <div className="item-total">

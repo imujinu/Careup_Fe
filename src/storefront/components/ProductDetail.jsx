@@ -1,15 +1,27 @@
 import React, { useState } from "react";
 import "./ProductDetail.css";
 
-const ProductDetail = ({ product, onBack, onBuy }) => {
+const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [selectedSize, setSelectedSize] = useState("270");
   const [selectedColor, setSelectedColor] = useState("Mushroom/Arid Stone");
   const [activeTab, setActiveTab] = useState("reviews");
   const [isInCart, setIsInCart] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState(null);
 
   const handleAddToCart = () => {
+    if (!selectedBranchId && product?.availableBranches && product.availableBranches.length > 0) {
+      alert('구매할 지점을 선택해주세요.');
+      return;
+    }
+    
     setIsInCart(true);
-    // 실제로는 장바구니에 추가하는 로직
+    if (onAddToCart) {
+      const productWithBranch = {
+        ...product,
+        selectedBranchId: selectedBranchId
+      };
+      onAddToCart(productWithBranch);
+    }
   };
 
   const handleBuy = () => {
@@ -29,8 +41,8 @@ const ProductDetail = ({ product, onBack, onBuy }) => {
           <div className="product-images">
             <div className="main-image">
               <img
-                src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80"
-                alt="New Balance 204L Suede Mushroom Arid Stone"
+                src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80"}
+                alt={product?.name || "New Balance 204L Suede Mushroom Arid Stone"}
               />
               <div className="image-nav">
                 <button className="nav-btn prev">‹</button>
@@ -47,31 +59,31 @@ const ProductDetail = ({ product, onBack, onBuy }) => {
             <div className="thumbnail-gallery">
               <div className="thumbnail active">
                 <img
-                  src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"
+                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb1"
                 />
               </div>
               <div className="thumbnail">
                 <img
-                  src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"
+                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb2"
                 />
               </div>
               <div className="thumbnail">
                 <img
-                  src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"
+                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb3"
                 />
               </div>
               <div className="thumbnail">
                 <img
-                  src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"
+                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb4"
                 />
               </div>
               <div className="thumbnail">
                 <img
-                  src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"
+                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb5"
                 />
               </div>
@@ -83,23 +95,42 @@ const ProductDetail = ({ product, onBack, onBuy }) => {
             <div className="price-section">
               <div className="instant-price">
                 <span className="price-label">즉시 구매가</span>
-                <span className="price-value">182,000원</span>
+                <span className="price-value">{product?.price?.toLocaleString()}원</span>
               </div>
             </div>
 
             <div className="product-title">
-              <h1>New Balance 204L Suede Mushroom Arid Stone</h1>
+              <h1>{product?.name || "New Balance 204L Suede Mushroom Arid Stone"}</h1>
               <p className="product-subtitle">
-                뉴발란스 204L 스웨이드 머쉬룸 애리드 스톤
+                {product?.description || "뉴발란스 204L 스웨이드 머쉬룸 애리드 스톤"}
               </p>
             </div>
 
             <div className="rating-section">
               <div className="rating">
                 <span className="stars">★4.8</span>
-                <span className="review-count">리뷰 638</span>
+                <span className="review-count">리뷰 {product?.reviews || 638}</span>
               </div>
             </div>
+
+            {/* 구매 가능한 지점 선택 */}
+            {product?.availableBranches && product.availableBranches.length > 0 && (
+              <div className="option-section">
+                <label className="option-label">구매 지점</label>
+                <select
+                  className="size-select branch-select"
+                  value={selectedBranchId || ''}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                >
+                  <option value="">구매할 지점을 선택하세요</option>
+                  {product.availableBranches.map(branch => (
+                    <option key={branch.branchId} value={branch.branchId}>
+                      {branch.branchName || `지점 ${branch.branchId}`} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* 사이즈 선택 */}
             <div className="option-section">
@@ -137,14 +168,14 @@ const ProductDetail = ({ product, onBack, onBuy }) => {
             {/* 구매 버튼들 */}
             <div className="purchase-buttons">
               <button className="buy-btn" onClick={handleBuy}>
-                <div className="btn-price">182,000원</div>
+                <div className="btn-price">{product?.price?.toLocaleString()}원</div>
                 <div className="btn-label">구매</div>
               </button>
               <button
                 className={`cart-btn ${isInCart ? "added" : ""}`}
                 onClick={handleAddToCart}
               >
-                <div className="btn-price">230,000원</div>
+                <div className="btn-price">{product?.price?.toLocaleString()}원</div>
                 <div className="btn-label">
                   {isInCart ? "장바구니 담김" : "장바구니"}
                 </div>
