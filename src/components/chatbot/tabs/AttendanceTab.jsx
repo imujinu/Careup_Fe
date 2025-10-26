@@ -27,3 +27,4 @@ const AttendanceTab = ({ onTabClick }) => {
 };
 
 export default AttendanceTab;
+

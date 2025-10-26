@@ -27,3 +27,4 @@ const SalesTab = ({ onTabClick }) => {
 };
 
 export default SalesTab;
+

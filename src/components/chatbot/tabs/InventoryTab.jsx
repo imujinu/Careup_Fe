@@ -26,3 +26,4 @@ const InventoryTab = ({ onTabClick }) => {
 };
 
 export default InventoryTab;
+

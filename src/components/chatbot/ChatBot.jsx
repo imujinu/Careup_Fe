@@ -20,7 +20,11 @@ const ChatBot = ({ onClose }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState(
+    "근태 정보를 조회하고 있습니다..."
+  );
   const [isComparing, setIsComparing] = useState(false);
+  const [isOrderRegistering, setIsOrderRegistering] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -170,8 +174,12 @@ const ChatBot = ({ onClose }) => {
   };
 
   // API 요청 함수
-  const sendChatbotRequest = async (message) => {
+  const sendChatbotRequest = async (
+    message,
+    loadingText = "정보를 조회하고 있습니다..."
+  ) => {
     try {
+      setLoadingMessage(loadingText);
       setIsLoading(true);
       console.log("message=============", message);
       const response = await axios.post("http://localhost:8081/chatbot/ask", {
@@ -218,13 +226,21 @@ const ChatBot = ({ onClose }) => {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => prev.slice(0, 1));
+    // 채팅 내용 유지 - 초기화하지 않음
     setActiveTab(null);
     if (tabType === "전체직원조회") {
-      const result = await sendChatbotRequest("전체 직원 근태 조회");
+      const result = await sendChatbotRequest(
+        "전체 직원 근태 조회",
+        "근태 정보를 조회하고 있습니다..."
+      );
 
-      if (result && result.result && result.result.body) {
-        const employees = result.result.body.employees;
+      if (
+        result &&
+        result.data &&
+        result.data.result &&
+        result.data.result.body
+      ) {
+        const employees = result.data.result.body.employees;
 
         const botMessage = {
           id: Date.now() + 1,
@@ -318,7 +334,10 @@ const ChatBot = ({ onClose }) => {
         message = "근태 조회";
     }
 
-    const result = await sendChatbotRequest(message);
+    const result = await sendChatbotRequest(
+      message,
+      "근태 정보를 조회하고 있습니다..."
+    );
 
     let botContent = "";
 
@@ -327,8 +346,8 @@ const ChatBot = ({ onClose }) => {
     } else {
       // 금일 근무 현황인 경우 특별 처리
       if (tabType === "금일근무현황") {
-        if (result.result && result.result.body) {
-          const todayData = parseTodayAttendanceData(result.result.body);
+        if (result.data && result.data.result && result.data.result.body) {
+          const todayData = parseTodayAttendanceData(result.data.result.body);
           if (todayData) {
             botContent = formatTodayAttendanceTable(todayData);
           } else {
@@ -383,32 +402,62 @@ const ChatBot = ({ onClose }) => {
 
   // 재고 탭 클릭 핸들러
   const handleInventoryTab = async (tabType) => {
-    setMessages((prev) => prev.slice(0, 1)); // 초기화
+    // 채팅 내용 유지 - 초기화하지 않음
     setActiveTab(null);
 
     if (tabType === "전체조회") {
-      const result = await sendChatbotRequest("재고 전체 조회");
+      const result = await sendChatbotRequest(
+        "재고 전체 조회",
+        "재고 정보를 조회하고 있습니다..."
+      );
 
-      if (result?.result?.body && Array.isArray(result.result.body)) {
-        const stocks = result.result.body;
+      // result.data.result.body가 배열인 경우 처리
+      if (result?.result?.body) {
+        let stocks = [];
+        const body = result.result.body;
 
-        const botMessage = {
-          id: Date.now(),
-          type: "bot",
-          content: {
-            type: "inventory_table",
-            data: stocks.map((item) => ({
-              productName: item.productName,
-              serialNumber: item.serialNumber,
-              stockQuantity: item.stockQuantity,
-              safetyStock: item.safetyStock,
-              price: item.price,
-            })),
-          },
-          timestamp: new Date(),
-        };
+        // result.data.result.body가 배열인 경우
+        if (Array.isArray(body)) {
+          stocks = body;
+        }
+        // result.data.result.body가 객체이고 배열 속성을 가진 경우
+        else if (body.stocks && Array.isArray(body.stocks)) {
+          stocks = body.stocks;
+        }
+        // result.data.result.body가 객체이고 직접 재고 데이터를 포함하는 경우
+        else if (body.branchProductId) {
+          stocks = [body]; // 단일 객체를 배열로 변환
+        }
 
-        setMessages((prev) => [...prev, botMessage]);
+        if (stocks.length > 0) {
+          const botMessage = {
+            id: Date.now(),
+            type: "bot",
+            content: {
+              type: "inventory_table",
+              data: stocks.map((item) => ({
+                id: item.branchProductId,
+                productName: item.productName,
+                stockQuantity: item.stockQuantity,
+                safetyStock: item.safetyStock,
+                price: item.price,
+              })),
+            },
+            timestamp: new Date(),
+          };
+
+          setMessages((prev) => [...prev, botMessage]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              type: "bot",
+              content: "재고 데이터를 불러오지 못했습니다.",
+              timestamp: new Date(),
+            },
+          ]);
+        }
       } else {
         setMessages((prev) => [
           ...prev,
@@ -435,14 +484,17 @@ const ChatBot = ({ onClose }) => {
     }
 
     if (tabType === "회전율") {
-      const result = await sendChatbotRequest("재고 회전율 조회");
+      const result = await sendChatbotRequest(
+        "재고 회전율 조회",
+        "회전율 정보를 조회하고 있습니다..."
+      );
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now(),
           type: "bot",
-          content: result?.result?.body
-            ? JSON.stringify(result.result.body, null, 2)
+          content: result?.data?.result?.body
+            ? JSON.stringify(result.data.result.body, null, 2)
             : "회전율 데이터를 불러오지 못했습니다.",
           timestamp: new Date(),
         },
@@ -452,7 +504,7 @@ const ChatBot = ({ onClose }) => {
 
   // 발주 탭 클릭 핸들러
   const handleOrderTab = async (tabType) => {
-    setMessages((prev) => prev.slice(0, 1));
+    // 채팅 내용 유지 - 초기화하지 않음
     setActiveTab(null);
 
     const userMessage = {
@@ -463,6 +515,40 @@ const ChatBot = ({ onClose }) => {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+
+    // 발주 관련 API 요청
+    if (tabType === "전체조회") {
+      const result = await sendChatbotRequest(
+        "발주 전체 조회",
+        "발주 정보를 조회하고 있습니다..."
+      );
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: result?.data?.result?.body
+          ? JSON.stringify(result.data.result.body, null, 2)
+          : "발주 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    // 발주 등록 처리
+    if (tabType === "발주등록") {
+      setIsOrderRegistering(true);
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content:
+          "발주 등록을 위해 필요한 정보를 입력해주세요.\n\n예시: 상품명, 수량, 공급업체명 등을 입력하세요.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
 
     // 봇 응답 시뮬레이션
     setTimeout(() => {
@@ -489,7 +575,7 @@ const ChatBot = ({ onClose }) => {
 
   // 매출 탭 클릭 핸들러
   const handleSalesTab = async (tabType) => {
-    setMessages((prev) => prev.slice(0, 1));
+    // 채팅 내용 유지 - 초기화하지 않음
     setActiveTab(null);
 
     const userMessage = {
@@ -500,6 +586,26 @@ const ChatBot = ({ onClose }) => {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+
+    // 매출 관련 API 요청
+    if (tabType === "일일매출") {
+      const result = await sendChatbotRequest(
+        "일일 매출 조회",
+        "매출 정보를 조회하고 있습니다..."
+      );
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: result?.data?.result?.body
+          ? JSON.stringify(result.data.result.body, null, 2)
+          : "매출 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
 
     // 봇 응답 시뮬레이션
     setTimeout(() => {
@@ -552,13 +658,37 @@ const ChatBot = ({ onClose }) => {
     const messageContent = inputValue;
     setInputValue("");
 
+    // 발주 등록 입력 처리
+    if (isOrderRegistering) {
+      const result = await sendChatbotRequest(
+        `발주 등록 ${messageContent}`,
+        "발주 등록을 처리하고 있습니다..."
+      );
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: result?.data?.result?.body
+          ? `발주 등록이 완료되었습니다!\n\n${JSON.stringify(result.data.result.body, null, 2)}`
+          : "발주 등록 처리 중 오류가 발생했습니다.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+      setIsOrderRegistering(false);
+      return;
+    }
+
     // 직원 이름으로 근태 조회하는 경우
     if (messageContent.trim()) {
       const requestMessage = isComparing
         ? `${messageContent} 직원 상세 근태 조회`
         : `${messageContent} 근태 조회`;
 
-      const result = await sendChatbotRequest(requestMessage);
+      const result = await sendChatbotRequest(
+        requestMessage,
+        "근태 정보를 조회하고 있습니다..."
+      );
 
       let botContent = "";
 
@@ -663,7 +793,8 @@ const ChatBot = ({ onClose }) => {
                   typeof message.content === "object" &&
                   (message.content.type === "attendance_table" ||
                     message.content.type === "today_attendance_table" ||
-                    message.content.type === "detail_table") ? (
+                    message.content.type === "detail_table" ||
+                    message.content.type === "inventory_table") ? (
                     <div className="attendance-table-container">
                       <div className="attendance-title">
                         {message.content.type === "today_attendance_table"
@@ -842,15 +973,11 @@ const ChatBot = ({ onClose }) => {
                           // ✅ 재고 조회 테이블 (새로 추가)
                           <>
                             <div className="attendance-header">
+                              <div className="attendance-cell header">ID</div>
                               <div className="attendance-cell header">
                                 상품명
                               </div>
-                              <div className="attendance-cell header">
-                                시리얼번호
-                              </div>
-                              <div className="attendance-cell header">
-                                재고수량
-                              </div>
+                              <div className="attendance-cell header">수량</div>
                               <div className="attendance-cell header">
                                 안전재고
                               </div>
@@ -858,11 +985,9 @@ const ChatBot = ({ onClose }) => {
                             </div>
                             {message.content.data.map((item, index) => (
                               <div key={index} className="attendance-row">
+                                <div className="attendance-cell">{item.id}</div>
                                 <div className="attendance-cell">
                                   {item.productName}
-                                </div>
-                                <div className="attendance-cell">
-                                  {item.serialNumber}
                                 </div>
                                 <div className="attendance-cell">
                                   {item.stockQuantity}
@@ -879,10 +1004,12 @@ const ChatBot = ({ onClose }) => {
                         ) : null}
                       </div>
                     </div>
-                  ) : (
+                  ) : typeof message.content === "string" ? (
                     message.content
                       .split("\n")
                       .map((line, index) => <div key={index}>{line}</div>)
+                  ) : (
+                    <div>{String(message.content)}</div>
                   )}
                 </div>
                 <div className="message-time">
@@ -909,7 +1036,7 @@ const ChatBot = ({ onClose }) => {
           {isLoading && (
             <div className="loading-message">
               <div className="loading-spinner"></div>
-              <span>근태 정보를 조회하고 있습니다...</span>
+              <span>{loadingMessage}</span>
             </div>
           )}
 
