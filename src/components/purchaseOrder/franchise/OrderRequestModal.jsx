@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { purchaseOrderService } from '../../../service/purchaseOrderService';
+import { inventoryService } from '../../../service/inventoryService';
+import { authService } from '../../../service/authService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -302,55 +305,57 @@ const OrderRequestButton = styled(Button)`
   }
 `;
 
-function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
+function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedProducts, setSelectedProducts] = useState({});
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const products = [
-    {
-      id: 'MATERIAL-001',
-      name: '커피원두',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 15000
-    },
-    {
-      id: 'MATERIAL-002',
-      name: '우유',
-      category: '원재료',
-      unit: 'L',
-      unitPrice: 3000
-    },
-    {
-      id: 'MATERIAL-003',
-      name: '크로와상 반죽',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 12000
-    },
-    {
-      id: 'MATERIAL-004',
-      name: '쿠키반죽',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 8000
-    },
-    {
-      id: 'MATERIAL-005',
-      name: '치즈케이크',
-      category: '원재료',
-      unit: 'ea',
-      unitPrice: 25000
-    },
-    {
-      id: 'MATERIAL-006',
-      name: '선타',
-      category: '원재료',
-      unit: 'kg',
-      unitPrice: 7000
+  // 상품 목록 조회 (가맹점에 등록된 상품 목록만)
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      
+      const userInfo = authService.getCurrentUser();
+      const branchId = userInfo?.branchId || 2; // 가맹점 branchId (2번으로 가정)
+      
+      // 가맹점에 등록된 상품 목록만 조회
+      const data = await inventoryService.getBranchProducts(branchId);
+      
+      const formattedProducts = data.map(item => ({
+        id: item.branchProductId,
+        productId: item.productId, // 실제 productId 저장
+        name: item.productName || '상품명 없음',
+        category: item.categoryName || '미분류',
+        unit: '개', // 기본 단위
+        unitPrice: item.price && item.price > 0 ? item.price : 0
+      }));
+      
+      
+      setProducts(formattedProducts);
+      
+      // 상품이 하나도 없으면 경고
+      if (formattedProducts.length === 0) {
+        alert('가맹점에 등록된 상품이 없습니다. 먼저 상품을 추가해주세요.');
+      }
+    } catch (error) {
+      console.error('가맹점 상품 목록 조회 실패:', error);
+      // 실패 시 빈 배열로 설정
+      setProducts([]);
+      alert('상품 목록을 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // 모달이 열릴 때 상품 목록 조회
+  useEffect(() => {
+    if (isOpen) {
+      fetchProducts();
+      setSelectedProducts({}); // 모달이 열릴 때 선택 상태 초기화
+    }
+  }, [isOpen]);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = !searchTerm || 
@@ -384,28 +389,158 @@ function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
     }
   };
 
-  const handleOrderRequest = () => {
+  const handleOrderRequest = async () => {
+    if (loading) return; // 이미 처리 중이면 중복 실행 방지
+    
     const orderItems = Object.entries(selectedProducts)
       .filter(([_, quantity]) => quantity > 0)
       .map(([productId, quantity]) => {
-        const product = products.find(p => p.id === productId);
+        const product = products.find(p => String(p.id) === String(productId));
+        if (!product) {
+          console.error('상품을 찾을 수 없습니다:', productId);
+          console.log('선택된 productId:', productId);
+          console.log('전체 products:', products);
+          return null;
+        }
+        
+        // productId 확인
+        if (!product.productId) {
+          console.error('productId가 없습니다:', product);
+          return null;
+        }
+        
+        // unitPrice 안전 처리
+        const safeUnitPrice = product.unitPrice || 0;
+        
         return {
-          productId,
+          productId: product.productId, // 실제 productId 사용
           name: product.name,
           quantity,
           unit: product.unit,
-          unitPrice: product.unitPrice,
-          totalPrice: quantity * product.unitPrice
+          unitPrice: safeUnitPrice,
+          totalPrice: quantity * safeUnitPrice
         };
-      });
+      })
+      .filter(item => item !== null); // null 제거
 
     if (orderItems.length === 0) {
       alert('발주할 상품을 선택해주세요.');
       return;
     }
 
-    onOrderRequest(orderItems);
+    // 데이터 검증
+    const invalidItems = orderItems.filter(item => 
+      !item.productId || item.quantity <= 0 || !item.unitPrice
+    );
+    
+    if (invalidItems.length > 0) {
+      console.error('유효하지 않은 발주 항목들:', invalidItems);
+      alert('발주 정보가 올바르지 않습니다. 상품 정보를 확인해주세요.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // 백엔드 API 호출
+      const userInfo = authService.getCurrentUser();
+      const branchId = userInfo?.branchId || 2;
+      
+      const orderData = {
+        branchId: branchId,
+        orderDetails: orderItems.map(item => {
+          const productId = parseInt(item.productId) || 0;
+          const quantity = parseInt(item.quantity) || 0;
+          let supplyPrice = 0;
+          
+          // supplyPrice 안전 변환 (더 강력한 방식)
+          try {
+            const rawPrice = item.unitPrice;
+            
+            if (rawPrice === null || rawPrice === undefined || rawPrice === '') {
+              supplyPrice = 0;
+            } else {
+              // 문자열이면 숫자로 변환, 이미 숫자면 그대로 사용
+              const numPrice = Number(rawPrice);
+              supplyPrice = isNaN(numPrice) ? 0 : Math.floor(numPrice); // 정수로 변환
+            }
+          } catch (e) {
+            console.error('supplyPrice 변환 실패:', e);
+            supplyPrice = 0;
+          }
+          
+          console.log(`상품 ${productId}: quantity=${quantity}, supplyPrice=${supplyPrice}`);
+          console.log(`  - 원본unitPrice:`, item.unitPrice, `(타입: ${typeof item.unitPrice})`);
+          console.log(`  - parseInt 결과:`, parseInt(item.unitPrice), `(isNaN: ${isNaN(parseInt(item.unitPrice))})`);
+          console.log(`  - 최종 supplyPrice:`, supplyPrice, `(타입: ${typeof supplyPrice})`);
+          
+          return {
+            productId: productId,
+            quantity: quantity,
+            supplyPrice: supplyPrice
+          };
+        })
+      };
+
+      // JSON 직렬화 전 최종 검증
+      const hasInvalidData = orderData.orderDetails.some(detail => 
+        detail.supplyPrice === null || 
+        detail.supplyPrice === undefined || 
+        isNaN(detail.supplyPrice) ||
+        detail.productId === null ||
+        detail.productId === undefined ||
+        detail.quantity <= 0
+      );
+      
+      if (hasInvalidData) {
+        console.error('유효하지 않은 데이터 발견:', orderData.orderDetails);
+        alert('발주 데이터에 오류가 있습니다. 다시 시도해주세요.');
+        return;
+      }
+      
+      console.log('발주 요청 데이터:', JSON.stringify(orderData, null, 2));
+      console.log('원본 orderItems:', orderItems);
+      
+      // JSON.stringify 후 다시 파싱해서 확인 (실제 전송되는 데이터)
+      const serialized = JSON.stringify(orderData);
+      const parsed = JSON.parse(serialized);
+      console.log('실제 전송될 데이터:', parsed);
+
+      const response = await purchaseOrderService.createPurchaseOrder(orderData);
+    
+      alert('발주가 성공적으로 생성되었습니다.');
+      onSubmitOrderRequest(orderItems); // 부모 컴포넌트에 알림
     onClose();
+    } catch (error) {
+      console.error('발주 생성 실패:', error);
+      console.error('에러 응답 상태:', error.response?.status);
+      console.error('에러 응답 데이터:', error.response?.data);
+      console.error('에러 config:', error.config);
+      
+      // 에러 메시지 추출 및 개선된 에러 처리
+      let errorMessage = '발주 생성에 실패했습니다.';
+      
+      if (error.response?.data) {
+        if (error.response.data.status_message) {
+          errorMessage = error.response.data.status_message;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // 네트워크 오류인 경우
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectedCount = Object.values(selectedProducts).filter(qty => qty > 0).length;
@@ -449,12 +584,13 @@ function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
             React.createElement(SectionTitle, null, `상품 선택 (${filteredProducts.length}개)`),
             React.createElement(SelectedCount, null, `선택된 상품: ${selectedCount}개`)
           ),
+          loading ? 
+            React.createElement('div', { style: { textAlign: 'center', padding: '40px' } }, '상품 목록을 불러오는 중...') :
           React.createElement(ProductGrid, null,
             filteredProducts.map((product) =>
               React.createElement(ProductCard, { key: product.id },
                 React.createElement(ProductHeader, null,
                   React.createElement(ProductName, null, product.name),
-                  React.createElement(ProductId, null, product.id),
                   React.createElement(ProductCategory, null, product.category)
                 ),
                 React.createElement(ProductPrice, null, `₩${product.unitPrice.toLocaleString()}/${product.unit}`),
@@ -484,8 +620,8 @@ function OrderRequestModal({ isOpen, onClose, onOrderRequest }) {
           React.createElement(CancelButton, { onClick: onClose }, '취소'),
           React.createElement(OrderRequestButton, {
             onClick: handleOrderRequest,
-            disabled: selectedCount === 0
-          }, '발주 요청')
+            disabled: selectedCount === 0 || loading
+          }, loading ? '처리 중...' : '발주 요청')
         )
       )
     )

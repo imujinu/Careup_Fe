@@ -53,6 +53,14 @@ const CardValue = styled.div`
 `;
 
 function SummaryCards({ summary }) {
+  // 금액 포맷 함수
+  const formatTotalValue = (value) => {
+    if (value === 0) return '₩0';
+    if (value < 10000) return `₩${value.toLocaleString()}`;
+    if (value < 100000000) return `₩${(value / 10000).toFixed(1)}만원`;
+    return `₩${(value / 100000000).toFixed(1)}억`;
+  };
+
   const cards = [
     {
       title: '총 재고 품목',
@@ -77,7 +85,7 @@ function SummaryCards({ summary }) {
     },
     {
       title: '총 재고 가치',
-      value: `₩${(summary.totalValue / 100000000).toFixed(1)}억`,
+      value: formatTotalValue(summary.totalValue),
       icon: '📈',
       color: '#f3e8ff',
       iconColor: '#6b46c1'
