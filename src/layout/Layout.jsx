@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
-import styled from 'styled-components';
-import { useAppSelector } from '../stores/hooks';
-import Header from './Header';
-import Sidebar from './Sidebar';
-import Footer from './Footer';
+import React, { useState } from "react";
+import { Outlet } from "react-router-dom";
+import styled from "styled-components";
+import { useAppSelector } from "../stores/hooks";
+import Header from "./Header";
+import Sidebar from "./Sidebar";
+import Footer from "./Footer";
 
 const LayoutContainer = styled.div`
   min-height: 100vh;
@@ -13,7 +13,7 @@ const LayoutContainer = styled.div`
 
 const MainContent = styled.main`
   margin-top: 80px;
-  margin-left: ${props => props.sidebarVisible ? '240px' : '0'};
+  margin-left: ${(props) => (props.sidebarVisible ? "240px" : "0")};
   margin-bottom: 100px;
   padding: 32px;
   min-height: calc(100vh - 180px);
@@ -22,25 +22,29 @@ const MainContent = styled.main`
 
 function Layout() {
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const { userType, branchId } = useAppSelector(state => state.auth);
+  const { userType, branchId } = useAppSelector((state) => state.auth);
 
   const handleToggleSidebar = () => {
     setSidebarVisible(!sidebarVisible);
   };
 
-  return React.createElement(LayoutContainer, null,
-    React.createElement(Header, { 
-      onToggleSidebar: handleToggleSidebar, 
+  return React.createElement(
+    LayoutContainer,
+    null,
+    React.createElement(Header, {
+      onToggleSidebar: handleToggleSidebar,
       sidebarVisible,
       userType,
-      branchId
+      branchId,
     }),
-    React.createElement(Sidebar, { 
+    React.createElement(Sidebar, {
       isVisible: sidebarVisible,
       userType,
-      branchId
+      branchId,
     }),
-    React.createElement(MainContent, { sidebarVisible }, 
+    React.createElement(
+      MainContent,
+      { sidebarVisible },
       React.createElement(Outlet, null)
     ),
     React.createElement(Footer, { sidebarVisible })

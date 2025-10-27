@@ -7,6 +7,8 @@ import branchSlice from './slices/branchSlice';
 import customerAuthReducer from './slices/customerAuthSlice';
 import employeeSlice from './slices/employeeSlice';
 import salesReportSlice from './slices/salesReportSlice';
+import chatbotSlice from "./slices/chatbotSlice";
+import alertsSlice from "./slices/alertsSlice";
 
 export const store = configureStore({
   reducer: {
@@ -16,13 +18,15 @@ export const store = configureStore({
     branch: branchSlice,
     employee: employeeSlice,
     salesReport: salesReportSlice,
+    chatbot: chatbotSlice,
+    alerts: alertsSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ['persist/PERSIST'],
+        ignoredActions: ["persist/PERSIST"],
       },
     }),
 });
 
-  // JavaScript에서는 타입 정의 제거
+// JavaScript에서는 타입 정의 제거

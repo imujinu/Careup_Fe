@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -11,12 +11,17 @@ import {
 } from "react-router-dom";
 
 import { useAppDispatch, useAppSelector } from "./stores/hooks";
+import { store } from "./stores";
 import { checkAuthStatus } from "./stores/slices/authSlice";
+import { toggleChatbot, closeChatbot } from "./stores/slices/chatbotSlice";
+import { closeAlerts } from "./stores/slices/alertsSlice";
 
 import Layout from "./layout/Layout";
 import Login from "./pages/auth/Login";
 import { ToastProvider } from "./components/common/Toast";
 import ShopApp from "./storefront/pages/ShopApp";
+import ChatBot from "./components/chatbot/ChatBot";
+import "./components/chatbot/ChatBot.css";
 
 import { headquartersRoutes } from "./routes/headquartersRoutes";
 import { franchiseRoutes } from "./routes/franchiseRoutes";
@@ -41,7 +46,9 @@ import sharkFavicon from "./assets/logos/shark-favicon.svg";
 
 function ProtectedRoute() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, userType, branchId } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, userType, branchId } = useAppSelector(
+    (state) => state.auth
+  );
   const location = useLocation();
 
   useEffect(() => {
@@ -61,7 +68,9 @@ function ProtectedRoute() {
 
 function RouteWrapper({ headquartersComponent, franchiseComponent }) {
   const { userType } = useAppSelector((state) => state.auth);
-  return userType === "headquarters" ? headquartersComponent : franchiseComponent;
+  return userType === "headquarters"
+    ? headquartersComponent
+    : franchiseComponent;
 }
 
 function StaffLogoutWatcher() {
@@ -109,6 +118,10 @@ function BrandingManager() {
 }
 
 export default function App() {
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, userType } = useAppSelector((state) => state.auth);
+  const { isOpen: showChatBot } = useAppSelector((state) => state.chatbot);
+
   const getRouteElement = (path) => {
     const hqRoute = headquartersRoutes.find((r) => r.path === path);
     const frRoute = franchiseRoutes.find((r) => r.path === path);
@@ -177,6 +190,39 @@ export default function App() {
           <Route path="/" element={<Navigate to="/shop" replace />} />
           <Route path="*" element={<Navigate to="/shop" replace />} />
         </Routes>
+
+        {/* 챗봇 - 관리자(본사)일 때만 표시 */}
+        {/* {isAuthenticated && userType !== "headquarters" && showChatBot && (
+          <ChatBot onClose={() => setShowChatBot(false)} />
+        )} */}
+
+        {showChatBot && <ChatBot onClose={() => dispatch(closeChatbot())} />}
+
+        {/* 챗봇 토글 버튼 - 관리자(본사)일 때만 표시 */}
+        {/* {isAuthenticated && userType !== "headquarters" && (
+          <button
+            onClick={() => setShowChatBot(!showChatBot)}
+            className="chatbot-toggle-btn"
+            title="챗봇 열기"
+          >
+            🤖
+          </button>
+        )} */}
+
+        <button
+          onClick={() => {
+            const { isOpen: isChatbotOpen } = store.getState().chatbot;
+            if (!isChatbotOpen) {
+              // 챗봇을 열 때 알림창 닫기
+              dispatch(closeAlerts());
+            }
+            dispatch(toggleChatbot());
+          }}
+          className="chatbot-toggle-btn"
+          title="챗봇 열기"
+        >
+          🤖
+        </button>
       </Router>
     </ToastProvider>
   );
