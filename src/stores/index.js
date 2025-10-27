@@ -25,4 +25,4 @@ export const store = configureStore({
     }),
 });
 
-// JavaScript에서는 타입 정의 제거
+  // JavaScript에서는 타입 정의 제거
