@@ -67,49 +67,34 @@ function ShopLayout() {
     let processed = false;
 
     const checkAndNavigate = () => {
-      // 이미 처리했으면 다시 실행하지 않음
-      if (processed) {
-        return;
-      }
+      if (processed) return;
 
-      // URL에 /shop/order-complete가 있고 paymentCompleted가 있으면
       if (window.location.pathname.includes('/shop/order-complete')) {
         const paymentCompleted = localStorage.getItem('paymentCompleted');
         if (paymentCompleted) {
           try {
             processed = true;
             const data = JSON.parse(paymentCompleted);
-            console.log('🎉 결제 완료 정보 복원:', data);
-            
             setOrderData(data.orderData);
             setPaymentData(data.paymentData);
-            
-            // page를 order-complete로 설정
-            console.log('📝 page를 order-complete로 설정합니다');
             setPage('order-complete');
-            console.log('✅ setPage 완료');
-            
-            // localStorage 정리
-            localStorage.removeItem('paymentCompleted');
-            localStorage.removeItem('currentOrderData');
-            
-            console.log('✅ 주문 완료 페이지로 이동 - page state:', 'order-complete');
+            return;
           } catch (error) {
             console.error('결제 완료 정보 파싱 실패:', error);
           }
+        } else {
+          setTimeout(() => {
+            window.location.href = `${window.location.origin}/shop`;
+          }, 3000);
         }
       }
     };
 
-    // 즉시 체크
     checkAndNavigate();
 
-    // URL 변경 감지를 위한 주기적 체크 (처리될 때까지)
     const interval = setInterval(() => {
       checkAndNavigate();
-      if (processed) {
-        clearInterval(interval);
-      }
+      if (processed) clearInterval(interval);
     }, 100);
 
     return () => clearInterval(interval);
@@ -133,14 +118,11 @@ function ShopLayout() {
 
     async function loadCategories() {
       try {
-        console.log('🔍 카테고리 로딩 시작');
         // 인증 없이 접근 가능한 엔드포인트 사용
         const res = await axios.get(`${API_BASE_URL}/api/categories`);
-        console.log('📡 카테고리 API 응답:', res);
         
         // 백엔드 응답 구조: ResponseDto<List<CategoryResponseDto>>
         const data = res?.data?.data ?? res?.data ?? [];
-        console.log('📦 카테고리 원본 데이터:', data);
         
         const list = Array.isArray(data) ? data : [];
         const mapped = list.map((c) => ({
@@ -149,7 +131,6 @@ function ShopLayout() {
           description: c.description || ""
         }));
         
-        console.log('✅ 매핑된 카테고리:', mapped);
         
         if (mapped.length > 0) {
           setCategories(mapped);
@@ -157,14 +138,12 @@ function ShopLayout() {
             setActiveCategoryPage(mapped[0].name);
           }
         } else {
-          console.log('⚠️ 카테고리 데이터가 비어있음, 더미 데이터 사용');
           setCategories(
             Object.keys(categoryImageMap).map((name) => ({ name, photo: categoryImageMap[name] }))
           );
         }
       } catch (e) {
         console.error('❌ 카테고리 로딩 실패:', e);
-        console.log('🔄 더미 데이터로 폴백');
         setCategories([
           { name: "신발", photo: categoryImageMap["신발"] },
           { name: "의류", photo: categoryImageMap["의류"] },
@@ -192,7 +171,6 @@ function ShopLayout() {
       setIsSearching(true);
       setSearchError(null);
       
-      console.log('🔍 상품 검색 시작:', query);
       
       // 고객용 검색 API 사용
       const res = await shopApi.get('/api/public/products/search', {
@@ -203,16 +181,15 @@ function ShopLayout() {
         }
       });
 
-      console.log('📡 검색 API 응답:', res);
-
       const raw = res?.data?.data?.content ?? res?.data?.data ?? res?.data ?? [];
-      console.log('📦 검색 원본 데이터:', raw);
 
       const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
         id: item.productId ?? Math.random(),
         productId: item.productId,
-        name: item.productName || "상품", // ProductWithBranchesDto 필드명: productName
+        name: item.name || item.productName || "상품",
         price: Number(item.minPrice || 0),
+        minPrice: Number(item.minPrice || 0),
+        maxPrice: Number(item.maxPrice || 0),
         promotionPrice: null,
         discountRate: null,
         imageAlt: item.productName || "상품 이미지",
@@ -234,16 +211,13 @@ function ShopLayout() {
         images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
         reviews: [],
         relatedProducts: [],
-        availableBranches: item.availableBranches || [],
-        availableBranchCount: item.availableBranchCount || 0
+        availableBranches: [],
+        availableBranchCount: 0
       }));
       
-      // 재고가 있는 상품만 필터링
-      const filteredMapped = mapped.filter(item => {
-        return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
-      });
+      // 검색 결과는 모든 상품 표시
+      const filteredMapped = mapped;
 
-      console.log('✅ 검색 결과:', filteredMapped);
       setSearchResults(filteredMapped);
       
     } catch (e) {
@@ -256,7 +230,6 @@ function ShopLayout() {
       });
 
       // 검색 실패 시 현재 지점의 상품에서 클라이언트 사이드 검색
-      console.log('🔄 클라이언트 사이드 검색으로 폴백');
       const filteredProducts = products.filter(product => 
         product.name.toLowerCase().includes(query.toLowerCase()) ||
         product.category.toLowerCase().includes(query.toLowerCase()) ||
@@ -315,20 +288,16 @@ function ShopLayout() {
         setLoadingProducts(true);
         setProductsError(null);
         
-        console.log('🔍 전체 상품 로딩 시작');
-        
-        // 전체 상품 조회 (지점 정보 포함된 API 사용)
-        const res = await shopApi.get('/api/public/products/with-branches');
-        console.log('📡 API 응답:', res);
-        
+        const res = await shopApi.get('/api/public/products');
         const raw = res?.data?.data ?? [];
-        console.log('📦 원본 데이터:', raw);
         
         const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
           id: item.productId ?? Math.random(),
           productId: item.productId,
-          name: item.productName || "상품", // ProductWithBranchesDto 필드명: productName
+          name: item.productName || "상품",
           price: Number(item.minPrice || 0),
+          minPrice: Number(item.minPrice || 0),  // 권장 최소 판매가
+          maxPrice: Number(item.maxPrice || 0),  // 권장 최대 판매가
           promotionPrice: null,
           discountRate: null,
           imageAlt: item.productName || "상품 이미지",
@@ -361,8 +330,6 @@ function ShopLayout() {
           return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
         });
         
-        console.log('✅ 매핑된 상품:', filteredMapped);
-        console.log(`📊 총 ${mapped.length}개 상품 중 ${filteredMapped.length}개 재고 있는 상품 표시`);
         setProducts(filteredMapped);
       } catch (e) {
         console.error('❌ 상품 로딩 실패:', e);
@@ -400,7 +367,6 @@ function ShopLayout() {
     }
 
     try {
-      console.log('장바구니 추가 - 상품 데이터:', product);
       
       // branchProductId 결정
       // 지점이 선택된 경우 해당 지점의 branchProductId 사용, 없으면 첫 번째 지점 사용
@@ -422,7 +388,6 @@ function ShopLayout() {
         }
       }
       
-      console.log('사용할 branchProductId:', branchProductId);
       
       // 백엔드 API를 통한 장바구니 추가
       const cartData = {
@@ -433,7 +398,6 @@ function ShopLayout() {
         attributeValue: null
       };
 
-      console.log('장바구니 추가 데이터:', cartData);
       await cartService.addToCart(cartData);
       
       // Redux 상태 업데이트
@@ -527,7 +491,6 @@ function ShopLayout() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                console.log('🔐 로그인 버튼 클릭됨');
                 setPage("login");
               }}
             >
@@ -538,7 +501,6 @@ function ShopLayout() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                console.log('👤 마이페이지 버튼 클릭됨');
                 setPage("mypage");
               }}
             >
@@ -551,7 +513,6 @@ function ShopLayout() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                console.log('🚪 로그아웃 버튼 클릭됨');
                 handleLogout();
               }}
             >
@@ -583,7 +544,6 @@ function ShopLayout() {
                 className={page === "home" ? "active" : ""}
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log('🏠 HOME 버튼 클릭됨');
                   setDetailProduct(null);
                   setCheckoutProduct(null);
                   setActiveTab("전체");  // HOME 클릭 시 전체 상품 표시
@@ -597,7 +557,6 @@ function ShopLayout() {
                 className={page === "products" ? "active" : ""}
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log('🛍️ SHOP 버튼 클릭됨');
                   setDetailProduct(null);
                   setCheckoutProduct(null);
                   setActiveTab("전체");  // SHOP 클릭 시 전체 상품 표시

@@ -39,10 +39,7 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
           });
           
           const branchProducts = response?.data?.data || [];
-          console.log(`📦 상품 ${item.productName} 검색 결과:`, branchProducts);
-          
           const productBranches = branchProducts.filter(bp => bp.productId === item.productId);
-          console.log(`🏪 상품 ${item.productName} 지점별 재고:`, productBranches);
           
           if (productBranches.length > 0) {
             branchesData[item.productId] = productBranches.map(bp => ({
@@ -75,7 +72,6 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
         }
       }
       
-      console.log('✅ 최종 지점 정보:', branchesData);
       setAvailableBranches(branchesData);
     };
     
@@ -145,11 +141,11 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
 
       // 주문 데이터 구성 (백엔드 API 구조에 맞게)
       const orderData = {
-        memberId: currentUser?.memberId || 1, // 로그인한 회원 ID 사용
-        branchId: selectedBranch.branchId,
+        memberId: Number(currentUser?.memberId || 1), // 로그인한 회원 ID 사용
+        branchId: Number(selectedBranch.branchId),
         orderType: 'ONLINE', // OrderType enum 값
         orderItems: items.map(item => ({
-          branchProductId: item.branchProductId,
+          branchProductId: Number(item.branchProductId),
           quantity: item.quantity
         })),
         couponId: null // 쿠폰 미적용

@@ -34,10 +34,10 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   const selectedBranches = actualOrderData?.selectedBranches || {};
   const availableBranches = actualOrderData?.availableBranches || {};
 
-  // 토스페이먼츠 SDK 로드
+  // 토스페이먼츠 SDK 로드 (v2)
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = 'https://js.tosspayments.com/v1/payment';
+    script.src = 'https://js.tosspayments.com/v2/standard';
     script.async = true;
     document.head.appendChild(script);
 
@@ -57,172 +57,61 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
       setLoading(true);
       setPaymentError(null);
 
-      // 토스페이먼츠 결제 위젯 초기화
+      // 토스페이먼츠 v2 초기화
       const clientKey = import.meta.env.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+      const customerKey = `customer_${currentUser?.memberId || 1}`;
       
       if (!window.TossPayments) {
         throw new Error('토스페이먼츠 SDK가 로드되지 않았습니다.');
       }
 
       const tossPayments = window.TossPayments(clientKey);
-
-      // 토스페이먼츠용 orderId 생성 (영문 대소문자, 숫자, 특수문자(-, _)만 허용, 6자 이상 64자 이하)
-      const tossOrderId = `CAREUP_ORDER_${actualOrderData.orderId}`;
       
-      // ✅ 백엔드가 DB에서 계산한 실제 주문 금액 사용 (orderData.totalAmount)
-      // 프론트엔드가 계산한 금액과 불일치를 방지하기 위해 백엔드가 저장한 금액 사용
+      // 토스페이먼츠용 orderId 생성
+      const tossOrderId = `CAREUP_ORDER_${actualOrderData.orderId}`;
       const actualAmount = actualOrderData.totalAmount;
       
-      console.log(`💰 총 결제 금액: ${actualAmount}원 (백엔드 DB 금액)`);
-      console.log(`📋 주문 정보 전체:`, actualOrderData);
-      console.log(`📦 주문 ID: ${actualOrderData.orderId}`);
-      console.log(`💵 주문 금액 (totalAmount): ${actualOrderData.totalAmount}`);
+      console.log('결제 요청:', { tossOrderId, actualAmount });
 
-      // 결제 요청
-      await tossPayments.requestPayment('카드', {
-        amount: actualAmount,
+      // 주문 정보 저장 (PaymentSuccessPage에서 사용)
+      localStorage.setItem('currentOrderData', JSON.stringify(actualOrderData));
+
+      // v2 Payment 인스턴스 생성
+      const payment = tossPayments.payment({ customerKey });
+      
+      // 결제 요청 (v2 방식)
+      await payment.requestPayment({
+        method: 'CARD',
+        amount: {
+          currency: 'KRW',
+          value: actualAmount,
+        },
         orderId: tossOrderId,
         orderName: `Care Up 주문 (${items.length}개 상품)`,
-        customerName: currentUser?.name || currentUser?.nickname || '고객',
         customerEmail: currentUser?.email || 'customer@example.com',
-        successUrl: `${window.location.origin}/shop/payment-success?orderId=${actualOrderData.orderId}`,
-        failUrl: `${window.location.origin}/shop/payment-fail?orderId=${actualOrderData.orderId}`,
+        customerName: currentUser?.name || currentUser?.nickname || '고객',
+        successUrl: `${window.location.origin}/shop/payment-success`,
+        failUrl: `${window.location.origin}/shop/payment-fail`,
+        card: {
+          useEscrow: false,
+          flowMode: 'DEFAULT',
+          useCardPoint: false,
+          useAppCardOnly: false,
+        },
       });
 
     } catch (error) {
-      console.error('결제 실패:', error);
-      setPaymentError(error.message || '결제 처리 중 오류가 발생했습니다.');
-    } finally {
+      if (error.code === 'USER_CANCEL') {
+        console.log('사용자가 결제를 취소했습니다.');
+      } else {
+        console.error('결제 실패:', error);
+        setPaymentError(error.message || '결제 처리 중 오류가 발생했습니다.');
+      }
       setLoading(false);
     }
   };
 
-  // 결제 성공 처리 (URL 파라미터에서 호출)
-  const handlePaymentSuccess = async (paymentKey, orderId, amount, tossOrderId) => {
-    try {
-      setLoading(true);
-      setPaymentError(null);
 
-      console.log('🎉 결제 승인 시작 - paymentKey:', paymentKey, 'orderId:', orderId, 'amount:', amount);
-
-      // CAREUP_ORDER_X에서 숫자만 추출해서 백엔드로 전달
-      const numericOrderId = orderId.replace('CAREUP_ORDER_', '');
-      console.log('숫자로 변환된 주문 ID:', numericOrderId);
-      
-      // 결제 승인 API 호출
-      const response = await cartService.processPayment(numericOrderId, {
-        paymentKey,
-        orderId: numericOrderId, // 숫자만 전달 (백엔드에서 getTossOrderId()로 변환)
-        amount
-      });
-
-      console.log('✅ 결제 승인 성공:', response);
-
-      // 장바구니 비우기 (프론트엔드)
-      dispatch(clearCart());
-      
-      // 백엔드 장바구니도 삭제
-      try {
-        const memberId = currentUser?.memberId;
-        if (memberId) {
-          await cartService.clearCart(memberId);
-          console.log('백엔드 장바구니 삭제 완료');
-        }
-      } catch (error) {
-        console.error('백엔드 장바구니 삭제 실패:', error);
-      }
-
-      // 결제 완료 정보를 localStorage에 저장
-      const paymentResult = {
-        orderId: parseInt(numericOrderId),
-        paymentData: response.data || response.result || response,
-        orderData: actualOrderData
-      };
-      localStorage.setItem('paymentCompleted', JSON.stringify(paymentResult));
-      
-      // localStorage 정리 (orderData)
-      localStorage.removeItem('currentOrderData');
-      
-      console.log('✅ 결제 완료 정보 저장:', paymentResult);
-      
-      // 주문 완료 페이지로 리다이렉트
-      window.location.href = `${window.location.origin}/shop/order-complete`;
-
-    } catch (error) {
-      console.error('결제 승인 실패:', error);
-      setPaymentError(error.response?.data?.message || error.message || '결제 승인 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // URL 파라미터 확인 (결제 성공/실패 처리) - 리다이렉트 후 체크
-  useEffect(() => {
-    let intervalId;
-    
-    const checkAndProcessPayment = () => {
-      // localStorage로 중복 처리 체크 (영구적)
-      const urlParams = new URLSearchParams(window.location.search);
-      const paymentKey = urlParams.get('paymentKey');
-      
-      if (!paymentKey) {
-        return false;
-      }
-      
-      // 이미 처리된 paymentKey인지 확인
-      const processedKey = `payment_processed_${paymentKey}`;
-      if (localStorage.getItem(processedKey) === 'true') {
-        console.log('⚠️ 이미 처리된 결제입니다. (localStorage 체크)', paymentKey);
-        if (intervalId) clearInterval(intervalId);
-        return true;
-      }
-
-      // 이미 처리된 경우 중복 실행 방지
-      if (hasProcessedPayment.current) {
-        console.log('⚠️ 이미 처리된 결제입니다. (current 플래그)');
-        if (intervalId) clearInterval(intervalId);
-        return true;
-      }
-
-      console.log('📍 현재 URL:', window.location.href);
-
-      const allOrderIds = urlParams.getAll('orderId');
-      const orderId = allOrderIds.length > 0 ? allOrderIds[0] : null;
-      const tossOrderId = urlParams.get('tossOrderId');
-      const amount = urlParams.get('amount');
-
-      console.log('✅ 결제 성공 URL 파라미터:', { paymentKey, orderId, tossOrderId, amount, allOrderIds });
-
-      if (paymentKey && orderId && amount) {
-        hasProcessedPayment.current = true;
-        
-        // localStorage에 처리 완료 표시
-        localStorage.setItem(processedKey, 'true');
-        
-        console.log('🔐 결제 승인 처리 시작:', { paymentKey, orderId, amount });
-        if (intervalId) clearInterval(intervalId); // 즉시 interval 종료
-        handlePaymentSuccess(paymentKey, orderId, parseInt(amount), tossOrderId);
-        return true;
-      }
-
-      return false;
-    };
-
-    // 즉시 체크
-    if (!checkAndProcessPayment()) {
-      // URL 체크를 주기적으로 반복 (리다이렉트 감지)
-      intervalId = setInterval(() => {
-        const processed = checkAndProcessPayment();
-        if (processed) {
-          clearInterval(intervalId);
-        }
-      }, 500);
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, []);
 
   if (!actualOrderData) {
     return (

@@ -53,40 +53,29 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
           branchProductId = branch.branchProductId;
         }
         
-        console.log(`주문 아이템 - 상품: ${item.productName}, 선택 지점: ${selectedBranchId}, branchProductId: ${branchProductId}, 가격: ${branch?.price || item.price}`);
         
         return {
-          branchProductId: branchProductId,
+          branchProductId: Number(branchProductId),
           quantity: item.quantity
         };
       });
       
       // 첫 번째 상품의 지점 ID를 사용 (모든 상품이 같은 지점이어야 함)
-      const firstItemBranchId = selectedBranches[items[0]?.productId];
+      const firstItemBranchId = Number(selectedBranches[items[0]?.productId]);
 
       const orderRequestData = {
-        memberId: currentUser?.memberId || 1,
+        memberId: Number(currentUser?.memberId || 1),
         branchId: firstItemBranchId,
         orderType: 'ONLINE',
         orderItems: orderItems,
         couponId: null
       };
 
-      console.log('📤 주문 데이터:', orderRequestData);
 
       // 주문 생성 API 호출
       const response = await cartService.createOrder(orderRequestData);
       
-      console.log('✅ 주문 생성 성공:', response);
-      
-      // 백엔드 응답 구조 파싱
-      // 백엔드 응답: {success: true, code: 200, message: "...", data: {orderId, totalAmount, ...}}
       const orderData = response?.data?.data || response?.data;
-      
-      console.log('📦 주문 ID:', orderData?.orderId);
-      console.log('💵 주문 금액 (totalAmount):', orderData?.totalAmount);
-      console.log('📋 전체 응답 데이터:', response?.data);
-      console.log('🎯 파싱된 orderData:', orderData);
       
       // 주문 ID 저장
       const orderId = orderData?.orderId;
