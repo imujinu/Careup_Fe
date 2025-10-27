@@ -29,8 +29,15 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
     }
     
     // 카테고리 필터링
-    if (activeTab !== "전체") {
-      productList = productList.filter((p) => p.category === activeTab);
+    if (activeTab && activeTab !== "전체") {
+      console.log('🔍 카테고리 필터링:', activeTab);
+      console.log('📦 상품 카테고리 목록:', [...new Set(productList.map(p => p.category))]);
+      productList = productList.filter((p) => {
+        const match = p.category === activeTab || p.category?.toLowerCase() === activeTab?.toLowerCase();
+        console.log(`${p.name} - category: "${p.category}" === activeTab: "${activeTab}" => ${match}`);
+        return match;
+      });
+      console.log('✅ 필터링된 상품:', productList.length, '개');
     }
 
     // 가격 범위 필터링

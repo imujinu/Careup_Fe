@@ -10,9 +10,17 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
   const [loading, setLoading] = useState(false);
   const [orderError, setOrderError] = useState(null);
   const [orderId, setOrderId] = useState(null);
+  const [availableBranches, setAvailableBranches] = useState({}); // {productId: [branches]}
 
   // orderData에서 선택된 지점 정보 사용
   const selectedBranches = orderData?.selectedBranches || {};
+  
+  // 지점별 가격 정보 로드 (CartPage에서 로드한 정보 사용)
+  React.useEffect(() => {
+    if (orderData?.availableBranches) {
+      setAvailableBranches(orderData.availableBranches);
+    }
+  }, [orderData]);
 
   // 주문 생성
   const handleCreateOrder = async () => {
@@ -32,11 +40,26 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
       setLoading(true);
       setOrderError(null);
 
-      // 주문 데이터 구성 (백엔드 형식에 맞게)
-      const orderItems = items.map(item => ({
-        branchProductId: item.branchProductId,
-        quantity: item.quantity
-      }));
+      // 주문 데이터 구성 (선택한 지점의 branchProductId 사용)
+      const orderItems = items.map(item => {
+        const selectedBranchId = selectedBranches[item.productId];
+        const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+        
+        // branchProductId는 브랜치의 실제 ID (백엔드에서 구분)
+        let branchProductId = item.branchProductId;
+        
+        // 만약 branch에 branchProductId가 있다면 사용
+        if (branch && branch.branchProductId) {
+          branchProductId = branch.branchProductId;
+        }
+        
+        console.log(`주문 아이템 - 상품: ${item.productName}, 선택 지점: ${selectedBranchId}, branchProductId: ${branchProductId}, 가격: ${branch?.price || item.price}`);
+        
+        return {
+          branchProductId: branchProductId,
+          quantity: item.quantity
+        };
+      });
       
       // 첫 번째 상품의 지점 ID를 사용 (모든 상품이 같은 지점이어야 함)
       const firstItemBranchId = selectedBranches[items[0]?.productId];
@@ -49,20 +72,33 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
         couponId: null
       };
 
-      console.log('주문 데이터:', orderRequestData);
+      console.log('📤 주문 데이터:', orderRequestData);
 
       // 주문 생성 API 호출
       const response = await cartService.createOrder(orderRequestData);
       
-      console.log('주문 생성 성공:', response);
+      console.log('✅ 주문 생성 성공:', response);
       
-      // 주문 ID 저장 (백엔드 ResponseDto 구조에 맞게 수정)
-      const orderId = response?.data?.orderId;
+      // 백엔드 응답 구조 파싱
+      // 백엔드 응답: {success: true, code: 200, message: "...", data: {orderId, totalAmount, ...}}
+      const orderData = response?.data?.data || response?.data;
+      
+      console.log('📦 주문 ID:', orderData?.orderId);
+      console.log('💵 주문 금액 (totalAmount):', orderData?.totalAmount);
+      console.log('📋 전체 응답 데이터:', response?.data);
+      console.log('🎯 파싱된 orderData:', orderData);
+      
+      // 주문 ID 저장
+      const orderId = orderData?.orderId;
       setOrderId(orderId);
       
-      // 결제 페이지로 진행
+      // 결제 페이지로 진행 (selectedBranches와 availableBranches 포함)
       if (onProceedToPayment) {
-        onProceedToPayment(response?.data);
+        onProceedToPayment({
+          ...orderData,
+          selectedBranches,
+          availableBranches
+        });
       }
       
     } catch (error) {
@@ -123,7 +159,14 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
               </div>
               <div className="item-info">
                 <h4 className="item-name">{item.productName}</h4>
-                <p className="item-price">{item.price.toLocaleString()}원</p>
+                <p className="item-price">
+                  {(() => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return displayPrice.toLocaleString();
+                  })()}원
+                </p>
                 <div className="item-quantity">
                   <span>수량: {item.quantity}개</span>
                 </div>
@@ -132,7 +175,14 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
                 </div>
               </div>
               <div className="item-total">
-                <span className="total-price">{(item.price * item.quantity).toLocaleString()}원</span>
+                <span className="total-price">
+                  {(() => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return (displayPrice * item.quantity).toLocaleString();
+                  })()}원
+                </span>
               </div>
             </div>
           ))}
@@ -145,7 +195,17 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
           <div className="summary-content">
             <div className="summary-row">
               <span>총 상품 금액</span>
-              <span>{totalAmount.toLocaleString()}원</span>
+              <span>
+                {(() => {
+                  const calculatedTotal = items.reduce((sum, item) => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return sum + (displayPrice * item.quantity);
+                  }, 0);
+                  return calculatedTotal.toLocaleString();
+                })()}원
+              </span>
             </div>
             <div className="summary-row">
               <span>배송비</span>
@@ -153,7 +213,17 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
             </div>
             <div className="summary-row total">
               <span>총 결제 예정 금액</span>
-              <span>{totalAmount.toLocaleString()}원</span>
+              <span>
+                {(() => {
+                  const calculatedTotal = items.reduce((sum, item) => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return sum + (displayPrice * item.quantity);
+                  }, 0);
+                  return calculatedTotal.toLocaleString();
+                })()}원
+              </span>
             </div>
           </div>
           

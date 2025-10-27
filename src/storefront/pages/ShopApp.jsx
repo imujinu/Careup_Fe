@@ -62,6 +62,59 @@ function ShopLayout() {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
+  // URL 체크 및 결제 완료 처리
+  useEffect(() => {
+    let processed = false;
+
+    const checkAndNavigate = () => {
+      // 이미 처리했으면 다시 실행하지 않음
+      if (processed) {
+        return;
+      }
+
+      // URL에 /shop/order-complete가 있고 paymentCompleted가 있으면
+      if (window.location.pathname.includes('/shop/order-complete')) {
+        const paymentCompleted = localStorage.getItem('paymentCompleted');
+        if (paymentCompleted) {
+          try {
+            processed = true;
+            const data = JSON.parse(paymentCompleted);
+            console.log('🎉 결제 완료 정보 복원:', data);
+            
+            setOrderData(data.orderData);
+            setPaymentData(data.paymentData);
+            
+            // page를 order-complete로 설정
+            console.log('📝 page를 order-complete로 설정합니다');
+            setPage('order-complete');
+            console.log('✅ setPage 완료');
+            
+            // localStorage 정리
+            localStorage.removeItem('paymentCompleted');
+            localStorage.removeItem('currentOrderData');
+            
+            console.log('✅ 주문 완료 페이지로 이동 - page state:', 'order-complete');
+          } catch (error) {
+            console.error('결제 완료 정보 파싱 실패:', error);
+          }
+        }
+      }
+    };
+
+    // 즉시 체크
+    checkAndNavigate();
+
+    // URL 변경 감지를 위한 주기적 체크 (처리될 때까지)
+    const interval = setInterval(() => {
+      checkAndNavigate();
+      if (processed) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const categoryImageMap = {
       "신발": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600&auto=format&fit=crop",
@@ -434,6 +487,10 @@ function ShopLayout() {
   // 결제 페이지로 이동
   const handleProceedToPayment = (order) => {
     setOrderData(order);
+    // localStorage에 저장 (리다이렉트 후 복원을 위해)
+    if (order) {
+      localStorage.setItem('currentOrderData', JSON.stringify(order));
+    }
     setPage("payment");
   };
 

@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import "./ProductDetail.css";
 
 const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
-  const [selectedSize, setSelectedSize] = useState("270");
-  const [selectedColor, setSelectedColor] = useState("Mushroom/Arid Stone");
   const [activeTab, setActiveTab] = useState("reviews");
   const [isInCart, setIsInCart] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
@@ -91,21 +89,25 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
             <div className="price-section">
               <div className="instant-price">
                 <span className="price-label">즉시 구매가</span>
-                <span className="price-value">{product?.price?.toLocaleString()}원</span>
+                <span className="price-value">
+                  {product?.minPrice ? `₩${product.minPrice?.toLocaleString()} ~ ₩${product.maxPrice?.toLocaleString()}` : 
+                   product?.availableBranches?.[0]?.price ? `${product.availableBranches[0].price.toLocaleString()}원` : 
+                   '가격 문의'}
+                </span>
               </div>
             </div>
 
             <div className="product-title">
-              <h1>{product?.name || "New Balance 204L Suede Mushroom Arid Stone"}</h1>
+              <h1>{product?.name || product?.productName || "상품명"}</h1>
               <p className="product-subtitle">
-                {product?.description || "뉴발란스 204L 스웨이드 머쉬룸 애리드 스톤"}
+                {product?.description || product?.productDescription || "상품 설명이 없습니다."}
               </p>
             </div>
 
             <div className="rating-section">
               <div className="rating">
                 <span className="stars">★4.8</span>
-                <span className="review-count">리뷰 {product?.reviews || 638}</span>
+                <span className="review-count">리뷰 {product?.reviewCount || 0}</span>
               </div>
             </div>
 
@@ -128,50 +130,51 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               </div>
             )}
 
-            {/* 사이즈 선택 */}
-            <div className="option-section">
-              <label className="option-label">사이즈</label>
-              <select
-                className="size-select"
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
-              >
-                <option value="">모든 사이즈</option>
-                <option value="240">240</option>
-                <option value="250">250</option>
-                <option value="260">260</option>
-                <option value="270">270</option>
-                <option value="280">280</option>
-                <option value="290">290</option>
-              </select>
-            </div>
-
-            {/* 컬러 선택 */}
-            <div className="option-section">
-              <label className="option-label">컬러</label>
-              <select
-                className="color-select"
-                value={selectedColor}
-                onChange={(e) => setSelectedColor(e.target.value)}
-              >
-                <option value="Mushroom/Arid Stone">Mushroom/Arid Stone</option>
-                <option value="Black/White">Black/White</option>
-                <option value="Navy/White">Navy/White</option>
-                <option value="Gray/White">Gray/White</option>
-              </select>
+            {/* 상품 정보 */}
+            <div className="product-specs">
+              {product?.category && (
+                <div className="spec-item">
+                  <span className="spec-label">카테고리</span>
+                  <span className="spec-value">{product.category.categoryName || product.category}</span>
+                </div>
+              )}
+              {product?.supplyPrice && (
+                <div className="spec-item">
+                  <span className="spec-label">공급가</span>
+                  <span className="spec-value">{product.supplyPrice.toLocaleString()}원</span>
+                </div>
+              )}
+              {product?.status && (
+                <div className="spec-item">
+                  <span className="spec-label">상태</span>
+                  <span className="spec-value">{product.status === 'ACTIVE' ? '판매중' : '판매중지'}</span>
+                </div>
+              )}
             </div>
 
             {/* 구매 버튼들 */}
             <div className="purchase-buttons">
               <button className="buy-btn" onClick={handleBuy}>
-                <div className="btn-price">{product?.price?.toLocaleString()}원</div>
+                <div className="btn-price">
+                  {selectedBranchId && product?.availableBranches?.[selectedBranchId]?.price 
+                    ? `${product.availableBranches[selectedBranchId].price.toLocaleString()}원`
+                    : product?.minPrice 
+                    ? `₩${product.minPrice.toLocaleString()}원~`
+                    : '구매하기'}
+                </div>
                 <div className="btn-label">구매</div>
               </button>
               <button
                 className={`cart-btn ${isInCart ? "added" : ""}`}
                 onClick={handleAddToCart}
               >
-                <div className="btn-price">{product?.price?.toLocaleString()}원</div>
+                <div className="btn-price">
+                  {selectedBranchId && product?.availableBranches?.[selectedBranchId]?.price 
+                    ? `${product.availableBranches[selectedBranchId].price.toLocaleString()}원`
+                    : product?.minPrice 
+                    ? `₩${product.minPrice.toLocaleString()}원~`
+                    : '가격보기'}
+                </div>
                 <div className="btn-label">
                   {isInCart ? "장바구니 담김" : "장바구니"}
                 </div>
@@ -204,29 +207,37 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
           </div>
         </div>
 
-        {/* 시세 정보 섹션 */}
+        {/* 상품 정보 섹션 */}
         <div className="price-info-section">
           <div className="price-info-grid">
             <div className="price-info-item">
-              <span className="info-label">최근 거래가</span>
-              <span className="info-value">229,000원</span>
-              <span className="price-change up">▲9,000 (+4.1%)</span>
+              <span className="info-label">판매가격</span>
+              <span className="info-value">
+                {product?.minPrice && product?.maxPrice 
+                  ? `₩${product.minPrice.toLocaleString()} ~ ₩${product.maxPrice.toLocaleString()}`
+                  : product?.availableBranches?.[0]?.price 
+                  ? `${product.availableBranches[0].price.toLocaleString()}원`
+                  : '가격 문의'}
+              </span>
             </div>
             <div className="price-info-item">
-              <span className="info-label">발매가</span>
-              <span className="info-value">159,000원</span>
+              <span className="info-label">공급가격</span>
+              <span className="info-value">{product?.supplyPrice?.toLocaleString() || '-'}원</span>
             </div>
             <div className="price-info-item">
-              <span className="info-label">모델번호</span>
-              <span className="info-value">U204LMMA</span>
+              <span className="info-label">상품ID</span>
+              <span className="info-value">{product?.productId || '-'}</span>
             </div>
             <div className="price-info-item">
-              <span className="info-label">출시일</span>
-              <span className="info-value">25/07/03</span>
+              <span className="info-label">카테고리</span>
+              <span className="info-value">{product?.category?.categoryName || product?.category || '-'}</span>
             </div>
             <div className="price-info-item">
-              <span className="info-label">대표 색상</span>
-              <span className="info-value">Mushroom/Arid Stone</span>
+              <span className="info-label">재고상태</span>
+              <span className="info-value">
+                {product?.status === 'ACTIVE' ? '판매중' : 
+                 product?.status === 'INACTIVE' ? '판매중지' : '-'}
+              </span>
             </div>
           </div>
         </div>
@@ -238,206 +249,57 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               className={`tab-btn ${activeTab === "reviews" ? "active" : ""}`}
               onClick={() => setActiveTab("reviews")}
             >
-              상품후기 (4)
+              상품설명
             </button>
             <button
               className={`tab-btn ${activeTab === "qa" ? "active" : ""}`}
               onClick={() => setActiveTab("qa")}
             >
-              상품 Q&A (1)
+              구매정보
             </button>
           </div>
 
-          {/* 후기 탭 */}
+          {/* 상품 설명 탭 */}
           {activeTab === "reviews" && (
             <div className="reviews-content">
-              {/* 스타일 리뷰 그리드 */}
-              <div className="style-reviews">
-                <h3>스타일 리뷰 97</h3>
-                <div className="style-grid">
-                  {[1, 2, 3, 4, 5, 6].map((item) => (
-                    <div key={item} className="style-item">
-                      <div className="style-image">
-                        <img src="../public/dummy.png" alt={`스타일 ${item}`} />
-                      </div>
-                      <div className="style-info">
-                        <div className="style-user">_jthe</div>
-                        <div className="style-likes">♡ 10</div>
-                        <div className="style-tags">
-                          #매일크챌 #가을맞이룩 #가을신발 #오오티디
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              <div className="product-description">
+                <h3>상품 상세 정보</h3>
+                <div className="description-text">
+                  {product?.description || product?.productDescription || "상품 설명이 없습니다."}
                 </div>
-              </div>
-
-              {/* 후기 작성 섹션 */}
-              <div className="review-write-section">
-                <div className="review-header">
-                  <h3>[설화수] 자음 2종 세트(쇼핑백 증정)</h3>
-                  <div className="review-meta">
-                    <span>베스트</span>
-                    <span>멤버스</span>
-                    <span>권**</span>
+                {product?.image && (
+                  <div className="product-detail-image">
+                    <img src={product.image} alt={product.name || product.productName} />
                   </div>
-                </div>
-
-                <div className="review-content">
-                  <p>
-                    설화수 윤조를 정기적으로 사용하고 있어요 (연 4회 정도)
-                    30대인데 설화수 제품이 가장 저렴하고 샘플도 많이 주는 곳이
-                    컬리 라방이에요. 기본 스킨케어는 설화수, 컬러 메이크업은
-                    헤라로 하고 있어요. 컬리 라방이 가성비가 정말 좋아요. 최근에
-                    3세트 구매해서 버킷백도 받았는데 색깔이 예뻐서 봄/여름에 쓸
-                    예정이에요. 설날에 어머니, 시어머니께 드릴 세트도 준비했고,
-                    저도 하나 남겨둘게요. 설화수에서 새해 복 많이 받으시길
-                    바라요. 설화수는 유명하고 성분도 좋고 30대부터 꾸준히
-                    사용하고 있어요. 설화수(아모레야) 제발 제 피부 좀
-                    챙겨주세요.
-                  </p>
-                </div>
-
-                <div className="review-images">
-                  <div className="image-gallery">
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 1"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 2"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 3"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 4"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 5"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 6"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 7"
-                    />
-                    <img
-                      src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=200&q=80"
-                      alt="리뷰 이미지 8"
-                    />
-                  </div>
-                </div>
-
-                <button className="product-select-btn">상품 선택</button>
+                )}
               </div>
             </div>
           )}
 
-          {/* Q&A 탭 */}
+          {/* 구매정보 탭 */}
           {activeTab === "qa" && (
             <div className="qa-content">
-              <div className="qa-header">
-                <h3>상품 문의</h3>
-                <div className="qa-instructions">
-                  <p>
-                    • 상품에 대한 문의를 남기는 공간입니다. 해당 게시판의 성격과
-                    다른 글은 사전동의 없이 담당 게시판으로 이동될 수 있습니다.
-                  </p>
-                  <p>
-                    • 배송관련, 주문(취소/교환/환불)관련 문의 및 요청사항은
-                    마이컬리 내 1:1 문의에 남겨주세요.
-                  </p>
+              <div className="purchase-info">
+                <h3>구매 안내</h3>
+                <div className="info-section">
+                  <h4>배송 정보</h4>
+                  <p>• 배송비: 무료 배송</p>
+                  <p>• 배송 소요일: 1-3일</p>
                 </div>
-                <button className="inquiry-btn">문의하기</button>
-              </div>
-
-              <div className="qa-table">
-                <div className="qa-table-header">
-                  <div className="qa-col-title">제목</div>
-                  <div className="qa-col-author">작성자</div>
-                  <div className="qa-col-date">작성일</div>
-                  <div className="qa-col-status">답변상태</div>
+                <div className="info-section">
+                  <h4>교환/환불 안내</h4>
+                  <p>• 제품 하자 또는 오배송 시 100% 재발송 또는 환불 처리</p>
+                  <p>• 고객 단순 변심 시 7일 이내 교환/환불 가능</p>
                 </div>
-
-                <div className="qa-table-body">
-                  <div className="qa-row">
-                    <div className="qa-col-title">쇼핑백 보내주세요</div>
-                    <div className="qa-col-author">이*진</div>
-                    <div className="qa-col-date">2025.09.22</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">
-                      비밀글입니다.
-                      <span className="lock-icon">🔒</span>
-                    </div>
-                    <div className="qa-col-author">박*회</div>
-                    <div className="qa-col-date">2025.09.21</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">
-                      비밀글입니다.
-                      <span className="lock-icon">🔒</span>
-                    </div>
-                    <div className="qa-col-author">김*정</div>
-                    <div className="qa-col-date">2025.09.18</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">
-                      탄력세트 3종 주문시 증정품
-                    </div>
-                    <div className="qa-col-author">임*원</div>
-                    <div className="qa-col-date">2025.09.16</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">
-                      비밀글입니다.
-                      <span className="lock-icon">🔒</span>
-                    </div>
-                    <div className="qa-col-author">김*라</div>
-                    <div className="qa-col-date">2025.08.23</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">
-                      영수증 끊어 계산시 20만이상 30만이상 증정품 관련
-                    </div>
-                    <div className="qa-col-author">김*정</div>
-                    <div className="qa-col-date">2025.08.20</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">
-                      비밀글입니다.
-                      <span className="lock-icon">🔒</span>
-                    </div>
-                    <div className="qa-col-author">신*연</div>
-                    <div className="qa-col-date">2025.07.26</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
-
-                  <div className="qa-row">
-                    <div className="qa-col-title">샘플</div>
-                    <div className="qa-col-author">조*인</div>
-                    <div className="qa-col-date">2025.06.26</div>
-                    <div className="qa-col-status answered">답변완료</div>
-                  </div>
+                <div className="info-section">
+                  <h4>결제 안내</h4>
+                  <p>• 무통장입금 / 카드결제 / 휴대폰결제</p>
+                  <p>• 할부 결제 가능 (3개월 무이자)</p>
+                </div>
+                <div className="info-section">
+                  <h4>포인트 적립</h4>
+                  <p>• 구매금액의 1% 포인트 적립</p>
+                  <p>• 다음 결제 시 사용 가능</p>
                 </div>
               </div>
             </div>
