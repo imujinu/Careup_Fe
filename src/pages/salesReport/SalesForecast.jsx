@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiChartLine, mdiSend, mdiCalculator, mdiDownload, mdiFileExcel } from '@mdi/js';
 import { format } from 'date-fns';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import {
   BarChart,
   Bar,
@@ -240,6 +241,7 @@ const SalesForecast = React.forwardRef((props, ref) => {
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [forecastDays, setForecastDays] = useState(30);
   const [sending, setSending] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // 지점 목록 가져오기
   useEffect(() => {
@@ -311,25 +313,28 @@ const SalesForecast = React.forwardRef((props, ref) => {
     }
   };
 
+  const handleSendToAllClick = () => {
+    setShowConfirmModal(true);
+  };
+
   const handleSendToAll = async () => {
-    if (window.confirm('모든 지점에 예상 매출액을 자동 계산하여 전송하시겠습니까?')) {
-      setSending(true);
-      try {
-        await dispatch(calculateAndSaveAllBranchForecasts(forecastDays)).unwrap();
-        toast.addToast({
-          type: 'success',
-          title: '전송 완료',
-          message: '모든 지점에 예상 매출액이 전송되었습니다.',
-        });
-      } catch (err) {
-        toast.addToast({
-          type: 'error',
-          title: '전송 실패',
-          message: err.message || '알 수 없는 오류가 발생했습니다.',
-        });
-      } finally {
-        setSending(false);
-      }
+    setShowConfirmModal(false);
+    setSending(true);
+    try {
+      await dispatch(calculateAndSaveAllBranchForecasts(forecastDays)).unwrap();
+      toast.addToast({
+        type: 'success',
+        title: '전송 완료',
+        message: '모든 지점에 예상 매출액이 전송되었습니다.',
+      });
+    } catch (err) {
+      toast.addToast({
+        type: 'error',
+        title: '전송 실패',
+        message: err.message || '알 수 없는 오류가 발생했습니다.',
+      });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -468,7 +473,7 @@ const SalesForecast = React.forwardRef((props, ref) => {
                   <Icon path={mdiSend} size={0.9} />
                   전송
                 </Button>
-                <Button $variant="warning" onClick={handleSendToAll} disabled={sending}>
+                <Button $variant="warning" onClick={handleSendToAllClick} disabled={sending}>
                   <Icon path={mdiDownload} size={0.9} />
                   전체 전송
                 </Button>
@@ -586,6 +591,18 @@ const SalesForecast = React.forwardRef((props, ref) => {
           </div>
         </Card>
       )}
+
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleSendToAll}
+        title="전체 전송 확인"
+        message="모든 지점에 예상 매출액을 자동 계산하여 전송하시겠습니까?"
+        confirmText="전송"
+        cancelText="취소"
+        confirmColor="#f59e0b"
+        isLoading={sending}
+      />
     </>
   );
 });
