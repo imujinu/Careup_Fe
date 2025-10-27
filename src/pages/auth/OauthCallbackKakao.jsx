@@ -1,3 +1,4 @@
+// src/pages/auth/OauthCallbackKakao.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { customerTokenStorage } from "../../service/customerAuthService";
 import customerAxios from "../../utils/customerAxios";

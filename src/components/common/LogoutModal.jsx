@@ -1,4 +1,5 @@
 // components/common/LogoutModal.jsx
+
 import React from "react";
 import WelcomeModal from "./WelcomeModal";
 

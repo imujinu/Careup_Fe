@@ -1,4 +1,3 @@
-// src/pages/auth/Login.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
@@ -222,10 +221,10 @@ const EyeIcon = (props) => (
 );
 const EyeOffIcon = (props) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0  0 1 5.06-5.94" />
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.86 21.86 0 0 1 5.06-5.94" />
     <path d="M9.9 4.24A10.94 10.94 0  0 1 12 5c7 0 11 7 11 7a21.86 21.86 0 0 1-4.87 5.82" />
     <path d="M1 1l22 22" />
-    <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
+    <path d="M9.88 9.88a3 3 0  0 0 4.24 4.24" />
   </svg>
 );
 
@@ -475,7 +474,7 @@ export default function Login({ onLoginSuccess }) {
             </Submit>
 
             <LinksRow>
-              <a href="#" onClick={(e) => e.preventDefault()}>아이디 찾기</a>
+              <a href="/employee/find-id">아이디 찾기</a>
               <span className="dot">·</span>
               <a href="/password/forgot">비밀번호 찾기</a>
             </LinksRow>

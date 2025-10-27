@@ -1,3 +1,5 @@
+// src/utils/welcomeSeen.js
+
 export function hasSeenWelcome(memberId) {
   try {
     if (!memberId) return false;

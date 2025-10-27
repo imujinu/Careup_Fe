@@ -1,3 +1,4 @@
+// src/pages/auth/AdditionalInfo.jsx
 import React, { useState } from "react";
 import styled from "styled-components";
 import customerAxios from "../../utils/customerAxios";
