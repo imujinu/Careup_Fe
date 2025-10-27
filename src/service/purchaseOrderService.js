@@ -1,7 +1,7 @@
 import axios from '../utils/axiosConfig';
 
 // 발주(purchase order)는 branch 서버에서 처리
-const API_BASE_URL = import.meta.env.VITE_BRANCH_API_URL || 'http://localhost:8081';
+const API_BASE_URL = import.meta.env.VITE_BRANCH_API_URL || 'http://localhost:8080';
 
 // axios 인스턴스 대신 기본 axios 사용 (interceptor가 적용됨)
 const purchaseOrderApi = axios;

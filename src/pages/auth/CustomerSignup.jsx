@@ -105,13 +105,14 @@ const Select = styled.select`
 
 const PwdWrap = styled.div`position: relative;`;
 
+/* CustomerLogin과 완전히 동일한 버튼 효과 */
 const IconBtn = styled.button`
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  width: 36px; height: 36px; border-radius: 8px; border: 1px solid transparent;
-  background: transparent; color: #6b7280; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px;
+  border-radius: 8px; border: 1px solid transparent; background: transparent; color: #6b7280; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: transform .02s ease, background-color .15s ease, border-color .15s ease;
   &:hover  { background: #f3f4f6; border-color: #e5e7eb; }
-  &:active { transform: translateY(1px); }
+  &:active { transform: translateY(calc(-50% + 1px)); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(107,114,128,0.18); }
 `;
 
 const ZipRow = styled.div`
@@ -391,10 +392,11 @@ export default function CustomerSignup() {
                 <IconBtn
                   type="button"
                   aria-label={showPwd ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  aria-pressed={showPwd}
                   onClick={() => setShowPwd(v => !v)}
                   title={showPwd ? "비밀번호 숨기기" : "비밀번호 보기"}
                 >
-                  {showPwd ? <EyeOffIcon/> : <EyeIcon/>}
+                  {showPwd ? <EyeOffIcon /> : <EyeIcon />}
                 </IconBtn>
               </PwdWrap>
               <Hint>비밀번호는 최소 8자 이상을 권장합니다.</Hint>
@@ -415,10 +417,11 @@ export default function CustomerSignup() {
                 <IconBtn
                   type="button"
                   aria-label={showPwd2 ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  aria-pressed={showPwd2}
                   onClick={() => setShowPwd2(v => !v)}
                   title={showPwd2 ? "비밀번호 숨기기" : "비밀번호 보기"}
                 >
-                  {showPwd2 ? <EyeOffIcon/> : <EyeIcon/>}
+                  {showPwd2 ? <EyeOffIcon /> : <EyeIcon />}
                 </IconBtn>
               </PwdWrap>
             </div>

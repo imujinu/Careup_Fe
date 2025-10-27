@@ -129,7 +129,6 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(null); // 'google' | 'kakao' | 'form' | null
   const [msg, setMsg] = useState("");
 
-  // ✅ 로그인 성공 모달
   const [successOpen, setSuccessOpen] = useState(false);
   const [successName, setSuccessName] = useState("");
   const [successNick, setSuccessNick] = useState("");
@@ -149,7 +148,10 @@ export default function CustomerLogin() {
 
   const issueStateOrThrow = async () => {
     setMsg("");
-    const { data } = await customerAxios.get("/auth/customers/oauth/state", { __skipAuthRefresh: true });
+    const { data } = await customerAxios.get("/auth/customers/oauth/state", {
+      __skipAuthHeader: true,
+      __skipAuthRefresh: true,
+    });
     const state = data?.result?.state;
     if (!state) throw new Error("state 발급 실패");
     sessionStorage.setItem("oauth_state", state);
@@ -264,7 +266,7 @@ export default function CustomerLogin() {
             <Hint>전화번호는 하이픈 없이도 입력 가능합니다.</Hint>
           </div>
 
-          <div>
+        <div>
             <Label htmlFor="password">비밀번호</Label>
             <PwdWrap>
               <PwdInput
@@ -308,7 +310,7 @@ export default function CustomerLogin() {
         <HelpRow>
           <StyledLink to="/customer/signup">회원가입</StyledLink>
           <span className="sep">|</span>
-          <a href="#">아이디 찾기</a>
+          <StyledLink to="/customer/find-id">아이디 찾기</StyledLink>
           <span className="sep">|</span>
           <StyledLink to="/customer/password/forgot">비밀번호 찾기</StyledLink>
         </HelpRow>
