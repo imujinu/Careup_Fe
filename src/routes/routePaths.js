@@ -20,6 +20,7 @@ export const HEADQUARTERS_PATHS = {
   ATTENDANCE: '/attendance',
   INVENTORY: '/inventory',
   PURCHASE_ORDER: '/purchase-order',
+  SALES_REPORT: '/sales-report',
   SETTINGS: '/settings',
 };
 
@@ -42,6 +43,7 @@ export const MENU_PATH_MAP = {
   attendance: '/attendance',
   inventory: '/inventory',
   purchaseOrder: '/purchase-order',
+  salesReport: '/sales-report',
   autoOrder: '/auto-order',
   settings: '/settings',
   shop: '/shop',

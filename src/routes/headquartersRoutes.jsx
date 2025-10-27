@@ -7,6 +7,7 @@ import BranchDetail from '../pages/branch/BranchDetail';
 import TestBranchRegistration from '../pages/branch/TestBranchRegistration';
 import InventoryManagement from '../pages/inventory/InventoryManagement';
 import PurchaseOrderManagement from '../pages/purchaseOrder/PurchaseOrderManagement';
+import SalesReport from '../pages/salesReport/SalesReport';
 
 /**
  * 본사(Headquarters) 전용 라우트 설정
@@ -60,6 +61,10 @@ export const headquartersRoutes = [
   {
     path: 'purchase-order',
     element: <PurchaseOrderManagement />,
+  },
+  {
+    path: 'sales-report',
+    element: <SalesReport />,
   },
   {
     path: 'settings',
