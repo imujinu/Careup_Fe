@@ -29,6 +29,7 @@ export const FRANCHISE_PATHS = {
   DASHBOARD: '/dashboard',
   INVENTORY: '/inventory',
   PURCHASE_ORDER: '/purchase-order',
+  AUTO_ORDER: '/auto-order',
   ATTENDANCE: '/attendance',
   SETTINGS: '/settings',
 };
@@ -43,6 +44,7 @@ export const MENU_PATH_MAP = {
   inventory: '/inventory',
   purchaseOrder: '/purchase-order',
   salesReport: '/sales-report',
+  autoOrder: '/auto-order',
   settings: '/settings',
   shop: '/shop',
   logout: '/logout',

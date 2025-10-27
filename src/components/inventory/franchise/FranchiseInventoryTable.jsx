@@ -151,8 +151,7 @@ function FranchiseInventoryTable({
           React.createElement(TableRow, { key: index },
             React.createElement(TableCell, null,
               React.createElement(ProductInfo, null,
-                React.createElement(ProductName, null, item.product.name),
-                React.createElement(ProductSku, null, `ID: ${item.product.id}`)
+                React.createElement(ProductName, null, item.product.name)
               )
             ),
             React.createElement(TableCell, null, item.category || '미분류'),
@@ -192,7 +191,14 @@ function FranchiseInventoryTable({
           disabled: currentPage === 1,
           $isActive: false
         }, '<'),
-        React.createElement(PageButton, { $isActive: true }, currentPage),
+        // 모든 페이지 번호 표시
+        ...Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum =>
+          React.createElement(PageButton, {
+            key: pageNum,
+            onClick: () => onPageChange(pageNum),
+            $isActive: pageNum === currentPage
+          }, pageNum)
+        ),
         React.createElement(PageButton, {
           onClick: () => onPageChange(currentPage + 1),
           disabled: currentPage === totalPages,

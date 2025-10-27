@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import FranchiseInventoryManagement from '../pages/inventory/FranchiseInventoryManagement';
 import FranchisePurchaseOrderManagement from '../pages/purchaseOrder/FranchisePurchaseOrderManagement';
+import AutoOrderSettings from '../pages/franchise/AutoOrderSettings';
 
 /**
  * 가맹점(Franchise) 전용 라우트 설정
@@ -17,12 +18,24 @@ export const franchiseRoutes = [
     element: <div>대시보드 (준비중)</div>,
   },
   {
+    path: 'client',
+    element: <Navigate to="/dashboard" replace />,
+  },
+  {
+    path: 'task',
+    element: <Navigate to="/dashboard" replace />,
+  },
+  {
     path: 'inventory',
     element: <FranchiseInventoryManagement />,
   },
   {
     path: 'purchase-order',
     element: <FranchisePurchaseOrderManagement />,
+  },
+  {
+    path: 'auto-order',
+    element: <AutoOrderSettings />,
   },
   {
     path: 'attendance',

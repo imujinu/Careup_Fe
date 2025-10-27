@@ -37,11 +37,11 @@ const PageNumber = styled.button`
   background: ${props => props.$active ? '#ede9fe' : '#fff'};
   color: ${props => props.$active ? '#6d28d9' : '#374151'};
   min-width: 36px;
-  cursor: pointer;
+  cursor: ${props => props.disabled ? 'default' : 'pointer'};
   font-weight: ${props => props.$active ? '600' : '400'};
   transition: all 0.2s;
   
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${props => props.$active ? '#ede9fe' : '#f3f4f6'};
     border-color: #6d28d9;
   }
@@ -152,58 +152,31 @@ function Pagination({ currentPage = 0, totalPages = 0, onChange }) {
     return pages;
   };
 
-  const pageNumbers = getPageNumbers();
+  // 모든 페이지 번호 생성
+  const pageNumbers = [];
+  for (let i = 0; i < totalPages; i++) {
+    pageNumbers.push(i);
+  }
 
   return (
     <Wrap>
-      {/* 이전 버튼들은 첫 페이지가 아닐 때만 표시 */}
-      {canPrev && (
-        <>
-          <PagerBtn onClick={() => goto(0)}>{'<<'}</PagerBtn>
-          <PagerBtn onClick={() => goto(currentPage - 1)}>{'<'}</PagerBtn>
-        </>
-      )}
+      <PagerBtn disabled={!canPrev} onClick={() => goto(0)}>{'<<'}</PagerBtn>
+      <PagerBtn disabled={!canPrev} onClick={() => goto(currentPage - 1)}>{'<'}</PagerBtn>
       
-      {/* 페이지 번호 버튼들 */}
-      {pageNumbers.map((pageNum, idx) => {
-        if (typeof pageNum === 'string') {
-          return <Ellipsis key={pageNum}>...</Ellipsis>;
-        }
-        return (
-          <PageNumber
-            key={pageNum}
-            $active={pageNum === currentPage}
-            onClick={() => goto(pageNum)}
-          >
-            {pageNum + 1}
-          </PageNumber>
-        );
-      })}
+      {/* 모든 페이지 번호 표시 */}
+      {pageNumbers.map(pageNum => (
+        <PageNumber 
+          key={pageNum} 
+          $active={pageNum === currentPage}
+          disabled={pageNum === currentPage}
+          onClick={() => goto(pageNum)}
+        >
+          {pageNum + 1}
+        </PageNumber>
+      ))}
       
-      {/* 다음 버튼들은 마지막 페이지가 아닐 때만 표시 */}
-      {canNext && (
-        <>
-          <PagerBtn onClick={() => goto(currentPage + 1)}>{'>'}</PagerBtn>
-          <PagerBtn onClick={() => goto((totalPages || 1) - 1)}>{'>>'}</PagerBtn>
-        </>
-      )}
-      
-      {/* 페이지 검색 */}
-      {totalPages > 1 && (
-        <>
-          <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
-          <PageInput
-            type="number"
-            min="1"
-            max={totalPages}
-            value={inputPage}
-            onChange={(e) => setInputPage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="페이지"
-          />
-          <GoButton onClick={handleGoToPage}>이동</GoButton>
-        </>
-      )}
+      <PagerBtn disabled={!canNext} onClick={() => goto(currentPage + 1)}>{'>'}</PagerBtn>
+      <PagerBtn disabled={!canNext} onClick={() => goto((totalPages || 1) - 1)}>{'>>'}</PagerBtn>
     </Wrap>
   );
 }

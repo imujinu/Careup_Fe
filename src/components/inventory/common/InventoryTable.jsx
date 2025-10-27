@@ -134,7 +134,8 @@ function InventoryTable({
   onPageChange,
   onPageSizeChange,
   onModify,
-  onDetail
+  onDetail,
+  onDelete
 }) {
   return React.createElement(TableContainer, null,
     React.createElement(Table, null,
@@ -156,8 +157,7 @@ function InventoryTable({
           React.createElement(TableRow, { key: index },
             React.createElement(TableCell, null,
               React.createElement(ProductInfo, null,
-                React.createElement(ProductName, null, item.product.name),
-                React.createElement(ProductSku, null, `ID: ${item.product.id}`)
+                React.createElement(ProductName, null, item.product.name)
               )
             ),
             React.createElement(TableCell, null, item.category || '미분류'),
@@ -174,7 +174,11 @@ function InventoryTable({
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,
                 React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정'),
-                React.createElement(ActionLink, { onClick: () => onDetail(item) }, '상세')
+                React.createElement(ActionLink, { onClick: () => onDetail(item) }, '상세'),
+                React.createElement(ActionLink, { 
+                  onClick: () => onDelete && onDelete(item),
+                  style: { color: '#dc2626' }
+                }, '삭제')
               )
             )
           )
@@ -196,7 +200,14 @@ function InventoryTable({
           disabled: currentPage === 1,
           $isActive: false
         }, '<'),
-        React.createElement(PageButton, { $isActive: true }, currentPage),
+        // 모든 페이지 번호 표시
+        ...Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum =>
+          React.createElement(PageButton, {
+            key: pageNum,
+            onClick: () => onPageChange(pageNum),
+            $isActive: pageNum === currentPage
+          }, pageNum)
+        ),
         React.createElement(PageButton, {
           onClick: () => onPageChange(currentPage + 1),
           disabled: currentPage === totalPages,
