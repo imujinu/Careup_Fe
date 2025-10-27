@@ -18,8 +18,14 @@ const REFRESH_PATH = '/auth/customers/refresh';
 // 요청 인터셉터: 고객 AT 주입
 customerAxios.interceptors.request.use(
   (config) => {
-    const token = customerTokenStorage.getAccessToken();
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    // 공개 API 등의 경우 토큰 주입 스킵
+    if (!config.__skipAuthHeader) {
+      const token = customerTokenStorage.getAccessToken();
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -49,7 +55,8 @@ customerAxios.interceptors.response.use(
     }
     original.__retried = true;
 
-    // (B) 리프레시 호출 자체거나, 명시적으로 스킵 지시한 요청이면 즉시 로그아웃
+    // (B) 리프레시 호출 자체거나, 명시적으로 스킵 지시한 요청이면 즉시 로그아웃(기존 동작)
+    //     비밀번호 재설정 등 공개 엔드포인트는 __skipAuthRefresh: true 로 오므로 여기로 들어옴
     const url = original.url || '';
     if (url.includes(REFRESH_PATH) || original.__skipAuthRefresh) {
       try { await customerAuthService.logout(); } catch {}

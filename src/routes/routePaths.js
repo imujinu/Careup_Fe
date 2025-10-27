@@ -8,11 +8,13 @@ export const PATHS = {
   ROOT: '/',
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
+  SHOP: '/shop',
 };
 
 // 본사 전용 경로
 export const HEADQUARTERS_PATHS = {
   BRANCH: '/branch',
+  BRANCH_DETAIL: '/branch/detail',
   CLIENT: '/client',
   TASK: '/task',
   ATTENDANCE: '/attendance',
@@ -42,6 +44,7 @@ export const MENU_PATH_MAP = {
   purchaseOrder: '/purchase-order',
   autoOrder: '/auto-order',
   settings: '/settings',
+  shop: '/shop',
   logout: '/logout',
 };
 
