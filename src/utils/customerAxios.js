@@ -1,4 +1,6 @@
 // src/utils/customerAxios.js
+// 고객용 axios 전역 설정
+
 import axios from 'axios';
 import { customerTokenStorage, customerAuthService } from '../service/customerAuthService.js';
 

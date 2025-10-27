@@ -47,22 +47,45 @@ const StatusBadge = styled.span`
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  background: #fee2e2;
-  color: #991b1b;
+  background: ${props => {
+    const status = props.status?.toLowerCase();
+    switch(status) {
+      case 'pending': return '#fef3c7';
+      case 'approved': return '#d1fae5';
+      case 'rejected': return '#fee2e2';
+      case 'partial': return '#fef3c7';
+      case 'shipped': return '#e0e7ff';
+      case 'completed': return '#fef3c7';
+      case 'cancelled': return '#fee2e2';
+      default: return '#f3f4f6';
+    }
+  }};
+  color: ${props => {
+    const status = props.status?.toLowerCase();
+    switch(status) {
+      case 'pending': return '#92400e';
+      case 'approved': return '#065f46';
+      case 'rejected': return '#991b1b';
+      case 'partial': return '#d97706';
+      case 'shipped': return '#4338ca';
+      case 'completed': return '#92400e';
+      case 'cancelled': return '#991b1b';
+      default: return '#374151';
+    }
+  }};
 `;
 
-const ModifyButton = styled.button`
-  background: #3b82f6;
-  color: white;
+const DetailLink = styled.button`
+  background: none;
   border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
+  color: #3b82f6;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  text-decoration: underline;
   
   &:hover {
-    background: #2563eb;
+    color: #1d4ed8;
   }
 `;
 
@@ -106,7 +129,9 @@ const PaginationControls = styled.div`
   gap: 8px;
 `;
 
-const PaginationButton = styled.button`
+const PaginationButton = styled.button.attrs(props => ({
+  isActive: props.active ? '' : undefined
+}))`
   width: 32px;
   height: 32px;
   border: 1px solid #d1d5db;
@@ -130,16 +155,22 @@ const PaginationButton = styled.button`
   }
 `;
 
-function InventoryTable({ data, currentPage, totalPages, pageSize, onPageChange, onPageSizeChange, onModify }) {
+function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageChange, onPageSizeChange, onDetail }) {
   const formatAmount = (amount) => {
     return new Intl.NumberFormat('ko-KR').format(amount);
   };
 
   const getStatusText = (status) => {
-    switch(status) {
-      case 'low': return '부족';
-      case 'normal': return '정상';
-      case 'high': return '과다';
+    if (!status) return status;
+    const upperStatus = status.toUpperCase();
+    switch(upperStatus) {
+      case 'PENDING': return '대기중';
+      case 'APPROVED': return '승인됨';
+      case 'REJECTED': return '반려됨';
+      case 'PARTIAL': return '부분승인';
+      case 'SHIPPED': return '배송중';
+      case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소됨';
       default: return status;
     }
   };
@@ -148,40 +179,33 @@ function InventoryTable({ data, currentPage, totalPages, pageSize, onPageChange,
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
-          React.createElement(TableHeaderCell, null, '상품'),
-          React.createElement(TableHeaderCell, null, '카테고리'),
-          React.createElement(TableHeaderCell, null, '현재고'),
-          React.createElement(TableHeaderCell, null, '안전재고'),
+          React.createElement(TableHeaderCell, null, '발주번호'),
+          React.createElement(TableHeaderCell, null, '지점명'),
+          React.createElement(TableHeaderCell, null, '발주일'),
+          React.createElement(TableHeaderCell, null, '상품 수'),
+          React.createElement(TableHeaderCell, null, '총 금액'),
           React.createElement(TableHeaderCell, null, '상태'),
-          React.createElement(TableHeaderCell, null, '단가'),
-          React.createElement(TableHeaderCell, null, '총 가치'),
-          React.createElement(TableHeaderCell, null, '마지막 입고'),
+          React.createElement(TableHeaderCell, null, '배송예정일'),
           React.createElement(TableHeaderCell, null, '작업')
         )
       ),
       React.createElement(TableBody, null,
-        data.map((item, index) =>
-          React.createElement(TableRow, { key: index },
+        data.map((item, index) => {
+          return React.createElement(TableRow, { key: index },
+            React.createElement(TableCell, null, item.id),
+            React.createElement(TableCell, null, item.branch),
+            React.createElement(TableCell, null, item.orderDate),
+            React.createElement(TableCell, null, `${item.productCount}개`),
+            React.createElement(TableCell, null, `₩${formatAmount(item.totalAmount)}`),
+                  React.createElement(TableCell, null,
+        React.createElement(StatusBadge, { status: (item.status || item.orderStatus || '').toLowerCase() }, getStatusText(item.status || item.orderStatus))
+      ),
+            React.createElement(TableCell, null, item.deliveryDate),
             React.createElement(TableCell, null,
-              React.createElement('div', null,
-                React.createElement('div', { style: { fontWeight: '600', marginBottom: '4px' } }, item.name),
-                React.createElement('div', { style: { fontSize: '12px', color: '#6b7280' } }, item.id)
-              )
-            ),
-            React.createElement(TableCell, null, item.category),
-            React.createElement(TableCell, null, `${item.currentStock}${item.unit}`),
-            React.createElement(TableCell, null, `${item.safetyStock}${item.unit}`),
-            React.createElement(TableCell, null,
-              React.createElement(StatusBadge, null, getStatusText(item.status))
-            ),
-            React.createElement(TableCell, null, `₩${formatAmount(item.unitPrice)}`),
-            React.createElement(TableCell, null, `₩${formatAmount(item.totalValue)}`),
-            React.createElement(TableCell, null, item.lastReceived),
-            React.createElement(TableCell, null,
-              React.createElement(ModifyButton, { onClick: () => onModify(item) }, '수정')
+              React.createElement(DetailLink, { onClick: () => onDetail(item) }, '상세보기')
             )
-          )
-        )
+          );
+        })
       )
     ),
     React.createElement(PaginationContainer, null,
@@ -201,10 +225,14 @@ function InventoryTable({ data, currentPage, totalPages, pageSize, onPageChange,
           onClick: () => onPageChange(currentPage - 1),
           disabled: currentPage === 1
         }, '<'),
-        React.createElement(PaginationButton, {
-          active: true,
-          onClick: () => onPageChange(1)
-        }, '1'),
+        // 모든 페이지 번호 표시
+        ...Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum =>
+          React.createElement(PaginationButton, {
+            key: pageNum,
+            active: pageNum === currentPage,
+            onClick: () => onPageChange(pageNum)
+          }, pageNum)
+        ),
         React.createElement(PaginationButton, {
           onClick: () => onPageChange(currentPage + 1),
           disabled: currentPage === totalPages
@@ -214,4 +242,4 @@ function InventoryTable({ data, currentPage, totalPages, pageSize, onPageChange,
   );
 }
 
-export default InventoryTable;
+export default PurchaseOrderTable;

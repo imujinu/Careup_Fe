@@ -140,6 +140,7 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'attendance', label: '근태관리', icon: '🕐', path: MENU_PATH_MAP.attendance },
     { id: 'inventory', label: '재고관리', icon: '📦', path: MENU_PATH_MAP.inventory },
     { id: 'purchaseOrder', label: '발주관리', icon: '🛒', path: MENU_PATH_MAP.purchaseOrder },
+    { id: 'salesReport', label: '매출 리포트', icon: '📈', path: MENU_PATH_MAP.salesReport },
     { id: 'settings', label: '설정', icon: '⚙️', path: MENU_PATH_MAP.settings },
     { id: 'logout', label: '로그아웃', icon: '↪️', isButton: true },
   ];
@@ -149,6 +150,7 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'dashboard', label: '대시보드', icon: '📊', path: MENU_PATH_MAP.dashboard },
     { id: 'inventory', label: '재고관리', icon: '📦', path: MENU_PATH_MAP.inventory },
     { id: 'purchaseOrder', label: '발주관리', icon: '🛒', path: MENU_PATH_MAP.purchaseOrder },
+    { id: 'autoOrder', label: '자동발주', icon: '🤖', path: MENU_PATH_MAP.autoOrder },
     { id: 'attendance', label: '근태관리', icon: '🕐', path: MENU_PATH_MAP.attendance },
     { id: 'settings', label: '설정', icon: '⚙️', path: MENU_PATH_MAP.settings },
     { id: 'logout', label: '로그아웃', icon: '↪️', isButton: true },

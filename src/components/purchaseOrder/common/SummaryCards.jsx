@@ -31,9 +31,9 @@ const IconContainer = styled.div`
   background: ${props => {
     switch(props.type) {
       case 'total': return '#3b82f6';
-      case 'lowStock': return '#ef4444';
-      case 'categories': return '#10b981';
-      case 'value': return '#8b5cf6';
+      case 'pending': return '#f59e0b';
+      case 'completed': return '#10b981';
+      case 'amount': return '#8b5cf6';
       default: return '#6b7280';
     }
   }};
@@ -58,41 +58,49 @@ const CardValue = styled.div`
 `;
 
 function SummaryCards({ summary }) {
+  // 금액 포맷 함수
+  const formatTotalAmount = (value) => {
+    if (value === 0) return '₩0';
+    if (value < 10000) return `₩${value.toLocaleString()}`;
+    if (value < 100000000) return `₩${(value / 10000).toFixed(1)}만원`;
+    return `₩${(value / 100000000).toFixed(1)}억`;
+  };
+
   return React.createElement(CardsContainer, null,
     React.createElement(Card, null,
       React.createElement(IconContainer, { type: 'total' },
-        React.createElement('span', null, '📦')
+        React.createElement('span', null, '🛒')
       ),
       React.createElement(CardContent, null,
-        React.createElement(CardTitle, null, '총 재고 품목'),
-        React.createElement(CardValue, null, summary.totalItems)
+        React.createElement(CardTitle, null, '총 발주 건수'),
+        React.createElement(CardValue, null, summary.totalOrders)
       )
     ),
     React.createElement(Card, null,
-      React.createElement(IconContainer, { type: 'lowStock' },
-        React.createElement('span', null, '⚠️')
+      React.createElement(IconContainer, { type: 'pending' },
+        React.createElement('span', null, '⏰')
       ),
       React.createElement(CardContent, null,
-        React.createElement(CardTitle, null, '재고 부족'),
-        React.createElement(CardValue, null, summary.lowStock)
+        React.createElement(CardTitle, null, '대기중'),
+        React.createElement(CardValue, null, summary.pending)
       )
     ),
     React.createElement(Card, null,
-      React.createElement(IconContainer, { type: 'categories' },
-        React.createElement('span', null, '📋')
+      React.createElement(IconContainer, { type: 'completed' },
+        React.createElement('span', null, '✅')
       ),
       React.createElement(CardContent, null,
-        React.createElement(CardTitle, null, '카테고리 수'),
-        React.createElement(CardValue, null, summary.categories)
+        React.createElement(CardTitle, null, '완료'),
+        React.createElement(CardValue, null, summary.completed)
       )
     ),
     React.createElement(Card, null,
-      React.createElement(IconContainer, { type: 'value' },
+      React.createElement(IconContainer, { type: 'amount' },
         React.createElement('span', null, '₩')
       ),
       React.createElement(CardContent, null,
-        React.createElement(CardTitle, null, '총 재고 가치'),
-        React.createElement(CardValue, null, `₩${(summary.totalValue / 1000).toFixed(0)}K`)
+        React.createElement(CardTitle, null, '총 발주 금액'),
+        React.createElement(CardValue, null, formatTotalAmount(summary.totalAmount))
       )
     )
   );
