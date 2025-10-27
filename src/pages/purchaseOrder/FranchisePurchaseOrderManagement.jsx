@@ -15,6 +15,7 @@ import { getBranchName } from '../../utils/branchUtils';
 const PageContainer = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+  padding-bottom: 80px;
 `;
 
 const PageHeader = styled.div`
@@ -127,29 +128,24 @@ function FranchisePurchaseOrderManagement() {
       ]);
       console.log('가맹점 발주 목록 API 응답:', data);
       
-      // 데이터 변환
+      // 데이터 변환 (백엔드 API 응답 필드명에 맞게 수정)
       const formattedData = data.map(item => ({
         id: item.purchaseOrderId,
-        orderDate: item.orderDate || new Date().toISOString().split('T')[0],
+        orderDate: item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
         productCount: item.productCount || 0,
-        totalAmount: item.totalAmount || 0,
-        status: item.status || 'pending',
+        totalAmount: item.totalPrice || 0, // totalPrice로 수정
+        status: item.orderStatus || 'PENDING', // orderStatus로 수정
         deliveryDate: item.deliveryDate || '-'
       }));
       
-      // 중복 데이터 제거
+      // ID 기반 중복 데이터 제거 (더 안전한 방식)
       const uniqueData = formattedData.reduce((acc, current) => {
-        const existingIndex = acc.findIndex(item => 
-          item.orderDate === current.orderDate && 
-          item.status === current.status &&
-          item.productCount === current.productCount
-        );
+        const existingIndex = acc.findIndex(item => item.id === current.id);
         if (existingIndex === -1) {
           acc.push(current);
         } else {
-          if (current.id > acc[existingIndex].id) {
-            acc[existingIndex] = current;
-          }
+          // 같은 ID면 최신 데이터로 업데이트
+          acc[existingIndex] = current;
         }
         return acc;
       }, []);
@@ -157,9 +153,9 @@ function FranchisePurchaseOrderManagement() {
       setPurchaseOrders(uniqueData);
       
       const totalOrders = uniqueData.length;
-      const pending = uniqueData.filter(item => item.status === 'pending').length;
-      const inProgress = uniqueData.filter(item => item.status === 'approved' || item.status === 'shipped').length;
-      const completed = uniqueData.filter(item => item.status === 'completed').length;
+      const pending = uniqueData.filter(item => item.status === 'PENDING').length;
+      const inProgress = uniqueData.filter(item => item.status === 'APPROVED' || item.status === 'PARTIAL' || item.status === 'SHIPPED').length;
+      const completed = uniqueData.filter(item => item.status === 'COMPLETED').length;
       
       setSummary({
         totalOrders,

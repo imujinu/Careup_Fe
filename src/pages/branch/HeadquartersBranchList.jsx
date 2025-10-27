@@ -51,6 +51,7 @@ export default HeadquartersBranchList;
 
 const Wrap = styled.div`
   padding: 24px;
+  padding-bottom: 80px;
 `;
 
 const HeaderRow = styled.div`

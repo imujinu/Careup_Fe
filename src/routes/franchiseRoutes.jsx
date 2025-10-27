@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import FranchiseInventoryManagement from '../pages/inventory/FranchiseInventoryManagement';
 import FranchisePurchaseOrderManagement from '../pages/purchaseOrder/FranchisePurchaseOrderManagement';
+import AutoOrderSettings from '../pages/franchise/AutoOrderSettings';
 
 /**
  * 가맹점(Franchise) 전용 라우트 설정
@@ -23,6 +24,10 @@ export const franchiseRoutes = [
   {
     path: 'purchase-order',
     element: <FranchisePurchaseOrderManagement />,
+  },
+  {
+    path: 'auto-order',
+    element: <AutoOrderSettings />,
   },
   {
     path: 'attendance',
