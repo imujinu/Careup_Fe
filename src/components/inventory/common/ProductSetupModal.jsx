@@ -181,10 +181,12 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
     onSave({
       productId: product.productId,
       serialNumber: formData.serialNumber,
-      stockQuantity: 0, // 상품 등록 시 재고는 항상 0
+      stockQuantity: 0,
       safetyStock: parseInt(formData.safetyStock),
       price: parseInt(formData.price)
     });
+    
+    handleClose();
   };
 
   const handleClose = () => {

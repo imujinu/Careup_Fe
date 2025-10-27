@@ -163,7 +163,9 @@ function SearchAndFilter({ filters, onFiltersChange, onOrderRequest, onOrderReco
         React.createElement('option', { value: '' }, '전체 상태'),
         React.createElement('option', { value: 'pending' }, '대기 중'),
         React.createElement('option', { value: 'inProgress' }, '처리 중'),
-        React.createElement('option', { value: 'completed' }, '완료')
+        React.createElement('option', { value: 'completed' }, '완료'),
+        React.createElement('option', { value: 'rejected' }, '반려됨'),
+        React.createElement('option', { value: 'cancelled' }, '취소됨')
       )
     ),
     React.createElement(ButtonGroup, null,

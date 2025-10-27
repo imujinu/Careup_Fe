@@ -2,9 +2,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { fetchBranchList, setParams, deleteBranchAction } from '../../stores/slices/branchSlice';
-import BranchTable from '../../components/branch/BranchTable';
-import BranchTableSkeleton from '../../components/branch/BranchTableSkeleton';
-import Pagination from '../../components/branch/Pagination';
+import BranchTable from '../../components/branchManagement/BranchTable';
+import BranchTableSkeleton from '../../components/branchManagement/BranchTableSkeleton';
+import Pagination from '../../components/branchManagement/Pagination';
 import DeleteConfirmModal from '../../components/common/DeleteConfirmModal';
 import { useToast } from '../../components/common/Toast';
 import styled from 'styled-components';
@@ -176,6 +176,7 @@ export default HeadquartersBranchList;
 
 const Wrap = styled.div`
   padding: 24px;
+  padding-bottom: 80px;
 `;
 
 const HeaderRow = styled.div`
