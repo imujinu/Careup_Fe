@@ -127,8 +127,13 @@ function InventoryManagement() {
       // 본사가 본사 재고 관리 탭인 경우, 본사에 BranchProduct가 없는 상품도 표시
       let allProducts = [];
       try {
-        allProducts = await inventoryService.getAllProducts();
-        console.log('본사 전체 상품 데이터:', allProducts);
+        const productsResponse = await inventoryService.getAllProducts();
+        console.log('본사 전체 상품 API 응답:', productsResponse);
+        
+        const pageData = productsResponse.data?.data || productsResponse.data;
+        allProducts = pageData?.content || [];
+        
+        console.log('본사 전체 상품 데이터 (content):', allProducts);
       } catch (err) {
         console.error('getAllProducts 실패 (서버가 꺼져있거나 엔드포인트 없음):', err);
         // 일단 빈 배열로 진행
@@ -272,8 +277,9 @@ function InventoryManagement() {
         
         console.log('상품 등록 응답:', productResponse);
         
-        // 등록된 상품의 ID 추출
-        const productId = productResponse.data?.productId || productResponse.productId;
+        // 등록된 상품의 ID 추출 (ResponseDto 구조 고려)
+        const responseData = productResponse.data?.data || productResponse.data;
+        const productId = responseData?.productId;
         
         if (productId) {
           // 본사 지점에 재고 추가 (초기 재고 0)

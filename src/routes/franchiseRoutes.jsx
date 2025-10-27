@@ -18,6 +18,14 @@ export const franchiseRoutes = [
     element: <div>대시보드 (준비중)</div>,
   },
   {
+    path: 'client',
+    element: <Navigate to="/dashboard" replace />,
+  },
+  {
+    path: 'task',
+    element: <Navigate to="/dashboard" replace />,
+  },
+  {
     path: 'inventory',
     element: <FranchiseInventoryManagement />,
   },

@@ -409,19 +409,33 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
           return null;
         }
         
+        // unitPrice 안전 처리
+        const safeUnitPrice = product.unitPrice || 0;
+        
         return {
           productId: product.productId, // 실제 productId 사용
           name: product.name,
           quantity,
           unit: product.unit,
-          unitPrice: product.unitPrice,
-          totalPrice: quantity * product.unitPrice
+          unitPrice: safeUnitPrice,
+          totalPrice: quantity * safeUnitPrice
         };
       })
       .filter(item => item !== null); // null 제거
 
     if (orderItems.length === 0) {
       alert('발주할 상품을 선택해주세요.');
+      return;
+    }
+
+    // 데이터 검증
+    const invalidItems = orderItems.filter(item => 
+      !item.productId || item.quantity <= 0 || !item.unitPrice
+    );
+    
+    if (invalidItems.length > 0) {
+      console.error('유효하지 않은 발주 항목들:', invalidItems);
+      alert('발주 정보가 올바르지 않습니다. 상품 정보를 확인해주세요.');
       return;
     }
 
@@ -434,12 +448,63 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
       
       const orderData = {
         branchId: branchId,
-        orderDetails: orderItems.map(item => ({
-          productId: item.productId,
-          quantity: parseInt(item.quantity), // int 타입으로 변환
-          supplyPrice: parseInt(item.unitPrice) // Long 타입으로 변환
-        }))
+        orderDetails: orderItems.map(item => {
+          const productId = parseInt(item.productId) || 0;
+          const quantity = parseInt(item.quantity) || 0;
+          let supplyPrice = 0;
+          
+          // supplyPrice 안전 변환 (더 강력한 방식)
+          try {
+            const rawPrice = item.unitPrice;
+            
+            if (rawPrice === null || rawPrice === undefined || rawPrice === '') {
+              supplyPrice = 0;
+            } else {
+              // 문자열이면 숫자로 변환, 이미 숫자면 그대로 사용
+              const numPrice = Number(rawPrice);
+              supplyPrice = isNaN(numPrice) ? 0 : Math.floor(numPrice); // 정수로 변환
+            }
+          } catch (e) {
+            console.error('supplyPrice 변환 실패:', e);
+            supplyPrice = 0;
+          }
+          
+          console.log(`상품 ${productId}: quantity=${quantity}, supplyPrice=${supplyPrice}`);
+          console.log(`  - 원본unitPrice:`, item.unitPrice, `(타입: ${typeof item.unitPrice})`);
+          console.log(`  - parseInt 결과:`, parseInt(item.unitPrice), `(isNaN: ${isNaN(parseInt(item.unitPrice))})`);
+          console.log(`  - 최종 supplyPrice:`, supplyPrice, `(타입: ${typeof supplyPrice})`);
+          
+          return {
+            productId: productId,
+            quantity: quantity,
+            supplyPrice: supplyPrice
+          };
+        })
       };
+
+      // JSON 직렬화 전 최종 검증
+      const hasInvalidData = orderData.orderDetails.some(detail => 
+        detail.supplyPrice === null || 
+        detail.supplyPrice === undefined || 
+        isNaN(detail.supplyPrice) ||
+        detail.productId === null ||
+        detail.productId === undefined ||
+        detail.quantity <= 0
+      );
+      
+      if (hasInvalidData) {
+        console.error('유효하지 않은 데이터 발견:', orderData.orderDetails);
+        alert('발주 데이터에 오류가 있습니다. 다시 시도해주세요.');
+        return;
+      }
+      
+      console.log('발주 요청 데이터:', JSON.stringify(orderData, null, 2));
+      console.log('원본 orderItems:', orderItems);
+      
+      // JSON.stringify 후 다시 파싱해서 확인 (실제 전송되는 데이터)
+      const serialized = JSON.stringify(orderData);
+      const parsed = JSON.parse(serialized);
+      console.log('실제 전송될 데이터:', parsed);
 
       const response = await purchaseOrderService.createPurchaseOrder(orderData);
     
@@ -448,10 +513,30 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
     onClose();
     } catch (error) {
       console.error('발주 생성 실패:', error);
+      console.error('에러 응답 상태:', error.response?.status);
       console.error('에러 응답 데이터:', error.response?.data);
+      console.error('에러 config:', error.config);
       
-      // 에러 메시지 추출
-      const errorMessage = error.response?.data?.status_message || error.response?.data?.message || error.message;
+      // 에러 메시지 추출 및 개선된 에러 처리
+      let errorMessage = '발주 생성에 실패했습니다.';
+      
+      if (error.response?.data) {
+        if (error.response.data.status_message) {
+          errorMessage = error.response.data.status_message;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // 네트워크 오류인 경우
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
+      }
+      
       alert(errorMessage);
     } finally {
       setLoading(false);

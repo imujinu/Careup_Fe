@@ -9,8 +9,19 @@ const purchaseOrderApi = axios;
 export const purchaseOrderService = {
   // 발주 생성 (가맹점용)
   createPurchaseOrder: async (data) => {
-    const response = await purchaseOrderApi.post(`${API_BASE_URL}/purchase-orders`, data);
-    return response.data;
+    console.log('발주 생성 API 호출:', `${API_BASE_URL}/purchase-orders`);
+    console.log('발주 생성 요청 데이터:', JSON.stringify(data, null, 2));
+    
+    try {
+      const response = await purchaseOrderApi.post(`${API_BASE_URL}/purchase-orders`, data);
+      console.log('발주 생성 API 응답:', response);
+      return response.data;
+    } catch (error) {
+      console.error('발주 생성 API 호출 실패:', error);
+      console.error('요청 URL:', `${API_BASE_URL}/purchase-orders`);
+      console.error('요청 데이터:', data);
+      throw error;
+    }
   },
 
   // 발주 목록 조회 (본사/가맹점 구분)

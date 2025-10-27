@@ -37,11 +37,11 @@ const PageNumber = styled.button`
   background: ${props => props.$active ? '#ede9fe' : '#fff'};
   color: ${props => props.$active ? '#6d28d9' : '#374151'};
   min-width: 36px;
-  cursor: pointer;
+  cursor: ${props => props.disabled ? 'default' : 'pointer'};
   font-weight: ${props => props.$active ? '600' : '400'};
   transition: all 0.2s;
   
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${props => props.$active ? '#ede9fe' : '#f3f4f6'};
     border-color: #6d28d9;
   }
@@ -165,13 +165,14 @@ function Pagination({ currentPage = 0, totalPages = 0, onChange }) {
       
       {/* 모든 페이지 번호 표시 */}
       {pageNumbers.map(pageNum => (
-        pageNum === currentPage ? (
-          <Current key={pageNum}>{pageNum + 1}</Current>
-        ) : (
-          <PagerBtn key={pageNum} onClick={() => goto(pageNum)}>
-            {pageNum + 1}
-          </PagerBtn>
-        )
+        <PageNumber 
+          key={pageNum} 
+          $active={pageNum === currentPage}
+          disabled={pageNum === currentPage}
+          onClick={() => goto(pageNum)}
+        >
+          {pageNum + 1}
+        </PageNumber>
       ))}
       
       <PagerBtn disabled={!canNext} onClick={() => goto(currentPage + 1)}>{'>'}</PagerBtn>

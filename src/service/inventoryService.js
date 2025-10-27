@@ -24,16 +24,43 @@ export const inventoryService = {
 
   // 상품 마스터 등록
   createProduct: async (data) => {
-    const response = await inventoryApi.post(`${API_BASE_URL}/api/products`, data);
+    const formData = new FormData();
+    
+    // product 객체를 JSON string으로 변환하여 FormData에 추가
+    const productData = {
+      name: data.name,
+      description: data.description,
+      categoryId: data.categoryId,
+      minPrice: data.minPrice,
+      maxPrice: data.maxPrice,
+      supplyPrice: data.supplyPrice,
+      imageUrl: data.imageUrl,
+      visibility: data.visibility
+    };
+    
+    formData.append('product', new Blob([JSON.stringify(productData)], {
+      type: 'application/json'
+    }));
+    
+    // 이미지 파일이 있으면 추가
+    if (data.imageFile) {
+      formData.append('image', data.imageFile);
+    }
+    
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/products`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 
-  // 전체 상품 목록 조회 (본사 상품 마스터)
-  getAllProducts: async () => {
-    const response = await inventoryApi.get(`${API_BASE_URL}/api/products`);
+  // 전체 상품 목록 조회 (본사 상품 마스터) - 페이징 지원
+  getAllProducts: async (page = 0, size = 100) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/products?page=${page}&size=${size}&sort=createdAt,desc`);
     console.log('getAllProducts API 전체 응답:', response);
     console.log('getAllProducts API 응답 데이터:', response.data);
-    return response.data;
+    return response.data; // Page<ProductResponseDto> 형태로 반환
   },
 
   // 상품 삭제
