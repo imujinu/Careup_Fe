@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { getBranchDetail } from '../../service/branchService';
-import BranchDetailHeader from '../../components/branch/BranchDetailHeader';
-import BranchDetailTabs from '../../components/branch/BranchDetailTabs';
-import BranchDetailModal from '../../components/branch/BranchDetailModal';
+import BranchDetailHeader from '../../components/branchManagement/BranchDetailHeader';
+import BranchDetailTabs from '../../components/branchManagement/BranchDetailTabs';
+import BranchDetailModal from '../../components/branchManagement/BranchDetailModal';
 import { useToast } from '../../components/common/Toast';
 import styled from 'styled-components';
 
