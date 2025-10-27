@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useEffect, useRef, useState} from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -11,7 +11,10 @@ import {
 } from "react-router-dom";
 
 import { useAppDispatch, useAppSelector } from "./stores/hooks";
+import { store } from "./stores";
 import { checkAuthStatus } from "./stores/slices/authSlice";
+import { toggleChatbot, closeChatbot } from "./stores/slices/chatbotSlice";
+import { closeAlerts } from "./stores/slices/alertsSlice";
 
 import Layout from "./layout/Layout";
 import Login from "./pages/auth/Login";
@@ -35,7 +38,9 @@ import EmployeePasswordReset from "./pages/auth/EmployeePasswordReset";
 
 function ProtectedRoute() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, userType, branchId } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, userType, branchId } = useAppSelector(
+    (state) => state.auth
+  );
   const location = useLocation();
 
   useEffect(() => {
@@ -77,8 +82,9 @@ function StaffLogoutWatcher() {
 }
 
 export default function App() {
-  const [showChatBot, setShowChatBot] = useState(true);
+  const dispatch = useAppDispatch();
   const { isAuthenticated, userType } = useAppSelector((state) => state.auth);
+  const { isOpen: showChatBot } = useAppSelector((state) => state.chatbot);
 
   const getRouteElement = (path) => {
     const hqRoute = headquartersRoutes.find((r) => r.path === path);
@@ -132,9 +138,15 @@ export default function App() {
             element={<AdditionalInfo />}
           />
           <Route path="/customer/signup" element={<CustomerSignup />} />
-          <Route path="/customer/password/forgot" element={<PasswordResetRequest />} />
+          <Route
+            path="/customer/password/forgot"
+            element={<PasswordResetRequest />}
+          />
           <Route path="/customer/password/reset" element={<PasswordReset />} />
-          <Route path="/password/forgot" element={<EmployeePasswordResetRequest />} />
+          <Route
+            path="/password/forgot"
+            element={<EmployeePasswordResetRequest />}
+          />
           <Route path="/password/reset" element={<EmployeePasswordReset />} />
           <Route path="/" element={<Navigate to="/shop" replace />} />
           <Route path="*" element={<Navigate to="/shop" replace />} />
@@ -145,7 +157,7 @@ export default function App() {
           <ChatBot onClose={() => setShowChatBot(false)} />
         )} */}
 
-        {showChatBot && <ChatBot onClose={() => setShowChatBot(false)} />}
+        {showChatBot && <ChatBot onClose={() => dispatch(closeChatbot())} />}
 
         {/* 챗봇 토글 버튼 - 관리자(본사)일 때만 표시 */}
         {/* {isAuthenticated && userType !== "headquarters" && (
@@ -159,7 +171,14 @@ export default function App() {
         )} */}
 
         <button
-          onClick={() => setShowChatBot(!showChatBot)}
+          onClick={() => {
+            const { isOpen: isChatbotOpen } = store.getState().chatbot;
+            if (!isChatbotOpen) {
+              // 챗봇을 열 때 알림창 닫기
+              dispatch(closeAlerts());
+            }
+            dispatch(toggleChatbot());
+          }}
           className="chatbot-toggle-btn"
           title="챗봇 열기"
         >
