@@ -6,6 +6,7 @@ import inventorySlice from './slices/inventorySlice';
 import branchSlice from './slices/branchSlice';
 import customerAuthReducer from './slices/customerAuthSlice';
 import employeeSlice from './slices/employeeSlice';
+import salesReportSlice from './slices/salesReportSlice';
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     inventory: inventorySlice,
     branch: branchSlice,
     employee: employeeSlice,
+    salesReport: salesReportSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
