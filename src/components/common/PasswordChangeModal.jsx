@@ -1,3 +1,5 @@
+// src/components/common/PasswordChangeModal.jsx
+
 import React from "react";
 import WelcomeModal from "./WelcomeModal";
 

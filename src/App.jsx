@@ -31,6 +31,14 @@ import PasswordReset from "./pages/auth/PasswordReset";
 import EmployeePasswordResetRequest from "./pages/auth/EmployeePasswordResetRequest";
 import EmployeePasswordReset from "./pages/auth/EmployeePasswordReset";
 
+// 고객 아이디 찾기
+import FindCustomerId from "./pages/auth/FindCustomerId";
+// ★ 직원 아이디 찾기 (공개 라우트) - 파일명 FindEmployeeId.jsx 기준
+import EmployeeFindId from "./pages/auth/FindEmployeeId";
+
+import careupFavicon from "./assets/logos/care-up_logo_primary.svg";
+import sharkFavicon from "./assets/logos/shark-favicon.svg";
+
 function ProtectedRoute() {
   const dispatch = useAppDispatch();
   const { isAuthenticated, userType, branchId } = useAppSelector((state) => state.auth);
@@ -72,6 +80,34 @@ function StaffLogoutWatcher() {
   return null;
 }
 
+function BrandingManager() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const isShop = location.pathname.startsWith("/shop");
+    const nextTitle = isShop ? "SHARK" : "Care-up";
+    const nextIcon = isShop ? sharkFavicon : careupFavicon;
+
+    if (document.title !== nextTitle) {
+      document.title = nextTitle;
+    }
+
+    const ensureIcon = (id, rel = "icon") => {
+      let link = document.querySelector(`link#${id}`) || document.createElement("link");
+      link.id = id;
+      link.rel = rel;
+      link.type = "image/svg+xml";
+      link.href = nextIcon;
+      if (!link.parentNode) document.head.appendChild(link);
+    };
+
+    ensureIcon("app-favicon", "icon");
+    ensureIcon("app-shortcut-icon", "shortcut icon");
+  }, [location]);
+
+  return null;
+}
+
 export default function App() {
   const getRouteElement = (path) => {
     const hqRoute = headquartersRoutes.find((r) => r.path === path);
@@ -102,15 +138,26 @@ export default function App() {
   return (
     <ToastProvider>
       <Router>
+        <BrandingManager />
         <StaffLogoutWatcher />
         <Routes>
+          {/* 고객 쇼핑몰: 인증 불필요 */}
           <Route path="/shop/*" element={<ShopApp />} />
+
+          {/* 직원 로그인 */}
           <Route path="/login" element={<Login />} />
+
+          {/* 중요: /auth/find-id 는 보호 라우트보다 먼저 리다이렉트 처리 */}
+          <Route path="/auth/find-id" element={<Navigate to="/customer/find-id" replace />} />
+
+          {/* 직원 포털: 인증 필요 */}
           <Route element={<ProtectedRoute />}>
             {allPaths.map((path) => (
               <Route key={path} path={path} element={getRouteElement(path)} />
             ))}
           </Route>
+
+          {/* 고객 인증/가입/리셋 */}
           <Route path="/customer/login" element={<CustomerLogin />} />
           <Route path="/oauth/google/callback" element={<OauthCallbackGoogle />} />
           <Route path="/oauth/kakao/callback" element={<OauthCallbackKakao />} />
@@ -118,8 +165,15 @@ export default function App() {
           <Route path="/customer/signup" element={<CustomerSignup />} />
           <Route path="/customer/password/forgot" element={<PasswordResetRequest />} />
           <Route path="/customer/password/reset" element={<PasswordReset />} />
+          <Route path="/customer/find-id" element={<FindCustomerId />} />
+
+          {/* 직원 인증/리셋 (공개) */}
           <Route path="/password/forgot" element={<EmployeePasswordResetRequest />} />
           <Route path="/password/reset" element={<EmployeePasswordReset />} />
+          {/* ★ 직원 아이디 찾기 (공개) */}
+          <Route path="/employee/find-id" element={<EmployeeFindId />} />
+
+          {/* 루트/기타 → 쇼핑 홈 */}
           <Route path="/" element={<Navigate to="/shop" replace />} />
           <Route path="*" element={<Navigate to="/shop" replace />} />
         </Routes>

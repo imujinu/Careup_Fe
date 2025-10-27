@@ -1,6 +1,8 @@
+// src/service/employeeService.js
+
 import axios from '../utils/axiosConfig';
 
-const BASE_URL = import.meta.env.VITE_BRANCH_URL || import.meta.env.VITE_API_URL || 'http://localhost:8081';
+const BASE_URL = import.meta.env.VITE_BRANCH_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // 직원(점주) 목록 조회
 export const fetchEmployeeList = async (params = {}) => {
