@@ -1,8 +1,9 @@
 // src/service/authService.js
+
 import axios from 'axios';
 import { decodeToken } from '../utils/jwt';
 
-const AUTH_API_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8080';
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem('accessToken'),

@@ -1,9 +1,10 @@
+// src/pages/auth/CustomerLogin.jsx
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Link } from "react-router-dom";
 import customerAxios from "../../utils/customerAxios";
 import { customerAuthService, customerTokenStorage } from "../../service/customerAuthService";
-import { markJustLoggedIn } from "../../utils/loginSignals"; // ✅ 유지
+import { markJustLoggedIn } from "../../utils/loginSignals";
 
 import GoogleIcon from "../../assets/icons/google_icon.svg";
 import KakaoIcon from "../../assets/icons/kakao_icon.svg";
@@ -225,7 +226,6 @@ export default function CustomerLogin() {
       await customerAuthService.login({ id, password: pw, rememberMe });
       markJustLoggedIn();
 
-      // ✅ 로그인 성공 모달 오픈 (바로 이동 X)
       const ui = customerTokenStorage.getUserInfo() || {};
       setSuccessName(ui.name || "");
       setSuccessNick(ui.nickname || "");
@@ -257,6 +257,8 @@ export default function CustomerLogin() {
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
             />
             <Hint>전화번호는 하이픈 없이도 입력 가능합니다.</Hint>
@@ -323,10 +325,9 @@ export default function CustomerLogin() {
           </SocialBtn>
         </SocialCol>
 
-        <Msg>{msg}</Msg>
+        <Msg aria-live="polite" role="status">{msg}</Msg>
       </Card>
 
-      {/* ✅ 로그인 성공 모달 */}
       <LoginSuccessModal
         open={successOpen}
         name={successName}

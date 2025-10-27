@@ -1,4 +1,5 @@
 // src/utils/loginSignals.js
+
 export function markJustLoggedIn() {
   try {
     sessionStorage.setItem("just_logged_in", "1");

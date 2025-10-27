@@ -1,4 +1,6 @@
 // src/stores/slices/customerAuthSlice.js
+// 고객용
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { customerAuthService } from '../../service/customerAuthService';
 

@@ -1,6 +1,6 @@
 import axios from '../utils/axiosConfig';
 
-const BASE_URL = import.meta.env.VITE_BRANCH_URL || import.meta.env.VITE_API_URL || 'http://localhost:8081';
+const BASE_URL = import.meta.env.VITE_BRANCH_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // 본점 관리자 지점 목록 조회 서비스
 export const branchService = {
