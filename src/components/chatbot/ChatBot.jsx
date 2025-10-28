@@ -119,9 +119,26 @@ const ChatBot = ({ onClose }) => {
 
   // 금일 근무 현황 데이터 파싱 함수
   const parseTodayAttendanceData = (data) => {
-    if (!data || !data.employees || !Array.isArray(data.employees)) return null;
+    console.log("parseTodayAttendanceData - 입력 데이터:", data);
 
-    return data.employees.map((employee) => {
+    if (!data || !data.employees || !Array.isArray(data.employees)) {
+      console.log(
+        "parseTodayAttendanceData - 데이터가 없거나 employees 배열이 아님:",
+        {
+          hasData: !!data,
+          hasEmployees: !!(data && data.employees),
+          isArray: !!(data && data.employees && Array.isArray(data.employees)),
+        }
+      );
+      return null;
+    }
+
+    console.log(
+      "parseTodayAttendanceData - employees 배열 길이:",
+      data.employees.length
+    );
+
+    const parsedData = data.employees.map((employee) => {
       const {
         employeeId,
         employeeName,
@@ -202,6 +219,9 @@ const ChatBot = ({ onClose }) => {
         breakMinutes,
       };
     });
+
+    console.log("parseTodayAttendanceData - 파싱된 결과:", parsedData);
+    return parsedData;
   };
 
   // 근태 데이터 파싱 함수 (기존)
@@ -463,14 +483,19 @@ const ChatBot = ({ onClose }) => {
     } else {
       // 금일 근무 현황인 경우 특별 처리
       if (tabType === "금일근무현황") {
+        // 여러 가능한 데이터 경로 확인
+        let todayData = null;
+
         if (result.data && result.data.result && result.data.result.body) {
-          const todayData = parseTodayAttendanceData(result.data.result.body);
-          if (todayData) {
-            botContent = formatTodayAttendanceTable(todayData);
-          } else {
-            botContent =
-              "관련 정보가 존재하지 않습니다.\n다른 항목을 입력하시거나 다른 날짜를 입력해주세요.";
-          }
+          todayData = parseTodayAttendanceData(result.data.result.body);
+        } else if (result.result && result.result.body) {
+          todayData = parseTodayAttendanceData(result.result.body);
+        } else if (result.body) {
+          todayData = parseTodayAttendanceData(result.body);
+        }
+
+        if (todayData) {
+          botContent = formatTodayAttendanceTable(todayData);
         } else {
           botContent =
             "관련 정보가 존재하지 않습니다.\n다른 항목을 입력하시거나 다른 날짜를 입력해주세요.";
@@ -1217,7 +1242,7 @@ const ChatBot = ({ onClose }) => {
                                   className="order-request-btn"
                                   onClick={handleOrderRequest}
                                 >
-                                  발주 요청
+                                  재고 수정
                                 </button>
                               </div>
                             </div>
@@ -1331,7 +1356,7 @@ const ChatBot = ({ onClose }) => {
             <div className="reset-modal-content">
               <div className="reset-modal-title">발주 요청</div>
               <div className="reset-modal-message">
-                발주를 요청하시겠습니까?
+                재고를 수정하시겠습니까?
               </div>
               <div className="reset-modal-buttons">
                 <button
