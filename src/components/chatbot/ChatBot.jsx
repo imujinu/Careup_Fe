@@ -25,10 +25,92 @@ const ChatBot = ({ onClose }) => {
   );
   const [isComparing, setIsComparing] = useState(false);
   const [isOrderRegistering, setIsOrderRegistering] = useState(false);
+  const [inventoryData, setInventoryData] = useState(null);
+  const [isInventoryEditMode, setIsInventoryEditMode] = useState(false);
+  const [orderQuantities, setOrderQuantities] = useState({});
+  const [showOrderConfirm, setShowOrderConfirm] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // 발주 수량 조절 함수들
+  const updateOrderQuantity = (itemId, quantity) => {
+    setOrderQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(0, quantity),
+    }));
+  };
+
+  const incrementQuantity = (itemId) => {
+    const currentQuantity = orderQuantities[itemId] || 0;
+    updateOrderQuantity(itemId, currentQuantity + 1);
+  };
+
+  const decrementQuantity = (itemId) => {
+    const currentQuantity = orderQuantities[itemId] || 0;
+    updateOrderQuantity(itemId, currentQuantity - 1);
+  };
+
+  // 최종 가격 계산
+  const calculateTotalPrice = () => {
+    if (!inventoryData) return 0;
+
+    return inventoryData.reduce((total, item) => {
+      const quantity = orderQuantities[item.id] || 0;
+      return total + item.price * quantity;
+    }, 0);
+  };
+
+  // 발주 요청 처리
+  const handleOrderRequest = () => {
+    setShowOrderConfirm(true);
+  };
+
+  const confirmOrderRequest = async () => {
+    const orderItems = inventoryData
+      .filter((item) => (orderQuantities[item.id] || 0) > 0)
+      .map((item) => ({
+        id: item.id,
+        productName: item.productName,
+        quantity: orderQuantities[item.id],
+        price: item.price,
+        totalPrice: item.price * orderQuantities[item.id],
+      }));
+
+    if (orderItems.length === 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "발주할 상품을 선택해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+      setShowOrderConfirm(false);
+      return;
+    }
+
+    const result = await sendChatbotRequest(
+      `발주 요청: ${JSON.stringify(orderItems)}`,
+      "발주 요청을 처리하고 있습니다..."
+    );
+
+    const botMessage = {
+      id: Date.now(),
+      type: "bot",
+      content: result?.data?.result?.body
+        ? `발주 요청이 완료되었습니다!\n\n${JSON.stringify(result.data.result.body, null, 2)}`
+        : "발주 요청이 완료되었습니다!",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, botMessage]);
+    setShowOrderConfirm(false);
+    setIsInventoryEditMode(false);
+    setOrderQuantities({});
   };
 
   useEffect(() => {
@@ -182,10 +264,12 @@ const ChatBot = ({ onClose }) => {
       setLoadingMessage(loadingText);
       setIsLoading(true);
       console.log("message=============", message);
-      const response = await axios.post("http://localhost:8081/chatbot/ask", {
-        branchId: 1,
-        message: message,
-      });
+      const response = await axios.post(
+        "http://localhost:8080/branch-service/chatbot/ask",
+        {
+          message: message,
+        }
+      );
       console.log(response);
       const result = response.data;
       console.log(result);
@@ -207,10 +291,43 @@ const ChatBot = ({ onClose }) => {
     { id: "reset", label: "채팅 초기화", icon: "🔄" },
   ];
 
-  const handleQuickButton = (buttonId) => {
+  const handleQuickButton = async (buttonId) => {
     if (buttonId === "reset") {
       setShowResetConfirm(true);
       return;
+    }
+
+    // 재고 버튼 클릭 시 전체 재고 조회 API 호출하여 상태에 저장
+    if (buttonId === "inventory" && !inventoryData) {
+      const result = await sendChatbotRequest(
+        "재고 전체 조회",
+        "재고 정보를 조회하고 있습니다..."
+      );
+
+      if (result?.result?.body) {
+        let stocks = [];
+        const body = result.result.body;
+
+        if (Array.isArray(body)) {
+          stocks = body;
+        } else if (body.stocks && Array.isArray(body.stocks)) {
+          stocks = body.stocks;
+        } else if (body.branchProductId) {
+          stocks = [body];
+        }
+
+        if (stocks.length > 0) {
+          const processedData = stocks.map((item) => ({
+            id: item.branchProductId,
+            productName: item.productName,
+            stockQuantity: item.stockQuantity,
+            safetyStock: item.safetyStock,
+            price: item.price,
+          }));
+          console.log("재고 버튼 클릭 - 데이터 저장:", processedData);
+          setInventoryData(processedData);
+        }
+      }
     }
 
     // 모든 탭을 닫고 새로운 탭을 열기
@@ -406,42 +523,58 @@ const ChatBot = ({ onClose }) => {
     setActiveTab(null);
 
     if (tabType === "전체조회") {
+      // 저장된 재고 데이터가 있으면 그대로 표시 (API 호출 없음)
+      console.log("전체조회 클릭 - inventoryData:", inventoryData);
+      if (inventoryData && inventoryData.length > 0) {
+        console.log("저장된 데이터 사용 - API 호출 없음");
+        const botMessage = {
+          id: Date.now(),
+          type: "bot",
+          content: {
+            type: "inventory_table",
+            data: inventoryData,
+          },
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+        return; // API 호출 없이 종료
+      }
+
+      // 저장된 데이터가 없을 때만 API 호출
       const result = await sendChatbotRequest(
         "재고 전체 조회",
         "재고 정보를 조회하고 있습니다..."
       );
 
-      // result.data.result.body가 배열인 경우 처리
       if (result?.result?.body) {
         let stocks = [];
         const body = result.result.body;
 
-        // result.data.result.body가 배열인 경우
         if (Array.isArray(body)) {
           stocks = body;
-        }
-        // result.data.result.body가 객체이고 배열 속성을 가진 경우
-        else if (body.stocks && Array.isArray(body.stocks)) {
+        } else if (body.stocks && Array.isArray(body.stocks)) {
           stocks = body.stocks;
-        }
-        // result.data.result.body가 객체이고 직접 재고 데이터를 포함하는 경우
-        else if (body.branchProductId) {
-          stocks = [body]; // 단일 객체를 배열로 변환
+        } else if (body.branchProductId) {
+          stocks = [body];
         }
 
         if (stocks.length > 0) {
+          const processedData = stocks.map((item) => ({
+            id: item.branchProductId,
+            productName: item.productName,
+            stockQuantity: item.stockQuantity,
+            safetyStock: item.safetyStock,
+            price: item.price,
+          }));
+
+          setInventoryData(processedData);
+
           const botMessage = {
             id: Date.now(),
             type: "bot",
             content: {
               type: "inventory_table",
-              data: stocks.map((item) => ({
-                id: item.branchProductId,
-                productName: item.productName,
-                stockQuantity: item.stockQuantity,
-                safetyStock: item.safetyStock,
-                price: item.price,
-              })),
+              data: processedData,
             },
             timestamp: new Date(),
           };
@@ -472,15 +605,32 @@ const ChatBot = ({ onClose }) => {
     }
 
     if (tabType === "재고수정") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          type: "bot",
-          content: "수정할 상품명을 입력해주세요.",
-          timestamp: new Date(),
+      if (!inventoryData || inventoryData.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            content: "먼저 전체 재고 조회를 해주세요.",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      setIsInventoryEditMode(true);
+      setOrderQuantities({});
+
+      const botMessage = {
+        id: Date.now(),
+        type: "bot",
+        content: {
+          type: "inventory_edit",
+          data: inventoryData,
         },
-      ]);
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
     }
 
     if (tabType === "회전율") {
@@ -794,7 +944,8 @@ const ChatBot = ({ onClose }) => {
                   (message.content.type === "attendance_table" ||
                     message.content.type === "today_attendance_table" ||
                     message.content.type === "detail_table" ||
-                    message.content.type === "inventory_table") ? (
+                    message.content.type === "inventory_table" ||
+                    message.content.type === "inventory_edit") ? (
                     <div className="attendance-table-container">
                       <div className="attendance-title">
                         {message.content.type === "today_attendance_table"
@@ -1001,6 +1152,76 @@ const ChatBot = ({ onClose }) => {
                               </div>
                             ))}
                           </>
+                        ) : message.content.type === "inventory_edit" ? (
+                          // ✅ 재고 수정 UI
+                          <>
+                            <div className="attendance-title">
+                              📦 재고 발주 관리
+                            </div>
+                            <div className="inventory-edit-container">
+                              <div className="inventory-edit-header">
+                                <div className="inventory-edit-cell header">
+                                  상품명
+                                </div>
+                                <div className="inventory-edit-cell header">
+                                  발주수량
+                                </div>
+                                <div className="inventory-edit-cell header">
+                                  단가
+                                </div>
+                              </div>
+                              {message.content.data.map((item, index) => (
+                                <div key={index} className="inventory-edit-row">
+                                  <div className="inventory-edit-cell product-name">
+                                    {item.productName}
+                                  </div>
+                                  <div className="inventory-edit-cell quantity-control">
+                                    <button
+                                      className="quantity-btn minus"
+                                      onClick={() => decrementQuantity(item.id)}
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      value={orderQuantities[item.id] || 0}
+                                      onChange={(e) =>
+                                        updateOrderQuantity(
+                                          item.id,
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="quantity-input"
+                                      min="0"
+                                    />
+                                    <button
+                                      className="quantity-btn plus"
+                                      onClick={() => incrementQuantity(item.id)}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  <div className="inventory-edit-cell price">
+                                    {item.price.toLocaleString()}원
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="order-summary">
+                                <div className="total-price">
+                                  최종 가격:{" "}
+                                  <span className="price-amount">
+                                    {calculateTotalPrice().toLocaleString()}원
+                                  </span>
+                                </div>
+                                <button
+                                  className="order-request-btn"
+                                  onClick={handleOrderRequest}
+                                >
+                                  발주 요청
+                                </button>
+                              </div>
+                            </div>
+                          </>
                         ) : null}
                       </div>
                     </div>
@@ -1098,6 +1319,32 @@ const ChatBot = ({ onClose }) => {
                 </button>
                 <button className="reset-confirm-btn" onClick={handleResetChat}>
                   확인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 발주 요청 확인 모달 */}
+        {showOrderConfirm && (
+          <div className="reset-modal">
+            <div className="reset-modal-content">
+              <div className="reset-modal-title">발주 요청</div>
+              <div className="reset-modal-message">
+                발주를 요청하시겠습니까?
+              </div>
+              <div className="reset-modal-buttons">
+                <button
+                  className="reset-cancel-btn"
+                  onClick={() => setShowOrderConfirm(false)}
+                >
+                  아니오
+                </button>
+                <button
+                  className="reset-confirm-btn"
+                  onClick={confirmOrderRequest}
+                >
+                  예
                 </button>
               </div>
             </div>
