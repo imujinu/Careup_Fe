@@ -1,16 +1,16 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
-import { useAppDispatch } from '../stores/hooks';
-import { logoutUser } from '../stores/slices/authSlice';
-import { MENU_PATH_MAP } from '../routes/routePaths';
-import { getBranchName } from '../utils/branchUtils';
+import React from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import { useAppDispatch } from "../stores/hooks";
+import { logoutUser } from "../stores/slices/authSlice";
+import { MENU_PATH_MAP } from "../routes/routePaths";
+import { getBranchName } from "../utils/branchUtils";
 
 const SidebarContainer = styled.aside`
   position: fixed;
   top: 0;
 
-  left: ${props => props.$isVisible ? '0' : '-240px'};
+  left: ${(props) => (props.$isVisible ? "0" : "-240px")};
   width: 240px;
   height: 100vh;
   background: #ffffff;
@@ -133,66 +133,139 @@ function Sidebar({ isVisible, userType, branchId }) {
 
   // 본사 메뉴 (branchId === 1)
   const headquartersMenuItems = [
-    { id: 'dashboard', label: '대시보드', icon: '📊', path: MENU_PATH_MAP.dashboard },
-    { id: 'branch', label: '지점관리', icon: '🏢', path: MENU_PATH_MAP.branch },
-    { id: 'client', label: '거래처', icon: '🤝', path: MENU_PATH_MAP.client },
-    { id: 'task', label: '작업관리', icon: '📋', path: MENU_PATH_MAP.task },
-    { id: 'attendance', label: '근태관리', icon: '🕐', path: MENU_PATH_MAP.attendance },
-    { id: 'inventory', label: '재고관리', icon: '📦', path: MENU_PATH_MAP.inventory },
-    { id: 'purchaseOrder', label: '발주관리', icon: '🛒', path: MENU_PATH_MAP.purchaseOrder },
-    { id: 'salesReport', label: '매출 리포트', icon: '📈', path: MENU_PATH_MAP.salesReport },
-    { id: 'settings', label: '설정', icon: '⚙️', path: MENU_PATH_MAP.settings },
-    { id: 'logout', label: '로그아웃', icon: '↪️', isButton: true },
+    {
+      id: "dashboard",
+      label: "대시보드",
+      icon: "📊",
+      path: MENU_PATH_MAP.dashboard,
+    },
+    { id: "branch", label: "지점관리", icon: "🏢", path: MENU_PATH_MAP.branch },
+    { id: "client", label: "거래처", icon: "🤝", path: MENU_PATH_MAP.client },
+    { id: "task", label: "작업관리", icon: "📋", path: MENU_PATH_MAP.task },
+    {
+      id: "attendance",
+      label: "근태관리",
+      icon: "🕐",
+      path: MENU_PATH_MAP.attendance,
+    },
+    {
+      id: "inventory",
+      label: "재고관리",
+      icon: "📦",
+      path: MENU_PATH_MAP.inventory,
+    },
+    {
+      id: "purchaseOrder",
+      label: "발주관리",
+      icon: "🛒",
+      path: MENU_PATH_MAP.purchaseOrder,
+    },
+    {
+      id: "salesReport",
+      label: "매출 리포트",
+      icon: "📈",
+      path: MENU_PATH_MAP.salesReport,
+    },
+    { id: "settings", label: "설정", icon: "⚙️", path: MENU_PATH_MAP.settings },
+    { id: "logout", label: "로그아웃", icon: "↪️", isButton: true },
   ];
 
   // 가맹점 메뉴 (branchId > 1)
   const franchiseMenuItems = [
-    { id: 'dashboard', label: '대시보드', icon: '📊', path: MENU_PATH_MAP.dashboard },
-    { id: 'inventory', label: '재고관리', icon: '📦', path: MENU_PATH_MAP.inventory },
-    { id: 'purchaseOrder', label: '발주관리', icon: '🛒', path: MENU_PATH_MAP.purchaseOrder },
-    { id: 'autoOrder', label: '자동발주', icon: '🤖', path: MENU_PATH_MAP.autoOrder },
-    { id: 'attendance', label: '근태관리', icon: '🕐', path: MENU_PATH_MAP.attendance },
-    { id: 'settings', label: '설정', icon: '⚙️', path: MENU_PATH_MAP.settings },
-    { id: 'logout', label: '로그아웃', icon: '↪️', isButton: true },
+    {
+      id: "dashboard",
+      label: "대시보드",
+      icon: "📊",
+      path: MENU_PATH_MAP.dashboard,
+    },
+    { id: "myBranch", label: "내 지점 관리", icon: "🏪", path: "/my-branch" },
+    {
+      id: "inventory",
+      label: "재고관리",
+      icon: "📦",
+      path: MENU_PATH_MAP.inventory,
+    },
+    {
+      id: "purchaseOrder",
+      label: "발주관리",
+      icon: "🛒",
+      path: MENU_PATH_MAP.purchaseOrder,
+    },
+    {
+      id: "autoOrder",
+      label: "자동발주",
+      icon: "🤖",
+      path: MENU_PATH_MAP.autoOrder,
+    },
+    {
+      id: "attendance",
+      label: "근태관리",
+      icon: "🕐",
+      path: MENU_PATH_MAP.attendance,
+    },
+    { id: "settings", label: "설정", icon: "⚙️", path: MENU_PATH_MAP.settings },
+    { id: "logout", label: "로그아웃", icon: "↪️", isButton: true },
   ];
 
-  const menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
+  const menuItems =
+    userType === "headquarters" ? headquartersMenuItems : franchiseMenuItems;
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate('/');
+    navigate("/");
   };
 
-  return React.createElement(SidebarContainer, { $isVisible: isVisible },
-    React.createElement(SidebarHeader, null,
-      React.createElement(Logo, null, 'H'),
-      React.createElement(AppTitle, null, 
-        '한솔도시락',
-        userType === 'franchise' && React.createElement('div', { 
-          style: { 
-            fontSize: '12px', 
-            color: '#6b7280', 
-            marginTop: '4px',
-            fontWeight: '400'
-          } 
-        }, getBranchName(branchId))
+  return React.createElement(
+    SidebarContainer,
+    { $isVisible: isVisible },
+    React.createElement(
+      SidebarHeader,
+      null,
+      React.createElement(Logo, null, "H"),
+      React.createElement(
+        AppTitle,
+        null,
+        "한솔도시락",
+        userType === "franchise" &&
+          React.createElement(
+            "div",
+            {
+              style: {
+                fontSize: "12px",
+                color: "#6b7280",
+                marginTop: "4px",
+                fontWeight: "400",
+              },
+            },
+            getBranchName(branchId)
+          )
       )
     ),
-    React.createElement(MenuSection, null,
-      React.createElement(MenuList, null,
+    React.createElement(
+      MenuSection,
+      null,
+      React.createElement(
+        MenuList,
+        null,
         menuItems.map((item) =>
-          React.createElement(MenuItem, { key: item.id },
-            item.isButton 
-              ? React.createElement(MenuButton, { 
-                  onClick: handleLogout
-                },
+          React.createElement(
+            MenuItem,
+            { key: item.id },
+            item.isButton
+              ? React.createElement(
+                  MenuButton,
+                  {
+                    onClick: handleLogout,
+                  },
                   React.createElement(MenuIcon, null, item.icon),
                   item.label
                 )
-              : React.createElement(StyledNavLink, { 
-                  to: item.path,
-                  className: ({ isActive }) => isActive ? 'active' : ''
-                },
+              : React.createElement(
+                  StyledNavLink,
+                  {
+                    to: item.path,
+                    className: ({ isActive }) => (isActive ? "active" : ""),
+                  },
                   React.createElement(MenuIcon, null, item.icon),
                   item.label
                 )

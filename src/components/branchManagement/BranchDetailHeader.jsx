@@ -1,56 +1,64 @@
-import React from 'react';
-import styled from 'styled-components';
-import { Icon } from '@mdi/react';
-import { 
-  mdiArrowLeft, 
-  mdiMapMarker, 
-  mdiPhone, 
-  mdiEmail, 
+import React from "react";
+import styled from "styled-components";
+import { Icon } from "@mdi/react";
+import {
+  mdiArrowLeft,
+  mdiMapMarker,
+  mdiPhone,
+  mdiEmail,
   mdiChevronDown,
   mdiPencil,
   mdiDelete,
-  mdiDotsVertical
-} from '@mdi/js';
+  mdiDotsVertical,
+} from "@mdi/js";
 
-function BranchDetailHeader({ branch, onBack, onShowDetail }) {
+function BranchDetailHeader({
+  branch,
+  onBack,
+  onShowDetail,
+  onEdit,
+  showEditButton = false,
+}) {
   if (!branch) return null;
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'OPERATING':
-      case '운영중':
-        return '#a78bfa';
-      case 'CLOSED':
-      case '폐점':
-        return '#ef4444';
-      case 'SUSPENDED':
-      case '휴업':
-        return '#f59e0b';
+      case "OPERATING":
+      case "운영중":
+        return "#a78bfa";
+      case "CLOSED":
+      case "폐점":
+        return "#ef4444";
+      case "SUSPENDED":
+      case "휴업":
+        return "#f59e0b";
       default:
-        return '#6b7280';
+        return "#6b7280";
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'OPERATING':
-        return '운영중';
-      case 'CLOSED':
-        return '폐점';
-      case 'SUSPENDED':
-        return '휴업';
+      case "OPERATING":
+        return "운영중";
+      case "CLOSED":
+        return "폐점";
+      case "SUSPENDED":
+        return "휴업";
       default:
-        return status || '알 수 없음';
+        return status || "알 수 없음";
     }
   };
 
   return (
     <HeaderContainer>
-      <BackButton onClick={onBack}>
-        <Icon path={mdiArrowLeft} size={1} />
-        목록으로
-      </BackButton>
-      
+      {onBack && (
+        <BackButton onClick={onBack}>
+          <Icon path={mdiArrowLeft} size={1} />
+          목록으로
+        </BackButton>
+      )}
+
       <HeaderContent>
         <LeftSection>
           <BranchInfo>
@@ -59,19 +67,19 @@ function BranchDetailHeader({ branch, onBack, onShowDetail }) {
               {getStatusText(branch.status)}
             </StatusBadge>
           </BranchInfo>
-          
+
           <ContactInfo>
             <ContactItem>
               <Icon path={mdiMapMarker} size={1} />
-              <span>{branch.address || '주소 정보 없음'}</span>
+              <span>{branch.address || "주소 정보 없음"}</span>
             </ContactItem>
             <ContactItem>
               <Icon path={mdiPhone} size={1} />
-              <span>{branch.phone || '전화번호 없음'}</span>
+              <span>{branch.phone || "전화번호 없음"}</span>
             </ContactItem>
             <ContactItem>
               <Icon path={mdiEmail} size={1} />
-              <span>{branch.email || '이메일 없음'}</span>
+              <span>{branch.email || "이메일 없음"}</span>
             </ContactItem>
           </ContactInfo>
         </LeftSection>
@@ -80,22 +88,36 @@ function BranchDetailHeader({ branch, onBack, onShowDetail }) {
           <ManagerCard>
             <ManagerTitle>지점장 정보</ManagerTitle>
             <ManagerInfo>
-              <ManagerName>{branch.attorneyName || '지점장 정보 없음'}</ManagerName>
-              <ManagerPhone>{branch.attorneyPhoneNumber || '연락처 없음'}</ManagerPhone>
+              <ManagerName>
+                {branch.attorneyName || "지점장 정보 없음"}
+              </ManagerName>
+              <ManagerPhone>
+                {branch.attorneyPhoneNumber || "연락처 없음"}
+              </ManagerPhone>
             </ManagerInfo>
-            
+
             <ActionButtons>
-              <EditButton>
-                <Icon path={mdiPencil} size={0.8} />
-                수정
-              </EditButton>
-              <DeleteButton>
-                <Icon path={mdiDelete} size={0.8} />
-                삭제
-              </DeleteButton>
-              <MoreButton>
-                <Icon path={mdiDotsVertical} size={1} />
-              </MoreButton>
+              {showEditButton && onEdit && (
+                <EditButton onClick={onEdit}>
+                  <Icon path={mdiPencil} size={0.8} />
+                  수정 요청
+                </EditButton>
+              )}
+              {!showEditButton && (
+                <>
+                  <EditButton>
+                    <Icon path={mdiPencil} size={0.8} />
+                    수정
+                  </EditButton>
+                  <DeleteButton>
+                    <Icon path={mdiDelete} size={0.8} />
+                    삭제
+                  </DeleteButton>
+                  <MoreButton>
+                    <Icon path={mdiDotsVertical} size={1} />
+                  </MoreButton>
+                </>
+              )}
             </ActionButtons>
           </ManagerCard>
         </RightSection>
@@ -133,7 +155,7 @@ const BackButton = styled.button`
   gap: 8px;
   margin-bottom: 20px;
   transition: all 0.2s;
-  
+
   &:hover {
     background: rgba(255, 255, 255, 0.3);
   }
@@ -165,9 +187,9 @@ const BranchName = styled.h1`
 `;
 
 const StatusBadge = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== 'statusColor',
+  shouldForwardProp: (prop) => prop !== "statusColor",
 })`
-  background: ${props => props.statusColor};
+  background: ${(props) => props.statusColor};
   color: white;
   padding: 6px 16px;
   border-radius: 20px;
@@ -243,7 +265,7 @@ const EditButton = styled.button`
   align-items: center;
   gap: 6px;
   transition: all 0.2s;
-  
+
   &:hover {
     background: #059669;
   }
@@ -262,7 +284,7 @@ const DeleteButton = styled.button`
   align-items: center;
   gap: 6px;
   transition: all 0.2s;
-  
+
   &:hover {
     background: #dc2626;
   }
@@ -279,7 +301,7 @@ const MoreButton = styled.button`
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  
+
   &:hover {
     background: rgba(255, 255, 255, 0.3);
   }
@@ -301,10 +323,9 @@ const DetailToggleButton = styled.button`
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.2s;
-  
+
   &:hover {
     transform: translateX(-50%) translateY(-2px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   }
 `;
-
