@@ -91,11 +91,12 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'logout',        label: '로그아웃', icon: mdiLogout,               isButton: true },
   ];
 
-  const menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
+  const menuItems =
+    userType === "headquarters" ? headquartersMenuItems : franchiseMenuItems;
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate('/');
+    navigate("/");
   };
 
   return (

@@ -20,7 +20,6 @@ export default function StaffCreate() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { branchId } = useAppSelector((s) => s.auth);
   const {
     createLoading, updateLoading,
     detail, detailError, createError, updateError,
@@ -52,7 +51,6 @@ export default function StaffCreate() {
     profileImageUrl: '',
     remark: '',
     rawPassword: '',
-    // ❌ 배치 제거: dispatches는 이 화면에서 사용하지 않음
   });
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -61,7 +59,6 @@ export default function StaffCreate() {
 
   const isEdit = useMemo(() => Boolean(id), [id]);
 
-  // 카카오 우편번호 스크립트 로드
   useEffect(() => {
     const script = document.createElement('script');
     script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
@@ -70,19 +67,16 @@ export default function StaffCreate() {
     return () => { document.head.removeChild(script); };
   }, []);
 
-  // 수정 모드: 상세 조회
   useEffect(() => {
     if (isEdit) dispatch(fetchStaffDetailAction(id));
   }, [dispatch, isEdit, id]);
 
-  // 직급 목록 없으면 로드
   useEffect(() => {
-    if (!jobGrades || jobGrades.length === 0) {
+    if (!jobGrades || (Array.isArray(jobGrades) && jobGrades.length === 0)) {
       dispatch(fetchJobGradesAction());
     }
   }, [dispatch, jobGrades]);
 
-  // 상세 로드되면 폼에 채우기
   useEffect(() => {
     if (detail && isEdit) {
       setForm({
@@ -112,7 +106,6 @@ export default function StaffCreate() {
     }
   }, [detail, isEdit]);
 
-  // 에러 토스트
   useEffect(() => {
     if (createError) { addToast({ type: 'error', title: '등록 실패', message: createError, duration: 3000 }); dispatch(clearErrors()); }
   }, [createError, addToast, dispatch]);
@@ -184,144 +177,204 @@ export default function StaffCreate() {
     }
   };
 
+  // 다양한 응답 형태 대비(배열/페이지/래퍼)
+  const jobGradeOptions = useMemo(() => {
+    const jg = jobGrades;
+    if (Array.isArray(jg)) return jg;
+    if (jg?.content && Array.isArray(jg.content)) return jg.content;
+    if (jg?.result && Array.isArray(jg.result)) return jg.result;
+    if (jg?.items && Array.isArray(jg.items)) return jg.items;
+    return [];
+  }, [jobGrades]);
+
   return (
     <Wrap>
       <Card>
         <Head>
           <h2>{isEdit ? '직원수정' : '직원등록'}</h2>
+          <HeadSub>{isEdit ? '직원 정보를 수정합니다' : '새로운 직원을 등록합니다'}</HeadSub>
         </Head>
+
+        <TopSection>
+          <TopTitle>프로필 이미지</TopTitle>
+          <TopUpload>
+            <TopPreview>
+              {preview ? (
+                <img src={preview} alt="profile" />
+              ) : (
+                <TopPlaceholder>
+                  <Icon path={mdiUpload} size={2} />
+                  <span>이미지 업로드</span>
+                </TopPlaceholder>
+              )}
+              <input type="file" accept="image/*" onChange={onImage} />
+            </TopPreview>
+          </TopUpload>
+        </TopSection>
+
         <Form onSubmit={submit}>
-          <Grid>
-            <Label>사번</Label>
-            <Input value={form.employeeNumber} onChange={(e) => pick('employeeNumber', e.target.value)} placeholder="사번" />
-            {errors.employeeNumber && <Err>{errors.employeeNumber}</Err>}
+          <Section>
+            <SectionTitle>기본 정보</SectionTitle>
+            <Grid>
+              <Label $required>사번</Label>
+              <Input value={form.employeeNumber} onChange={(e) => pick('employeeNumber', e.target.value)} placeholder="사번" />
+              {errors.employeeNumber && <Err>{errors.employeeNumber}</Err>}
 
-            <Label>직원명</Label>
-            <Input value={form.name} onChange={(e) => pick('name', e.target.value)} placeholder="직원명을 입력하세요." />
-            {errors.name && <Err>{errors.name}</Err>}
+              <Label $required>직원명</Label>
+              <Input value={form.name} onChange={(e) => pick('name', e.target.value)} placeholder="직원명을 입력하세요." />
+              {errors.name && <Err>{errors.name}</Err>}
 
-            <Label>직급</Label>
-            <Select
-              value={form.jobGradeId || ''}
-              onChange={(e) => pick('jobGradeId', e.target.value ? Number(e.target.value) : null)}
-              disabled={jobGradeLoading}
-            >
-              <option value="">{jobGradeLoading ? '불러오는 중...' : '선택'}</option>
-              {(jobGrades || []).map((jg) => (
-                <option key={jg.id} value={jg.id}>{jg.name}</option>
-              ))}
-            </Select>
-            {errors.jobGradeId && <Err>{errors.jobGradeId}</Err>}
+              <Label $required>직급</Label>
+              <Select
+                value={form.jobGradeId || ''}
+                onChange={(e) => pick('jobGradeId', e.target.value ? Number(e.target.value) : null)}
+                disabled={jobGradeLoading}
+              >
+                <option value="">{jobGradeLoading ? '불러오는 중...' : '선택'}</option>
+                {jobGradeOptions.map((jg) => (
+                  <option key={jg.id} value={jg.id}>{jg.name}</option>
+                ))}
+              </Select>
+              {errors.jobGradeId && <Err>{errors.jobGradeId}</Err>}
 
-            <Label>생년월일</Label>
-            <Input type="date" value={form.dateOfBirth} onChange={(e) => pick('dateOfBirth', e.target.value)} />
-            {errors.dateOfBirth && <Err>{errors.dateOfBirth}</Err>}
+              <Label $required>생년월일</Label>
+              <Input type="date" value={form.dateOfBirth} onChange={(e) => pick('dateOfBirth', e.target.value)} />
+              {errors.dateOfBirth && <Err>{errors.dateOfBirth}</Err>}
 
-            <Label>성별</Label>
-            <Select value={form.gender} onChange={(e) => pick('gender', e.target.value)}>
-              <option value="MALE">남성</option>
-              <option value="FEMALE">여성</option>
-            </Select>
+              <Label>성별</Label>
+              <Select value={form.gender} onChange={(e) => pick('gender', e.target.value)}>
+                <option value="MALE">남성</option>
+                <option value="FEMALE">여성</option>
+              </Select>
+            </Grid>
+          </Section>
 
-            <Label>이메일</Label>
-            <Input type="email" value={form.email} onChange={(e) => pick('email', e.target.value)} placeholder="example@care-up.com" />
-            {errors.email && <Err>{errors.email}</Err>}
+          <Section>
+            <SectionTitle>연락처 정보</SectionTitle>
+            <Grid>
+              <Label $required>이메일</Label>
+              <Input type="email" value={form.email} onChange={(e) => pick('email', e.target.value)} placeholder="example@care-up.com" />
+              {errors.email && <Err>{errors.email}</Err>}
 
-            <Label>우편번호</Label>
-            <Row>
-              <Input readOnly value={form.zipcode} placeholder="Kakao 우편번호 서비스 사용" />
-              <Btn type="button" onClick={onAddress}>주소 검색</Btn>
-            </Row>
-            {errors.zipcode && <Err>{errors.zipcode}</Err>}
+              <Label $required>휴대폰</Label>
+              <Input value={form.mobile} onChange={(e) => pick('mobile', e.target.value)} placeholder="010-0000-0000" />
+              {errors.mobile && <Err>{errors.mobile}</Err>}
 
-            <Label>주소</Label>
-            <Input readOnly value={form.address} placeholder="주소를 입력하세요." />
-            {errors.address && <Err>{errors.address}</Err>}
+              <Label $required>비상연락망</Label>
+              <Input value={form.emergencyTel} onChange={(e) => pick('emergencyTel', e.target.value)} placeholder="대체 연락처" />
+              {errors.emergencyTel && <Err>{errors.emergencyTel}</Err>}
 
-            <Label>상세주소</Label>
-            <Input value={form.addressDetail} onChange={(e) => pick('addressDetail', e.target.value)} placeholder="상세주소를 입력하세요." />
-            {errors.addressDetail && <Err>{errors.addressDetail}</Err>}
+              <Label $required>비상연락처 이름</Label>
+              <Input value={form.emergencyName} onChange={(e) => pick('emergencyName', e.target.value)} placeholder="관계자 성명" />
+              {errors.emergencyName && <Err>{errors.emergencyName}</Err>}
 
-            <Label>휴대폰</Label>
-            <Input value={form.mobile} onChange={(e) => pick('mobile', e.target.value)} placeholder="010-0000-0000" />
-            {errors.mobile && <Err>{errors.mobile}</Err>}
+              <Label $required>관계</Label>
+              <Select value={form.relationship} onChange={(e) => pick('relationship', e.target.value)}>
+                <option value="PARENT">부모</option>
+                <option value="SIBLING">형제자매</option>
+                <option value="SPOUSE">배우자</option>
+                <option value="CHILD">자녀</option>
+                <option value="FRIEND">친구</option>
+                <option value="NEIGHBOR">이웃</option>
+                <option value="OTHER">기타</option>
+              </Select>
+            </Grid>
+          </Section>
 
-            <Label>비상연락망</Label>
-            <Input value={form.emergencyTel} onChange={(e) => pick('emergencyTel', e.target.value)} placeholder="대체 연락처" />
-            {errors.emergencyTel && <Err>{errors.emergencyTel}</Err>}
+          <Section>
+            <SectionTitle>주소 정보</SectionTitle>
+            <Grid>
+              <Label $required>우편번호</Label>
+              <Row>
+                <Input
+                  value={form.zipcode}
+                  onChange={(e) => pick('zipcode', e.target.value)}
+                  placeholder="우편번호를 입력하거나 '주소 검색'을 누르세요"
+                  inputMode="numeric"
+                />
+                <Btn type="button" onClick={onAddress}>주소 검색</Btn>
+              </Row>
+              {errors.zipcode && <Err>{errors.zipcode}</Err>}
 
-            <Label>관계</Label>
-            <Select value={form.relationship} onChange={(e) => pick('relationship', e.target.value)}>
-              <option value="PARENT">부모</option>
-              <option value="SIBLING">형제자매</option>
-              <option value="SPOUSE">배우자</option>
-              <option value="CHILD">자녀</option>
-              <option value="FRIEND">친구</option>
-              <option value="NEIGHBOR">이웃</option>
-              <option value="OTHER">기타</option>
-            </Select>
+              <Label $required>주소</Label>
+              <Input
+                value={form.address}
+                onChange={(e) => pick('address', e.target.value)}
+                placeholder="주소를 직접 입력하거나 검색 결과를 사용하세요."
+              />
+              {errors.address && <Err>{errors.address}</Err>}
 
-            <Label>관계자 성명</Label>
-            <Input value={form.emergencyName} onChange={(e) => pick('emergencyName', e.target.value)} placeholder="관계자 성명" />
-            {errors.emergencyName && <Err>{errors.emergencyName}</Err>}
+              <Label $required>상세주소</Label>
+              <Input
+                value={form.addressDetail}
+                onChange={(e) => pick('addressDetail', e.target.value)}
+                placeholder="상세주소를 입력하세요."
+              />
+              {errors.addressDetail && <Err>{errors.addressDetail}</Err>}
+            </Grid>
+          </Section>
 
-            <Label>입사일</Label>
-            <Input type="date" value={form.hireDate} onChange={(e) => pick('hireDate', e.target.value)} />
-            {errors.hireDate && <Err>{errors.hireDate}</Err>}
+          <Section>
+            <SectionTitle>고용 정보</SectionTitle>
+            <Grid>
+              <Label $required>입사일</Label>
+              <Input type="date" value={form.hireDate} onChange={(e) => pick('hireDate', e.target.value)} />
+              {errors.hireDate && <Err>{errors.hireDate}</Err>}
 
-            <Label>퇴사일</Label>
-            <Input type="date" value={form.terminateDate || ''} onChange={(e) => pick('terminateDate', e.target.value)} />
+              <Label>퇴사일</Label>
+              <Input type="date" value={form.terminateDate || ''} onChange={(e) => pick('terminateDate', e.target.value)} />
 
-            {!isEdit && (
-              <>
-                <Label>비밀번호</Label>
+              <Label $required>권한 유형</Label>
+              <Select value={form.authorityType} onChange={(e) => pick('authorityType', e.target.value)}>
+                <option value="HQ_ADMIN">본점(본사) 관리자</option>
+                <option value="BRANCH_ADMIN">지점(직영점) 관리자</option>
+                <option value="FRANCHISE_OWNER">가맹점주 (관리자)</option>
+                <option value="STAFF">직원</option>
+              </Select>
+
+              <Label $required>고용상태</Label>
+              <Select value={form.employmentStatus} onChange={(e) => pick('employmentStatus', e.target.value)}>
+                <option value="ACTIVE">재직</option>
+                <option value="ON_LEAVE">휴직</option>
+                <option value="TERMINATED">퇴사</option>
+              </Select>
+
+              <Label $required>고용형태</Label>
+              <Select value={form.employmentType} onChange={(e) => pick('employmentType', e.target.value)}>
+                <option value="FULL_TIME">정규직</option>
+                <option value="PART_TIME">계약직</option>
+              </Select>
+            </Grid>
+          </Section>
+
+          {!isEdit && (
+            <Section>
+              <SectionTitle>계정 정보</SectionTitle>
+              <Grid>
+                <Label $required>비밀번호</Label>
                 <Input type="password" value={form.rawPassword} onChange={(e) => pick('rawPassword', e.target.value)} placeholder="8자 이상" />
                 {errors.rawPassword && <Err>{errors.rawPassword}</Err>}
-              </>
-            )}
+              </Grid>
+            </Section>
+          )}
 
-            <Label>권한 유형</Label>
-            <Select value={form.authorityType} onChange={(e) => pick('authorityType', e.target.value)}>
-              <option value="HQ_ADMIN">본점(본사) 관리자</option>
-              <option value="BRANCH_ADMIN">지점(직영점) 관리자</option>
-              <option value="FRANCHISE_OWNER">가맹점주 (관리자)</option>
-              <option value="STAFF">직원</option>
-            </Select>
-
-            <Label>고용상태</Label>
-            <Select value={form.employmentStatus} onChange={(e) => pick('employmentStatus', e.target.value)}>
-              <option value="ACTIVE">재직</option>
-              <option value="ON_LEAVE">휴직</option>
-              <option value="TERMINATED">퇴사</option>
-            </Select>
-
-            <Label>고용형태</Label>
-            <Select value={form.employmentType} onChange={(e) => pick('employmentType', e.target.value)}>
-              <option value="FULL_TIME">정규직</option>
-              <option value="PART_TIME">계약직</option>
-            </Select>
-
-            <Label>프로필 이미지</Label>
-            <Upload>
-              <Preview>
-                {preview ? <img src={preview} alt="profile" /> : <span>미리보기</span>}
-              </Preview>
-              <label>
-                <Icon path={mdiUpload} size={0.9} />
-                파일 선택
-                <input type="file" accept="image/*" onChange={onImage} />
-              </label>
-            </Upload>
-
-            <Label style={{ alignSelf: 'start' }}>비고</Label>
-            <TextArea rows={6} value={form.remark} onChange={(e) => pick('remark', e.target.value)} placeholder="비고란을 작성하실 수 있습니다." />
-          </Grid>
+          <Section>
+            <SectionTitle>비고</SectionTitle>
+            <Grid>
+              <TextAreaWide
+                rows={8}
+                value={form.remark}
+                onChange={(e) => pick('remark', e.target.value)}
+                placeholder="비고란을 작성하실 수 있습니다."
+              />
+            </Grid>
+          </Section>
 
           <Footer>
             <Ghost type="button" onClick={() => navigate('/staff')}>취소</Ghost>
             <Primary type="submit" disabled={createLoading || updateLoading}>
               <Icon path={mdiContentSave} size={1} />
-              {isEdit ? '수정' : '등록'}
+              확인
             </Primary>
           </Footer>
         </Form>
@@ -342,31 +395,253 @@ export default function StaffCreate() {
   );
 }
 
-const Wrap = styled.div`display:flex;justify-content:center;`;
-const Card = styled.section`width:min(920px,96vw);background:#fff;border-radius:12px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1);overflow:hidden;`;
-const Head = styled.header`padding:24px 28px;border-bottom:1px solid #e5e7eb;h2{margin:0;font-size:20px;font-weight:700;color:#111827;}`;
-const Form = styled.form`padding:28px;`;
-const Grid = styled.div`display:grid;grid-template-columns:160px 1fr;grid-auto-rows:minmax(44px,auto);gap:14px 16px;align-items:center;`;
-const Label = styled.label`color:#374151;font-size:14px;font-weight:600;`;
-const Input = styled.input`border:2px solid #e5e7eb;border-radius:8px;padding:12px 14px;font-size:14px;outline:0;`;
-const Select = styled.select`border:2px solid #e5e7eb;border-radius:8px;padding:12px 14px;font-size:14px;background:#fff;`;
-const Row = styled.div`display:flex;gap:8px;align-items:center; input{flex:1;}`;
-const Btn = styled.button`border:2px solid #e5e7eb;border-radius:8px;background:#f3f4f6;padding:10px 14px;cursor:pointer;`;
-const Upload = styled.div`display:flex;align-items:center;gap:12px;
-  label{display:inline-flex;gap:6px;align-items:center;border:1px dashed #cbd5e1;border-radius:8px;padding:10px 12px;cursor:pointer;background:#f8fafc;position:relative;}
-  input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+const Wrap = styled.div`
+  display:flex;
+  justify-content:center;
 `;
-const Preview = styled.div`width:64px;height:64px;border-radius:50%;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#9ca3af;
-  img{width:100%;height:100%;object-fit:cover;}
-`;
-const TextArea = styled.textarea`border:2px solid #e5e7eb;border-radius:8px;padding:12px 14px;font-size:14px;resize:vertical;`;
-const Err = styled.div`grid-column:2/3;color:#dc2626;font-size:12px;margin-top:-6px;`;
-const Footer = styled.div`display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:20px;border-top:1px solid #e5e7eb;`;
-const Ghost = styled.button`background:#fff;border:2px solid #e5e7eb;border-radius:8px;padding:12px 18px;cursor:pointer;`; // ✅ pointer
-const Primary = styled.button`display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:700;cursor:pointer;`; // ✅ pointer
 
-const ModalOverlay = styled.div`position:fixed;inset:0;background:rgba(17,24,39,.45);display:grid;place-items:center;z-index:1000;`;
-const ModalCard = styled.div`width:min(420px,92vw);background:#fff;border-radius:14px;box-shadow:0 20px 40px rgba(0,0,0,.18);padding:22px;`;
-const ModalTitle = styled.h3`margin:0 0 6px;font-size:18px;color:#111827;font-weight:700;`;
-const ModalSub = styled.p`margin:0 0 16px;color:#6b7280;font-size:14px;`;
-const ModalActions = styled.div`display:flex;justify-content:flex-end;gap:10px;`;
+const Card = styled.section`
+  width:min(960px,96vw);
+  background:#fff;
+  border-radius:12px;
+  box-shadow:0 4px 6px -1px rgba(0,0,0,.1);
+  overflow:hidden;
+`;
+
+const Head = styled.header`
+  padding:28px 32px;
+  border-bottom:2px solid #e5e7eb;
+  h2{margin:0;font-size:22px;font-weight:700;color:#111827;}
+`;
+
+const HeadSub = styled.p`
+  margin:8px 0 0;
+  font-size:14px;
+  color:#6b7280;
+`;
+
+const TopSection = styled.section`
+  padding:24px 32px 0; /* 제목 위 여백 */
+  border-bottom:1px solid #eef2f7;
+`;
+
+const TopTitle = styled.h3`
+  margin:0;
+  font-size:16px;
+  font-weight:700;
+  color:#374151;
+  padding-bottom:10px;
+  border-bottom:2px solid #e5e7eb;
+`;
+
+const TopUpload = styled.div`
+  padding:32px 0; /* 제목 하단선 ~ 플레이스홀더 상단 */
+  display:flex;
+  justify-content:center;
+  align-items:center;
+`;
+
+const TopPreview = styled.label`
+  position:relative;
+  width:168px;
+  height:168px;
+  border:2px dashed #d1d5db;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  cursor:pointer;
+  transition:.15s ease;
+  background:#fff;
+  &:hover{border-color:#8b5cf6;background:#f9fafb;}
+  img{width:100%;height:100%;object-fit:cover;}
+  input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+`;
+
+const TopPlaceholder = styled.div`
+  display:grid;
+  place-items:center;
+  gap:8px;
+  color:#6b7280;
+  font-size:12px;
+  transform: translateY(8px);
+`;
+
+const Form = styled.form`
+  padding:0 32px 32px;
+`;
+
+const Section = styled.section`
+  margin-top:32px;
+`;
+
+const SectionTitle = styled.h3`
+  margin:0 0 16px;
+  font-size:16px;
+  font-weight:700;
+  color:#374151;
+  padding-bottom:10px;
+  border-bottom:2px solid #e5e7eb;
+`;
+
+const Grid = styled.div`
+  display:grid;
+  grid-template-columns:180px 1fr;
+  grid-auto-rows:minmax(44px,auto);
+  gap:14px 16px;
+  align-items:center;
+`;
+
+const Label = styled.label.withConfig({ shouldForwardProp:(p)=>p!=='$required' })`
+  color:#374151;
+  font-size:14px;
+  font-weight:600;
+  &::after{
+    content:${(p)=>p.$required ? '" *"' : '""'};
+    color:#dc2626;
+  }
+`;
+
+const focusRing = `
+  border-color:#6d28d9;
+  box-shadow:0 0 0 3px rgba(109,40,217,0.15);
+`;
+
+const Input = styled.input`
+  border:2px solid #e5e7eb;
+  border-radius:8px;
+  padding:12px 14px;
+  font-size:14px;
+  outline:0;
+  transition: box-shadow .15s ease, border-color .15s ease;
+  &:focus{ ${focusRing} }
+  &[type="date"]{
+    position:relative;
+    height:48px;
+  }
+  &[type="date"]::-webkit-calendar-picker-indicator{
+    position:absolute;
+    right:12px;
+    top:50%;
+    transform:translateY(-50%);
+    cursor:pointer;
+  }
+`;
+
+const Select = styled.select`
+  border:2px solid #e5e7eb;
+  border-radius:8px;
+  padding:12px 14px;
+  font-size:14px;
+  background:#fff;
+  outline:0;
+  transition: box-shadow .15s ease, border-color .15s ease;
+  &:focus{ ${focusRing} }
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 40px; /* 오른쪽 여백 */
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center; /* 달력과 수직 중앙 정렬 */
+  background-size: 14px 14px;
+`;
+
+const TextArea = styled.textarea`
+  border:2px solid #e5e7eb;
+  border-radius:8px;
+  padding:12px 14px;
+  font-size:14px;
+  resize:vertical;
+  outline:0;
+  transition: box-shadow .15s ease, border-color .15s ease;
+  &:focus{ ${focusRing} }
+`;
+
+const TextAreaWide = styled(TextArea)`
+  grid-column: 1 / -1;
+`;
+
+const Row = styled.div`
+  display:flex;
+  gap:8px;
+  align-items:center;
+  input{flex:1;}
+`;
+
+const Btn = styled.button`
+  height:44px;
+  border:2px solid #e5e7eb;
+  border-radius:8px;
+  background:#f3f4f6;
+  padding:0 14px;
+  cursor:pointer;
+  font-weight:600;
+  transition: box-shadow .15s ease, border-color .15s ease, background .15s ease;
+  &:hover{background:#e5e7eb;}
+  &:focus{ outline:0; ${focusRing} }
+`;
+
+const Err = styled.div`
+  grid-column:2/3;
+  color:#dc2626;
+  font-size:12px;
+  margin-top:-6px;
+`;
+
+const Footer = styled.div`
+  display:flex;
+  justify-content:flex-end;
+  gap:12px;
+  margin-top:28px;
+  padding-top:20px;
+  border-top:1px solid #e5e7eb;
+`;
+
+const BaseBtn = styled.button`
+  height:44px;
+  border-radius:10px;
+  padding:0 16px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-weight:700;
+  cursor:pointer;
+`;
+
+const Ghost = styled(BaseBtn)`
+  background:#fff;
+  color:#374151;
+  border:2px solid #e5e7eb;
+  &:hover{background:#f9fafb;}
+`;
+
+const Primary = styled(BaseBtn)`
+  background:#8b5cf6;
+  color:#fff;
+  border:0;
+  &:hover{filter:brightness(0.98);}
+  &:disabled{opacity:.6;cursor:not-allowed;}
+`;
+
+const ModalOverlay = styled.div`
+  position:fixed; inset:0; background:rgba(17,24,39,.45);
+  display:grid; place-items:center; z-index:1000;
+`;
+
+const ModalCard = styled.div`
+  width:min(420px,92vw); background:#fff; border-radius:14px;
+  box-shadow:0 20px 40px rgba(0,0,0,.18); padding:22px;
+`;
+
+const ModalTitle = styled.h3`
+  margin:0 0 6px; font-size:18px; color:#111827; font-weight:700;
+`;
+
+const ModalSub = styled.p`
+  margin:0 0 16px; color:#6b7280; font-size:14px;
+`;
+
+const ModalActions = styled.div`
+  display:flex; justify-content:flex-end; gap:10px;
+`;

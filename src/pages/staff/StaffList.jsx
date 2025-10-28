@@ -20,9 +20,9 @@ import {
   mdiChevronRight,
   mdiChevronUp,
   mdiChevronDown,
-  mdiMicrosoftExcel,
   mdiFocusField,
 } from '@mdi/js';
+import excelIcon from '../../assets/icons/excel_icon.svg';
 
 const omitEmpty = (obj = {}) =>
   Object.fromEntries(Object.entries(obj).filter(([, v]) => !(v === '' || v === undefined || v === null)));
@@ -168,7 +168,6 @@ export default function StaffList() {
     []
   );
 
-  // ✅ 체크된 항목만 유효한 검색 타깃으로 사용 (아무것도 없으면 빈 배열 유지)
   const effectiveTargets = useMemo(() => {
     return Object.entries(searchIn)
       .filter(([, v]) => !!v)
@@ -194,7 +193,6 @@ export default function StaffList() {
   }, [openColumnPanel, openSearchPanel]);
 
   const fetchData = useCallback(() => {
-    // ✅ 검색어가 있어도 타깃이 없으면 서버에 search/targets를 보내지 않음(=검색하지 않음)
     const includeSearch = !!search && hasTargets;
     const params = omitEmpty({
       page: includeSearch ? 0 : page,
@@ -266,7 +264,6 @@ export default function StaffList() {
     return (av ?? 0) - (bv ?? 0);
   };
 
-  // ✅ 타깃이 없으면 클라이언트 필터링도 수행하지 않음
   const filtered = useMemo(() => {
     if (!search || !hasTargets) return list;
     const q = search.toLowerCase();
@@ -645,7 +642,7 @@ export default function StaffList() {
           </GhostButton>
 
           <GhostButton type="button" onClick={exportToXlsx} title="엑셀(xlsx)로 내보내기">
-            <Mdi path={mdiMicrosoftExcel} />
+            <SvgIcon src={excelIcon} alt="" aria-hidden />
             엑셀 내보내기
           </GhostButton>
 
@@ -839,7 +836,6 @@ export default function StaffList() {
             </tr>
           </thead>
 
-            {/* ✅ 0건일 때도 테이블 높이 점프가 없도록 빈 행의 높이를 일반 행과 동일하게 */}
           <tbody>
             {!loading && currentRows.length === 0 && (
               <tr>
@@ -1066,6 +1062,12 @@ const IconBtn = styled.button`
   }
 `;
 
+const SvgIcon = styled.img`
+  width: 21px;
+  height: 21px;
+  display: inline-block;
+`;
+
 const PopPanel = styled.div`
   position: absolute;
   top: 48px;
@@ -1190,7 +1192,6 @@ const TableWrap = styled.div`
     background: #fafafa;
   }
 
-  /* ✅ 빈 상태 행도 일반 행과 동일한 높이로 유지 (세로 점프 방지) */
   .empty {
     color: #6b7280;
     text-align: center;

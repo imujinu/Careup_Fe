@@ -5,10 +5,10 @@
 
 // 공통 경로
 export const PATHS = {
-  ROOT: '/',
-  LOGIN: '/login',
-  DASHBOARD: '/dashboard',
-  SHOP: '/shop',
+  ROOT: "/",
+  LOGIN: "/login",
+  DASHBOARD: "/dashboard",
+  SHOP: "/shop",
 };
 
 // 본사 전용 경로
@@ -30,12 +30,13 @@ export const HEADQUARTERS_PATHS = {
 
 // 가맹점 전용 경로
 export const FRANCHISE_PATHS = {
-  DASHBOARD: '/dashboard',
-  INVENTORY: '/inventory',
-  PURCHASE_ORDER: '/purchase-order',
-  AUTO_ORDER: '/auto-order',
-  ATTENDANCE: '/attendance',
-  SETTINGS: '/settings',
+  DASHBOARD: "/dashboard",
+  INVENTORY: "/inventory",
+  PURCHASE_ORDER: "/purchase-order",
+  AUTO_ORDER: "/auto-order",
+  ATTENDANCE: "/attendance",
+  SALES_REPORT: "/sales-report",
+  SETTINGS: "/settings",
 };
 
 // 메뉴 ID와 경로 매핑
