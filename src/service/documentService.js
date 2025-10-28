@@ -1,6 +1,6 @@
 import axios from '../utils/axiosConfig';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_BRANCH_URL;
 
 // 문서 타입 매핑
 export const DOCUMENT_TYPES = {
