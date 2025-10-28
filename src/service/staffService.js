@@ -60,6 +60,49 @@ export const fetchJobGrades = async () => {
   return res?.data?.result ?? res?.data ?? [];
 };
 
+/**
+ * 지점 옵션 조회
+ * - 백엔드 실제 제공 경로: /branch/public/list (공개), /branch (페이징, HQ 권한)
+ * - 게이트웨이 프리픽스 경로도 함께 시도: /branch-service/branch/**
+ * - 응답 래핑(CommonSuccessDto)와 페이징 구조(content|data) 모두 대응
+ */
+export const fetchBranchOptions = async () => {
+  const candidates = [
+    { url: `${BASE_URL}/branch/public/list`, mode: 'list' },
+    { url: `${BASE_URL}/branch`, mode: 'paged', params: { page: 0, size: 1000, sort: 'name,asc' } },
+    { url: `${BASE_URL}/branch-service/branch/public/list`, mode: 'list' },
+    { url: `${BASE_URL}/branch-service/branch`, mode: 'paged', params: { page: 0, size: 1000, sort: 'name,asc' } },
+  ];
+
+  for (const ep of candidates) {
+    try {
+      const res = await axios.get(ep.url, ep.params ? { params: ep.params } : undefined);
+      const data = res?.data?.result ?? res?.data;
+
+      let raw = [];
+      if (ep.mode === 'paged') {
+        raw = data?.content ?? data?.data ?? [];
+      } else if (Array.isArray(data)) {
+        raw = data;
+      } else {
+        raw = data?.items ?? data?.content ?? data?.data ?? [];
+      }
+
+      const mapped = (raw || [])
+        .map((b) => ({
+          id: b.id ?? b.branchId,
+          name: b.name ?? b.branchName,
+        }))
+        .filter((x) => x.id && x.name);
+
+      if (mapped.length) return mapped;
+    } catch (e) {
+      // 다음 후보 경로로 계속 시도
+    }
+  }
+  return [];
+};
+
 export default {
   fetchStaffList,
   fetchStaffListByBranch,
@@ -69,4 +112,5 @@ export default {
   deactivateStaff,
   rehireStaff,
   fetchJobGrades,
+  fetchBranchOptions,
 };

@@ -1,8 +1,8 @@
 // src/pages/staff/StaffCreate.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
-import { mdiContentSave, mdiUpload } from '@mdi/js';
+import { mdiContentSave, mdiUpload, mdiClose, mdiPlus, mdiDelete, mdiEye, mdiEyeOff } from '@mdi/js';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import {
   createStaffAction,
@@ -13,6 +13,7 @@ import {
 } from '../../stores/slices/staffSlice';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/common/Toast';
+import { fetchBranchOptions } from '../../service/staffService';
 
 const g = (k, s) => new URLSearchParams(s).get(k);
 
@@ -32,7 +33,7 @@ export default function StaffCreate() {
   const [form, setForm] = useState({
     employeeNumber: '',
     name: '',
-    jobGradeId: null,
+    jobGradeId: '',            // 문자열로 고정(Select value와 일치)
     dateOfBirth: '',
     gender: 'MALE',
     email: '',
@@ -52,13 +53,19 @@ export default function StaffCreate() {
     remark: '',
     rawPassword: '',
   });
+  const [dispatches, setDispatches] = useState([]);
+  const [branchOptions, setBranchOptions] = useState([]);
+
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [doneOpen, setDoneOpen] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
+  const fileRef = useRef(null);
   const isEdit = useMemo(() => Boolean(id), [id]);
 
+  // Daum 주소 스크립트
   useEffect(() => {
     const script = document.createElement('script');
     script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
@@ -67,6 +74,7 @@ export default function StaffCreate() {
     return () => { document.head.removeChild(script); };
   }, []);
 
+  // 상세/직급 로드
   useEffect(() => {
     if (isEdit) dispatch(fetchStaffDetailAction(id));
   }, [dispatch, isEdit, id]);
@@ -77,12 +85,24 @@ export default function StaffCreate() {
     }
   }, [dispatch, jobGrades]);
 
+  // 지점 옵션
+  useEffect(() => {
+    (async () => {
+      try {
+        const arr = await fetchBranchOptions();
+        setBranchOptions(arr);
+      } catch {}
+    })();
+  }, []);
+
+  // 상세 → 폼 값 주입(1차: 가능한 필드 그대로)
   useEffect(() => {
     if (detail && isEdit) {
+      const toStr = (v) => (v === undefined || v === null || v === '' ? '' : String(v));
       setForm({
         employeeNumber: detail.employeeNumber || '',
         name: detail.name || '',
-        jobGradeId: detail.jobGradeId ?? detail.jobGrade?.id ?? null,
+        jobGradeId: toStr(detail.jobGradeId ?? detail.jobGrade?.id),  // 우선 시도
         dateOfBirth: detail.dateOfBirth || '',
         gender: detail.gender || 'MALE',
         email: detail.email || '',
@@ -102,10 +122,50 @@ export default function StaffCreate() {
         remark: detail.remark || '',
         rawPassword: '',
       });
+      const ds = Array.isArray(detail.dispatches) ? detail.dispatches : [];
+      setDispatches(ds.map(d => ({
+        branchId: d.branchId ?? d.branch?.id ?? null,
+        assignedFrom: d.assignedFrom ?? '',
+        assignedTo: d.assignedTo ?? '',
+        placementYn: d.placementYn ?? 'N',
+      })));
       setPreview(detail.profileImageUrl || null);
     }
   }, [detail, isEdit]);
 
+  // 직급 옵션 계산
+  const jobGradeOptions = useMemo(() => {
+    const jg = jobGrades;
+    if (Array.isArray(jg)) return jg;
+    if (jg?.content && Array.isArray(jg.content)) return jg.content;
+    if (jg?.result && Array.isArray(jg.result)) return jg.result;
+    if (jg?.items && Array.isArray(jg.items)) return jg.items;
+    return [];
+  }, [jobGrades]);
+
+  // ⚠️ 보정 로직: 폼에 직급 ID가 비어있고, 상세/옵션이 준비되면
+  // 1) 상세의 jobGradeId 또는 jobGrade.id 재시도
+  // 2) 그래도 없으면 상세의 직급명과 옵션 name을 매칭해 ID 주입
+  useEffect(() => {
+    if (!isEdit || !detail) return;
+    if (form.jobGradeId) return; // 이미 값 있으면 건드리지 않음
+
+    const tryId = detail.jobGradeId ?? detail.jobGrade?.id;
+    if (tryId) {
+      setForm(f => ({ ...f, jobGradeId: String(tryId) }));
+      return;
+    }
+
+    const nameCandidate =
+      detail.jobGradeName ?? detail.jobGrade?.name ?? detail.jobGradeTitle ?? detail.jobGradeLabel;
+
+    if (nameCandidate && jobGradeOptions.length) {
+      const found = jobGradeOptions.find(j => j?.name === nameCandidate);
+      if (found?.id) setForm(f => ({ ...f, jobGradeId: String(found.id) }));
+    }
+  }, [isEdit, detail, jobGradeOptions, form.jobGradeId]);
+
+  // 에러 토스트
   useEffect(() => {
     if (createError) { addToast({ type: 'error', title: '등록 실패', message: createError, duration: 3000 }); dispatch(clearErrors()); }
   }, [createError, addToast, dispatch]);
@@ -116,6 +176,7 @@ export default function StaffCreate() {
     if (detailError) { addToast({ type: 'error', title: '상세 조회 실패', message: detailError, duration: 3000 }); dispatch(clearErrors()); }
   }, [detailError, addToast, dispatch]);
 
+  // ===== 핸들러 =====
   const pick = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
     if (errors[k]) setErrors((e) => ({ ...e, [k]: null }));
@@ -142,6 +203,12 @@ export default function StaffCreate() {
     reader.readAsDataURL(file);
   };
 
+  const clearImage = () => {
+    setImageFile(null);
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
   const validate = () => {
     const m = {};
     if (!form.employeeNumber.trim()) m.employeeNumber = '사번을 입력하세요';
@@ -165,7 +232,17 @@ export default function StaffCreate() {
     e.preventDefault();
     if (!validate()) return;
 
-    const payload = { ...form };
+    const payload = {
+      ...form,
+      jobGradeId: form.jobGradeId ? Number(form.jobGradeId) : null,
+      dispatches: dispatches.map(d => ({
+        branchId: d.branchId ? Number(d.branchId) : null,
+        assignedFrom: d.assignedFrom || null,
+        assignedTo: d.assignedTo || null,
+        placementYn: d.placementYn || 'N',
+      })),
+    };
+
     if (isEdit && !payload.rawPassword) delete payload.rawPassword;
 
     if (isEdit) {
@@ -177,15 +254,16 @@ export default function StaffCreate() {
     }
   };
 
-  // 다양한 응답 형태 대비(배열/페이지/래퍼)
-  const jobGradeOptions = useMemo(() => {
-    const jg = jobGrades;
-    if (Array.isArray(jg)) return jg;
-    if (jg?.content && Array.isArray(jg.content)) return jg.content;
-    if (jg?.result && Array.isArray(jg.result)) return jg.result;
-    if (jg?.items && Array.isArray(jg.items)) return jg.items;
-    return [];
-  }, [jobGrades]);
+  // ===== UI =====
+  const addDispatch = () => {
+    setDispatches(arr => [...arr, { branchId: '', assignedFrom: '', assignedTo: '', placementYn: 'N' }]);
+  };
+  const removeDispatch = (idx) => {
+    setDispatches(arr => arr.filter((_, i) => i !== idx));
+  };
+  const changeDispatch = (idx, key, val) => {
+    setDispatches(arr => arr.map((it, i) => i === idx ? { ...it, [key]: val } : it));
+  };
 
   return (
     <Wrap>
@@ -198,17 +276,30 @@ export default function StaffCreate() {
         <TopSection>
           <TopTitle>프로필 이미지</TopTitle>
           <TopUpload>
-            <TopPreview>
-              {preview ? (
-                <img src={preview} alt="profile" />
-              ) : (
-                <TopPlaceholder>
-                  <Icon path={mdiUpload} size={2} />
-                  <span>이미지 업로드</span>
-                </TopPlaceholder>
+            <PreviewWrap>
+              <TopPreview>
+                {preview ? (
+                  <img src={preview} alt="profile" />
+                ) : (
+                  <TopPlaceholder>
+                    <Icon path={mdiUpload} size={2} />
+                    <span>이미지 업로드</span>
+                  </TopPlaceholder>
+                )}
+                <input ref={fileRef} type="file" accept="image/*" onChange={onImage} />
+              </TopPreview>
+
+              {preview && (
+                <ClearBadge
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearImage(); }}
+                  aria-label="이미지 제거"
+                  title="이미지 제거"
+                >
+                  <Icon path={mdiClose} size={0.82} />
+                </ClearBadge>
               )}
-              <input type="file" accept="image/*" onChange={onImage} />
-            </TopPreview>
+            </PreviewWrap>
           </TopUpload>
         </TopSection>
 
@@ -226,13 +317,13 @@ export default function StaffCreate() {
 
               <Label $required>직급</Label>
               <Select
-                value={form.jobGradeId || ''}
-                onChange={(e) => pick('jobGradeId', e.target.value ? Number(e.target.value) : null)}
+                value={form.jobGradeId ?? ''}                  // 방어적 접근
+                onChange={(e) => pick('jobGradeId', e.target.value)}
                 disabled={jobGradeLoading}
               >
                 <option value="">{jobGradeLoading ? '불러오는 중...' : '선택'}</option>
                 {jobGradeOptions.map((jg) => (
-                  <option key={jg.id} value={jg.id}>{jg.name}</option>
+                  <option key={jg.id} value={String(jg.id)}>{jg.name}</option>
                 ))}
               </Select>
               {errors.jobGradeId && <Err>{errors.jobGradeId}</Err>}
@@ -347,12 +438,66 @@ export default function StaffCreate() {
             </Grid>
           </Section>
 
+          <Section>
+            <SectionTitle>지점 배치</SectionTitle>
+            <DispatchList>
+              {dispatches.map((d, idx) => (
+                <DispatchRow key={idx}>
+                  <Field>
+                    <SmallLabel>지점</SmallLabel>
+                    <Select
+                      value={d.branchId != null ? String(d.branchId) : ''}
+                      onChange={(e) => changeDispatch(idx, 'branchId', e.target.value ? Number(e.target.value) : '')}
+                    >
+                      <option value="">선택</option>
+                      {branchOptions.map((b) => (
+                        <option key={b.id} value={String(b.id)}>{b.name}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field>
+                    <SmallLabel>시작일</SmallLabel>
+                    <Input type="date" value={d.assignedFrom} onChange={(e) => changeDispatch(idx, 'assignedFrom', e.target.value)} />
+                  </Field>
+                  <Field>
+                    <SmallLabel>종료일</SmallLabel>
+                    <Input type="date" value={d.assignedTo} onChange={(e) => changeDispatch(idx, 'assignedTo', e.target.value)} />
+                  </Field>
+                  <IconBtn
+                    type="button"
+                    aria-label="배치 삭제"
+                    onClick={() => removeDispatch(idx)}
+                    title="배치 삭제"
+                  >
+                    <Icon path={mdiDelete} size={0.9} />
+                  </IconBtn>
+                </DispatchRow>
+              ))}
+            </DispatchList>
+            <AddLine>
+              <Ghost type="button" onClick={addDispatch}>
+                <Icon path={mdiPlus} size={1} />
+                배치 추가
+              </Ghost>
+            </AddLine>
+          </Section>
+
           {!isEdit && (
             <Section>
               <SectionTitle>계정 정보</SectionTitle>
               <Grid>
                 <Label $required>비밀번호</Label>
-                <Input type="password" value={form.rawPassword} onChange={(e) => pick('rawPassword', e.target.value)} placeholder="8자 이상" />
+                <InputAffix>
+                  <Input
+                    type={showPw ? 'text' : 'password'}
+                    value={form.rawPassword}
+                    onChange={(e) => pick('rawPassword', e.target.value)}
+                    placeholder="8자 이상"
+                  />
+                  <AffixBtn type="button" onClick={() => setShowPw(v => !v)} aria-label="비밀번호 표시 전환">
+                    <Icon path={showPw ? mdiEyeOff : mdiEye} size={0.9} />
+                  </AffixBtn>
+                </InputAffix>
                 {errors.rawPassword && <Err>{errors.rawPassword}</Err>}
               </Grid>
             </Section>
@@ -421,7 +566,7 @@ const HeadSub = styled.p`
 `;
 
 const TopSection = styled.section`
-  padding:24px 32px 0; /* 제목 위 여백 */
+  padding:24px 32px 0;
   border-bottom:1px solid #eef2f7;
 `;
 
@@ -435,10 +580,16 @@ const TopTitle = styled.h3`
 `;
 
 const TopUpload = styled.div`
-  padding:32px 0; /* 제목 하단선 ~ 플레이스홀더 상단 */
+  padding:32px 0;
   display:flex;
   justify-content:center;
   align-items:center;
+`;
+
+const PreviewWrap = styled.div`
+  position:relative;
+  width:168px;
+  height:168px;
 `;
 
 const TopPreview = styled.label`
@@ -455,7 +606,13 @@ const TopPreview = styled.label`
   background:#fff;
   &:hover{border-color:#8b5cf6;background:#f9fafb;}
   img{width:100%;height:100%;object-fit:cover;}
-  input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  input{
+    position:absolute;
+    inset:0;
+    opacity:0;
+    cursor:pointer;
+    z-index:1;
+  }
 `;
 
 const TopPlaceholder = styled.div`
@@ -465,6 +622,24 @@ const TopPlaceholder = styled.div`
   color:#6b7280;
   font-size:12px;
   transform: translateY(8px);
+`;
+
+const ClearBadge = styled.button`
+  position:absolute;
+  top:-10px;
+  right:-10px;
+  width:30px;
+  height:30px;
+  border-radius:999px;
+  border:2px solid #e5e7eb;
+  background:#fff;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  z-index:3;
+  transition: box-shadow .15s ease, border-color .15s ease, background .15s ease;
+  &:hover{background:#f9fafb;border-color:#d1d5db;}
+  &:focus{outline:0; box-shadow:0 0 0 3px rgba(109,40,217,0.15);}
 `;
 
 const Form = styled.form`
@@ -531,7 +706,9 @@ const Input = styled.input`
 const Select = styled.select`
   border:2px solid #e5e7eb;
   border-radius:8px;
+  height:48px;
   padding:12px 14px;
+  padding-right:40px;
   font-size:14px;
   background:#fff;
   outline:0;
@@ -540,10 +717,9 @@ const Select = styled.select`
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  padding-right: 40px; /* 오른쪽 여백 */
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>');
   background-repeat: no-repeat;
-  background-position: right 12px center; /* 달력과 수직 중앙 정렬 */
+  background-position: right 12px center;
   background-size: 14px 14px;
 `;
 
@@ -644,4 +820,68 @@ const ModalSub = styled.p`
 
 const ModalActions = styled.div`
   display:flex; justify-content:flex-end; gap:10px;
+`;
+
+const DispatchList = styled.div`
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+`;
+
+const DispatchRow = styled.div`
+  display:grid;
+  grid-template-columns: 1.2fr 1fr 1fr 48px;
+  gap:12px;
+  align-items:end;
+  padding:14px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fff;
+`;
+
+const Field = styled.div`
+  display:flex;
+  flex-direction:column;
+`;
+
+const SmallLabel = styled.div`
+  font-size:12px;
+  color:#6b7280;
+  margin:0 0 6px;
+`;
+
+const IconBtn = styled.button`
+  height:48px;
+  border:0;
+  background:transparent;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+`;
+
+const AddLine = styled.div`
+  display:flex; justify-content:flex-end; margin-top:10px;
+`;
+
+const InputAffix = styled.div`
+  position:relative;
+  display:flex;
+  align-items:center;
+  input{width:100%; padding-right:44px;}
+`;
+
+const AffixBtn = styled.button`
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  &:hover{background:#f9fafb;}
 `;
