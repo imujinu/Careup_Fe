@@ -203,6 +203,12 @@ function Sidebar({ isVisible, userType, branchId }) {
       icon: "🕐",
       path: MENU_PATH_MAP.attendance,
     },
+    {
+      id: "salesReport",
+      label: "매출 리포트",
+      icon: "📈",
+      path: MENU_PATH_MAP.salesReport,
+    },
     { id: "settings", label: "설정", icon: "⚙️", path: MENU_PATH_MAP.settings },
     { id: "logout", label: "로그아웃", icon: "↪️", isButton: true },
   ];

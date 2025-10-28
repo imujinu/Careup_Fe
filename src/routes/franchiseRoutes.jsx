@@ -4,6 +4,7 @@ import FranchiseInventoryManagement from "../pages/inventory/FranchiseInventoryM
 import FranchisePurchaseOrderManagement from "../pages/purchaseOrder/FranchisePurchaseOrderManagement";
 import AutoOrderSettings from "../pages/franchise/AutoOrderSettings";
 import MyBranchDetail from "../pages/branch/MyBranchDetail";
+import BranchSalesReport from "../pages/salesReport/BranchSalesReport";
 
 /**
  * 가맹점(Franchise) 전용 라우트 설정
@@ -45,6 +46,10 @@ export const franchiseRoutes = [
   {
     path: "my-branch",
     element: <MyBranchDetail />,
+  },
+  {
+    path: "sales-report",
+    element: <BranchSalesReport />,
   },
   {
     path: "settings",
