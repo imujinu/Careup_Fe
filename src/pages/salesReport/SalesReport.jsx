@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import styled from 'styled-components';
-import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
-import { Icon } from '@mdi/react';
-import { mdiCash, mdiPackageVariant, mdiHandCoin, mdiStore } from '@mdi/js';
-import excelIcon from '../../assets/icons/microsoft_excel-logo.wine.svg';
+import React, { useState, useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import styled from "styled-components";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+import { Icon } from "@mdi/react";
+import { mdiCash, mdiPackageVariant, mdiHandCoin, mdiStore } from "@mdi/js";
+import excelIcon from "../../assets/icons/microsoft_excel-logo.wine.svg";
 import {
   LineChart,
   Line,
@@ -17,18 +17,19 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts';
+} from "recharts";
 import {
   fetchAllBranchesSales,
   fetchBranchSalesDetail,
   fetchBranchComparison,
-} from '../../stores/slices/salesReportSlice';
-import { branchService } from '../../service/branchService';
-import { salesReportService } from '../../service/salesReportService';
-import { useToast } from '../../components/common/Toast';
-import BranchDetail from './BranchDetail';
-import BranchComparison from './BranchComparison';
-import SalesForecast from './SalesForecast';
+} from "../../stores/slices/salesReportSlice";
+import { branchService } from "../../service/branchService";
+import { salesReportService } from "../../service/salesReportService";
+import { useToast } from "../../components/common/Toast";
+import BranchDetail from "./BranchDetail";
+import BranchComparison from "./BranchComparison";
+import SalesForecast from "./SalesForecast";
+import Royalty from "./Royalty";
 
 const Container = styled.div`
   padding: 32px;
@@ -135,15 +136,15 @@ const PeriodTab = styled.button`
   padding: 8px 16px;
   border-radius: 6px;
   border: none;
-  background: ${props => props.$active ? '#6b46c1' : 'transparent'};
-  color: ${props => props.$active ? 'white' : '#6b7280'};
+  background: ${(props) => (props.$active ? "#6b46c1" : "transparent")};
+  color: ${(props) => (props.$active ? "white" : "#6b7280")};
   font-size: 14px;
-  font-weight: ${props => props.$active ? 600 : 400};
+  font-weight: ${(props) => (props.$active ? 600 : 400)};
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.$active ? '#6b46c1' : '#f3f4f6'};
+    background: ${(props) => (props.$active ? "#6b46c1" : "#f3f4f6")};
   }
 `;
 
@@ -170,7 +171,9 @@ const KPICard = styled.div`
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 
   &:hover {
     transform: translateY(-2px);
@@ -182,7 +185,7 @@ const KPIIcon = styled.div`
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: ${props => props.$color || '#f3f4f6'};
+  background: ${(props) => props.$color || "#f3f4f6"};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -208,7 +211,7 @@ const KPIValue = styled.div`
 
 const KPIChange = styled.div`
   font-size: 12px;
-  color: ${props => props.$positive ? '#059669' : '#dc2626'};
+  color: ${(props) => (props.$positive ? "#059669" : "#dc2626")};
 `;
 
 const ChartCard = styled.div`
@@ -236,16 +239,17 @@ const Tab = styled.button`
   padding: 12px 24px;
   border-radius: 8px 8px 0 0;
   border: none;
-  background: ${props => props.$active ? 'white' : '#f3f4f6'};
-  color: ${props => props.$active ? '#6b46c1' : '#6b7280'};
+  background: ${(props) => (props.$active ? "white" : "#f3f4f6")};
+  color: ${(props) => (props.$active ? "#6b46c1" : "#6b7280")};
   font-size: 15px;
-  font-weight: ${props => props.$active ? 600 : 400};
+  font-weight: ${(props) => (props.$active ? 600 : 400)};
   cursor: pointer;
   transition: all 0.2s;
-  border-bottom: 2px solid ${props => props.$active ? '#6b46c1' : 'transparent'};
+  border-bottom: 2px solid
+    ${(props) => (props.$active ? "#6b46c1" : "transparent")};
 
   &:hover {
-    background: ${props => props.$active ? 'white' : '#f9fafb'};
+    background: ${(props) => (props.$active ? "white" : "#f9fafb")};
   }
 `;
 
@@ -264,7 +268,7 @@ const SkeletonCard = styled.div`
 `;
 
 const SkeletonLine = styled.div`
-  height: ${props => props.$height || '20px'};
+  height: ${(props) => props.$height || "20px"};
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   border-radius: 4px;
@@ -328,16 +332,18 @@ const KPISkeleton = () => (
 );
 
 const formatCurrency = (value) => {
-  return new Intl.NumberFormat('ko-KR', {
-    style: 'currency',
-    currency: 'KRW',
+  return new Intl.NumberFormat("ko-KR", {
+    style: "currency",
+    currency: "KRW",
     minimumFractionDigits: 0,
   }).format(value);
 };
 
 function SalesReport() {
   const dispatch = useDispatch();
-  const { allBranchesSales, loading, error } = useSelector((state) => state.salesReport);
+  const { allBranchesSales, loading, error } = useSelector(
+    (state) => state.salesReport
+  );
   const toast = useToast();
   const [isExporting, setIsExporting] = useState(false);
 
@@ -348,22 +354,29 @@ function SalesReport() {
     sevenDaysAgo.setDate(today.getDate() - 7);
     return {
       startDate: sevenDaysAgo,
-      endDate: today
+      endDate: today,
     };
   };
 
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState("all");
   const [startDate, setStartDate] = useState(getDefaultDates().startDate);
   const [endDate, setEndDate] = useState(getDefaultDates().endDate);
-  const [periodType, setPeriodType] = useState('DAY');
+  const [periodType, setPeriodType] = useState("DAY");
   const branchDetailExportRef = useRef(null);
   const branchComparisonExportRef = useRef(null);
   const salesForecastExportRef = useRef(null);
+  const royaltyExportRef = useRef(null);
 
   useEffect(() => {
-    const startDateStr = format(startDate, 'yyyy-MM-dd');
-    const endDateStr = format(endDate, 'yyyy-MM-dd');
-    dispatch(fetchAllBranchesSales({ startDate: startDateStr, endDate: endDateStr, periodType }));
+    const startDateStr = format(startDate, "yyyy-MM-dd");
+    const endDateStr = format(endDate, "yyyy-MM-dd");
+    dispatch(
+      fetchAllBranchesSales({
+        startDate: startDateStr,
+        endDate: endDateStr,
+        periodType,
+      })
+    );
   }, [dispatch, startDate, endDate, periodType]);
 
   const handleStartDateChange = (e) => {
@@ -383,32 +396,41 @@ function SalesReport() {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      const startDateStr = format(startDate, 'yyyy-MM-dd');
-      const endDateStr = format(endDate, 'yyyy-MM-dd');
-      
+      const startDateStr = format(startDate, "yyyy-MM-dd");
+      const endDateStr = format(endDate, "yyyy-MM-dd");
+
       // activeTab에 따라 다른 엑셀 다운로드 함수 호출
       switch (activeTab) {
-        case 'all':
-          await salesReportService.exportAllBranchesSales(startDateStr, endDateStr, periodType);
+        case "all":
+          await salesReportService.exportAllBranchesSales(
+            startDateStr,
+            endDateStr,
+            periodType
+          );
           toast.addToast({
-            type: 'success',
-            title: '다운로드 완료',
-            message: '엑셀 파일이 다운로드되었습니다.',
+            type: "success",
+            title: "다운로드 완료",
+            message: "엑셀 파일이 다운로드되었습니다.",
           });
           break;
-        case 'branch':
+        case "branch":
           if (branchDetailExportRef.current) {
             await branchDetailExportRef.current.exportExcel();
           }
           break;
-        case 'comparison':
+        case "comparison":
           if (branchComparisonExportRef.current) {
             await branchComparisonExportRef.current.exportExcel();
           }
           break;
-        case 'forecast':
+        case "forecast":
           if (salesForecastExportRef.current) {
             await salesForecastExportRef.current.exportExcel();
+          }
+          break;
+        case "royalty":
+          if (royaltyExportRef.current) {
+            await royaltyExportRef.current.exportExcel();
           }
           break;
         default:
@@ -416,9 +438,9 @@ function SalesReport() {
       }
     } catch (error) {
       toast.addToast({
-        type: 'error',
-        title: '다운로드 실패',
-        message: error.message || '엑셀 파일 다운로드에 실패했습니다.',
+        type: "error",
+        title: "다운로드 실패",
+        message: error.message || "엑셀 파일 다운로드에 실패했습니다.",
       });
     } finally {
       setIsExporting(false);
@@ -440,42 +462,42 @@ function SalesReport() {
     const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     const newStartDate = new Date(endDate);
     newStartDate.setDate(newStartDate.getDate() + 1);
-    
+
     if (newStartDate > today) return; // 미래로는 이동 불가
-    
+
     const newEndDate = new Date(newStartDate);
     newEndDate.setDate(newEndDate.getDate() + daysDiff);
-    
+
     if (newEndDate > today) {
       newEndDate.setTime(today.getTime());
     }
-    
+
     setStartDate(newStartDate);
     setEndDate(newEndDate);
   };
 
   const handlePeriodTypeChange = (type) => {
     setPeriodType(type);
-    
+
     const today = new Date();
     let newStartDate, newEndDate;
 
     switch (type) {
-      case 'DAY':
+      case "DAY":
         newEndDate = new Date(today);
         newStartDate = new Date(today);
         break;
-      case 'WEEK':
+      case "WEEK":
         newEndDate = new Date(today);
         newStartDate = new Date(today);
         newStartDate.setDate(newStartDate.getDate() - 7);
         break;
-      case 'MONTH':
+      case "MONTH":
         newEndDate = new Date(today);
         newStartDate = new Date(today);
         newStartDate.setMonth(newStartDate.getMonth() - 1);
         break;
-      case 'YEAR':
+      case "YEAR":
         newEndDate = new Date(today);
         newStartDate = new Date(today);
         newStartDate.setFullYear(newStartDate.getFullYear() - 1);
@@ -483,17 +505,17 @@ function SalesReport() {
       default:
         return;
     }
-    
+
     setStartDate(newStartDate);
     setEndDate(newEndDate);
   };
 
   const formatDate = (date) => {
-    return format(date, 'yyyy.MM.dd(E)', { locale: ko });
+    return format(date, "yyyy.MM.dd(E)", { locale: ko });
   };
 
   const formatDateForInput = (date) => {
-    return format(date, 'yyyy-MM-dd');
+    return format(date, "yyyy-MM-dd");
   };
 
   const prepareChartData = () => {
@@ -508,14 +530,30 @@ function SalesReport() {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'all':
+      case "all":
         return renderAllSalesView();
-      case 'branch':
-        return <BranchDetail ref={branchDetailExportRef} startDate={startDate} endDate={endDate} periodType={periodType} />;
-      case 'comparison':
-        return <BranchComparison ref={branchComparisonExportRef} startDate={startDate} endDate={endDate} periodType={periodType} />;
-      case 'forecast':
+      case "branch":
+        return (
+          <BranchDetail
+            ref={branchDetailExportRef}
+            startDate={startDate}
+            endDate={endDate}
+            periodType={periodType}
+          />
+        );
+      case "comparison":
+        return (
+          <BranchComparison
+            ref={branchComparisonExportRef}
+            startDate={startDate}
+            endDate={endDate}
+            periodType={periodType}
+          />
+        );
+      case "forecast":
         return <SalesForecast ref={salesForecastExportRef} />;
+      case "royalty":
+        return <Royalty ref={royaltyExportRef} />;
       default:
         return renderAllSalesView();
     }
@@ -547,8 +585,13 @@ function SalesReport() {
               </KPIIcon>
               <KPIInfo>
                 <KPILabel>총 매출</KPILabel>
-                <KPIValue>{formatCurrency(allBranchesSales.totalSales || 0)}</KPIValue>
-                <KPIChange $positive>평균: {formatCurrency(allBranchesSales.averageSalesPerBranch || 0)}</KPIChange>
+                <KPIValue>
+                  {formatCurrency(allBranchesSales.totalSales || 0)}
+                </KPIValue>
+                <KPIChange $positive>
+                  평균:{" "}
+                  {formatCurrency(allBranchesSales.averageSalesPerBranch || 0)}
+                </KPIChange>
               </KPIInfo>
             </KPICard>
             <KPICard>
@@ -558,7 +601,9 @@ function SalesReport() {
               <KPIInfo>
                 <KPILabel>총 주문</KPILabel>
                 <KPIValue>{allBranchesSales.totalOrders || 0}건</KPIValue>
-                <KPIChange $positive>지점 수: {allBranchesSales.totalBranchCount || 0}</KPIChange>
+                <KPIChange $positive>
+                  지점 수: {allBranchesSales.totalBranchCount || 0}
+                </KPIChange>
               </KPIInfo>
             </KPICard>
             <KPICard>
@@ -569,8 +614,13 @@ function SalesReport() {
                 <KPILabel>평균 주문액</KPILabel>
                 <KPIValue>
                   {allBranchesSales.totalSales && allBranchesSales.totalOrders
-                    ? formatCurrency(Math.floor(allBranchesSales.totalSales / allBranchesSales.totalOrders))
-                    : '0원'}
+                    ? formatCurrency(
+                        Math.floor(
+                          allBranchesSales.totalSales /
+                            allBranchesSales.totalOrders
+                        )
+                      )
+                    : "0원"}
                 </KPIValue>
                 <KPIChange $positive>주문당 금액</KPIChange>
               </KPIInfo>
@@ -582,7 +632,8 @@ function SalesReport() {
               <KPIInfo>
                 <KPILabel>주문 활성 지점</KPILabel>
                 <KPIValue>
-                  {allBranchesSales.salesData?.[0]?.activeBranchCount || 0}개 지점
+                  {allBranchesSales.salesData?.[0]?.activeBranchCount || 0}개
+                  지점
                 </KPIValue>
                 <KPIChange $positive>판매 활동 중</KPIChange>
               </KPIInfo>
@@ -619,28 +670,46 @@ function SalesReport() {
     <Container>
       <Header>
         <Title>매출 리포트</Title>
-        <ExcelButton onClick={handleExportExcel} disabled={isExporting || loading}>
+        <ExcelButton
+          onClick={handleExportExcel}
+          disabled={isExporting || loading}
+        >
           <img src={excelIcon} alt="Excel" />
           엑셀 다운로드
         </ExcelButton>
       </Header>
 
       <TabContainer>
-        <Tab $active={activeTab === 'all'} onClick={() => setActiveTab('all')}>
+        <Tab $active={activeTab === "all"} onClick={() => setActiveTab("all")}>
           전체 매출
         </Tab>
-        <Tab $active={activeTab === 'branch'} onClick={() => setActiveTab('branch')}>
+        <Tab
+          $active={activeTab === "branch"}
+          onClick={() => setActiveTab("branch")}
+        >
           지점 상세
         </Tab>
-        <Tab $active={activeTab === 'comparison'} onClick={() => setActiveTab('comparison')}>
+        <Tab
+          $active={activeTab === "comparison"}
+          onClick={() => setActiveTab("comparison")}
+        >
           지점 비교
         </Tab>
-        <Tab $active={activeTab === 'forecast'} onClick={() => setActiveTab('forecast')}>
+        <Tab
+          $active={activeTab === "forecast"}
+          onClick={() => setActiveTab("forecast")}
+        >
           예상 매출액
+        </Tab>
+        <Tab
+          $active={activeTab === "royalty"}
+          onClick={() => setActiveTab("royalty")}
+        >
+          로열티
         </Tab>
       </TabContainer>
 
-      {activeTab !== 'forecast' && (
+      {activeTab !== "forecast" && activeTab !== "royalty" && (
         <ControlsRow>
           <DateRangeContainer>
             <DateSelector>
@@ -651,9 +720,7 @@ function SalesReport() {
                 onChange={handleStartDateChange}
                 max={formatDateForInput(endDate)}
               />
-              <DateRangeDisplay>
-                ~
-              </DateRangeDisplay>
+              <DateRangeDisplay>~</DateRangeDisplay>
               <DateInput
                 type="date"
                 value={formatDateForInput(endDate)}
@@ -661,22 +728,32 @@ function SalesReport() {
                 min={formatDateForInput(startDate)}
                 max={formatDateForInput(new Date())}
               />
-              <DateButton onClick={handleNextWeek}>
-                ▶
-              </DateButton>
+              <DateButton onClick={handleNextWeek}>▶</DateButton>
             </DateSelector>
 
             <PeriodTabs>
-              <PeriodTab $active={periodType === 'DAY'} onClick={() => handlePeriodTypeChange('DAY')}>
+              <PeriodTab
+                $active={periodType === "DAY"}
+                onClick={() => handlePeriodTypeChange("DAY")}
+              >
                 일간
               </PeriodTab>
-              <PeriodTab $active={periodType === 'WEEK'} onClick={() => handlePeriodTypeChange('WEEK')}>
+              <PeriodTab
+                $active={periodType === "WEEK"}
+                onClick={() => handlePeriodTypeChange("WEEK")}
+              >
                 주간
               </PeriodTab>
-              <PeriodTab $active={periodType === 'MONTH'} onClick={() => handlePeriodTypeChange('MONTH')}>
+              <PeriodTab
+                $active={periodType === "MONTH"}
+                onClick={() => handlePeriodTypeChange("MONTH")}
+              >
                 월간
               </PeriodTab>
-              <PeriodTab $active={periodType === 'YEAR'} onClick={() => handlePeriodTypeChange('YEAR')}>
+              <PeriodTab
+                $active={periodType === "YEAR"}
+                onClick={() => handlePeriodTypeChange("YEAR")}
+              >
                 연간
               </PeriodTab>
             </PeriodTabs>
@@ -684,12 +761,9 @@ function SalesReport() {
         </ControlsRow>
       )}
 
-      <ContentWrapper>
-        {renderTabContent()}
-      </ContentWrapper>
+      <ContentWrapper>{renderTabContent()}</ContentWrapper>
     </Container>
   );
 }
 
 export default SalesReport;
-
