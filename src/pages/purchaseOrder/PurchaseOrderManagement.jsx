@@ -94,6 +94,7 @@ function PurchaseOrderManagement() {
   const [statusStatistics, setStatusStatistics] = useState([]);
   const [branchStatistics, setBranchStatistics] = useState([]);
   const [productStatistics, setProductStatistics] = useState([]);
+  const [branchList, setBranchList] = useState([]);
 
   // 상태 한글 변환 함수
   const getStatusText = (status) => {
@@ -121,12 +122,13 @@ function PurchaseOrderManagement() {
       const userInfo = authService.getCurrentUser();
       const branchId = userInfo?.branchId || 1; // 본사 ID
       
-      const [data, statistics, statusStats, branchStats, productStats] = await Promise.all([
+      const [data, statistics, statusStats, branchStats, productStats, branches] = await Promise.all([
         purchaseOrderService.getPurchaseOrders(branchId),
         purchaseOrderService.getHQOverallStatistics(),
         purchaseOrderService.getHQStatusStatistics().catch(() => []),
         purchaseOrderService.getHQBranchStatistics().catch(() => []),
-        purchaseOrderService.getHQProductStatistics().catch(() => [])
+        purchaseOrderService.getHQProductStatistics().catch(() => []),
+        purchaseOrderService.getBranchList().catch(() => [])
       ]);
       
       // 데이터 변환
@@ -135,13 +137,27 @@ function PurchaseOrderManagement() {
         branch: item.branchName || `지점-${item.branchId}`,
         orderDate: item.orderDate || new Date().toISOString().split('T')[0],
         productCount: item.productCount || 0,
-        totalAmount: item.totalAmount || 0,
+        totalAmount: item.totalPrice || 0,  // 백엔드에서 totalPrice 필드로 반환됨
         status: item.orderStatus || item.status || 'pending',
         orderStatus: item.orderStatus,
         deliveryDate: item.deliveryDate || '-'
       }));
       
       setPurchaseOrders(formattedData);
+      
+      // 지점 목록 설정
+      console.log('지점 목록 API 응답:', branches);
+      if (branches && branches.length > 0) {
+        setBranchList(branches);
+        console.log('지점 목록 설정 완료:', branches.length, '개');
+      } else {
+        console.warn('지점 목록이 비어있습니다. 임시 데이터를 사용합니다.');
+        // 임시 지점 데이터 (API가 실패할 경우)
+        const fallbackBranches = [
+          { id: 1, name: '본점' }
+        ];
+        setBranchList(fallbackBranches);
+      }
       
       // 차트 데이터 설정
       if (statusStats && statusStats.length > 0) {
@@ -249,7 +265,8 @@ function PurchaseOrderManagement() {
       item.branch.toLowerCase().includes(filters.searchTerm.toLowerCase());
     
     const matchesBranch = !filters.branchFilter || item.branch === filters.branchFilter;
-    const matchesStatus = !filters.statusFilter || (item.status || '').toLowerCase() === filters.statusFilter.toLowerCase();
+    const matchesStatus = !filters.statusFilter || 
+      (item.status || item.orderStatus || '').toUpperCase() === filters.statusFilter.toUpperCase();
     
     return matchesSearch && matchesBranch && matchesStatus;
   });
@@ -281,7 +298,8 @@ function PurchaseOrderManagement() {
     }),
     React.createElement(SearchAndFilter, {
       filters,
-      onFiltersChange: handleFiltersChange
+      onFiltersChange: handleFiltersChange,
+      branchList
     }),
     React.createElement(PurchaseOrderTable, {
       data: paginatedData,
