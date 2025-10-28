@@ -288,7 +288,7 @@ function ShopLayout() {
         setLoadingProducts(true);
         setProductsError(null);
         
-        const res = await shopApi.get('/api/public/products');
+        const res = await shopApi.get('/api/public/products/with-branches');
         const raw = res?.data?.data ?? [];
         
         const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
