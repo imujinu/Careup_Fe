@@ -1,7 +1,6 @@
 import axios from "../utils/axiosConfig";
 
-const ROYALTY_API_BASE_URL =
-  import.meta.env.VITE_BRANCH_URL;
+const ROYALTY_API_BASE_URL = import.meta.env.VITE_BRANCH_URL;
 
 // 엑셀 파일 다운로드 헬퍼 함수
 const downloadExcelFile = async (url, fileName) => {
