@@ -17,6 +17,7 @@ function BranchDetailHeader({
   onBack,
   onShowDetail,
   onEdit,
+  onDelete,
   showEditButton = false,
 }) {
   if (!branch) return null;
@@ -105,14 +106,18 @@ function BranchDetailHeader({
               )}
               {!showEditButton && (
                 <>
-                  <EditButton>
-                    <Icon path={mdiPencil} size={0.8} />
-                    수정
-                  </EditButton>
-                  <DeleteButton>
-                    <Icon path={mdiDelete} size={0.8} />
-                    삭제
-                  </DeleteButton>
+                  {onEdit && (
+                    <EditButton onClick={onEdit}>
+                      <Icon path={mdiPencil} size={0.8} />
+                      수정
+                    </EditButton>
+                  )}
+                  {onDelete && (
+                    <DeleteButton onClick={onDelete}>
+                      <Icon path={mdiDelete} size={0.8} />
+                      삭제
+                    </DeleteButton>
+                  )}
                   <MoreButton>
                     <Icon path={mdiDotsVertical} size={1} />
                   </MoreButton>
