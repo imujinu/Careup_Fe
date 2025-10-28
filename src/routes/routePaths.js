@@ -22,6 +22,10 @@ export const HEADQUARTERS_PATHS = {
   PURCHASE_ORDER: '/purchase-order',
   SALES_REPORT: '/sales-report',
   SETTINGS: '/settings',
+
+  // 직원관리
+  STAFF: '/staff',
+  STAFF_CREATE: '/staff/create',
 };
 
 // 가맹점 전용 경로
@@ -48,7 +52,10 @@ export const MENU_PATH_MAP = {
   settings: '/settings',
   shop: '/shop',
   logout: '/logout',
+
+  // 직원관리
+  staff: '/staff',
+  staffCreate: '/staff/create',
 };
 
 export default PATHS;
-
