@@ -64,23 +64,7 @@ const OrderCompletePage = ({ orderData, paymentData, onBackToHome }) => {
           </div>
         </div>
 
-        <div className="detail-section">
-          <h3>배송 정보</h3>
-          <div className="detail-content">
-            <div className="detail-row">
-              <span className="label">배송지</span>
-              <span className="value">지점 픽업</span>
-            </div>
-            <div className="detail-row">
-              <span className="label">배송상태</span>
-              <span className="value status-pending">준비중</span>
-            </div>
-            <div className="detail-row">
-              <span className="label">예상 수령일</span>
-              <span className="value">주문 접수 후 1-2일</span>
-            </div>
-          </div>
-        </div>
+        {/* 배송 정보 섹션 제거 */}
       </div>
 
       <div className="next-steps">

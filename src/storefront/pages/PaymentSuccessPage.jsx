@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cartService } from '../../service/cartService';
 import { useDispatch } from 'react-redux';
@@ -10,9 +10,12 @@ const PaymentSuccessPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
+  const hasProcessedRef = useRef(false);
 
   useEffect(() => {
     const handlePaymentSuccess = async () => {
+      if (hasProcessedRef.current) return;
+      hasProcessedRef.current = true;
       try {
         setLoading(true);
         
@@ -31,6 +34,22 @@ const PaymentSuccessPage = () => {
         
         // CAREUP_ORDER_X에서 숫자만 추출
         const numericOrderId = orderId.replace('CAREUP_ORDER_', '');
+        const numericOrderIdInt = parseInt(numericOrderId);
+        
+        console.log('💳 결제 승인 요청 시작:', { orderId: numericOrderIdInt, paymentKey, amount });
+        
+        // 백엔드에 결제 승인 요청
+        // 백엔드는 Long.parseLong(request.getOrderId())를 사용하므로 숫자만 보내야 함
+        const paymentRequestData = {
+          paymentKey: paymentKey,
+          orderId: numericOrderIdInt.toString(), // 숫자만 전송 (예: "4")
+          amount: parseInt(amount)
+        };
+        
+        console.log('📤 결제 승인 API 호출:', paymentRequestData);
+        
+        const paymentResponse = await cartService.processPayment(numericOrderIdInt, paymentRequestData);
+        console.log('✅ 결제 승인 성공:', paymentResponse);
         
         // 장바구니 비우기
         dispatch(clearCart());
@@ -49,13 +68,16 @@ const PaymentSuccessPage = () => {
 
         // localStorage에 결제 완료 정보 저장
         const paymentResult = {
-          orderId: parseInt(numericOrderId),
+          orderId: numericOrderIdInt,
           paymentData: { paymentKey, amount: parseInt(amount), orderId },
-          orderData: orderData
+          orderData: orderData,
+          paymentResponse: paymentResponse
         };
         
         localStorage.setItem('paymentCompleted', JSON.stringify(paymentResult));
         localStorage.removeItem('currentOrderData');
+        
+        console.log('🎉 결제 완료! 주문 완료 페이지로 이동합니다.');
         
         // 주문 완료 페이지로 이동
         window.location.href = `/shop/order-complete`;

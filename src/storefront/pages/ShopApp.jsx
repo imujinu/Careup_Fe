@@ -9,6 +9,7 @@ import CartPage from "./CartPage";
 import OrderPage from "./OrderPage";
 import PaymentPage from "./PaymentPage";
 import OrderCompletePage from "./OrderCompletePage";
+import PaymentSuccessPage from "./PaymentSuccessPage";
 import BranchSelector from "../components/BranchSelector";
 import ChatBot from "../components/ChatBot";
 import CustomerLogin from "../../pages/auth/CustomerLogin";
@@ -17,6 +18,8 @@ import Tabs from "../components/Tabs";
 import Checkout from "../components/Checkout";
 import SearchResultsPage from "../components/SearchResultsPage";
 import ProductInquiryModal from "../components/ProductInquiryModal";
+import ShopHeader from "../components/ShopHeader";
+import ShopFooter from "../components/ShopFooter";
 import "../styles/shop.css";
 import axios from "axios";
 import { authService } from "../../service/authService";
@@ -38,12 +41,15 @@ function ShopLayout() {
   const { items: cartItems, branchId } = useSelector(state => state.cart);
   const selectedBranch = useSelector(state => state.branch.selectedBranch);
   const [activeTab, setActiveTab] = useState("전체");
-  const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | order | payment | order-complete | search
+  const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | order | payment | payment-success | order-complete | search
   const [activeCategoryPage, setActiveCategoryPage] = useState("의류");
   const [favorites, setFavorites] = useState(new Set());
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productsError, setProductsError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [detailProduct, setDetailProduct] = useState(null);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(customerAuthService.isAuthenticated());
@@ -68,6 +74,12 @@ function ShopLayout() {
 
     const checkAndNavigate = () => {
       if (processed) return;
+
+      if (window.location.pathname.includes('/shop/payment-success')) {
+        processed = true;
+        setPage('payment-success');
+        return;
+      }
 
       if (window.location.pathname.includes('/shop/order-complete')) {
         const paymentCompleted = localStorage.getItem('paymentCompleted');
@@ -288,49 +300,82 @@ function ShopLayout() {
         setLoadingProducts(true);
         setProductsError(null);
         
-        const res = await shopApi.get('/api/public/products/with-branches');
-        const raw = res?.data?.data ?? [];
+        const page = currentPage;
+        const size = 12; // 한 페이지에 12개
         
-        const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
-          id: item.productId ?? Math.random(),
-          productId: item.productId,
-          name: item.productName || "상품",
-          price: Number(item.minPrice || 0),
-          minPrice: Number(item.minPrice || 0),  // 권장 최소 판매가
-          maxPrice: Number(item.maxPrice || 0),  // 권장 최대 판매가
-          promotionPrice: null,
-          discountRate: null,
-          imageAlt: item.productName || "상품 이미지",
-          image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
-          category: item.categoryName || "미분류",
-          stock: 0,
-          safetyStock: 0,
-          isOutOfStock: false,
-          isLowStock: false,
-          brand: "",
-          likes: 0,
-          reviews: 0,
-          pop: 0,
-          discount: 0,
-          description: item.description || "상품에 대한 자세한 설명이 없습니다.",
-          specifications: [
-            { name: "카테고리", value: item.categoryName || "정보 없음" },
-          ],
-          images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
-          reviews: [],
-          relatedProducts: [],
-          // 백엔드에서 제공하는 지점 정보
-          availableBranches: item.availableBranches || [],
-          availableBranchCount: item.availableBranchCount || 0
-        }));
-        
-        // 재고가 있는 상품만 필터링 (백엔드에서 이미 필터링되어 오지만 이중 체크)
-        const filteredMapped = mapped.filter(item => {
-          // availableBranchCount가 0보다 크고, 실제로 지점 정보가 있는 경우만 표시
-          return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
+        const res = await shopApi.get('/api/public/products/with-branches', {
+          params: {
+            page: page,
+            size: size
+          }
         });
         
-        setProducts(filteredMapped);
+        // 페이지네이션 응답 처리
+        const responseData = res?.data?.data;
+        const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
+        
+        if (isPageResponse) {
+          // Page 형식 응답
+          setTotalPages(responseData.totalPages || 0);
+          setTotalElements(responseData.totalElements || 0);
+          const raw = responseData.content || [];
+          
+          const mapProduct = (item) => ({
+            id: item.productId ?? Math.random(),
+            productId: item.productId,
+            name: item.productName || "상품",
+            price: Number(item.minPrice || 0),
+            minPrice: Number(item.minPrice || 0),  // 권장 최소 판매가
+            maxPrice: Number(item.maxPrice || 0),  // 권장 최대 판매가
+            promotionPrice: null,
+            discountRate: null,
+            imageAlt: item.productName || "상품 이미지",
+            image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+            category: item.categoryName || "미분류",
+            stock: 0,
+            safetyStock: 0,
+            isOutOfStock: false,
+            isLowStock: false,
+            brand: "",
+            likes: 0,
+            reviews: 0,
+            pop: 0,
+            discount: 0,
+            description: item.description || "상품에 대한 자세한 설명이 없습니다.",
+            specifications: [
+              { name: "카테고리", value: item.categoryName || "정보 없음" },
+            ],
+            images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
+            reviews: [],
+            relatedProducts: [],
+            // 백엔드에서 제공하는 지점 정보
+            availableBranches: item.availableBranches || [],
+            availableBranchCount: item.availableBranchCount || 0
+          });
+
+          const mapped = (Array.isArray(raw) ? raw : []).map(mapProduct);
+        
+          // 재고가 있는 상품만 필터링 (백엔드에서 이미 필터링되어 오지만 이중 체크)
+          const filteredMapped = mapped.filter(item => {
+            // availableBranchCount가 0보다 크고, 실제로 지점 정보가 있는 경우만 표시
+            return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
+          });
+        
+          setProducts(filteredMapped);
+        } else {
+          // 기존 방식 (List 응답) - 하위 호환성
+          const raw = responseData || [];
+          
+          const mapped = (Array.isArray(raw) ? raw : []).map(mapProduct);
+          
+          const filteredMapped = mapped.filter(item => {
+            return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
+          });
+          
+          setProducts(filteredMapped);
+          setTotalPages(0);
+          setTotalElements(filteredMapped.length);
+        }
       } catch (e) {
         console.error('❌ 상품 로딩 실패:', e);
         console.error('❌ 에러 상세:', {
@@ -342,12 +387,14 @@ function ShopLayout() {
         
         setProductsError(e?.message || "상품을 불러오지 못했습니다.");
         setProducts([]);
+        setTotalPages(0);
+        setTotalElements(0);
       } finally {
         setLoadingProducts(false);
       }
     }
     loadBranchProducts();
-  }, []); // 지점 선택과 무관하게 한 번만 로드
+  }, [currentPage]); // currentPage가 변경될 때마다 로드
   
   const toggleFavorite = (id) => {
     setFavorites((prev) => {
@@ -482,154 +529,25 @@ function ShopLayout() {
   
   return (
     <div>
-      <header className="header">
-        <div className="container">
-          <div className="header-top">
-            <a href="#">고객센터</a>
-          {!isLoggedIn ? (
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage("login");
-              }}
-            >
-              로그인
-            </a>
-          ) : (
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage("mypage");
-              }}
-            >
-              {currentUser?.nickname || currentUser?.name || '마이페이지'}
-            </a>
-          )}
-          <a href="#">관심</a>
-          {isLoggedIn && (
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                handleLogout();
-              }}
-            >
-              로그아웃
-            </a>
-          )}
-          </div>
-          <div className="header-main">
-            <div
-              className="logo"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                cursor: "pointer",
-              }}
-              onClick={() => {
-                setDetailProduct(null);
-                setCheckoutProduct(null);
-                setPage("home");
-              }}
-            >
-              <SharkLogo size={26} />
-              <span>Shark</span>
-            </div>
-            <nav className="nav">
-              <a
-                href="#"
-                className={page === "home" ? "active" : ""}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setDetailProduct(null);
-                  setCheckoutProduct(null);
-                  setActiveTab("전체");  // HOME 클릭 시 전체 상품 표시
-                  setPage("home");
-                }}
-              >
-                HOME
-              </a>
-              <a
-                href="#"
-                className={page === "products" ? "active" : ""}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setDetailProduct(null);
-                  setCheckoutProduct(null);
-                  setActiveTab("전체");  // SHOP 클릭 시 전체 상품 표시
-                  setPage("products");
-                }}
-              >
-                SHOP
-              </a>
-              
-            </nav>
-            <div className="actions">
-              {showSearch && (
-                <div className="search-container">
-                  <input
-                    type="text"
-                    placeholder="상품을 검색하세요..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
-                    className="search-input"
-                    autoFocus
-                  />
-                  <button
-                    className="icon-btn"
-                    onClick={() => setShowSearch(false)}
-                    aria-label="검색 닫기"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-              {!showSearch && (
-                <button 
-                  className="icon-btn" 
-                  aria-label="검색"
-                  onClick={() => setShowSearch(true)}
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0-2C6.582 2 3 5.582 3 10s3.582 8 8 8a7.96 7.96 0 0 0 4.9-1.692l4.396 4.396a1 1 0 0 0 1.414-1.414l-4.396-4.396A7.96 7.96 0 0 0 19 10c0-4.418-3.582-8-8-8Z" />
-                  </svg>
-                </button>
-              )}
-               <button 
-                 className="icon-btn cart-btn" 
-                 aria-label="장바구니"
-                 onClick={() => {
-                   setPage("cart");
-                 }}
-               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path d="M7 6h10l1.8 9.1A2 2 0 0 1 16.84 18H7.16a2 2 0 0 1-1.96-2.9L7 6Zm.5-4a1 1 0 0 1 1 1V4h7V3a1 1 0 1 1 2 0v1h1a1 1 0 1 1 0 2H6a1 1 0 1 1 0-2h1V3a1 1 0 0 1 1-1Z" />
-                </svg>
-                {getCartItemCount() > 0 && (
-                  <span className="cart-badge">{getCartItemCount()}</span>
-                )}
-              </button>
-              <button className="icon-btn" aria-label="메뉴">
-                ☰
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ShopHeader
+        isLoggedIn={isLoggedIn}
+        currentUser={currentUser}
+        page={page}
+        setPage={setPage}
+        setDetailProduct={setDetailProduct}
+        setCheckoutProduct={setCheckoutProduct}
+        setActiveTab={setActiveTab}
+        handleLogout={handleLogout}
+        cartItems={cartItems}
+        showSearch={showSearch}
+        setShowSearch={setShowSearch}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        handleSearch={handleSearch}
+        setShowBranchSelector={setShowBranchSelector}
+        selectedBranch={selectedBranch}
+        getCartItemCount={getCartItemCount}
+      />
 
       <main>
         {checkoutProduct ? (
@@ -659,6 +577,9 @@ function ShopLayout() {
              categories={categories}
              activeTab={activeTab}
              onTabChange={setActiveTab}
+             currentPage={currentPage}
+             setCurrentPage={setCurrentPage}
+             totalPages={totalPages}
            />
          ) : page === "search" ? (
            <SearchResultsPage
@@ -733,6 +654,8 @@ function ShopLayout() {
                currentUser={currentUser}
              />
            )
+         ) : page === "payment-success" ? (
+           <PaymentSuccessPage />
          ) : page === "order-complete" ? (
            <OrderCompletePage 
              orderData={orderData}
@@ -817,7 +740,7 @@ function ShopLayout() {
                       </div>
                     </div>
                   )}
-                  {!loadingProducts && !productsError && filteredProducts.slice(0, 12).map((p) => (
+                  {!loadingProducts && !productsError && filteredProducts.map((p) => (
                     <article className="card" key={p.id} onClick={() => setDetailProduct(p)} style={{ cursor: "pointer" }}>
                       <button
                         className={`fav-btn${
@@ -854,8 +777,12 @@ function ShopLayout() {
                       </button>
                       <div className="card-img">
                         <img
-                          src={p.image}
+                          src={p.image || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"}
                           alt={p.imageAlt}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                          }}
                           style={{
                             width: "100%",
                             height: "100%",
@@ -940,42 +867,7 @@ function ShopLayout() {
         )}
       </main>
 
-      <footer className="footer">
-        <div className="container footer-grid">
-          <div>
-            <h4>이용안내</h4>
-            <ul>
-              <li>검수기준</li>
-              <li>이용정책</li>
-              <li>패널티 정책</li>
-              <li>커뮤니티 가이드라인</li>
-            </ul>
-          </div>
-          <div>
-            <h4>고객지원</h4>
-            <ul>
-              <li>공지사항</li>
-              <li>서비스 소개</li>
-              <li>스토어 안내</li>
-              <li>판매자 방문접수</li>
-            </ul>
-          </div>
-          <div>
-            <h4>ABOUT 샤크</h4>
-            <ul>
-              <li>회사소개</li>
-              <li>인재채용</li>
-              <li>제휴문의</li>
-            </ul>
-          </div>
-          <div>
-            <h4>고객센터 1588-7813</h4>
-            <div>운영시간 평일 10:00 - 18:00</div>
-            <div>점심시간 평일 13:00 - 14:00</div>
-            <div>1:1 문의하기는 앱에서만 가능합니다.</div>
-          </div>
-        </div>
-      </footer>
+      <ShopFooter />
       
       {showBranchSelector && (
         <BranchSelector
