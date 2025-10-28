@@ -12,6 +12,7 @@ const ModalOverlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 100011;
   z-index: 10001;
 `;
 
@@ -302,19 +303,19 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
               React.createElement('div', { style: { fontSize: '14px' } }, '모든 상품이 이미 등록되었거나 검색 조건에 맞는 상품이 없습니다.')
             ) :
             React.createElement(ProductGrid, null,
-              filteredProducts.map((product) => {
-                const isSelected = selectedProducts.find(p => p.productId === product.productId);
-                return React.createElement(ProductCard, {
+              filteredProducts.map((product) =>
+                React.createElement(ProductCard, {
                   key: product.productId,
-                  $selected: !!isSelected,
+                  $selected: selectedProduct?.productId === product.productId,
                   onClick: () => handleProductSelect(product)
                 },
                   React.createElement(ProductName, null, product.productName || '알 수 없음'),
+                  React.createElement(ProductInfo, null, `ID: ${product.productId}`),
                   React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
                   React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`),
                   React.createElement(ProductPrice, null, `공급가: ₩${product.price?.toLocaleString() || 0}`)
-                );
-              })
+                )
+              )
             ),
         React.createElement(ButtonGroup, null,
           React.createElement(CancelButton, { onClick: handleClose }, '취소'),
