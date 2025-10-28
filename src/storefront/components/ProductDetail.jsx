@@ -37,6 +37,10 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               <img
                 src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80"}
                 alt={product?.name || "New Balance 204L Suede Mushroom Arid Stone"}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
+                }}
               />
               <div className="image-nav">
                 <button className="nav-btn prev">‹</button>
@@ -55,30 +59,50 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 <img
                   src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb1"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                  }}
                 />
               </div>
               <div className="thumbnail">
                 <img
                   src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb2"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                  }}
                 />
               </div>
               <div className="thumbnail">
                 <img
                   src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb3"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                  }}
                 />
               </div>
               <div className="thumbnail">
                 <img
                   src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb4"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                  }}
                 />
               </div>
               <div className="thumbnail">
                 <img
                   src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
                   alt="thumb5"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                  }}
                 />
               </div>
             </div>
