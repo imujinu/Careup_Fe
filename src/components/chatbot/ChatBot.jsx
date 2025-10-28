@@ -275,6 +275,90 @@ const ChatBot = ({ onClose }) => {
     };
   };
 
+  // 발주 데이터 파싱 함수
+  const parseOrderData = (data) => {
+    console.log("parseOrderData - 입력 데이터:", data);
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log("parseOrderData - 데이터가 없거나 배열이 아님");
+      return null;
+    }
+
+    console.log("parseOrderData - 발주 배열 길이:", data.length);
+
+    const parsedData = data.map((order) => {
+      const {
+        branchId,
+        branchName,
+        createdAt,
+        orderStatus,
+        productCount,
+        purchaseOrderId,
+        totalPrice,
+        updatedAt,
+      } = order;
+
+      // 상태별 표시 로직
+      let statusText = "";
+      switch (orderStatus) {
+        case "PENDING":
+          statusText = "대기중";
+          break;
+        case "APPROVED":
+          statusText = "승인됨";
+          break;
+        case "REJECTED":
+          statusText = "거부됨";
+          break;
+        case "SHIPPED":
+          statusText = "배송중";
+          break;
+        case "DELIVERED":
+          statusText = "배송완료";
+          break;
+        default:
+          statusText = orderStatus;
+      }
+
+      // 날짜 포맷팅
+      const formatDate = (dateString) => {
+        if (!dateString) return "";
+        return new Date(dateString).toLocaleDateString("ko-KR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      };
+
+      return {
+        purchaseOrderId,
+        branchName,
+        productCount,
+        totalPrice: totalPrice.toLocaleString(),
+        status: statusText,
+        createdAt: formatDate(createdAt),
+        updatedAt: formatDate(updatedAt),
+      };
+    });
+
+    console.log("parseOrderData - 파싱된 결과:", parsedData);
+    return parsedData;
+  };
+
+  // 발주 정보를 표 형태로 표시하는 함수
+  const formatOrderTable = (orders) => {
+    if (!orders || orders.length === 0) {
+      return "관련 정보가 존재하지 않습니다.\n다른 항목을 입력하시거나 다른 날짜를 입력해주세요.";
+    }
+
+    return {
+      type: "order_table",
+      data: orders,
+    };
+  };
+
   // API 요청 함수
   const sendChatbotRequest = async (
     message,
@@ -371,36 +455,31 @@ const ChatBot = ({ onClose }) => {
         "근태 정보를 조회하고 있습니다..."
       );
 
+      // 여러 가능한 데이터 경로 확인
+      let employees = null;
+
+      console.log("전체직원조회 - API 응답:", result);
+
       if (
         result &&
         result.data &&
         result.data.result &&
         result.data.result.body
       ) {
-        const employees = result.data.result.body.employees;
+        employees = result.data.result.body.employees;
+        console.log("전체직원조회 - 경로1에서 찾음:", employees);
+      } else if (result && result.result && result.result.body) {
+        employees = result.result.body.employees;
+        console.log("전체직원조회 - 경로2에서 찾음:", employees);
+      } else if (result && result.body) {
+        employees = result.body.employees;
+        console.log("전체직원조회 - 경로3에서 찾음:", employees);
+      } else if (result && result.employees) {
+        employees = result.employees;
+        console.log("전체직원조회 - 경로4에서 찾음:", employees);
+      }
 
-        const botMessage = {
-          id: Date.now() + 1,
-          type: "bot",
-          content: {
-            type: "attendance_table",
-            data: employees.map((emp) => ({
-              employeeName: emp.employeeName,
-              totalDays: emp.summary.totalDays ?? 0,
-              workDays: emp.summary.workDays ?? 0,
-              absentDays: emp.summary.absentDays ?? 0,
-              leaveDays: emp.summary.leaveDays ?? 0,
-              totalWorkMinutes: emp.summary.totalWorkMinutes ?? 0,
-              averageWorkMinutes: emp.summary.averageWorkMinutes ?? 0,
-            })),
-          },
-          timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, botMessage]);
-      } else if (result.employees && Array.isArray(result.employees)) {
-        const employees = result.employees;
-
+      if (employees && Array.isArray(employees)) {
         const botMessage = {
           id: Date.now() + 1,
           type: "bot",
@@ -698,16 +777,58 @@ const ChatBot = ({ onClose }) => {
         "발주 정보를 조회하고 있습니다..."
       );
 
-      const botMessage = {
-        id: Date.now() + 1,
-        type: "bot",
-        content: result?.data?.result?.body
-          ? JSON.stringify(result.data.result.body, null, 2)
-          : "발주 데이터를 불러오지 못했습니다.",
-        timestamp: new Date(),
-      };
+      console.log("발주전체조회 - API 응답:", result);
 
-      setMessages((prev) => [...prev, botMessage]);
+      // 여러 가능한 데이터 경로 확인
+      let orderData = null;
+
+      if (
+        result &&
+        result.data &&
+        result.data.result &&
+        result.data.result.body
+      ) {
+        orderData = result.data.result.body;
+        console.log("발주전체조회 - 경로1에서 찾음:", orderData);
+      } else if (result && result.result && result.result.body) {
+        orderData = result.result.body;
+        console.log("발주전체조회 - 경로2에서 찾음:", orderData);
+      } else if (result && result.body) {
+        orderData = result.body;
+        console.log("발주전체조회 - 경로3에서 찾음:", orderData);
+      } else if (result && Array.isArray(result)) {
+        orderData = result;
+        console.log("발주전체조회 - 경로4에서 찾음:", orderData);
+      }
+
+      if (orderData) {
+        const parsedOrders = parseOrderData(orderData);
+        if (parsedOrders) {
+          const botMessage = {
+            id: Date.now() + 1,
+            type: "bot",
+            content: formatOrderTable(parsedOrders),
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, botMessage]);
+        } else {
+          const botMessage = {
+            id: Date.now() + 1,
+            type: "bot",
+            content: "발주 데이터를 파싱할 수 없습니다.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, botMessage]);
+        }
+      } else {
+        const botMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content: "발주 데이터를 불러오지 못했습니다.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+      }
       return;
     }
 
@@ -970,12 +1091,15 @@ const ChatBot = ({ onClose }) => {
                     message.content.type === "today_attendance_table" ||
                     message.content.type === "detail_table" ||
                     message.content.type === "inventory_table" ||
-                    message.content.type === "inventory_edit") ? (
+                    message.content.type === "inventory_edit" ||
+                    message.content.type === "order_table") ? (
                     <div className="attendance-table-container">
                       <div className="attendance-title">
                         {message.content.type === "today_attendance_table"
                           ? "📅 금일 근무 현황"
-                          : "📊 근태 현황"}
+                          : message.content.type === "order_table"
+                            ? "📋 발주 현황"
+                            : "📊 근태 현황"}
                       </div>
                       <div className="attendance-table">
                         {message.content.type === "today_attendance_table" ? (
@@ -1247,6 +1371,60 @@ const ChatBot = ({ onClose }) => {
                               </div>
                             </div>
                           </>
+                        ) : message.content.type === "order_table" ? (
+                          // ✅ 발주 현황 테이블
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                발주번호
+                              </div>
+                              <div className="attendance-cell header">
+                                지점명
+                              </div>
+                              <div className="attendance-cell header">
+                                상품수
+                              </div>
+                              <div className="attendance-cell header">
+                                총금액
+                              </div>
+                              <div className="attendance-cell header">상태</div>
+                              <div className="attendance-cell header">
+                                생성일
+                              </div>
+                              <div className="attendance-cell header">
+                                수정일
+                              </div>
+                            </div>
+                            {message.content.data.map((order, index) => (
+                              <div key={index} className="attendance-row">
+                                <div className="attendance-cell">
+                                  #{order.purchaseOrderId}
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.branchName}
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.productCount}개
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.totalPrice}원
+                                </div>
+                                <div className="attendance-cell">
+                                  <span
+                                    className={`status-badge status-${order.status.toLowerCase()}`}
+                                  >
+                                    {order.status}
+                                  </span>
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.createdAt}
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.updatedAt}
+                                </div>
+                              </div>
+                            ))}
+                          </>
                         ) : null}
                       </div>
                     </div>
@@ -1354,7 +1532,7 @@ const ChatBot = ({ onClose }) => {
         {showOrderConfirm && (
           <div className="reset-modal">
             <div className="reset-modal-content">
-              <div className="reset-modal-title">발주 요청</div>
+              <div className="reset-modal-title">재고 수정</div>
               <div className="reset-modal-message">
                 재고를 수정하시겠습니까?
               </div>
