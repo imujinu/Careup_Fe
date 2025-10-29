@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 
-const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, products, searchQuery, categories, activeTab: externalActiveTab, onTabChange }) => {
+const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, products, searchQuery, categories, activeTab: externalActiveTab, onTabChange, currentPage, setCurrentPage, totalPages }) => {
   const [activeTab, setActiveTab] = useState(externalActiveTab || "전체");
   const [sort, setSort] = useState("인기순");
   const [viewMode, setViewMode] = useState("grid"); // grid | list
@@ -159,6 +159,10 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
               <img
                 src={p.image}
                 alt={p.imageAlt}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                }}
                 style={{
                   width: "100%",
                   height: "100%",
@@ -190,6 +194,48 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
           </article>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="pagination" style={{ marginTop: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+          <button 
+            className="btn-secondary"
+            onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+            disabled={currentPage === 0}
+            style={{ padding: '8px 16px' }}
+          >
+            이전
+          </button>
+          
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = Math.max(0, Math.min(totalPages - 1, Math.floor(currentPage / 5) * 5 + i));
+              return (
+                <button
+                  key={pageNum}
+                  className={currentPage === pageNum ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setCurrentPage(pageNum)}
+                  style={{ padding: '8px 12px', minWidth: '44px' }}
+                >
+                  {pageNum + 1}
+                </button>
+              );
+            })}
+          </div>
+          
+          <button 
+            className="btn-secondary"
+            onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+            disabled={currentPage >= totalPages - 1}
+            style={{ padding: '8px 16px' }}
+          >
+            다음
+          </button>
+          
+          <span style={{ marginLeft: '16px', color: '#666' }}>
+            {currentPage + 1} / {totalPages} 페이지
+          </span>
+        </div>
+      )}
     </div>
   );
 };

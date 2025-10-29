@@ -41,6 +41,20 @@ function ShopLayout() {
   const { items: cartItems, branchId } = useSelector(state => state.cart);
   const selectedBranch = useSelector(state => state.branch.selectedBranch);
   const [activeTab, setActiveTab] = useState("전체");
+  
+  // 카테고리 ID 매핑 (이름 -> ID)
+  const getCategoryIdByName = (categoryName) => {
+    if (!categoryName || categoryName === '전체') return null;
+    const category = categories.find(c => c.name === categoryName);
+    return category?.id || null;
+  };
+  
+  // 탭 변경 핸들러
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    setSelectedCategoryId(getCategoryIdByName(tabName));
+    setCurrentPage(0); // 탭 변경 시 첫 페이지로 리셋
+  };
   const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | order | payment | payment-success | order-complete | search
   const [activeCategoryPage, setActiveCategoryPage] = useState("의류");
   const [favorites, setFavorites] = useState(new Set());
@@ -60,6 +74,7 @@ function ShopLayout() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null); // 선택된 카테고리 ID
   const [orderData, setOrderData] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
   const [showBranchSelector, setShowBranchSelector] = useState(false);
@@ -138,6 +153,7 @@ function ShopLayout() {
         
         const list = Array.isArray(data) ? data : [];
         const mapped = list.map((c) => ({
+          id: c.id || c.categoryId, // 카테고리 ID 추가
           name: c.name || "기타",
           photo: categoryImageMap[c.name] || categoryImageMap["의류"],
           description: c.description || ""
@@ -303,11 +319,19 @@ function ShopLayout() {
         const page = currentPage;
         const size = 12; // 한 페이지에 12개
         
+        // 카테고리 필터 파라미터 구성
+        const params = {
+          page: page,
+          size: size
+        };
+        
+        // 카테고리 ID가 있으면 추가
+        if (selectedCategoryId) {
+          params.categoryId = selectedCategoryId;
+        }
+        
         const res = await shopApi.get('/api/public/products/with-branches', {
-          params: {
-            page: page,
-            size: size
-          }
+          params: params
         });
         
         // 페이지네이션 응답 처리
@@ -394,7 +418,7 @@ function ShopLayout() {
       }
     }
     loadBranchProducts();
-  }, [currentPage]); // currentPage가 변경될 때마다 로드
+  }, [currentPage, selectedCategoryId]); // currentPage나 selectedCategoryId가 변경될 때마다 로드
   
   const toggleFavorite = (id) => {
     setFavorites((prev) => {
@@ -576,7 +600,7 @@ function ShopLayout() {
              searchQuery={searchQuery}
              categories={categories}
              activeTab={activeTab}
-             onTabChange={setActiveTab}
+             onTabChange={handleTabChange}
              currentPage={currentPage}
              setCurrentPage={setCurrentPage}
              totalPages={totalPages}
