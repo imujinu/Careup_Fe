@@ -18,7 +18,8 @@ const ShopHeader = ({
   handleSearch,
   setShowBranchSelector,
   selectedBranch,
-  getCartItemCount
+  getCartItemCount,
+  handleAdminClick
 }) => {
   return (
     <header className="header">
@@ -26,15 +27,31 @@ const ShopHeader = ({
         <div className="header-top">
           <a href="#">고객센터</a>
           {!isLoggedIn ? (
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage("login");
-              }}
-            >
-              로그인
-            </a>
+            <>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage("login");
+                }}
+              >
+                로그인
+              </a>
+              <a
+                href="#"
+                style={{ marginLeft: 2 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (handleAdminClick) {
+                    handleAdminClick(e);
+                  } else {
+                    window.location.href = "/login";
+                  }
+                }}
+              >
+                관리자
+              </a>
+            </>
           ) : (
             <a
               href="#"

@@ -513,6 +513,17 @@ function ShopLayout() {
     }
   };
 
+  // 관리자 페이지로 이동
+  const handleAdminClick = (e) => {
+    e.preventDefault();
+    try {
+      const staffAuthed = authService?.isAuthenticated?.();
+      window.location.href = staffAuthed ? "/dashboard" : "/login";
+    } catch {
+      window.location.href = "/login";
+    }
+  };
+
   // 주문 페이지로 이동
   const handleProceedToOrder = (cartData) => {
     setOrderData(cartData);
@@ -571,6 +582,7 @@ function ShopLayout() {
         setShowBranchSelector={setShowBranchSelector}
         selectedBranch={selectedBranch}
         getCartItemCount={getCartItemCount}
+        handleAdminClick={handleAdminClick}
       />
 
       <main>
