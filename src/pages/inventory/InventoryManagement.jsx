@@ -440,7 +440,7 @@ function InventoryManagement() {
           minPrice: formData.minPrice,
           maxPrice: formData.maxPrice,
           supplyPrice: formData.supplyPrice,
-          imageUrl: formData.imageUrl,
+          imageFile: formData.imageFile,
           visibility: formData.visibility
         });
         
@@ -540,8 +540,42 @@ function InventoryManagement() {
     try {
       console.log('Saving inventory data:', formData);
       
-      // 재고 정보 업데이트 (안전재고, 단가)
+      const productId = formData.productId || selectedItem?.product?.id;
       const branchProductId = selectedItem?.branchProductId || selectedItem?.id;
+      
+      // 상품 정보 수정 (이름, 이미지)
+      if (productId && (formData.productName || formData.imageFile || formData.removeImage)) {
+        try {
+          // 기존 상품 정보 가져오기
+          const productResponse = await inventoryService.getProduct(productId);
+          const existingProduct = productResponse.data?.data || productResponse.data;
+          
+          // 이미지 제거인 경우
+          const imageFileToSend = formData.removeImage ? null : formData.imageFile || null;
+          const imageUrlToSend = formData.removeImage ? "" : (formData.imageFile ? undefined : existingProduct.imageUrl);
+          
+          // 상품 수정 API 호출
+          await inventoryService.updateProduct(productId, {
+            name: formData.productName || existingProduct.name,
+            description: existingProduct.description || '',
+            categoryId: existingProduct.categoryId || existingProduct.category?.categoryId,
+            minPrice: existingProduct.minPrice || 0,
+            maxPrice: existingProduct.maxPrice || 0,
+            supplyPrice: existingProduct.supplyPrice || 0,
+            visibility: existingProduct.visibility || 'ALL',
+            imageFile: imageFileToSend,
+            imageUrl: imageUrlToSend
+          });
+          
+          console.log('상품 정보가 성공적으로 수정되었습니다.');
+        } catch (err) {
+          console.error('상품 정보 수정 실패:', err);
+          alert('상품 정보 수정에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
+          return;
+        }
+      }
+      
+      // 재고 정보 업데이트 (안전재고, 단가)
       if (branchProductId) {
         await inventoryService.updateInventoryInfo(
           branchProductId,
