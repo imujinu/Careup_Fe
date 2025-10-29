@@ -26,14 +26,39 @@ export default function StaffCreate() {
     detail, detailError, createError, updateError,
     jobGrades, jobGradeLoading
   } = useAppSelector((s) => s.staff);
+  const { role: rawRole, user: authUser } = useAppSelector((s) => s.auth);
 
-  const search = useLocation().search;
-  const id = g('id', search);
+  const role = useMemo(() => (rawRole || '').replace(/^ROLE_/, '').toUpperCase(), [rawRole]);
+  const isHqAdmin = role === 'HQ_ADMIN';
+  const isManager = role === 'BRANCH_ADMIN' || role === 'FRANCHISE_OWNER';
+  const isGeneralStaff = role === 'STAFF';
+
+  const location = useLocation();
+  const search = location?.search || '';
+  const pathIsMy = location.pathname === '/my';
+
+  const myId = useMemo(
+    () => authUser?.id || authUser?.employeeId || authUser?.staffId || null,
+    [authUser]
+  );
+  const id = useMemo(() => g('id', search) || (pathIsMy ? myId : null), [search, pathIsMy, myId]);
+
+  const isSelf = useMemo(() => {
+    if (!myId || !id) return pathIsMy;
+    return String(myId) === String(id) || pathIsMy;
+  }, [myId, id, pathIsMy]);
+
+  const isSelfRestricted = !isHqAdmin && !!isSelf;
+
+  const targetAuthorityType = (detail?.authorityType || 'STAFF');
+
+  const canEditJobGrade = !isSelf && (isHqAdmin || (isManager && targetAuthorityType === 'STAFF'));
+  const canEditAuthorityType = isHqAdmin && !isSelf;
 
   const [form, setForm] = useState({
     employeeNumber: '',
     name: '',
-    jobGradeId: '',            // 문자열로 고정(Select value와 일치)
+    jobGradeId: '',
     dateOfBirth: '',
     gender: 'MALE',
     email: '',
@@ -46,7 +71,7 @@ export default function StaffCreate() {
     relationship: 'PARENT',
     hireDate: '',
     terminateDate: '',
-    authorityType: 'FRANCHISE_OWNER',
+    authorityType: 'STAFF',
     employmentStatus: 'ACTIVE',
     employmentType: 'FULL_TIME',
     profileImageUrl: '',
@@ -63,9 +88,7 @@ export default function StaffCreate() {
   const [showPw, setShowPw] = useState(false);
 
   const fileRef = useRef(null);
-  const isEdit = useMemo(() => Boolean(id), [id]);
 
-  // Daum 주소 스크립트
   useEffect(() => {
     const script = document.createElement('script');
     script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
@@ -74,18 +97,18 @@ export default function StaffCreate() {
     return () => { document.head.removeChild(script); };
   }, []);
 
-  // 상세/직급 로드
+  const isEdit = useMemo(() => Boolean(id), [id]);
+
   useEffect(() => {
-    if (isEdit) dispatch(fetchStaffDetailAction(id));
+    if (isEdit && id) dispatch(fetchStaffDetailAction(id));
   }, [dispatch, isEdit, id]);
 
   useEffect(() => {
     if (!jobGrades || (Array.isArray(jobGrades) && jobGrades.length === 0)) {
-      dispatch(fetchJobGradesAction());
+      if (!isGeneralStaff && !isSelfRestricted) dispatch(fetchJobGradesAction());
     }
-  }, [dispatch, jobGrades]);
+  }, [dispatch, jobGrades, isGeneralStaff, isSelfRestricted]);
 
-  // 지점 옵션
   useEffect(() => {
     (async () => {
       try {
@@ -95,14 +118,13 @@ export default function StaffCreate() {
     })();
   }, []);
 
-  // 상세 → 폼 값 주입(1차: 가능한 필드 그대로)
   useEffect(() => {
     if (detail && isEdit) {
       const toStr = (v) => (v === undefined || v === null || v === '' ? '' : String(v));
       setForm({
         employeeNumber: detail.employeeNumber || '',
         name: detail.name || '',
-        jobGradeId: toStr(detail.jobGradeId ?? detail.jobGrade?.id),  // 우선 시도
+        jobGradeId: toStr(detail.jobGradeId ?? detail.jobGrade?.id),
         dateOfBirth: detail.dateOfBirth || '',
         gender: detail.gender || 'MALE',
         email: detail.email || '',
@@ -115,7 +137,7 @@ export default function StaffCreate() {
         relationship: detail.relationship || 'PARENT',
         hireDate: detail.hireDate || '',
         terminateDate: detail.terminateDate || '',
-        authorityType: detail.authorityType || 'FRANCHISE_OWNER',
+        authorityType: detail.authorityType || 'STAFF',
         employmentStatus: detail.employmentStatus || 'ACTIVE',
         employmentType: detail.employmentType || 'FULL_TIME',
         profileImageUrl: detail.profileImageUrl || '',
@@ -133,8 +155,7 @@ export default function StaffCreate() {
     }
   }, [detail, isEdit]);
 
-  // 직급 옵션 계산
-  const jobGradeOptions = useMemo(() => {
+  const rawJobGradeOptions = useMemo(() => {
     const jg = jobGrades;
     if (Array.isArray(jg)) return jg;
     if (jg?.content && Array.isArray(jg.content)) return jg.content;
@@ -143,29 +164,46 @@ export default function StaffCreate() {
     return [];
   }, [jobGrades]);
 
-  // ⚠️ 보정 로직: 폼에 직급 ID가 비어있고, 상세/옵션이 준비되면
-  // 1) 상세의 jobGradeId 또는 jobGrade.id 재시도
-  // 2) 그래도 없으면 상세의 직급명과 옵션 name을 매칭해 ID 주입
+  const currentJobGradeId = useMemo(() => {
+    return String(form.jobGradeId || detail?.jobGradeId || detail?.jobGrade?.id || '');
+  }, [form.jobGradeId, detail?.jobGradeId, detail?.jobGrade?.id]);
+
+  const currentJobGradeName = useMemo(() => {
+    const found = rawJobGradeOptions.find(o => String(o?.id) === String(currentJobGradeId));
+    return found?.name || detail?.jobGrade?.name || detail?.jobGradeName || '';
+  }, [rawJobGradeOptions, currentJobGradeId, detail?.jobGrade?.name, detail?.jobGradeName]);
+
+  const jobGradeOptionsWithCurrent = useMemo(() => {
+    let opts = [...rawJobGradeOptions];
+    const exists = opts.some(o => String(o?.id) === String(currentJobGradeId));
+    if (!exists && currentJobGradeId) {
+      opts = [{ id: Number(currentJobGradeId), name: currentJobGradeName || '(현재 직급)', authorityType: targetAuthorityType }, ...opts];
+    }
+    return opts;
+  }, [rawJobGradeOptions, currentJobGradeId, currentJobGradeName, targetAuthorityType]);
+
+  const effectiveJobGradeOptions = useMemo(() => {
+    if (isHqAdmin) return jobGradeOptionsWithCurrent;
+    if (isSelf) return jobGradeOptionsWithCurrent;
+    return jobGradeOptionsWithCurrent.filter(
+      o => (o?.authorityType || 'STAFF') === 'STAFF' || String(o?.id) === String(currentJobGradeId)
+    );
+  }, [isHqAdmin, isSelf, jobGradeOptionsWithCurrent, currentJobGradeId]);
+
   useEffect(() => {
-    if (!isEdit || !detail) return;
-    if (form.jobGradeId) return; // 이미 값 있으면 건드리지 않음
-
-    const tryId = detail.jobGradeId ?? detail.jobGrade?.id;
-    if (tryId) {
-      setForm(f => ({ ...f, jobGradeId: String(tryId) }));
-      return;
+    if (!canEditAuthorityType && detail?.authorityType) {
+      setForm((f) => ({ ...f, authorityType: detail.authorityType }));
     }
+  }, [canEditAuthorityType, detail?.authorityType]);
 
-    const nameCandidate =
-      detail.jobGradeName ?? detail.jobGrade?.name ?? detail.jobGradeTitle ?? detail.jobGradeLabel;
-
-    if (nameCandidate && jobGradeOptions.length) {
-      const found = jobGradeOptions.find(j => j?.name === nameCandidate);
-      if (found?.id) setForm(f => ({ ...f, jobGradeId: String(found.id) }));
+  useEffect(() => {
+    if (!isHqAdmin || isSelf) return;
+    const jg = effectiveJobGradeOptions.find((x) => String(x?.id) === String(currentJobGradeId));
+    if (jg?.authorityType && form.authorityType !== jg.authorityType) {
+      setForm((f) => ({ ...f, authorityType: jg.authorityType }));
     }
-  }, [isEdit, detail, jobGradeOptions, form.jobGradeId]);
+  }, [isHqAdmin, isSelf, effectiveJobGradeOptions, currentJobGradeId, form.authorityType]);
 
-  // 에러 토스트
   useEffect(() => {
     if (createError) { addToast({ type: 'error', title: '등록 실패', message: createError, duration: 3000 }); dispatch(clearErrors()); }
   }, [createError, addToast, dispatch]);
@@ -176,7 +214,14 @@ export default function StaffCreate() {
     if (detailError) { addToast({ type: 'error', title: '상세 조회 실패', message: detailError, duration: 3000 }); dispatch(clearErrors()); }
   }, [detailError, addToast, dispatch]);
 
-  // ===== 핸들러 =====
+  useEffect(() => {
+    if (!isEdit || !detail) return;
+    if (!form.jobGradeId) {
+      const idStr = String(detail?.jobGradeId ?? detail?.jobGrade?.id ?? '');
+      if (idStr) setForm((f) => ({ ...f, jobGradeId: idStr }));
+    }
+  }, [isEdit, detail, form.jobGradeId]);
+
   const pick = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
     if (errors[k]) setErrors((e) => ({ ...e, [k]: null }));
@@ -195,6 +240,7 @@ export default function StaffCreate() {
   };
 
   const onImage = (e) => {
+    if (isSelfRestricted) return;
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
@@ -204,6 +250,7 @@ export default function StaffCreate() {
   };
 
   const clearImage = () => {
+    if (isSelfRestricted) return;
     setImageFile(null);
     setPreview(null);
     if (fileRef.current) fileRef.current.value = '';
@@ -211,9 +258,6 @@ export default function StaffCreate() {
 
   const validate = () => {
     const m = {};
-    if (!form.employeeNumber.trim()) m.employeeNumber = '사번을 입력하세요';
-    if (!form.name.trim()) m.name = '이름을 입력하세요';
-    if (!form.dateOfBirth) m.dateOfBirth = '생년월일을 입력하세요';
     if (!form.email.trim()) m.email = '이메일을 입력하세요';
     if (!form.zipcode.trim()) m.zipcode = '우편번호를 입력하세요';
     if (!form.address.trim()) m.address = '주소를 입력하세요';
@@ -221,20 +265,38 @@ export default function StaffCreate() {
     if (!form.mobile.trim()) m.mobile = '휴대폰번호를 입력하세요';
     if (!form.emergencyTel.trim()) m.emergencyTel = '비상연락처를 입력하세요';
     if (!form.emergencyName.trim()) m.emergencyName = '비상연락처 이름을 입력하세요';
-    if (!form.hireDate) m.hireDate = '입사일을 입력하세요';
-    if (!isEdit && !form.rawPassword.trim()) m.rawPassword = '비밀번호를 입력하세요';
-    if (!form.jobGradeId) m.jobGradeId = '직급을 선택하세요';
+
+    if (!isSelfRestricted) {
+      if (!form.employeeNumber.trim()) m.employeeNumber = '사번을 입력하세요';
+      if (!form.name.trim()) m.name = '이름을 입력하세요';
+      if (!form.dateOfBirth) m.dateOfBirth = '생년월일을 입력하세요';
+      if (!isEdit && !form.rawPassword.trim()) m.rawPassword = '비밀번호를 입력하세요';
+      if (!currentJobGradeId) m.jobGradeId = '직급을 선택하세요';
+      if (!form.hireDate) m.hireDate = '입사일을 입력하세요';
+    }
+
     setErrors(m);
     return Object.keys(m).length === 0;
   };
+
+  const viewBranchOptions = useMemo(() => {
+    if (isHqAdmin) return branchOptions;
+    const ids = new Set(
+      Array.isArray(authUser?.managedBranchIds) && authUser.managedBranchIds.length
+        ? authUser.managedBranchIds
+        : [authUser?.branchId].filter(Boolean)
+    );
+    if (ids.size === 0) return branchOptions;
+    return branchOptions.filter(b => ids.has(b.id));
+  }, [isHqAdmin, branchOptions, authUser?.managedBranchIds, authUser?.branchId]);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
-    const payload = {
+    let payload = {
       ...form,
-      jobGradeId: form.jobGradeId ? Number(form.jobGradeId) : null,
+      jobGradeId: currentJobGradeId ? Number(currentJobGradeId) : null,
       dispatches: dispatches.map(d => ({
         branchId: d.branchId ? Number(d.branchId) : null,
         assignedFrom: d.assignedFrom || null,
@@ -243,10 +305,43 @@ export default function StaffCreate() {
       })),
     };
 
+    if (isSelfRestricted && detail) {
+      const keep = (k, fallback = null) => (detail[k] === undefined ? fallback : detail[k]);
+      payload.employeeNumber   = keep('employeeNumber', payload.employeeNumber);
+      payload.name             = keep('name', payload.name);
+      payload.jobGradeId       = detail.jobGradeId ?? detail.jobGrade?.id ?? payload.jobGradeId;
+      payload.dateOfBirth      = keep('dateOfBirth', payload.dateOfBirth);
+      payload.gender           = keep('gender', payload.gender);
+      payload.hireDate         = keep('hireDate', payload.hireDate);
+      payload.terminateDate    = keep('terminateDate', payload.terminateDate);
+      payload.authorityType    = keep('authorityType', payload.authorityType);
+      payload.employmentStatus = keep('employmentStatus', payload.employmentStatus);
+      payload.employmentType   = keep('employmentType', payload.employmentType);
+      payload.profileImageUrl  = keep('profileImageUrl', payload.profileImageUrl);
+      payload.remark           = keep('remark', payload.remark);
+      payload.dispatches = (Array.isArray(detail.dispatches) ? detail.dispatches : []).map(d => ({
+        branchId: d.branchId ?? d.branch?.id ?? null,
+        assignedFrom: d.assignedFrom ?? null,
+        assignedTo: d.assignedTo ?? null,
+        placementYn: d.placementYn ?? 'N',
+      }));
+      payload.rawPassword = '';
+    }
+
+    if (!isHqAdmin && !isSelf) {
+      payload.authorityType = 'STAFF';
+    }
+
     if (isEdit && !payload.rawPassword) delete payload.rawPassword;
 
     if (isEdit) {
-      await dispatch(updateStaffAction({ staffId: id, payload, profileImage: imageFile })).unwrap();
+      await dispatch(
+        updateStaffAction({
+          staffId: id,
+          payload,
+          profileImage: isSelfRestricted ? null : imageFile,
+        })
+      ).unwrap();
       setDoneOpen(true);
     } else {
       await dispatch(createStaffAction({ payload, profileImage: imageFile })).unwrap();
@@ -254,14 +349,16 @@ export default function StaffCreate() {
     }
   };
 
-  // ===== UI =====
   const addDispatch = () => {
+    if (isSelfRestricted) return;
     setDispatches(arr => [...arr, { branchId: '', assignedFrom: '', assignedTo: '', placementYn: 'N' }]);
   };
   const removeDispatch = (idx) => {
+    if (isSelfRestricted) return;
     setDispatches(arr => arr.filter((_, i) => i !== idx));
   };
   const changeDispatch = (idx, key, val) => {
+    if (isSelfRestricted) return;
     setDispatches(arr => arr.map((it, i) => i === idx ? { ...it, [key]: val } : it));
   };
 
@@ -269,27 +366,33 @@ export default function StaffCreate() {
     <Wrap>
       <Card>
         <Head>
-          <h2>{isEdit ? '직원수정' : '직원등록'}</h2>
-          <HeadSub>{isEdit ? '직원 정보를 수정합니다' : '새로운 직원을 등록합니다'}</HeadSub>
+          <h2>{isEdit ? (isSelf ? '내 정보 수정' : '직원수정') : '직원등록'}</h2>
+          <HeadSub>
+            {isEdit
+              ? (isSelfRestricted ? '연락처와 주소 정보만 수정 가능합니다' : '직원 정보를 수정합니다')
+              : '새로운 직원을 등록합니다'}
+          </HeadSub>
         </Head>
 
         <TopSection>
           <TopTitle>프로필 이미지</TopTitle>
           <TopUpload>
             <PreviewWrap>
-              <TopPreview>
+              <TopPreview $disabled={isSelfRestricted}>
                 {preview ? (
                   <img src={preview} alt="profile" />
                 ) : (
                   <TopPlaceholder>
                     <Icon path={mdiUpload} size={2} />
-                    <span>이미지 업로드</span>
+                    <span>{isSelfRestricted ? '이미지 변경 불가' : '이미지 업로드'}</span>
                   </TopPlaceholder>
                 )}
-                <input ref={fileRef} type="file" accept="image/*" onChange={onImage} />
+                {!isSelfRestricted && (
+                  <input ref={fileRef} type="file" accept="image/*" onChange={onImage} />
+                )}
               </TopPreview>
 
-              {preview && (
+              {preview && !isSelfRestricted && (
                 <ClearBadge
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearImage(); }}
@@ -307,33 +410,61 @@ export default function StaffCreate() {
           <Section>
             <SectionTitle>기본 정보</SectionTitle>
             <Grid>
-              <Label $required>사번</Label>
-              <Input value={form.employeeNumber} onChange={(e) => pick('employeeNumber', e.target.value)} placeholder="사번" />
+              <Label $required={!isSelfRestricted}>사번</Label>
+              <Input
+                value={form.employeeNumber}
+                onChange={(e) => pick('employeeNumber', e.target.value)}
+                placeholder="사번"
+                disabled={isSelfRestricted}
+                readOnly={isSelfRestricted}
+              />
               {errors.employeeNumber && <Err>{errors.employeeNumber}</Err>}
 
-              <Label $required>직원명</Label>
-              <Input value={form.name} onChange={(e) => pick('name', e.target.value)} placeholder="직원명을 입력하세요." />
+              <Label $required={!isSelfRestricted}>직원명</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => pick('name', e.target.value)}
+                placeholder="직원명을 입력하세요."
+                disabled={isSelfRestricted}
+                readOnly={isSelfRestricted}
+              />
               {errors.name && <Err>{errors.name}</Err>}
 
-              <Label $required>직급</Label>
-              <Select
-                value={form.jobGradeId ?? ''}                  // 방어적 접근
-                onChange={(e) => pick('jobGradeId', e.target.value)}
-                disabled={jobGradeLoading}
-              >
-                <option value="">{jobGradeLoading ? '불러오는 중...' : '선택'}</option>
-                {jobGradeOptions.map((jg) => (
-                  <option key={jg.id} value={String(jg.id)}>{jg.name}</option>
-                ))}
-              </Select>
+              <Label $required={!isSelfRestricted}>직급</Label>
+              {isSelfRestricted ? (
+                <ReadOnlyBox>{currentJobGradeName || '-'}</ReadOnlyBox>
+              ) : (
+                <Select
+                  value={currentJobGradeId}
+                  onChange={(e) => pick('jobGradeId', e.target.value)}
+                  disabled={!canEditJobGrade}
+                >
+                  {!currentJobGradeId && (
+                    <option value="">{jobGradeLoading ? '불러오는 중...' : '선택'}</option>
+                  )}
+                  {effectiveJobGradeOptions.map((jg) => (
+                    <option key={jg.id} value={String(jg.id)}>{jg.name}</option>
+                  ))}
+                </Select>
+              )}
               {errors.jobGradeId && <Err>{errors.jobGradeId}</Err>}
 
-              <Label $required>생년월일</Label>
-              <Input type="date" value={form.dateOfBirth} onChange={(e) => pick('dateOfBirth', e.target.value)} />
+              <Label $required={!isSelfRestricted}>생년월일</Label>
+              <Input
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(e) => pick('dateOfBirth', e.target.value)}
+                disabled={isSelfRestricted}
+                readOnly={isSelfRestricted}
+              />
               {errors.dateOfBirth && <Err>{errors.dateOfBirth}</Err>}
 
               <Label>성별</Label>
-              <Select value={form.gender} onChange={(e) => pick('gender', e.target.value)}>
+              <Select
+                value={form.gender}
+                onChange={(e) => pick('gender', e.target.value)}
+                disabled={isSelfRestricted}
+              >
                 <option value="MALE">남성</option>
                 <option value="FEMALE">여성</option>
               </Select>
@@ -344,23 +475,43 @@ export default function StaffCreate() {
             <SectionTitle>연락처 정보</SectionTitle>
             <Grid>
               <Label $required>이메일</Label>
-              <Input type="email" value={form.email} onChange={(e) => pick('email', e.target.value)} placeholder="example@care-up.com" />
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => pick('email', e.target.value)}
+                placeholder="example@care-up.com"
+              />
               {errors.email && <Err>{errors.email}</Err>}
 
               <Label $required>휴대폰</Label>
-              <Input value={form.mobile} onChange={(e) => pick('mobile', e.target.value)} placeholder="010-0000-0000" />
+              <Input
+                value={form.mobile}
+                onChange={(e) => pick('mobile', e.target.value)}
+                placeholder="010-0000-0000"
+              />
               {errors.mobile && <Err>{errors.mobile}</Err>}
 
               <Label $required>비상연락망</Label>
-              <Input value={form.emergencyTel} onChange={(e) => pick('emergencyTel', e.target.value)} placeholder="대체 연락처" />
+              <Input
+                value={form.emergencyTel}
+                onChange={(e) => pick('emergencyTel', e.target.value)}
+                placeholder="대체 연락처"
+              />
               {errors.emergencyTel && <Err>{errors.emergencyTel}</Err>}
 
               <Label $required>비상연락처 이름</Label>
-              <Input value={form.emergencyName} onChange={(e) => pick('emergencyName', e.target.value)} placeholder="관계자 성명" />
+              <Input
+                value={form.emergencyName}
+                onChange={(e) => pick('emergencyName', e.target.value)}
+                placeholder="관계자 성명"
+              />
               {errors.emergencyName && <Err>{errors.emergencyName}</Err>}
 
               <Label $required>관계</Label>
-              <Select value={form.relationship} onChange={(e) => pick('relationship', e.target.value)}>
+              <Select
+                value={form.relationship}
+                onChange={(e) => pick('relationship', e.target.value)}
+              >
                 <option value="PARENT">부모</option>
                 <option value="SIBLING">형제자매</option>
                 <option value="SPOUSE">배우자</option>
@@ -408,30 +559,62 @@ export default function StaffCreate() {
           <Section>
             <SectionTitle>고용 정보</SectionTitle>
             <Grid>
-              <Label $required>입사일</Label>
-              <Input type="date" value={form.hireDate} onChange={(e) => pick('hireDate', e.target.value)} />
+              <Label $required={!isSelfRestricted}>입사일</Label>
+              <Input
+                type="date"
+                value={form.hireDate}
+                onChange={(e) => pick('hireDate', e.target.value)}
+                disabled={isSelfRestricted}
+                readOnly={isSelfRestricted}
+              />
               {errors.hireDate && <Err>{errors.hireDate}</Err>}
 
               <Label>퇴사일</Label>
-              <Input type="date" value={form.terminateDate || ''} onChange={(e) => pick('terminateDate', e.target.value)} />
+              <Input
+                type="date"
+                value={form.terminateDate || ''}
+                onChange={(e) => pick('terminateDate', e.target.value)}
+                disabled={isSelfRestricted}
+                readOnly={isSelfRestricted}
+              />
 
-              <Label $required>권한 유형</Label>
-              <Select value={form.authorityType} onChange={(e) => pick('authorityType', e.target.value)}>
-                <option value="HQ_ADMIN">본점(본사) 관리자</option>
-                <option value="BRANCH_ADMIN">지점(직영점) 관리자</option>
-                <option value="FRANCHISE_OWNER">가맹점주 (관리자)</option>
-                <option value="STAFF">직원</option>
-              </Select>
+              <Label $required={canEditAuthorityType}>권한 유형</Label>
+              {canEditAuthorityType ? (
+                <Select
+                  value={form.authorityType}
+                  onChange={(e) => pick('authorityType', e.target.value)}
+                >
+                  <option value="HQ_ADMIN">본점(본사) 관리자</option>
+                  <option value="BRANCH_ADMIN">지점(직영점) 관리자</option>
+                  <option value="FRANCHISE_OWNER">가맹점주 (관리자)</option>
+                  <option value="STAFF">직원</option>
+                </Select>
+              ) : (
+                <ReadOnlyBox>
+                  {form.authorityType === 'HQ_ADMIN' && '본점(본사) 관리자'}
+                  {form.authorityType === 'BRANCH_ADMIN' && '지점(직영점) 관리자'}
+                  {form.authorityType === 'FRANCHISE_OWNER' && '가맹점주 (관리자)'}
+                  {form.authorityType === 'STAFF' && '직원'}
+                </ReadOnlyBox>
+              )}
 
-              <Label $required>고용상태</Label>
-              <Select value={form.employmentStatus} onChange={(e) => pick('employmentStatus', e.target.value)}>
+              <Label $required={!isSelfRestricted}>고용상태</Label>
+              <Select
+                value={form.employmentStatus}
+                onChange={(e) => pick('employmentStatus', e.target.value)}
+                disabled={isSelfRestricted}
+              >
                 <option value="ACTIVE">재직</option>
                 <option value="ON_LEAVE">휴직</option>
                 <option value="TERMINATED">퇴사</option>
               </Select>
 
-              <Label $required>고용형태</Label>
-              <Select value={form.employmentType} onChange={(e) => pick('employmentType', e.target.value)}>
+              <Label $required={!isSelfRestricted}>고용형태</Label>
+              <Select
+                value={form.employmentType}
+                onChange={(e) => pick('employmentType', e.target.value)}
+                disabled={isSelfRestricted}
+              >
                 <option value="FULL_TIME">정규직</option>
                 <option value="PART_TIME">계약직</option>
               </Select>
@@ -448,38 +631,55 @@ export default function StaffCreate() {
                     <Select
                       value={d.branchId != null ? String(d.branchId) : ''}
                       onChange={(e) => changeDispatch(idx, 'branchId', e.target.value ? Number(e.target.value) : '')}
+                      disabled={isSelfRestricted}
                     >
                       <option value="">선택</option>
-                      {branchOptions.map((b) => (
+                      {viewBranchOptions.map((b) => (
                         <option key={b.id} value={String(b.id)}>{b.name}</option>
                       ))}
                     </Select>
                   </Field>
                   <Field>
                     <SmallLabel>시작일</SmallLabel>
-                    <Input type="date" value={d.assignedFrom} onChange={(e) => changeDispatch(idx, 'assignedFrom', e.target.value)} />
+                    <Input
+                      type="date"
+                      value={d.assignedFrom}
+                      onChange={(e) => changeDispatch(idx, 'assignedFrom', e.target.value)}
+                      disabled={isSelfRestricted}
+                      readOnly={isSelfRestricted}
+                    />
                   </Field>
                   <Field>
                     <SmallLabel>종료일</SmallLabel>
-                    <Input type="date" value={d.assignedTo} onChange={(e) => changeDispatch(idx, 'assignedTo', e.target.value)} />
+                    <Input
+                      type="date"
+                      value={d.assignedTo}
+                      onChange={(e) => changeDispatch(idx, 'assignedTo', e.target.value)}
+                      disabled={isSelfRestricted}
+                      readOnly={isSelfRestricted}
+                    />
                   </Field>
-                  <IconBtn
-                    type="button"
-                    aria-label="배치 삭제"
-                    onClick={() => removeDispatch(idx)}
-                    title="배치 삭제"
-                  >
-                    <Icon path={mdiDelete} size={0.9} />
-                  </IconBtn>
+                  {!isSelfRestricted && (
+                    <IconBtn
+                      type="button"
+                      aria-label="배치 삭제"
+                      onClick={() => removeDispatch(idx)}
+                      title="배치 삭제"
+                    >
+                      <Icon path={mdiDelete} size={0.9} />
+                    </IconBtn>
+                  )}
                 </DispatchRow>
               ))}
             </DispatchList>
-            <AddLine>
-              <Ghost type="button" onClick={addDispatch}>
-                <Icon path={mdiPlus} size={1} />
-                배치 추가
-              </Ghost>
-            </AddLine>
+            {!isSelfRestricted && (
+              <AddLine>
+                <Ghost type="button" onClick={addDispatch}>
+                  <Icon path={mdiPlus} size={1} />
+                  배치 추가
+                </Ghost>
+              </AddLine>
+            )}
           </Section>
 
           {!isEdit && (
@@ -495,7 +695,8 @@ export default function StaffCreate() {
                     placeholder="8자 이상"
                   />
                   <AffixBtn type="button" onClick={() => setShowPw(v => !v)} aria-label="비밀번호 표시 전환">
-                    <Icon path={showPw ? mdiEyeOff : mdiEye} size={0.9} />
+                    <Icon path={mdiEyeOff} size={0.9} style={{ display: showPw ? 'none' : 'block' }} />
+                    <Icon path={mdiEye} size={0.9} style={{ display: showPw ? 'block' : 'none' }} />
                   </AffixBtn>
                 </InputAffix>
                 {errors.rawPassword && <Err>{errors.rawPassword}</Err>}
@@ -511,12 +712,14 @@ export default function StaffCreate() {
                 value={form.remark}
                 onChange={(e) => pick('remark', e.target.value)}
                 placeholder="비고란을 작성하실 수 있습니다."
+                disabled={isSelfRestricted}
+                readOnly={isSelfRestricted}
               />
             </Grid>
           </Section>
 
           <Footer>
-            <Ghost type="button" onClick={() => navigate('/staff')}>취소</Ghost>
+            <Ghost type="button" onClick={() => navigate(pathIsMy ? '/my' : '/staff')}>취소</Ghost>
             <Primary type="submit" disabled={createLoading || updateLoading}>
               <Icon path={mdiContentSave} size={1} />
               확인
@@ -529,9 +732,15 @@ export default function StaffCreate() {
         <ModalOverlay>
           <ModalCard>
             <ModalTitle>{isEdit ? '수정이 완료되었습니다' : '등록이 완료되었습니다'}</ModalTitle>
-            <ModalSub>확인을 누르면 직원 목록으로 이동합니다.</ModalSub>
+            <ModalSub>
+              {isSelfRestricted
+                ? '확인을 누르면 내 정보 페이지로 이동합니다.'
+                : '확인을 누르면 직원 목록으로 이동합니다.'}
+            </ModalSub>
             <ModalActions>
-              <Primary onClick={() => navigate('/staff')}>확인</Primary>
+              <Primary onClick={() => navigate(pathIsMy ? '/my' : '/staff', { replace: true })}>
+                확인
+              </Primary>
             </ModalActions>
           </ModalCard>
         </ModalOverlay>
@@ -592,7 +801,7 @@ const PreviewWrap = styled.div`
   height:168px;
 `;
 
-const TopPreview = styled.label`
+const TopPreview = styled.label.withConfig({ shouldForwardProp:(p)=>p!=='$disabled' })`
   position:relative;
   width:168px;
   height:168px;
@@ -601,10 +810,10 @@ const TopPreview = styled.label`
   display:grid;
   place-items:center;
   overflow:hidden;
-  cursor:pointer;
+  cursor:${(p)=>p.$disabled ? 'default' : 'pointer'};
   transition:.15s ease;
   background:#fff;
-  &:hover{border-color:#8b5cf6;background:#f9fafb;}
+  ${(p)=>p.$disabled ? '' : '&:hover{border-color:#8b5cf6;background:#f9fafb;}'}
   img{width:100%;height:100%;object-fit:cover;}
   input{
     position:absolute;
@@ -721,6 +930,18 @@ const Select = styled.select`
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 14px 14px;
+`;
+
+const ReadOnlyBox = styled.div`
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+  border:2px solid #e5e7eb;
+  border-radius:8px;
+  background:#f9fafb;
+  color:#374151;
+  font-size:14px;
 `;
 
 const TextArea = styled.textarea`

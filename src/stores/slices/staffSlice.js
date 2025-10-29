@@ -13,9 +13,11 @@ import {
 
 export const fetchStaffListAction = createAsyncThunk(
   'staff/fetchList',
-  async (params, { rejectWithValue }) => {
+  async (arg, { rejectWithValue }) => {
     try {
-      const data = await fetchStaffList(params || {});
+      const params =
+        arg && typeof arg === 'object' && 'params' in arg ? arg.params : (arg || {});
+      const data = await fetchStaffList(params);
       return data;
     } catch (e) {
       const m = e?.response?.data?.status_message || e.message || '직원 목록 조회 실패';
@@ -26,9 +28,15 @@ export const fetchStaffListAction = createAsyncThunk(
 
 export const fetchStaffListByBranchAction = createAsyncThunk(
   'staff/fetchListByBranch',
-  async ({ branchId, params }, { rejectWithValue }) => {
+  async (arg, { rejectWithValue }) => {
     try {
-      const data = await fetchStaffListByBranch(branchId, params || {});
+      const branchId = arg?.branchId;
+      const rawParams = arg?.params || {};
+      const params =
+        rawParams && typeof rawParams === 'object' && 'params' in rawParams
+          ? rawParams.params
+          : rawParams;
+      const data = await fetchStaffListByBranch(branchId, params);
       return data;
     } catch (e) {
       const m = e?.response?.data?.status_message || e.message || '지점별 직원 목록 조회 실패';
@@ -164,7 +172,6 @@ const staffSlice = createSlice({
     },
   },
   extraReducers: (b) => {
-    // 본사 전체 조회
     b.addCase(fetchStaffListAction.pending, (s) => {
       s.loading = true;
       s.error = null;
@@ -198,7 +205,6 @@ const staffSlice = createSlice({
       s.error = a.payload;
     });
 
-    // 지점별 조회
     b.addCase(fetchStaffListByBranchAction.pending, (s) => {
       s.loading = true;
       s.error = null;
@@ -232,7 +238,6 @@ const staffSlice = createSlice({
       s.error = a.payload;
     });
 
-    // 상세
     b.addCase(fetchStaffDetailAction.pending, (s) => {
       s.detailLoading = true;
       s.detailError = null;
@@ -246,7 +251,6 @@ const staffSlice = createSlice({
       s.detailError = a.payload;
     });
 
-    // 생성
     b.addCase(createStaffAction.pending, (s) => {
       s.createLoading = true;
       s.createError = null;
@@ -263,7 +267,6 @@ const staffSlice = createSlice({
       s.createError = a.payload;
     });
 
-    // 수정
     b.addCase(updateStaffAction.pending, (s) => {
       s.updateLoading = true;
       s.updateError = null;
@@ -279,7 +282,6 @@ const staffSlice = createSlice({
       s.updateError = a.payload;
     });
 
-    // 비활성화
     b.addCase(deactivateStaffAction.pending, (s) => {
       s.deactivateLoading = true;
       s.deactivateError = null;
@@ -303,7 +305,6 @@ const staffSlice = createSlice({
       s.deactivateError = a.payload;
     });
 
-    // 재입사
     b.addCase(rehireStaffAction.pending, (s) => {
       s.rehireLoading = true;
       s.rehireError = null;
@@ -320,7 +321,6 @@ const staffSlice = createSlice({
       s.rehireError = a.payload;
     });
 
-    // 직급
     b.addCase(fetchJobGradesAction.pending, (s) => {
       s.jobGradeLoading = true;
       s.jobGradeError = null;

@@ -78,6 +78,13 @@ const authSlice = createSlice({
     setRole: (state, action) => {
       state.role = action.payload || '';
     },
+    // ★ 본인 정보 일부 갱신(헤더 실시간 반영)
+    mergeUser: (state, action) => {
+      const patch = action.payload || {};
+      const next = { ...(state.user || {}), ...patch };
+      state.user = next;
+      try { tokenStorage.setUserInfo(next); } catch {}
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -134,5 +141,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUserType, setBranchId, setRole } = authSlice.actions;
+export const { clearError, setUserType, setBranchId, setRole, mergeUser } = authSlice.actions;
 export default authSlice.reducer;

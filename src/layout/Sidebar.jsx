@@ -2,7 +2,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { useAppDispatch } from '../stores/hooks';
+import { useAppDispatch, useAppSelector } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
 import { MENU_PATH_MAP } from '../routes/routePaths';
 import { getBranchName } from '../utils/branchUtils';
@@ -65,8 +65,10 @@ const Mdi = ({ path }) => <Icon path={path} size={0.95} />;
 function Sidebar({ isVisible, userType, branchId }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const rawRole = useAppSelector((s) => s.auth.role);
+  const role = String(rawRole || '').replace(/^ROLE_/, '').toUpperCase();
+  const canManageStaff = role === 'BRANCH_ADMIN' || role === 'FRANCHISE_OWNER';
 
-  // 본사 메뉴
   const headquartersMenuItems = [
     { id: 'dashboard',     label: '대시보드',     icon: mdiViewDashboardOutline, path: MENU_PATH_MAP.dashboard },
     { id: 'branch',        label: '지점관리',     icon: mdiOfficeBuilding,       path: MENU_PATH_MAP.branch },
@@ -82,8 +84,7 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'logout',        label: '로그아웃',     icon: mdiLogout,               isButton: true },
   ];
 
-  // 가맹점 메뉴
-  const franchiseMenuItems = [
+  const franchiseBase = [
     { id: 'dashboard',     label: '대시보드', icon: mdiViewDashboardOutline, path: MENU_PATH_MAP.dashboard },
     { id: 'inventory',     label: '재고관리', icon: mdiPackageVariantClosed, path: MENU_PATH_MAP.inventory },
     { id: 'purchaseOrder', label: '발주관리', icon: mdiCartOutline,          path: MENU_PATH_MAP.purchaseOrder },
@@ -94,12 +95,19 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'logout',        label: '로그아웃', icon: mdiLogout,               isButton: true },
   ];
 
-  const menuItems =
-    userType === "headquarters" ? headquartersMenuItems : franchiseMenuItems;
+  const franchiseMenuItems = (() => {
+    if (!canManageStaff) return franchiseBase;
+    const items = [...franchiseBase];
+    const staffItem = { id: 'staff', label: '직원관리', icon: mdiAccountGroupOutline, path: MENU_PATH_MAP.staff };
+    items.splice(1, 0, staffItem);
+    return items;
+  })();
+
+  const menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/");
+    navigate('/');
   };
 
   return (

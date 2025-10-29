@@ -12,6 +12,7 @@ import StaffList from '../pages/staff/StaffList';
 import StaffCreate from '../pages/staff/StaffCreate';
 import HeadquartersDashboard from '../pages/admin/HeadquartersDashboard';
 import OrderManagement from '../pages/admin/OrderManagement';
+import StaffDetail from '../pages/staff/StaffDetail';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -26,6 +27,7 @@ export const headquartersRoutes = [
   // 직원관리
   { path: 'staff', element: <StaffList /> },
   { path: 'staff/create', element: <StaffCreate /> },
+  { path: 'staff/detail/:id', element: <StaffDetail /> },
 
   { path: 'client', element: <div>거래처 관리 (준비중)</div> },
   { path: 'task', element: <div>작업 관리 (준비중)</div> },
