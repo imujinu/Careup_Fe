@@ -1,8 +1,53 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./MyPage.css";
+import { cartService } from "../../service/cartService";
+import customerAxios from "../../utils/customerAxios";
 
-const MyPage = ({ onBack }) => {
+const MyPage = ({ onBack, currentUser }) => {
   const [activeTab, setActiveTab] = useState("profile");
+  const [profile, setProfile] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // 마이페이지 정보 로드
+  useEffect(() => {
+    const loadMyPageData = async () => {
+      if (!currentUser?.memberId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // 프로필 정보
+        const profileRes = await customerAxios.get('/customers/my-page');
+        setProfile(profileRes?.data?.result);
+        
+        // 주문 내역
+        const ordersRes = await cartService.getOrdersByMember(currentUser.memberId);
+        setOrders(ordersRes?.data || ordersRes || []);
+      } catch (err) {
+        console.error('마이페이지 데이터 로드 실패:', err);
+        setError('정보를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMyPageData();
+  }, [currentUser]);
+
+  if (loading) {
+    return (
+      <div className="mypage">
+        <div className="container" style={{ textAlign: "center", padding: "40px 0" }}>
+          <p>로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mypage">
@@ -73,8 +118,8 @@ const MyPage = ({ onBack }) => {
                   <div className="avatar-placeholder">👤</div>
                 </div>
                 <div className="profile-details">
-                  <div className="username">avv5hu</div>
-                  <div className="email">wl...... •@naver.com</div>
+                  <div className="username">{profile?.nickname || profile?.name || currentUser?.nickname || currentUser?.name || '사용자'}</div>
+                  <div className="email">{profile?.email || currentUser?.email || '이메일 없음'}</div>
                 </div>
               </div>
               <div className="quick-link-item">
@@ -105,17 +150,24 @@ const MyPage = ({ onBack }) => {
                   <div className="profile-form">
                     <div className="form-group">
                       <label>닉네임</label>
-                      <input type="text" defaultValue="avv5hu" />
+                      <input type="text" defaultValue={profile?.nickname || ''} disabled />
+                    </div>
+                    <div className="form-group">
+                      <label>이름</label>
+                      <input type="text" defaultValue={profile?.name || ''} disabled />
                     </div>
                     <div className="form-group">
                       <label>이메일</label>
-                      <input type="email" defaultValue="wl...... •@naver.com" />
+                      <input type="email" defaultValue={profile?.email || ''} disabled />
                     </div>
                     <div className="form-group">
                       <label>휴대폰 번호</label>
-                      <input type="tel" placeholder="010-0000-0000" />
+                      <input type="tel" defaultValue={profile?.phone || ''} disabled />
                     </div>
-                    <button className="save-btn">저장하기</button>
+                    <div className="form-group">
+                      <label>주소</label>
+                      <input type="text" defaultValue={profile?.address || ''} disabled />
+                    </div>
                   </div>
                 </div>
               )}
@@ -123,25 +175,30 @@ const MyPage = ({ onBack }) => {
               {activeTab === "purchase" && (
                 <div className="purchase-content">
                   <h3>구매 내역</h3>
+                  {error && <div style={{ color: 'red', marginBottom: '20px' }}>{error}</div>}
                   <div className="purchase-list">
-                    <div className="purchase-item">
-                      <div className="purchase-image">
-                        <img
-                          src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=100&q=80"
-                          alt="상품"
-                        />
+                    {orders.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                        <p>구매 내역이 없습니다.</p>
                       </div>
-                      <div className="purchase-info">
-                        <div className="purchase-name">
-                          New Balance 204L Suede
+                    ) : (
+                      orders.map((order) => (
+                        <div key={order.orderId || order.id} className="purchase-item">
+                          <div className="purchase-info">
+                            <div className="purchase-name">주문번호: {order.orderId || order.id}</div>
+                            <div className="purchase-price">{(order.totalAmount || 0).toLocaleString()}원</div>
+                            <div className="purchase-date">
+                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ko-KR') : '-'}
+                            </div>
+                            <div className={`purchase-status ${order.orderStatus?.toLowerCase() || 'pending'}`}>
+                              {order.orderStatus === 'CONFIRMED' ? '구매완료' : 
+                               order.orderStatus === 'PENDING' ? '주문대기' :
+                               order.orderStatus === 'CANCELLED' ? '취소됨' : order.orderStatus || '대기중'}
+                            </div>
+                          </div>
                         </div>
-                        <div className="purchase-price">182,000원</div>
-                        <div className="purchase-date">2024.01.15</div>
-                        <div className="purchase-status completed">
-                          구매완료
-                        </div>
-                      </div>
-                    </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -149,21 +206,8 @@ const MyPage = ({ onBack }) => {
               {activeTab === "favorites" && (
                 <div className="favorites-content">
                   <h3>관심 상품</h3>
-                  <div className="favorites-list">
-                    <div className="favorite-item">
-                      <div className="favorite-image">
-                        <img
-                          src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=100&q=80"
-                          alt="상품"
-                        />
-                      </div>
-                      <div className="favorite-info">
-                        <div className="favorite-name">Adidas 러닝화</div>
-                        <div className="favorite-price">89,000원</div>
-                        <div className="favorite-date">2024.01.10</div>
-                      </div>
-                      <button className="remove-btn">삭제</button>
-                    </div>
+                  <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                    <p style={{ fontSize: '16px', color: '#666' }}>이 기능은 추후 추가 예정입니다.</p>
                   </div>
                 </div>
               )}
@@ -171,25 +215,8 @@ const MyPage = ({ onBack }) => {
               {activeTab === "reviews" && (
                 <div className="reviews-content">
                   <h3>리뷰 목록</h3>
-                  <div className="reviews-list">
-                    <div className="review-item">
-                      <div className="review-image">
-                        <img
-                          src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=100&q=80"
-                          alt="상품"
-                        />
-                      </div>
-                      <div className="review-info">
-                        <div className="review-name">
-                          New Balance 204L Suede
-                        </div>
-                        <div className="review-rating">★★★★★</div>
-                        <div className="review-text">
-                          정말 좋은 신발이에요! 착화감도 편하고 디자인도 예뻐요.
-                        </div>
-                        <div className="review-date">2024.01.15</div>
-                      </div>
-                    </div>
+                  <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                    <p style={{ fontSize: '16px', color: '#666' }}>이 기능은 추후 추가 예정입니다.</p>
                   </div>
                 </div>
               )}

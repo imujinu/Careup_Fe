@@ -589,8 +589,8 @@ function ShopLayout() {
          ) : page === "login" ? (
            <CustomerLogin />
         ) : page === "mypage" ? (
-          <MyPage onBack={() => setPage("home")} />
-         ) : page === "products" ? (
+          <MyPage onBack={() => setPage("home")} currentUser={currentUser} />
+        ) : page === "products" ? (
            <ProductsPage
              favorites={favorites}
              onToggleFavorite={toggleFavorite}
