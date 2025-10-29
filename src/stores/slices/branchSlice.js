@@ -1,3 +1,5 @@
+// src/stores/slices/branchSlice.js
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { branchService, deleteBranch } from '../../service/branchService';
 

@@ -10,6 +10,7 @@ import salesReportSlice from "./slices/salesReportSlice";
 import royaltySlice from "./slices/royaltySlice";
 import chatbotSlice from "./slices/chatbotSlice";
 import alertsSlice from "./slices/alertsSlice";
+import staffSlice from "./slices/staffSlice";
 
 export const store = configureStore({
   reducer: {
@@ -22,13 +23,12 @@ export const store = configureStore({
     royalty: royaltySlice,
     chatbot: chatbotSlice,
     alerts: alertsSlice,
+    staff: staffSlice,   
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ["persist/PERSIST"],
+        ignoredActions: ['persist/PERSIST'],
       },
     }),
 });
-
-// JavaScript에서는 타입 정의 제거
