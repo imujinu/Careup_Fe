@@ -32,9 +32,10 @@ const PaymentSuccessPage = () => {
         // localStorage에서 저장된 주문 정보 가져오기
         const orderData = JSON.parse(localStorage.getItem('currentOrderData') || '{}');
         
-        // CAREUP_ORDER_X에서 숫자만 추출
-        const numericOrderId = orderId.replace('CAREUP_ORDER_', '');
-        const numericOrderIdInt = parseInt(numericOrderId);
+        // CAREUP_ORDER_X 또는 CAREUP_ORDER_X_timestamp 형식에서 실제 주문 ID만 추출
+        // 형식: CAREUP_ORDER_123 또는 CAREUP_ORDER_123_1234567890
+        const match = orderId.match(/^CAREUP_ORDER_(\d+)(?:_\d+)?$/);
+        const numericOrderIdInt = match ? parseInt(match[1]) : parseInt(orderId.replace('CAREUP_ORDER_', ''));
         
         console.log('💳 결제 승인 요청 시작:', { orderId: numericOrderIdInt, paymentKey, amount });
         

@@ -67,8 +67,9 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
 
       const tossPayments = window.TossPayments(clientKey);
       
-      // 토스페이먼츠용 orderId 생성
-      const tossOrderId = `CAREUP_ORDER_${actualOrderData.orderId}`;
+      // 토스페이먼츠용 orderId 생성 (타임스탬프 추가하여 중복 방지)
+      const timestamp = Date.now();
+      const tossOrderId = `CAREUP_ORDER_${actualOrderData.orderId}_${timestamp}`;
       const actualAmount = actualOrderData.totalAmount;
       
       console.log('결제 요청:', { tossOrderId, actualAmount });
