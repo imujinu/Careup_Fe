@@ -29,7 +29,7 @@ const categories = [
   { code: "REVIEW", label: "리뷰", icon: mdiStarOutline },
   { code: "INVENTORY", label: "재고", icon: mdiChartBar },
   { code: "ATTENDANCE", label: "출근", icon: mdiAccountGroup },
-  { code: "CUSTOMER_SATISFACTION", label: "고객만족", icon: mdiHeartOutline },
+  { code: "CUSTOMER", label: "고객만족", icon: mdiHeartOutline },
   { code: "CUSTOM", label: "커스텀", icon: mdiChartTimelineVariant },
 ];
 
@@ -37,13 +37,8 @@ const periods = {
   DAILY: "일간",
   WEEKLY: "주간",
   MONTHLY: "월간",
+  QUARTERLY: "분기",
   YEARLY: "연간",
-};
-
-const statuses = {
-  ACTIVE: "활성",
-  ACHIEVED: "달성",
-  EXPIRED: "만료",
 };
 
 function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
@@ -54,24 +49,20 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
-    targetValue: 0,
-    unit: "",
-    period: "MONTHLY",
-    kpiStatus: "ACTIVE",
     description: "",
+    category: "",
+    periodType: "MONTHLY",
+    calculationFormula: "",
   });
 
   useEffect(() => {
     if (kpi) {
       setFormData({
-        name: kpi.name || kpi.kpiName || "",
-        category: kpi.category || "",
-        targetValue: kpi.targetValue || 0,
-        unit: kpi.unit || "",
-        period: kpi.period || "MONTHLY",
-        kpiStatus: kpi.kpiStatus || "ACTIVE",
+        name: kpi.name || "",
         description: kpi.description || "",
+        category: kpi.category || "",
+        periodType: kpi.periodType || "MONTHLY",
+        calculationFormula: kpi.calculationFormula || "",
       });
     }
   }, [kpi]);
@@ -102,19 +93,14 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
     try {
       setLoading(true);
       const updateData = {
-        kpiId: kpi.kpiId,
-        branchId: kpi.branchId,
-        targetValue: formData.targetValue,
-        currentValue: kpi.currentValue || 0,
-        startDate: kpi.startDate || new Date().toISOString().split("T")[0],
-        endDate: kpi.endDate || null,
-        kpiStatus: formData.kpiStatus,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        periodType: formData.periodType,
+        calculationFormula: formData.calculationFormula,
       };
 
       await branchKpiService.updateBranchKpi(kpi.id, updateData);
-
-      // 이름, 설명 등 추가 정보는 별도 처리 필요 (백엔드 API 확인 필요)
-      // 일단 기본 정보만 업데이트
 
       addToast({
         type: "success",
@@ -165,13 +151,11 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
 
   const handleCancel = () => {
     setFormData({
-      name: kpi.name || kpi.kpiName || "",
-      category: kpi.category || "",
-      targetValue: kpi.targetValue || 0,
-      unit: kpi.unit || "",
-      period: kpi.period || "MONTHLY",
-      kpiStatus: kpi.kpiStatus || "ACTIVE",
+      name: kpi.name || "",
       description: kpi.description || "",
+      category: kpi.category || "",
+      periodType: kpi.periodType || "MONTHLY",
+      calculationFormula: kpi.calculationFormula || "",
     });
     setIsEditing(false);
   };
@@ -186,25 +170,20 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
     return category?.label || categoryCode;
   };
 
-  const formatValue = (value, unit) => {
-    if (unit === "원" || unit === "KRW") {
-      return `${Number(value).toLocaleString()}원`;
-    }
-    return `${Number(value).toLocaleString()}${unit || ""}`;
-  };
-
   const formatDate = (dateString) => {
-    if (!dateString) return "-";
+    if (!dateString) return '-';
+    // LocalDate 형식 (YYYY-MM-DD) 또는 ISO 형식 처리
     const date = new Date(dateString);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
+    if (isNaN(date.getTime())) {
+      // 날짜 파싱 실패 시 원본 반환
+      return dateString;
+    }
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
     });
   };
-
-  const achievementRate = kpi?.achievementRate || 0;
-  const isAchieved = achievementRate >= 100;
 
   return (
     <Container>
@@ -220,10 +199,7 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
               <Icon path={getCategoryIcon(kpi?.category)} size={1.5} />
             </HeaderIcon>
             <HeaderTitle>
-              <TitleText>{kpi?.name || kpi?.kpiName || "KPI 이름"}</TitleText>
-              {kpi?.kpiStatus === "ACTIVE" && (
-                <Icon path={mdiCheck} size={1} color="#10b981" />
-              )}
+              <TitleText>{kpi?.name || "KPI 이름"}</TitleText>
             </HeaderTitle>
             <HeaderDescription>{kpi?.description || "설명"}</HeaderDescription>
           </HeaderLeft>
@@ -255,31 +231,26 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
         </HeaderContent>
       </HeaderSection>
 
-      {/* 달성률 현황 */}
-      <AchievementSection>
-        <SectionTitle>달성률 현황</SectionTitle>
-        <AchievementContent>
-          <CurrentValue>
-            {formatValue(kpi?.currentValue || 0, kpi?.unit || "")}
-          </CurrentValue>
-          <TargetValue>
-            목표: {formatValue(kpi?.targetValue || 0, kpi?.unit || "")}
-          </TargetValue>
-          <ProgressContainer>
-            <ProgressBar progress={achievementRate} isAchieved={isAchieved} />
-            <ProgressText isAchieved={isAchieved}>
-              {achievementRate.toFixed(1)}%
-            </ProgressText>
-          </ProgressContainer>
-          <StatusMessageBox isAchieved={isAchieved}>
-            {isAchieved
-              ? `${kpi?.name || kpi?.kpiName || "KPI"} 목표를 달성했습니다!`
-              : `${kpi?.name || kpi?.kpiName || "KPI"} 목표 달성률이 ${achievementRate.toFixed(
-                  0
-                )}% 입니다. 조금만 더 노력하세요! 💪`}
-          </StatusMessageBox>
-        </AchievementContent>
-      </AchievementSection>
+      {/* KPI 정보 */}
+      <KPISection>
+        <SectionTitle>KPI 정보</SectionTitle>
+        <KPIContent>
+          <KPIInfo>
+            <KPIItem>
+              <KPILabel>카테고리</KPILabel>
+              <KPIValue>{getCategoryLabel(kpi?.category) || "-"}</KPIValue>
+            </KPIItem>
+            <KPIItem>
+              <KPILabel>기간</KPILabel>
+              <KPIValue>{periods[kpi?.periodType] || kpi?.periodType || "-"}</KPIValue>
+            </KPIItem>
+            <KPIItem>
+              <KPILabel>계산 공식</KPILabel>
+              <KPIValue>{kpi?.calculationFormula || "-"}</KPIValue>
+            </KPIItem>
+          </KPIInfo>
+        </KPIContent>
+      </KPISection>
 
       {/* KPI 설정 */}
       <SettingsSection>
@@ -321,71 +292,35 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
           </SettingItem>
 
           <SettingItem>
-            <SettingLabel>목표값</SettingLabel>
-            {isEditing ? (
-              <Input
-                type="number"
-                value={formData.targetValue}
-                onChange={(e) =>
-                  handleInputChange(
-                    "targetValue",
-                    parseFloat(e.target.value) || 0
-                  )
-                }
-              />
-            ) : (
-              <SettingValue>
-                {formatValue(kpi?.targetValue || 0, kpi?.unit || "")}
-              </SettingValue>
-            )}
-          </SettingItem>
-
-          <SettingItem>
-            <SettingLabel>단위</SettingLabel>
-            {isEditing ? (
-              <Input
-                value={formData.unit}
-                onChange={(e) => handleInputChange("unit", e.target.value)}
-              />
-            ) : (
-              <SettingValue>{kpi?.unit || "-"}</SettingValue>
-            )}
-          </SettingItem>
-
-          <SettingItem>
             <SettingLabel>기간</SettingLabel>
             {isEditing ? (
               <Select
-                value={formData.period}
-                onChange={(e) => handleInputChange("period", e.target.value)}
+                value={formData.periodType}
+                onChange={(e) => handleInputChange("periodType", e.target.value)}
               >
                 <option value="DAILY">일간</option>
                 <option value="WEEKLY">주간</option>
                 <option value="MONTHLY">월간</option>
+                <option value="QUARTERLY">분기</option>
                 <option value="YEARLY">연간</option>
               </Select>
             ) : (
               <SettingValue>
-                {periods[kpi?.period] || kpi?.period || "-"}
+                {periods[kpi?.periodType] || kpi?.periodType || "-"}
               </SettingValue>
             )}
           </SettingItem>
 
           <SettingItem>
-            <SettingLabel>상태</SettingLabel>
+            <SettingLabel>계산 공식</SettingLabel>
             {isEditing ? (
-              <Select
-                value={formData.kpiStatus}
-                onChange={(e) => handleInputChange("kpiStatus", e.target.value)}
-              >
-                <option value="ACTIVE">활성</option>
-                <option value="ACHIEVED">달성</option>
-                <option value="EXPIRED">만료</option>
-              </Select>
+              <Input
+                value={formData.calculationFormula}
+                onChange={(e) => handleInputChange("calculationFormula", e.target.value)}
+                placeholder="예: 매출액 / 목표매출액 * 100"
+              />
             ) : (
-              <SettingValue>
-                {statuses[kpi?.kpiStatus] || kpi?.kpiStatus || "-"}
-              </SettingValue>
+              <SettingValue>{kpi?.calculationFormula || "-"}</SettingValue>
             )}
           </SettingItem>
 
@@ -419,7 +354,7 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
             </MetaIcon>
             <MetaContent>
               <MetaLabel>생성일</MetaLabel>
-              <MetaValue>{formatDate(kpi?.startDate)}</MetaValue>
+              <MetaValue>{formatDate(kpi?.createdAt)}</MetaValue>
             </MetaContent>
           </MetaItem>
 
@@ -429,17 +364,7 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
             </MetaIcon>
             <MetaContent>
               <MetaLabel>수정일</MetaLabel>
-              <MetaValue>{formatDate(kpi?.endDate)}</MetaValue>
-            </MetaContent>
-          </MetaItem>
-
-          <MetaItem>
-            <MetaIcon>
-              <Icon path={mdiTarget} size={1} />
-            </MetaIcon>
-            <MetaContent>
-              <MetaLabel>목표일</MetaLabel>
-              <MetaValue>{formatDate(kpi?.endDate)}</MetaValue>
+              <MetaValue>{formatDate(kpi?.updatedAt || kpi?.modifiedAt)}</MetaValue>
             </MetaContent>
           </MetaItem>
         </MetaGrid>
@@ -452,7 +377,7 @@ function KPIDetail({ kpi: initialKpi, branchId, onBack, onUpdate }) {
           onConfirm={handleDelete}
           title="KPI 삭제"
           message="해당 KPI를 삭제하시겠습니까?"
-          itemName={kpi?.name || kpi?.kpiName || "KPI"}
+          itemName={kpi?.name || "KPI"}
         />
       )}
     </Container>
@@ -618,7 +543,7 @@ const SaveButton = styled.button`
   }
 `;
 
-const AchievementSection = styled.div`
+const KPISection = styled.div`
   background: white;
   border-radius: 12px;
   padding: 24px;
@@ -636,69 +561,37 @@ const SectionTitle = styled.h2`
   gap: 8px;
 `;
 
-const AchievementContent = styled.div`
+const KPIContent = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
 `;
 
-const CurrentValue = styled.div`
-  font-size: 32px;
-  font-weight: 700;
-  color: #1f2937;
+const KPIInfo = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
 `;
 
-const TargetValue = styled.div`
-  font-size: 16px;
+const KPIItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+`;
+
+const KPILabel = styled.div`
+  font-size: 14px;
+  font-weight: 500;
   color: #6b7280;
 `;
 
-const ProgressContainer = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-`;
-
-const ProgressBar = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== "progress" && prop !== "isAchieved",
-})`
-  flex: 1;
-  height: 12px;
-  background: #e5e7eb;
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: ${(props) => Math.min(props.progress, 100)}%;
-    background: ${(props) => (props.isAchieved ? "#10b981" : "#f59e0b")};
-    transition: width 0.3s ease;
-  }
-`;
-
-const ProgressText = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== "isAchieved",
-})`
+const KPIValue = styled.div`
   font-size: 16px;
   font-weight: 600;
-  color: ${(props) => (props.isAchieved ? "#10b981" : "#f59e0b")};
-  min-width: 60px;
-`;
-
-const StatusMessageBox = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== "isAchieved",
-})`
-  padding: 16px;
-  background: ${(props) => (props.isAchieved ? "#d1fae5" : "#fed7aa")};
-  border-radius: 8px;
-  font-size: 14px;
-  color: ${(props) => (props.isAchieved ? "#065f46" : "#92400e")};
-  line-height: 1.6;
+  color: #1f2937;
 `;
 
 const SettingsSection = styled.div`

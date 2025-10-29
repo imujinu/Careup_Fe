@@ -20,6 +20,7 @@ import {
   mdiHeartOutline,
   mdiChartTimelineVariant,
   mdiArrowLeft,
+  mdiTrendingUp,
 } from "@mdi/js";
 import { branchKpiService } from "../../service/branchKpiService";
 import { useToast } from "../common/Toast";
@@ -33,7 +34,7 @@ const categories = [
   { code: "REVIEW", label: "리뷰", icon: mdiStarOutline },
   { code: "INVENTORY", label: "재고", icon: mdiChartBar },
   { code: "ATTENDANCE", label: "출근", icon: mdiAccountGroup },
-  { code: "CUSTOMER_SATISFACTION", label: "고객만족", icon: mdiHeartOutline },
+  { code: "CUSTOMER", label: "고객만족", icon: mdiHeartOutline },
   { code: "CUSTOM", label: "커스텀", icon: mdiChartTimelineVariant },
 ];
 
@@ -41,6 +42,7 @@ const periods = {
   DAILY: "일간",
   WEEKLY: "주간",
   MONTHLY: "월간",
+  QUARTERLY: "분기",
   YEARLY: "연간",
 };
 
@@ -61,13 +63,13 @@ function KPIManagement({ branchId }) {
     totalPages: 0,
     totalElements: 0,
     size: 10,
+    first: true,
+    last: false,
   });
 
   useEffect(() => {
-    if (branchId) {
-      fetchKpis();
-    }
-  }, [branchId]);
+    fetchKpis();
+  }, [pagination.currentPage]);
 
   useEffect(() => {
     filterKpis();
@@ -81,13 +83,18 @@ function KPIManagement({ branchId }) {
         size: pagination.size,
       });
 
-      if (response?.data) {
-        setKpis(response.data);
+      // API 응답 구조: response.data.result 또는 response.result
+      const result = response?.data || response?.result || response;
+      
+      if (result?.data && Array.isArray(result.data)) {
+        setKpis(result.data);
         setPagination({
-          currentPage: response.currentPage || 0,
-          totalPages: response.totalPages || 0,
-          totalElements: response.totalElements || 0,
-          size: response.size || 10,
+          currentPage: result.currentPage ?? 0,
+          totalPages: result.totalPages ?? 0,
+          totalElements: result.totalElements ?? 0,
+          size: result.size ?? 10,
+          first: result.first ?? false,
+          last: result.last ?? false,
         });
       } else {
         setKpis([]);
@@ -121,20 +128,22 @@ function KPIManagement({ branchId }) {
     }
 
     if (categoryFilter !== "ALL") {
-      // category 필터는 백엔드 데이터 구조에 따라 조정 필요
-      // filtered = filtered.filter((kpi) => kpi.category === categoryFilter);
+      filtered = filtered.filter((kpi) => kpi.category === categoryFilter);
     }
 
     if (statusFilter !== "ALL") {
-      filtered = filtered.filter((kpi) => kpi.kpiStatus === statusFilter);
+      // 상태 필터링은 필요시 구현
+      // filtered = filtered.filter((kpi) => kpi.kpiStatus === statusFilter);
     }
 
     setFilteredKpis(filtered);
   };
 
   const handleAddKpi = async (formData) => {
+    console.log("[KPIManagement] handleAddKpi called with:", formData);
     try {
-      await branchKpiService.createBranchKpi(formData);
+      const response = await branchKpiService.createBranchKpi(formData);
+      console.log("[KPIManagement] KPI creation response:", response);
       addToast({
         type: "success",
         title: "성공",
@@ -142,9 +151,10 @@ function KPIManagement({ branchId }) {
         duration: 3000,
       });
       setShowAddModal(false);
-      fetchKpis();
+      await fetchKpis();
     } catch (error) {
       console.error("KPI 생성 실패:", error);
+      console.error("KPI 생성 실패 상세:", error.response?.data);
       addToast({
         type: "error",
         title: "오류",
@@ -152,6 +162,7 @@ function KPIManagement({ branchId }) {
           error.response?.data?.status_message || "KPI 생성에 실패했습니다.",
         duration: 3000,
       });
+      throw error; // 에러를 다시 throw하여 KPIAddModal에서도 처리 가능하도록
     }
   };
 
@@ -181,6 +192,30 @@ function KPIManagement({ branchId }) {
     }
   };
 
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, currentPage: newPage }));
+  };
+
+  const handleFirstPage = () => {
+    handlePageChange(0);
+  };
+
+  const handleLastPage = () => {
+    handlePageChange(pagination.totalPages - 1);
+  };
+
+  const handlePrevPage = () => {
+    if (pagination.currentPage > 0) {
+      handlePageChange(pagination.currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.currentPage < pagination.totalPages - 1) {
+      handlePageChange(pagination.currentPage + 1);
+    }
+  };
+
   const handleViewDetail = (kpi) => {
     setSelectedKpi(kpi);
     setViewMode("detail");
@@ -197,14 +232,34 @@ function KPIManagement({ branchId }) {
     return category?.icon || mdiChartBar;
   };
 
+  const getStatusMessage = (kpi) => {
+    const achievementRate = kpi.averageAchievementRate || 0;
+    const achievedCount = kpi.achievedBranchCount || 0;
+    const totalCount = kpi.totalBranchCount || 0;
+    const activeCount = kpi.activeBranchCount || 0;
+
+    if (achievementRate >= 100) {
+      return `${kpi.name || "KPI"} 목표를 달성했습니다!`;
+    } else if (achievementRate >= 80) {
+      return `${kpi.name || "KPI"} 목표 달성률이 80% 이상입니다. 조금만 더 노력하세요!`;
+    } else {
+      return `${kpi.name || "KPI"} 목표 달성을 위해 더 노력이 필요합니다.`;
+    }
+  };
+
+  const formatNumber = (num) => {
+    if (num == null) return "-";
+    return num.toLocaleString("ko-KR");
+  };
+
   const calculateStats = () => {
     const total = kpis.length;
-    const active = kpis.filter((k) => k.kpiStatus === "ACTIVE").length;
-    const achieved = kpis.filter((k) => k.kpiStatus === "ACHIEVED").length;
+    const active = kpis.reduce((sum, k) => sum + (k.activeBranchCount || 0), 0);
+    const achieved = kpis.reduce((sum, k) => sum + (k.achievedBranchCount || 0), 0);
     const avgAchievement =
       kpis.length > 0
         ? (
-            kpis.reduce((sum, k) => sum + (k.achievementRate || 0), 0) /
+            kpis.reduce((sum, k) => sum + (k.averageAchievementRate || 0), 0) /
             kpis.length
           ).toFixed(1)
         : 0;
@@ -313,7 +368,10 @@ function KPIManagement({ branchId }) {
           <option value="EXPIRED">만료</option>
         </FilterSelect>
 
-        <AddButton onClick={() => setShowAddModal(true)}>
+        <AddButton onClick={() => {
+          console.log("[KPIManagement] Add button clicked");
+          setShowAddModal(true);
+        }}>
           <Icon path={mdiPlus} size={1} />
           KPI 추가
         </AddButton>
@@ -335,10 +393,7 @@ function KPIManagement({ branchId }) {
                   <Icon path={getCategoryIcon(kpi.category)} size={1.2} />
                 </CardIconSmall>
                 <CardTitleContainer>
-                  <CardTitle>{kpi.name || kpi.kpiName || "KPI 이름"}</CardTitle>
-                  {kpi.kpiStatus === "ACTIVE" && (
-                    <Icon path={mdiCheck} size={0.8} color="#10b981" />
-                  )}
+                  <CardTitle>{kpi.name || "KPI 이름"}</CardTitle>
                 </CardTitleContainer>
                 <CardActions>
                   <ActionButton
@@ -362,48 +417,98 @@ function KPIManagement({ branchId }) {
               </CardHeader>
 
               <CardBody>
-                <CurrentValue>
-                  {formatValue(kpi.currentValue || 0, kpi.unit || "")}
-                </CurrentValue>
-                <TargetValue>
-                  목표: {formatValue(kpi.targetValue || 0, kpi.unit || "")}
-                </TargetValue>
+                {/* 통계 정보 */}
+                <StatSection>
+                  <StatValue>
+                    달성 {formatNumber(kpi.achievedBranchCount || 0)} 지점
+                  </StatValue>
+                  <StatTarget>
+                    목표 {formatNumber(kpi.totalBranchCount || 0)} 지점
+                  </StatTarget>
+                </StatSection>
 
-                <ProgressBarContainer>
-                  <ProgressBar
-                    progress={kpi.achievementRate || 0}
-                    isAchieved={(kpi.achievementRate || 0) >= 100}
-                  />
-                  <ProgressText isAchieved={(kpi.achievementRate || 0) >= 100}>
-                    {kpi.achievementRate?.toFixed(1) || 0}%
-                  </ProgressText>
-                </ProgressBarContainer>
+                {/* 진행률 바 */}
+                <ProgressSection>
+                  <ProgressBarContainer>
+                    <ProgressBar
+                      percentage={Math.min(
+                        ((kpi.achievedBranchCount || 0) / (kpi.totalBranchCount || 1)) * 100,
+                        100
+                      )}
+                    />
+                  </ProgressBarContainer>
+                  <ProgressPercentage>
+                    {(
+                      ((kpi.achievedBranchCount || 0) / (kpi.totalBranchCount || 1)) * 100
+                    ).toFixed(1)}%
+                    <TrendIcon>
+                      <Icon path={mdiTrendingUp} size={0.8} />
+                    </TrendIcon>
+                  </ProgressPercentage>
+                </ProgressSection>
 
-                <KPIMeta>
-                  <MetaItem>
-                    <MetaLabel>기간:</MetaLabel>
-                    <MetaValue>
-                      {periods[kpi.period] || kpi.period || "월간"}
-                    </MetaValue>
-                  </MetaItem>
-                  <MetaItem>
-                    <MetaLabel>설명:</MetaLabel>
-                    <MetaValue>{kpi.description || "-"}</MetaValue>
-                  </MetaItem>
-                </KPIMeta>
+                {/* 기간 및 평균 달성률 */}
+                <InfoSection>
+                  <PeriodBadge>
+                    {periods[kpi.periodType] || kpi.periodType || "월간"}
+                  </PeriodBadge>
+                  <AvgRate>
+                    평균 달성률: {(kpi.averageAchievementRate || 0).toFixed(1)}%
+                  </AvgRate>
+                </InfoSection>
 
-                <StatusMessage isAchieved={(kpi.achievementRate || 0) >= 100}>
-                  {(kpi.achievementRate || 0) >= 100
-                    ? `${kpi.name || kpi.kpiName || "KPI"} 목표를 달성했습니다!`
-                    : `${kpi.name || kpi.kpiName || "KPI"} 목표 달성률이 ${(
-                        kpi.achievementRate || 0
-                      ).toFixed(0)}% 입니다. 조금만 더 노력하세요! 💪`}
+                {/* 상태 정보 */}
+                <StatusInfo>
+                  달성 {kpi.achievedBranchCount || 0} / 진행중 {kpi.activeBranchCount || 0} / 전체 {kpi.totalBranchCount || 0}
+                </StatusInfo>
+
+                {/* 상태 메시지 */}
+                <StatusMessage>
+                  {getStatusMessage(kpi)}
                 </StatusMessage>
               </CardBody>
             </KPICard>
           ))
         )}
       </KPICardsGrid>
+
+      {/* 페이지네이션 */}
+      {pagination.totalPages > 1 && (
+        <PaginationContainer>
+          <PaginationInfo>
+            총 {pagination.totalElements}개 중 {pagination.currentPage * pagination.size + 1}-{Math.min((pagination.currentPage + 1) * pagination.size, pagination.totalElements)}개 표시
+          </PaginationInfo>
+          <PaginationButtons>
+            <PaginationButton
+              onClick={handleFirstPage}
+              disabled={pagination.first}
+            >
+              첫 페이지
+            </PaginationButton>
+            <PaginationButton
+              onClick={handlePrevPage}
+              disabled={pagination.first}
+            >
+              이전
+            </PaginationButton>
+            <PageNumber>
+              {pagination.currentPage + 1} / {pagination.totalPages}
+            </PageNumber>
+            <PaginationButton
+              onClick={handleNextPage}
+              disabled={pagination.last}
+            >
+              다음
+            </PaginationButton>
+            <PaginationButton
+              onClick={handleLastPage}
+              disabled={pagination.last}
+            >
+              마지막 페이지
+            </PaginationButton>
+          </PaginationButtons>
+        </PaginationContainer>
+      )}
 
       {showAddModal && (
         <KPIAddModal
@@ -424,19 +529,12 @@ function KPIManagement({ branchId }) {
           onConfirm={handleDeleteKpi}
           title="KPI 삭제"
           message="해당 KPI를 삭제하시겠습니까?"
-          itemName={selectedKpi.name || selectedKpi.kpiName || "KPI"}
+          itemName={selectedKpi.name || "KPI"}
         />
       )}
     </Container>
   );
 }
-
-const formatValue = (value, unit) => {
-  if (unit === "원" || unit === "KRW") {
-    return `${Number(value).toLocaleString()}원`;
-  }
-  return `${Number(value).toLocaleString()}${unit || ""}`;
-};
 
 export default KPIManagement;
 
@@ -630,84 +728,100 @@ const CardBody = styled.div`
   gap: 16px;
 `;
 
-const CurrentValue = styled.div`
-  font-size: 28px;
+const StatSection = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+`;
+
+const StatValue = styled.div`
+  font-size: 24px;
   font-weight: 700;
   color: #1f2937;
 `;
 
-const TargetValue = styled.div`
+const StatTarget = styled.div`
   font-size: 14px;
   color: #6b7280;
+  font-weight: 500;
 `;
 
-const ProgressBarContainer = styled.div`
+const ProgressSection = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 12px;
 `;
 
-const ProgressBar = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== "progress" && prop !== "isAchieved",
-})`
+const ProgressBarContainer = styled.div`
   flex: 1;
   height: 8px;
   background: #e5e7eb;
   border-radius: 4px;
   overflow: hidden;
-  position: relative;
-
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: ${(props) => Math.min(props.progress, 100)}%;
-    background: ${(props) => (props.isAchieved ? "#10b981" : "#f59e0b")};
-    transition: width 0.3s ease;
-  }
 `;
 
-const ProgressText = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== "isAchieved",
+const ProgressBar = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== "percentage",
 })`
-  font-size: 14px;
+  height: 100%;
+  background: linear-gradient(90deg, #6d28d9 0%, #8b5cf6 100%);
+  width: ${(props) => props.percentage}%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+`;
+
+const ProgressPercentage = styled.div`
+  font-size: 16px;
   font-weight: 600;
-  color: ${(props) => (props.isAchieved ? "#10b981" : "#f59e0b")};
-  min-width: 50px;
-`;
-
-const KPIMeta = styled.div`
+  color: #1f2937;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+  min-width: 60px;
 `;
 
-const MetaItem = styled.div`
+const TrendIcon = styled.span`
+  color: #10b981;
   display: flex;
-  gap: 8px;
+  align-items: center;
 `;
 
-const MetaLabel = styled.span`
+const InfoSection = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+`;
+
+const PeriodBadge = styled.span`
+  padding: 4px 12px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+`;
+
+const AvgRate = styled.div`
   font-size: 13px;
   color: #6b7280;
   font-weight: 500;
 `;
 
-const MetaValue = styled.span`
-  font-size: 13px;
-  color: #374151;
+const StatusInfo = styled.div`
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
 `;
 
-const StatusMessage = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== "isAchieved",
-})`
+const StatusMessage = styled.div`
   padding: 12px;
-  background: ${(props) => (props.isAchieved ? "#d1fae5" : "#fed7aa")};
+  background: #d1fae5;
   border-radius: 8px;
   font-size: 13px;
-  color: ${(props) => (props.isAchieved ? "#065f46" : "#92400e")};
+  color: #065f46;
   line-height: 1.5;
 `;
 
@@ -741,4 +855,54 @@ const LoadingMessage = styled.div`
   height: 200px;
   font-size: 16px;
   color: #6b7280;
+`;
+
+
+const PaginationContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+`;
+
+const PaginationInfo = styled.div`
+  font-size: 14px;
+  color: #6b7280;
+`;
+
+const PaginationButtons = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const PaginationButton = styled.button`
+  padding: 8px 16px;
+  background: ${props => props.disabled ? '#f3f4f6' : '#6d28d9'};
+  color: ${props => props.disabled ? '#9ca3af' : 'white'};
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #5b21b6;
+  }
+`;
+
+const PageNumber = styled.div`
+  padding: 8px 16px;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 80px;
+  text-align: center;
 `;

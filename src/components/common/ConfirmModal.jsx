@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import BaseModal from './BaseModal';
 
 const ConfirmModal = ({ 
   isOpen, 
@@ -12,70 +13,44 @@ const ConfirmModal = ({
   isLoading = false,
   confirmColor = "#10b981"
 }) => {
-  if (!isOpen) return null;
-
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   const handleConfirm = () => {
     onConfirm();
   };
 
   return (
-    <ModalOverlay onClick={handleOverlayClick}>
-      <ModalContent>
-        <ModalHeader>
-          <ModalTitle>{title}</ModalTitle>
-          <ModalMessage>{message}</ModalMessage>
-        </ModalHeader>
-        
-        <ModalActions>
-          <CancelButton 
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            {cancelText}
-          </CancelButton>
-          <ConfirmButton 
-            onClick={handleConfirm}
-            disabled={isLoading}
-            $confirmColor={confirmColor}
-          >
-            {isLoading && <LoadingSpinner />}
-            {confirmText}
-          </ConfirmButton>
-        </ModalActions>
-      </ModalContent>
-    </ModalOverlay>
+    <BaseModal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      maxWidth="400px"
+      allowBackdropClose={false}
+    >
+      <ModalHeader>
+        <ModalTitle>{title}</ModalTitle>
+        <ModalMessage>{message}</ModalMessage>
+      </ModalHeader>
+      
+      <ModalActions>
+        <CancelButton 
+          onClick={onClose}
+          disabled={isLoading}
+        >
+          {cancelText}
+        </CancelButton>
+        <ConfirmButton 
+          onClick={handleConfirm}
+          disabled={isLoading}
+          $confirmColor={confirmColor}
+        >
+          {isLoading && <LoadingSpinner />}
+          {confirmText}
+        </ConfirmButton>
+      </ModalActions>
+    </BaseModal>
   );
 };
 
 export default ConfirmModal;
 
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-`;
 
 const ModalHeader = styled.div`
   margin-bottom: 16px;
