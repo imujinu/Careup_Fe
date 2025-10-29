@@ -3,8 +3,9 @@ import React from "react";
 const SalesTab = ({ onTabClick }) => {
   const salesTabs = [
     { id: "일일매출", label: "📊 일일 매출" },
-    { id: "월별매출", label: "📈 월별 매출" },
     { id: "상품별매출", label: "🛍️ 상품별 매출" },
+    { id: "인건비 분석", label: "📈 인건비 분석" },
+
     { id: "매출분석", label: "📋 매출 분석" },
   ];
 
@@ -27,4 +28,3 @@ const SalesTab = ({ onTabClick }) => {
 };
 
 export default SalesTab;
-
