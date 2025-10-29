@@ -2,6 +2,7 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import FranchiseInventoryManagement from "../pages/inventory/FranchiseInventoryManagement";
 import FranchisePurchaseOrderManagement from "../pages/purchaseOrder/FranchisePurchaseOrderManagement";
+import FranchiseOrderManagement from "../pages/franchise/FranchiseOrderManagement";
 import AutoOrderSettings from "../pages/franchise/AutoOrderSettings";
 import MyBranchDetail from "../pages/branch/MyBranchDetail";
 import BranchSalesReport from "../pages/salesReport/BranchSalesReport";
@@ -34,6 +35,10 @@ export const franchiseRoutes = [
   {
     path: "purchase-order",
     element: <FranchisePurchaseOrderManagement />,
+  },
+  {
+    path: "order",
+    element: <FranchiseOrderManagement />,
   },
   {
     path: "auto-order",

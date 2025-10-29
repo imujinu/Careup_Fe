@@ -10,10 +10,12 @@ import PurchaseOrderManagement from '../pages/purchaseOrder/PurchaseOrderManagem
 import SalesReport from '../pages/salesReport/SalesReport';
 import StaffList from '../pages/staff/StaffList';
 import StaffCreate from '../pages/staff/StaffCreate';
+import HeadquartersDashboard from '../pages/admin/HeadquartersDashboard';
+import OrderManagement from '../pages/admin/OrderManagement';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
-  { path: 'dashboard', element: <div>대시보드 (준비중)</div> },
+  { path: 'dashboard', element: <HeadquartersDashboard /> },
 
   { path: 'branch', element: <HeadquartersBranchList /> },
   { path: 'branch/register', element: <BranchRegistration /> },
@@ -30,6 +32,7 @@ export const headquartersRoutes = [
   { path: 'attendance', element: <div>근태 관리 (준비중)</div> },
   { path: 'inventory', element: <InventoryManagement /> },
   { path: 'purchase-order', element: <PurchaseOrderManagement /> },
+  { path: 'order', element: <OrderManagement /> },
   { path: 'sales-report', element: <SalesReport /> },
   { path: 'settings', element: <div>설정 (준비중)</div> },
 ];
