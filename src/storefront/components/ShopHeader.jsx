@@ -18,7 +18,8 @@ const ShopHeader = ({
   handleSearch,
   setShowBranchSelector,
   selectedBranch,
-  getCartItemCount
+  getCartItemCount,
+  handleAdminClick
 }) => {
   return (
     <header className="header">
@@ -31,7 +32,7 @@ const ShopHeader = ({
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  window.location.href = "http://localhost:5173/login";
+                  setPage("login");
                 }}
               >
                 로그인
@@ -41,7 +42,11 @@ const ShopHeader = ({
                 style={{ marginLeft: 2 }}
                 onClick={(e) => {
                   e.preventDefault();
-                  window.location.href = "http://localhost:5173/login"; // 관리자 포털 로그인으로 이동
+                  if (handleAdminClick) {
+                    handleAdminClick(e);
+                  } else {
+                    window.location.href = "/login";
+                  }
                 }}
               >
                 관리자
