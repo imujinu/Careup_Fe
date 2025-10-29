@@ -125,10 +125,23 @@ function PurchaseOrderManagement() {
       const [data, statistics, statusStats, branchStats, productStats, branches] = await Promise.all([
         purchaseOrderService.getPurchaseOrders(branchId),
         purchaseOrderService.getHQOverallStatistics(),
-        purchaseOrderService.getHQStatusStatistics().catch(() => []),
-        purchaseOrderService.getHQBranchStatistics().catch(() => []),
-        purchaseOrderService.getHQProductStatistics().catch(() => []),
-        purchaseOrderService.getBranchList().catch(() => [])
+        purchaseOrderService.getHQStatusStatistics().catch((err) => {
+          console.error('상태 통계 API 호출 실패:', err);
+          return [];
+        }),
+        purchaseOrderService.getHQBranchStatistics().catch((err) => {
+          console.error('지점 통계 API 호출 실패:', err);
+          return [];
+        }),
+        purchaseOrderService.getHQProductStatistics().catch((err) => {
+          console.error('상품 통계 API 호출 실패:', err);
+          return [];
+        }),
+        purchaseOrderService.getBranchList().catch((err) => {
+          console.error('지점 목록 API 호출 실패:', err);
+          console.error('에러 상세:', err.response?.data || err.message);
+          return null;
+        })
       ]);
       
       // 데이터 변환
@@ -147,16 +160,60 @@ function PurchaseOrderManagement() {
       
       // 지점 목록 설정
       console.log('지점 목록 API 응답:', branches);
-      if (branches && branches.length > 0) {
-        setBranchList(branches);
-        console.log('지점 목록 설정 완료:', branches.length, '개');
+      
+      // API 응답이 배열이 아닌 경우 처리 (예: { data: [...] } 형태)
+      let branchArray = null;
+      if (branches === null || branches === undefined) {
+        // API 실패 시 null 반환됨
+        branchArray = null;
+      } else if (Array.isArray(branches)) {
+        branchArray = branches;
+      } else if (branches.data && Array.isArray(branches.data)) {
+        branchArray = branches.data;
+      } else if (branches.result && Array.isArray(branches.result)) {
+        branchArray = branches.result;
+      } else if (branches.result?.data && Array.isArray(branches.result.data)) {
+        branchArray = branches.result.data;
+      }
+      
+      if (branchArray && branchArray.length > 0) {
+        // 응답 데이터 형태 정규화 (id와 name 필드 확인)
+        const normalizedBranches = branchArray.map(branch => {
+          if (typeof branch === 'string') {
+            return { id: branch, name: branch };
+          }
+          return {
+            id: branch.id || branch.branchId || branch.name,
+            name: branch.name || branch.branchName || String(branch.id || branch.branchId)
+          };
+        });
+        setBranchList(normalizedBranches);
+        console.log('지점 목록 설정 완료:', normalizedBranches.length, '개', normalizedBranches);
       } else {
-        console.warn('지점 목록이 비어있습니다. 임시 데이터를 사용합니다.');
-        // 임시 지점 데이터 (API가 실패할 경우)
-        const fallbackBranches = [
-          { id: 1, name: '본점' }
-        ];
-        setBranchList(fallbackBranches);
+        console.warn('지점 목록 API가 실패했거나 데이터가 비어있습니다. 발주 목록에서 지점 추출을 시도합니다.');
+        // API가 실패했을 경우, 실제 발주 목록에서 고유한 지점명 추출
+        const uniqueBranches = {};
+        formattedData.forEach(item => {
+          if (item.branch && !uniqueBranches[item.branch]) {
+            uniqueBranches[item.branch] = {
+              id: item.branch,
+              name: item.branch
+            };
+          }
+        });
+        
+        const extractedBranches = Object.values(uniqueBranches);
+        if (extractedBranches.length > 0) {
+          setBranchList(extractedBranches);
+          console.log('발주 목록에서 지점 추출 완료:', extractedBranches.length, '개', extractedBranches);
+        } else {
+          console.warn('발주 목록에서도 지점을 찾을 수 없습니다. 기본값을 사용합니다.');
+          // 최후의 수단: 기본 지점 데이터
+          const fallbackBranches = [
+            { id: 1, name: '본점' }
+          ];
+          setBranchList(fallbackBranches);
+        }
       }
       
       // 차트 데이터 설정
