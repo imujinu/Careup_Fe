@@ -3,6 +3,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import Login from '../pages/auth/Login';
 import ShopApp from '../storefront/pages/ShopApp';
+import PaymentSuccessPage from '../storefront/pages/PaymentSuccessPage';
+import PaymentFailPage from '../storefront/pages/PaymentFailPage';
 import { headquartersRoutes } from './headquartersRoutes';
 import { franchiseRoutes } from './franchiseRoutes';
 
@@ -20,6 +22,14 @@ export const createAppRouter = (authState) => {
       {
         path: '/shop',
         element: <ShopApp />,
+      },
+      {
+        path: '/shop/payment-success',
+        element: <PaymentSuccessPage />,
+      },
+      {
+        path: '/shop/payment-fail',
+        element: <PaymentFailPage />,
       },
       {
         path: '/login',
@@ -41,6 +51,14 @@ export const createAppRouter = (authState) => {
     {
       path: '/shop',
       element: <ShopApp />,
+    },
+    {
+      path: '/shop/payment-success',
+      element: <PaymentSuccessPage />,
+    },
+    {
+      path: '/shop/payment-fail',
+      element: <PaymentFailPage />,
     },
     {
       path: '/',

@@ -433,16 +433,20 @@ function InventoryManagement() {
         }
         
         // 본사 관리자: 상품 마스터 등록
-        const productResponse = await inventoryService.createProduct({
+        const productData = {
           name: formData.name,
-          description: formData.description,
+          description: formData.description || '',
           categoryId: parseInt(formData.category),
-          minPrice: formData.minPrice,
-          maxPrice: formData.maxPrice,
-          supplyPrice: formData.supplyPrice,
-          imageFile: formData.imageFile,
-          visibility: formData.visibility
-        });
+          minPrice: formData.minPrice || 0,
+          maxPrice: formData.maxPrice || 0,
+          supplyPrice: formData.supplyPrice || 0,
+          imageUrl: formData.imageUrl || '',
+          visibility: formData.visibility || 'ALL'
+        };
+        
+        console.log('상품 등록 데이터:', productData);
+        
+        const productResponse = await inventoryService.createProduct(productData, null);
         
         console.log('상품 등록 응답:', productResponse);
         

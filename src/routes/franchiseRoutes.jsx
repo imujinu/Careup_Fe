@@ -1,8 +1,11 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import FranchiseInventoryManagement from '../pages/inventory/FranchiseInventoryManagement';
-import FranchisePurchaseOrderManagement from '../pages/purchaseOrder/FranchisePurchaseOrderManagement';
-import AutoOrderSettings from '../pages/franchise/AutoOrderSettings';
+import React from "react";
+import { Navigate } from "react-router-dom";
+import FranchiseInventoryManagement from "../pages/inventory/FranchiseInventoryManagement";
+import FranchisePurchaseOrderManagement from "../pages/purchaseOrder/FranchisePurchaseOrderManagement";
+import FranchiseOrderManagement from "../pages/franchise/FranchiseOrderManagement";
+import AutoOrderSettings from "../pages/franchise/AutoOrderSettings";
+import MyBranchDetail from "../pages/branch/MyBranchDetail";
+import BranchSalesReport from "../pages/salesReport/BranchSalesReport";
 
 /**
  * 가맹점(Franchise) 전용 라우트 설정
@@ -14,38 +17,49 @@ export const franchiseRoutes = [
     element: <Navigate to="/dashboard" replace />,
   },
   {
-    path: 'dashboard',
+    path: "dashboard",
     element: <div>대시보드 (준비중)</div>,
   },
   {
-    path: 'client',
+    path: "client",
     element: <Navigate to="/dashboard" replace />,
   },
   {
-    path: 'task',
+    path: "task",
     element: <Navigate to="/dashboard" replace />,
   },
   {
-    path: 'inventory',
+    path: "inventory",
     element: <FranchiseInventoryManagement />,
   },
   {
-    path: 'purchase-order',
+    path: "purchase-order",
     element: <FranchisePurchaseOrderManagement />,
   },
   {
-    path: 'auto-order',
+    path: "order",
+    element: <FranchiseOrderManagement />,
+  },
+  {
+    path: "auto-order",
     element: <AutoOrderSettings />,
   },
   {
-    path: 'attendance',
+    path: "attendance",
     element: <div>근태 관리 (준비중)</div>,
   },
   {
-    path: 'settings',
+    path: "my-branch",
+    element: <MyBranchDetail />,
+  },
+  {
+    path: "sales-report",
+    element: <BranchSalesReport />,
+  },
+  {
+    path: "settings",
     element: <div>설정 (준비중)</div>,
   },
 ];
 
 export default franchiseRoutes;
-
