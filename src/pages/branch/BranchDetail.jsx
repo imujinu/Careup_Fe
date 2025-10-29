@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '../../stores/hooks';
-import { getBranchDetail } from '../../service/branchService';
-import BranchDetailHeader from '../../components/branchManagement/BranchDetailHeader';
-import BranchDetailTabs from '../../components/branchManagement/BranchDetailTabs';
-import BranchDetailModal from '../../components/branchManagement/BranchDetailModal';
-import { useToast } from '../../components/common/Toast';
-import styled from 'styled-components';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../../stores/hooks";
+import { getBranchDetail, deleteBranch } from "../../service/branchService";
+import BranchDetailHeader from "../../components/branchManagement/BranchDetailHeader";
+import BranchDetailTabs from "../../components/branchManagement/BranchDetailTabs";
+import BranchDetailModal from "../../components/branchManagement/BranchDetailModal";
+import DeleteConfirmModal from "../../components/common/DeleteConfirmModal";
+import { useToast } from "../../components/common/Toast";
+import styled from "styled-components";
 
 function BranchDetail() {
   const { branchId } = useParams();
@@ -16,6 +17,8 @@ function BranchDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (branchId) {
@@ -30,13 +33,13 @@ function BranchDetail() {
       const data = await getBranchDetail(branchId);
       setBranchData(data);
     } catch (err) {
-      console.error('지점 상세 정보 조회 실패:', err);
-      setError('지점 정보를 불러오는데 실패했습니다.');
+      console.error("지점 상세 정보 조회 실패:", err);
+      setError("지점 정보를 불러오는데 실패했습니다.");
       addToast({
-        type: 'error',
-        title: '오류',
-        message: '지점 정보를 불러오는데 실패했습니다.',
-        duration: 3000
+        type: "error",
+        title: "오류",
+        message: "지점 정보를 불러오는데 실패했습니다.",
+        duration: 3000,
       });
     } finally {
       setLoading(false);
@@ -44,7 +47,7 @@ function BranchDetail() {
   };
 
   const handleBackToList = () => {
-    navigate('/branch');
+    navigate("/branch");
   };
 
   const handleShowDetail = () => {
@@ -53,6 +56,38 @@ function BranchDetail() {
 
   const handleCloseDetailModal = () => {
     setShowDetailModal(false);
+  };
+
+  const handleEdit = () => {
+    navigate(`/branch/edit/${branchId}`);
+  };
+
+  const handleDelete = async () => {
+    if (!branchId) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteBranch(branchId);
+      addToast({
+        type: "success",
+        title: "성공",
+        message: "지점이 삭제되었습니다.",
+        duration: 3000,
+      });
+      navigate("/branch");
+    } catch (err) {
+      console.error("지점 삭제 실패:", err);
+      addToast({
+        type: "error",
+        title: "오류",
+        message:
+          err.response?.data?.status_message || "지점 삭제에 실패했습니다.",
+        duration: 3000,
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   if (loading) {
@@ -68,7 +103,7 @@ function BranchDetail() {
       <Container>
         <ErrorMessage>
           <h3>오류가 발생했습니다</h3>
-          <p>{error || '지점 정보를 찾을 수 없습니다.'}</p>
+          <p>{error || "지점 정보를 찾을 수 없습니다."}</p>
           <BackButton onClick={handleBackToList}>목록으로 돌아가기</BackButton>
         </ErrorMessage>
       </Container>
@@ -77,12 +112,14 @@ function BranchDetail() {
 
   return (
     <Container>
-      <BranchDetailHeader 
+      <BranchDetailHeader
         branch={branchData}
         onBack={handleBackToList}
         onShowDetail={handleShowDetail}
+        onEdit={handleEdit}
+        onDelete={() => setShowDeleteModal(true)}
       />
-      
+
       <BranchDetailTabs branchId={branchId} />
 
       {showDetailModal && (
@@ -90,6 +127,18 @@ function BranchDetail() {
           branch={branchData}
           isOpen={showDetailModal}
           onClose={handleCloseDetailModal}
+        />
+      )}
+
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDelete}
+          title="지점 삭제"
+          message="해당 지점을 영구히 삭제하시겠습니까?"
+          itemName={branchData?.name}
+          isLoading={isDeleting}
         />
       )}
     </Container>
@@ -119,12 +168,12 @@ const ErrorMessage = styled.div`
   justify-content: center;
   height: 400px;
   text-align: center;
-  
+
   h3 {
     color: #dc2626;
     margin-bottom: 16px;
   }
-  
+
   p {
     color: #6b7280;
     margin-bottom: 24px;
@@ -139,7 +188,7 @@ const BackButton = styled.button`
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  
+
   &:hover {
     background: #5b21b6;
   }
