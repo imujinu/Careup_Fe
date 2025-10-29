@@ -107,12 +107,10 @@ function FranchiseInventoryManagement() {
       const totalItems = uniqueData.length;
       const lowStock = uniqueData.filter(item => item.status === 'low').length;
       const totalValue = uniqueData.reduce((sum, item) => sum + item.totalValue, 0);
-      const categories = [...new Set(uniqueData.map(item => item.category))];
       
       setSummary({
         totalItems,
         lowStock,
-        categories: categories.length,
         totalValue
       });
     } catch (err) {
@@ -300,7 +298,10 @@ function FranchiseInventoryManagement() {
       React.createElement(PageTitle, null, `재고관리 - ${getBranchName(branchId)}`),
       React.createElement(PageSubtitle, null, '가맹점 재고 조회, 수정 및 발주 추천')
     ),
-    React.createElement(SummaryCards, { summary }),
+    React.createElement(SummaryCards, { 
+      summary,
+      userRole: 'BRANCH_MANAGER'
+    }),
     React.createElement(SearchAndFilter, {
       filters,
       onFiltersChange: handleFiltersChange,

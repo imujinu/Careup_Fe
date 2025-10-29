@@ -774,7 +774,10 @@ function InventoryManagement() {
     ),
     React.createElement(TabContent, null,
       activeTab === 'inventory' ? React.createElement(React.Fragment, null,
-        React.createElement(SummaryCards, { summary }),
+        React.createElement(SummaryCards, { 
+          summary,
+          userRole: authService.getCurrentUser()?.role
+        }),
         React.createElement(SearchAndFilter, {
           filters,
           onFiltersChange: handleFiltersChange,
