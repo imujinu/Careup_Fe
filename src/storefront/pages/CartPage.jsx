@@ -4,9 +4,6 @@ import { removeFromCart, updateQuantity, clearCart } from '../../store/slices/ca
 import { cartService } from '../../service/cartService';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
-
 const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const dispatch = useDispatch();
   const { items, branchId, totalAmount } = useSelector(state => state.cart);
@@ -15,6 +12,8 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const [loading, setLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState(null);
+  const [selectedBranches, setSelectedBranches] = useState({}); // {productId: branchId}
+  const [availableBranches, setAvailableBranches] = useState({}); // {productId: [branches]}
 
   // 장바구니가 비어있으면 홈으로 리다이렉트
   useEffect(() => {
@@ -23,12 +22,93 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
     }
   }, [items.length, onBack]);
 
-  const handleQuantityChange = (branchProductId, newQuantity) => {
-    if (newQuantity <= 0) {
-      dispatch(removeFromCart(branchProductId));
-    } else {
-      dispatch(updateQuantity({ branchProductId, quantity: newQuantity }));
+  // 각 상품별로 재고 있는 지점 조회
+  useEffect(() => {
+    const loadBranchInfo = async () => {
+      const branchesData = {};
+      
+      for (const item of items) {
+        try {
+          // 각 상품의 모든 지점별 재고 정보 조회
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+          const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
+          
+          // 상품별로 모든 지점의 재고 정보 조회
+          const response = await shopApi.get(`/inventory/branch-products/search`, {
+            params: { keyword: item.productName }
+          });
+          
+          const branchProducts = response?.data?.data || [];
+          const productBranches = branchProducts.filter(bp => bp.productId === item.productId);
+          
+          if (productBranches.length > 0) {
+            branchesData[item.productId] = productBranches.map(bp => ({
+              branchProductId: bp.branchProductId || bp.id,
+              branchId: bp.branchId,
+              branchName: `지점 ${bp.branchId}`,
+              stockQuantity: bp.stockQuantity || 0,
+              price: bp.price || item.price
+            }));
+          } else {
+            // API에서 찾지 못한 경우 기본값 (현재 지점만)
+            branchesData[item.productId] = [{
+              branchProductId: item.branchProductId,
+              branchId: item.branchId,
+              branchName: `지점 ${item.branchId}`,
+              stockQuantity: 0,
+              price: item.price
+            }];
+          }
+        } catch (error) {
+          console.error(`❌ 상품 ${item.productName} 지점 정보 조회 실패:`, error);
+          // 에러 시 기본값 (현재 지점만)
+          branchesData[item.productId] = [{
+            branchProductId: item.branchProductId,
+            branchId: item.branchId,
+            branchName: `지점 ${item.branchId}`,
+            stockQuantity: 0,
+            price: item.price
+          }];
+        }
+      }
+      
+      setAvailableBranches(branchesData);
+    };
+    
+    if (items.length > 0) {
+      loadBranchInfo();
     }
+  }, [items]);
+
+  const handleBranchSelect = (productId, branchId) => {
+    setSelectedBranches(prev => ({
+      ...prev,
+      [productId]: branchId
+    }));
+  };
+
+  const handleProceedToOrder = () => {
+    // 지점 선택 여부 확인
+    const allSelected = items.every(item => 
+      selectedBranches[item.productId]
+    );
+
+    if (!allSelected) {
+      alert('모든 상품의 구매 지점을 선택해주세요.');
+      return;
+    }
+
+    // 결제 페이지로 이동 (지점 정보 포함)
+    if (onProceedToOrder) {
+      onProceedToOrder({ items, selectedBranches, availableBranches });
+    }
+  };
+
+  const handleQuantityChange = (branchProductId, newQuantity) => {
+    if (newQuantity < 1) {
+      return;
+    }
+    dispatch(updateQuantity({ branchProductId, quantity: newQuantity }));
   };
 
   const handleRemoveItem = (branchProductId) => {
@@ -61,11 +141,11 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
 
       // 주문 데이터 구성 (백엔드 API 구조에 맞게)
       const orderData = {
-        memberId: currentUser?.memberId || 1, // 로그인한 회원 ID 사용
-        branchId: selectedBranch.branchId,
+        memberId: Number(currentUser?.memberId || 1), // 로그인한 회원 ID 사용
+        branchId: Number(selectedBranch.branchId),
         orderType: 'ONLINE', // OrderType enum 값
         orderItems: items.map(item => ({
-          branchProductId: item.branchProductId,
+          branchProductId: Number(item.branchProductId),
           quantity: item.quantity
         })),
         couponId: null // 쿠폰 미적용
@@ -147,7 +227,29 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
               <div className="item-info">
                 <h4 className="item-name">{item.productName}</h4>
                 <div className="item-price">
-                  {item.price.toLocaleString()}원
+                  {(() => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return displayPrice.toLocaleString();
+                  })()}원
+                </div>
+                
+                {/* 지점 선택 드롭다운 */}
+                <div className="branch-selection">
+                  <label>구매 지점:</label>
+                  <select 
+                    value={selectedBranches[item.productId] || ''}
+                    onChange={(e) => handleBranchSelect(item.productId, e.target.value)}
+                    className="branch-select"
+                  >
+                    <option value="">구매할 지점을 선택하세요</option>
+                    {availableBranches[item.productId]?.map(branch => (
+                      <option key={branch.branchId} value={branch.branchId}>
+                        {branch.branchName || `지점 ${branch.branchId}`} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="item-quantity">
                   <button 
@@ -168,7 +270,12 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
               
               <div className="item-total">
                 <div className="total-price">
-                  {(item.price * item.quantity).toLocaleString()}원
+                  {(() => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return (displayPrice * item.quantity).toLocaleString();
+                  })()}원
                 </div>
                 <button 
                   className="remove-btn"
@@ -189,7 +296,15 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
           <div className="summary-content">
             <div className="summary-row">
               <span>상품 금액</span>
-              <span>{totalAmount.toLocaleString()}원</span>
+              <span>{(() => {
+                const calculatedTotal = items.reduce((sum, item) => {
+                  const selectedBranchId = selectedBranches[item.productId];
+                  const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                  const displayPrice = branch?.price || item.price;
+                  return sum + (displayPrice * item.quantity);
+                }, 0);
+                return calculatedTotal.toLocaleString();
+              })()}원</span>
             </div>
             <div className="summary-row">
               <span>배송비</span>
@@ -197,7 +312,15 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
             </div>
             <div className="summary-row total">
               <span>총 결제 금액</span>
-              <span>{totalAmount.toLocaleString()}원</span>
+              <span>{(() => {
+                const calculatedTotal = items.reduce((sum, item) => {
+                  const selectedBranchId = selectedBranches[item.productId];
+                  const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                  const displayPrice = branch?.price || item.price;
+                  return sum + (displayPrice * item.quantity);
+                }, 0);
+                return calculatedTotal.toLocaleString();
+              })()}원</span>
             </div>
           </div>
           
@@ -209,7 +332,7 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
           
               <button 
                 className="order-btn" 
-                onClick={() => onProceedToOrder && onProceedToOrder()} 
+                onClick={handleProceedToOrder} 
                 disabled={orderLoading || items.length === 0}
               >
                 {orderLoading ? '주문 처리 중...' : '주문하기'}

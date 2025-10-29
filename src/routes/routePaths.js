@@ -48,6 +48,7 @@ export const MENU_PATH_MAP = {
   attendance: '/attendance',
   inventory: '/inventory',
   purchaseOrder: '/purchase-order',
+  order: '/order',
   salesReport: '/sales-report',
   autoOrder: '/auto-order',
   settings: '/settings',

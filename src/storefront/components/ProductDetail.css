@@ -214,7 +214,8 @@
 }
 
 .size-select,
-.color-select {
+.color-select,
+.branch-select {
   padding: 12px 16px;
   border: 1px solid #ddd;
   border-radius: 6px;
@@ -225,7 +226,8 @@
 }
 
 .size-select:focus,
-.color-select:focus {
+.color-select:focus,
+.branch-select:focus {
   outline: none;
   border-color: #333;
 }
