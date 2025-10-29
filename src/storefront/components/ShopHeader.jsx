@@ -26,15 +26,27 @@ const ShopHeader = ({
         <div className="header-top">
           <a href="#">고객센터</a>
           {!isLoggedIn ? (
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage("login");
-              }}
-            >
-              로그인
-            </a>
+            <>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = "http://localhost:5173/login";
+                }}
+              >
+                로그인
+              </a>
+              <a
+                href="#"
+                style={{ marginLeft: 2 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = "http://localhost:5173/login"; // 관리자 포털 로그인으로 이동
+                }}
+              >
+                관리자
+              </a>
+            </>
           ) : (
             <a
               href="#"
