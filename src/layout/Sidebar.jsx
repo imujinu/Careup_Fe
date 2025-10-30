@@ -144,7 +144,11 @@ function Sidebar({ isVisible, userType, branchId }) {
     return items;
   })();
 
-  const menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
+  let menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
+  // STAFF는 발주관리 메뉴 비노출
+  if (role === 'STAFF') {
+    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder');
+  }
 
   const handleLogout = () => {
     dispatch(logoutUser());
