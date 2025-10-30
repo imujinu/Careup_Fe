@@ -7,20 +7,29 @@ import {
   mdiAccountGroup,
   mdiFileDocument,
   mdiAccount,
+  mdiInformationOutline,
 } from "@mdi/js";
 import EmployeeManagement from "./EmployeeManagement";
 import DocumentManagement from "./DocumentManagement";
 import KPIManagement from "./KPIManagement";
 
-function BranchDetailTabs({ branchId }) {
-  const [activeTab, setActiveTab] = useState("owner");
-
+function BranchDetailTabs({ branchId, branch, userType }) {
+  // 지점/가맹점 관리자용 탭 (지점 상세 정보로 변경)
+  const isBranchAdmin = userType === 'franchise';
+  
+  // 지점 관리자는 상세 정보 탭을 기본으로
+  const [activeTab, setActiveTab] = useState(isBranchAdmin ? "dashboard" : "owner");
+  
   const tabs = [
     {
       id: "dashboard",
-      label: "대시보드",
-      icon: mdiViewDashboard,
-      component: <DashboardContent branchId={branchId} />,
+      label: isBranchAdmin ? "지점 상세 정보" : "대시보드",
+      icon: isBranchAdmin ? mdiInformationOutline : mdiViewDashboard,
+      component: isBranchAdmin ? (
+        <DetailInfoContent branch={branch} />
+      ) : (
+        <DashboardContent branchId={branchId} />
+      ),
     },
     {
       id: "kpi",
@@ -73,6 +82,164 @@ function BranchDetailTabs({ branchId }) {
 
       <TabContent>{activeTabData?.component}</TabContent>
     </TabsContainer>
+  );
+}
+
+// 지점 상세 정보 컴포넌트 (지점/가맹점 관리자용)
+function DetailInfoContent({ branch }) {
+  const formatDate = (dateString) => {
+    if (!dateString) return '정보 없음';
+    return new Date(dateString).toLocaleDateString('ko-KR');
+  };
+
+  const formatOwnershipType = (type) => {
+    switch (type) {
+      case 'HEADQUARTERS':
+        return '본사';
+      case 'FRANCHISE':
+        return '가맹점';
+      case 'DIRECT':
+      case 'YES':
+        return '직영';
+      case 'NO':
+        return '가맹점';
+      default:
+        return type || '정보 없음';
+    }
+  };
+
+  const formatBranchStatus = (status) => {
+    switch (status) {
+      case 'OPERATING':
+      case 'OPENED':
+        return '운영중';
+      case 'CLOSED':
+        return '폐점';
+      case 'SUSPENDED':
+        return '휴업';
+      default:
+        return status || '정보 없음';
+    }
+  };
+
+  if (!branch) {
+    return (
+      <PlaceholderContent>
+        <PlaceholderText>지점 정보를 불러오는 중...</PlaceholderText>
+      </PlaceholderContent>
+    );
+  }
+
+  return (
+    <DetailInfoContainer>
+      <InfoSection>
+        <SectionTitle>기본 정보</SectionTitle>
+        <InfoGrid>
+          <InfoItem>
+            <InfoLabel>지점명</InfoLabel>
+            <InfoValue>{branch.name || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>사업자명</InfoLabel>
+            <InfoValue>{branch.businessDomain || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>지점 유형</InfoLabel>
+            <InfoValue>{formatOwnershipType(branch.ownershipType)}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>운영 상태</InfoLabel>
+            <InfoValue>{formatBranchStatus(branch.status)}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>개업일</InfoLabel>
+            <InfoValue>{formatDate(branch.openDate)}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>전화번호</InfoLabel>
+            <InfoValue>{branch.phone || '정보 없음'}</InfoValue>
+          </InfoItem>
+        </InfoGrid>
+      </InfoSection>
+
+      <InfoSection>
+        <SectionTitle>사업자 정보</SectionTitle>
+        <InfoGrid>
+          <InfoItem>
+            <InfoLabel>사업자등록번호</InfoLabel>
+            <InfoValue>{branch.businessNumber || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>법인등록번호</InfoLabel>
+            <InfoValue>{branch.corporationNumber || '정보 없음'}</InfoValue>
+          </InfoItem>
+        </InfoGrid>
+      </InfoSection>
+
+      <InfoSection>
+        <SectionTitle>주소 정보</SectionTitle>
+        <InfoGrid>
+          <InfoItem>
+            <InfoLabel>우편번호</InfoLabel>
+            <InfoValue>{branch.zipcode || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem fullWidth>
+            <InfoLabel>주소</InfoLabel>
+            <InfoValue>{branch.address || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem fullWidth>
+            <InfoLabel>상세주소</InfoLabel>
+            <InfoValue>{branch.addressDetail || '정보 없음'}</InfoValue>
+          </InfoItem>
+        </InfoGrid>
+      </InfoSection>
+
+      <InfoSection>
+        <SectionTitle>지점장 정보</SectionTitle>
+        <InfoGrid>
+          <InfoItem>
+            <InfoLabel>지점장명</InfoLabel>
+            <InfoValue>{branch.attorneyName || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>지점장 연락처</InfoLabel>
+            <InfoValue>{branch.attorneyPhoneNumber || '정보 없음'}</InfoValue>
+          </InfoItem>
+        </InfoGrid>
+      </InfoSection>
+
+      <InfoSection>
+        <SectionTitle>위치 정보</SectionTitle>
+        <InfoGrid>
+          <InfoItem>
+            <InfoLabel>위도</InfoLabel>
+            <InfoValue>{branch.latitude || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>경도</InfoLabel>
+            <InfoValue>{branch.longitude || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem>
+            <InfoLabel>지오펜스 반경 (m)</InfoLabel>
+            <InfoValue>{branch.geofenceRadius || '정보 없음'}</InfoValue>
+          </InfoItem>
+        </InfoGrid>
+      </InfoSection>
+
+      <InfoSection>
+        <SectionTitle>기타 정보</SectionTitle>
+        <InfoGrid>
+          <InfoItem>
+            <InfoLabel>이메일</InfoLabel>
+            <InfoValue>{branch.email || '정보 없음'}</InfoValue>
+          </InfoItem>
+          <InfoItem fullWidth>
+            <InfoLabel>비고</InfoLabel>
+            <InfoValue>{branch.remark || '정보 없음'}</InfoValue>
+          </InfoItem>
+        </InfoGrid>
+      </InfoSection>
+    </DetailInfoContainer>
   );
 }
 
@@ -206,4 +373,55 @@ const PlaceholderText = styled.p`
   line-height: 1.6;
   margin: 0;
   max-width: 500px;
+`;
+
+const DetailInfoContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+`;
+
+const InfoSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const SectionTitle = styled.h3`
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb;
+`;
+
+const InfoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+`;
+
+const InfoItem = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'fullWidth',
+})`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  ${(props) => props.fullWidth && "grid-column: 1 / -1;"}
+`;
+
+const InfoLabel = styled.span`
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+`;
+
+const InfoValue = styled.span`
+  font-size: 16px;
+  color: #111827;
+  word-break: break-word;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
 `;

@@ -13,6 +13,7 @@ function BranchDetail() {
   const { branchId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { userType } = useAppSelector((state) => state.auth);
   const [branchData, setBranchData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -120,7 +121,7 @@ function BranchDetail() {
         onDelete={() => setShowDeleteModal(true)}
       />
 
-      <BranchDetailTabs branchId={branchId} />
+      <BranchDetailTabs branchId={branchId} branch={branchData} userType={userType} />
 
       {showDetailModal && (
         <BranchDetailModal
