@@ -3,9 +3,8 @@ import React from "react";
 const OrderTab = ({ onTabClick }) => {
   const orderTabs = [
     { id: "전체조회", label: "📋 전체 발주 조회" },
-    { id: "발주등록", label: "➕ 발주 등록" },
-    { id: "발주수정", label: "✏️ 발주 수정" },
-    { id: "배송현황", label: "🚚 배송 현황" },
+    { id: "발주요청", label: "🧾 발주 요청" },
+    { id: "발주추천", label: "🛒 발주 추천" }, // ✅ handleOrderTab 분기와 일치
   ];
 
   return (
@@ -27,4 +26,3 @@ const OrderTab = ({ onTabClick }) => {
 };
 
 export default OrderTab;
-

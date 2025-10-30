@@ -6,15 +6,56 @@ const BASE_URL =
   import.meta.env.VITE_API_URL ||
   'http://localhost:8080';
 
+// 서버가 직접 정렬 가능한 필드만 허용(가상/조인 필요한 필드는 제외)
+const SERVER_SORTABLE = new Set([
+  'id',
+  'name',
+  'employeeNumber',
+  'dateOfBirth',
+  'gender',
+  'email',
+  'mobile',
+  'hireDate',
+  'terminateDate',
+  'employmentStatus',
+  'employmentType',
+]);
+
+const sanitizeParams = (params = {}) => {
+  const next = { ...(params || {}) };
+  if (next.sort) {
+    const [field] = String(next.sort).split(',');
+    if (!SERVER_SORTABLE.has(field)) {
+      delete next.sort;
+    }
+  }
+  return next;
+};
+
+const getWithRetrySansSort = async (url, params = {}) => {
+  try {
+    return await axios.get(url, { params: sanitizeParams(params) });
+  } catch (e) {
+    const hadSort = !!params?.sort;
+    const status = e?.response?.status;
+    if (hadSort && (status === 500 || status === 400)) {
+      const p2 = { ...(params || {}) };
+      delete p2.sort;
+      return await axios.get(url, { params: p2 });
+    }
+    throw e;
+  }
+};
+
 export const fetchStaffList = async (params = {}) => {
   const url = `${BASE_URL}/employees/list`;
-  const res = await axios.get(url, { params });
+  const res = await getWithRetrySansSort(url, params);
   return res?.data?.result ?? res?.data;
 };
 
 export const fetchStaffListByBranch = async (branchId, params = {}) => {
   const url = `${BASE_URL}/employees/list/branch/${branchId}`;
-  const res = await axios.get(url, { params });
+  const res = await getWithRetrySansSort(url, params);
   return res?.data?.result ?? res?.data;
 };
 
