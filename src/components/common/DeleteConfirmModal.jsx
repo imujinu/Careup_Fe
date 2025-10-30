@@ -1,27 +1,58 @@
 import React from 'react';
 import styled from 'styled-components';
+import BaseModal from './BaseModal';
 
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
+function DeleteConfirmModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title = "지점 삭제", 
+  message = "해당 지점을 영구히 삭제하시겠습니까?",
+  confirmText = "삭제",
+  cancelText = "취소",
+  isLoading = false,
+  itemName = ""
+}) {
+  const handleConfirm = () => {
+    onConfirm();
+  };
 
-const ModalContent = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-`;
+  return (
+    <BaseModal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      maxWidth="400px"
+      allowBackdropClose={false}
+    >
+      <ModalHeader>
+        <ModalTitle>{title}</ModalTitle>
+        <ModalMessage>
+          {itemName && `${itemName} `}{message}
+          <br />
+          <strong>이 작업은 되돌릴 수 없습니다.</strong>
+        </ModalMessage>
+      </ModalHeader>
+      
+      <ModalActions>
+        <CancelButton 
+          onClick={onClose}
+          disabled={isLoading}
+        >
+          {cancelText}
+        </CancelButton>
+        <DeleteButton 
+          onClick={handleConfirm}
+          disabled={isLoading}
+        >
+          {isLoading && <LoadingSpinner />}
+          {confirmText}
+        </DeleteButton>
+      </ModalActions>
+    </BaseModal>
+  );
+}
+
+export default DeleteConfirmModal;
 
 const ModalHeader = styled.div`
   margin-bottom: 16px;
@@ -105,63 +136,6 @@ const LoadingSpinner = styled.div`
   margin-right: 8px;
   
   @keyframes spin {
-    to { transform: rotate(360deg); }
+to { transform: rotate(360deg); }
   }
 `;
-
-function DeleteConfirmModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title = "지점 삭제", 
-  message = "해당 지점을 영구히 삭제하시겠습니까?",
-  confirmText = "삭제",
-  cancelText = "취소",
-  isLoading = false,
-  itemName = ""
-}) {
-  if (!isOpen) return null;
-
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  const handleConfirm = () => {
-    onConfirm();
-  };
-
-  return (
-    <ModalOverlay onClick={handleOverlayClick}>
-      <ModalContent>
-        <ModalHeader>
-          <ModalTitle>{title}</ModalTitle>
-          <ModalMessage>
-            {itemName && `${itemName} `}{message}
-            <br />
-            <strong>이 작업은 되돌릴 수 없습니다.</strong>
-          </ModalMessage>
-        </ModalHeader>
-        
-        <ModalActions>
-          <CancelButton 
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            {cancelText}
-          </CancelButton>
-          <DeleteButton 
-            onClick={handleConfirm}
-            disabled={isLoading}
-          >
-            {isLoading && <LoadingSpinner />}
-            {confirmText}
-          </DeleteButton>
-        </ModalActions>
-      </ModalContent>
-    </ModalOverlay>
-  );
-}
-
-export default DeleteConfirmModal;

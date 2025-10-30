@@ -35,6 +35,7 @@ export const FRANCHISE_PATHS = {
   PURCHASE_ORDER: "/purchase-order",
   AUTO_ORDER: "/auto-order",
   ATTENDANCE: "/attendance",
+  MY_BRANCH: "/my-branch",
   SALES_REPORT: "/sales-report",
   SETTINGS: "/settings",
 };
@@ -43,6 +44,7 @@ export const FRANCHISE_PATHS = {
 export const MENU_PATH_MAP = {
   dashboard: '/dashboard',
   branch: '/branch',
+  myBranch: '/my-branch',
   client: '/client',
   task: '/task',
   attendance: '/attendance',

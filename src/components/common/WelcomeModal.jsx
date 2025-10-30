@@ -116,9 +116,24 @@ export default function WelcomeModal({
 }) {
   useEffect(() => {
     if (!open) return;
+    
+    // 모달이 열릴 때 뒷단 스크롤 방지
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    
     const onKey = (e) => e.key === "Escape" && onClose?.();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    
+    return () => {
+      // 모달이 닫힐 때 스크롤 위치 복원
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -129,7 +144,7 @@ export default function WelcomeModal({
   const accentColor = primaryColor;
 
   return (
-    <Overlay role="dialog" aria-modal="true" onClick={onClose}>
+    <Overlay role="dialog" aria-modal="true">
       <Dialog onClick={(e) => e.stopPropagation()}>
         <Close aria-label="닫기" onClick={onClose}>
           <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
