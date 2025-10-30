@@ -524,10 +524,13 @@ function ShopLayout() {
     }
   };
 
-  // 주문 페이지로 이동
-  const handleProceedToOrder = (cartData) => {
-    setOrderData(cartData);
-    setPage("order");
+  // 장바구니에서 주문 생성 후 바로 결제 페이지로 이동
+  const handleProceedToOrder = (order) => {
+    setOrderData(order);
+    if (order) {
+      localStorage.setItem('currentOrderData', JSON.stringify(order));
+    }
+    setPage("payment");
   };
 
   // 결제 페이지로 이동
@@ -716,7 +719,7 @@ function ShopLayout() {
                     key={c.name}
                   onClick={() => {
                     setActiveCategoryPage(c.name);
-                    setActiveTab(c.name);  // 필터링을 위한 activeTab도 업데이트
+                    handleTabChange(c.name); // 카테고리 선택 시 탭 변경 핸들러 사용
                     setPage("products");  // category 대신 products 페이지로 이동
                   }}
                     style={{ cursor: "pointer" }}
@@ -733,7 +736,7 @@ function ShopLayout() {
                 <div className="section-title">지금 가장 주목받는 신상</div>
                 <Tabs
                   active={activeTab}
-                  onChange={setActiveTab}
+                  onChange={handleTabChange}
                   tabs={["전체", ...Array.from(new Set(categories.map((c) => c.name)))]}
                 />
                 <div className="grid">

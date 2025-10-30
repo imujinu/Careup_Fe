@@ -42,6 +42,17 @@ const cartSlice = createSlice({
       state.totalAmount = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
     },
     
+    // 각 상품에 선택된 지점 정보를 저장 (주문 전 UI/로직용)
+    setItemBranchSelection: (state, action) => {
+      const { productId, selectedBranchId, selectedBranchProductId, selectedPrice } = action.payload;
+      const item = state.items.find(item => item.productId === productId);
+      if (item) {
+        item.selectedBranchId = selectedBranchId;
+        if (selectedBranchProductId) item.selectedBranchProductId = selectedBranchProductId;
+        if (typeof selectedPrice === 'number') item.selectedPrice = selectedPrice;
+      }
+    },
+
     removeFromCart: (state, action) => {
       const branchProductId = action.payload;
       state.items = state.items.filter(item => item.branchProductId !== branchProductId);
@@ -96,7 +107,8 @@ export const {
   removeFromCart, 
   updateQuantity, 
   clearCart, 
-  changeBranch 
+  changeBranch,
+  setItemBranchSelection
 } = cartSlice.actions;
 
 export default cartSlice.reducer;

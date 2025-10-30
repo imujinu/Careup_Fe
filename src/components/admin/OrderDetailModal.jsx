@@ -319,6 +319,12 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
               React.createElement(InfoLabel, {}, '승인자 ID'),
               React.createElement(InfoValue, {}, order.approvedBy)
             ),
+            order.rejectedBy && React.createElement(
+              InfoItem,
+              {},
+              React.createElement(InfoLabel, {}, '거부자 ID'),
+              React.createElement(InfoValue, {}, order.rejectedBy)
+            ),
             order.rejectedReason && React.createElement(
               InfoItem,
               {},
