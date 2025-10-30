@@ -16,6 +16,20 @@ axios.interceptors.request.use(
     if (token) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
+      
+      // 디버깅: 주문 API 호출 시 토큰 확인
+      if (config.url && config.url.includes('/api/orders')) {
+        console.log('🔐 [관리자 axiosConfig] Authorization 헤더 설정:', {
+          url: config.url,
+          tokenPrefix: token.substring(0, 20) + '...',
+          tokenLength: token.length
+        });
+      }
+    } else {
+      // 토큰이 없을 때 경고
+      if (config.url && config.url.includes('/api/orders')) {
+        console.warn('⚠️ [관리자 axiosConfig] accessToken이 없습니다!');
+      }
     }
     
     // FormData인 경우 Content-Type을 설정하지 않음 (브라우저가 자동으로 multipart/form-data 설정)

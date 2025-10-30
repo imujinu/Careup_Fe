@@ -193,16 +193,19 @@ function OrderManagement() {
   // 상태 한글 변환 함수
   const getStatusText = (status) => {
     if (!status) return status;
-    switch (status.toUpperCase()) {
+    const s = String(status).toUpperCase();
+    switch (s) {
       case 'PENDING':
         return '대기중';
       case 'APPROVED':
+      case 'CONFIRMED': // 백엔드에서 CONFIRMED로 들어오는 케이스 대응
         return '승인됨';
       case 'REJECTED':
         return '거부됨';
       case 'COMPLETED':
         return '완료';
       case 'CANCELLED':
+      case 'CANCELED': // 철자 변형 대응
         return '취소됨';
       default:
         return status;
@@ -215,31 +218,30 @@ function OrderManagement() {
       setLoading(true);
       console.log('주문 목록 조회 시작...');
       const response = await orderService.getAllOrders();
-      console.log('주문 목록 조회 응답:', response);
-      
-      let ordersData = [];
-      
-      // ResponseDto 구조에 맞게 데이터 추출
-      if (response.result) {
-        ordersData = response.result;
-      } else if (Array.isArray(response)) {
-        ordersData = response;
-      } else if (response.data) {
-        ordersData = response.data;
-      }
+      console.log('주문 목록 조회 응답(normalized):', response);
+
+      const ordersData = Array.isArray(response)
+        ? response
+        : (response?.data || response?.items || []);
 
       console.log('파싱된 주문 데이터:', ordersData);
 
       // 데이터 변환
-      const formattedOrders = ordersData.map((order) => ({
-        id: order.orderId || order.id,
-        memberName: order.memberName || '-',
-        branchId: order.branchId || '-',
-        totalAmount: order.totalAmount || 0,
-        status: order.orderStatus || order.status || 'PENDING',
-        createdAt: order.createdAt || new Date().toISOString(),
-        orderItems: order.orderItems || []
-      }));
+      const formattedOrders = ordersData.map((order) => {
+        const raw = (order.orderStatus || order.status || 'PENDING');
+        const norm = String(raw).toUpperCase();
+        // 상태 표준화
+        const normalized = norm === 'CONFIRMED' ? 'APPROVED' : (norm === 'CANCELED' ? 'CANCELLED' : norm);
+        return {
+          id: order.orderId || order.id,
+          memberName: order.memberName || '-',
+          branchId: order.branchId || '-',
+          totalAmount: order.totalAmount || 0,
+          status: normalized,
+          createdAt: order.createdAt || new Date().toISOString(),
+          orderItems: order.orderItems || [],
+        };
+      });
 
       console.log('포맷팅된 주문 데이터:', formattedOrders);
       setOrders(formattedOrders);
@@ -285,7 +287,8 @@ function OrderManagement() {
 
       await orderService.approveOrder(orderId, approvedBy);
       alert('주문이 승인되었습니다.');
-      fetchOrders(); // 목록 새로고침
+      // 즉시 카운팅 반영
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'APPROVED' } : o)));
     } catch (error) {
       console.error('주문 승인 실패:', error);
       alert('주문 승인에 실패했습니다.');
@@ -302,7 +305,10 @@ function OrderManagement() {
     try {
       await orderService.rejectOrder(orderId, rejectReason);
       alert('주문이 거부되었습니다.');
-      fetchOrders(); // 목록 새로고침
+      // 즉시 카운팅 반영 + 거부자 기록
+      const userInfo = authService.getCurrentUser();
+      const rejectedBy = userInfo?.id || 'me';
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'REJECTED', rejectedBy } : o)));
     } catch (error) {
       console.error('주문 거부 실패:', error);
       alert('주문 거부에 실패했습니다.');
@@ -317,14 +323,31 @@ function OrderManagement() {
   // 상세 모달 열기
   const handleOpenDetail = async (order) => {
     try {
-      const orderDetail = await orderService.getOrderDetail(order.id);
-      // ResponseDto 구조에 맞게 데이터 추출
-      const detailData = orderDetail.result || orderDetail;
-      setSelectedOrder(detailData);
+      const detailData = await orderService.getOrderDetail(order.id);
+      // 리스트 항목과 병합하여 필드 누락 방지
+      setSelectedOrder({
+        id: order.id,
+        orderId: detailData.orderId ?? order.orderId ?? order.id,
+        memberName: detailData.memberName ?? order.memberName ?? '-',
+        branchId: detailData.branchId ?? order.branchId ?? '-',
+        totalAmount: detailData.totalAmount ?? order.totalAmount ?? 0,
+        orderStatus: (detailData.orderStatus ?? order.status),
+        status: (() => {
+          const raw = (detailData.status ?? detailData.orderStatus ?? order.status);
+          const up = String(raw || 'PENDING').toUpperCase();
+          if (up === 'CONFIRMED') return 'APPROVED';
+          if (up === 'CANCELED') return 'CANCELLED';
+          return up;
+        })(),
+        orderType: detailData.orderType ?? order.orderType,
+        createdAt: detailData.createdAt ?? order.createdAt,
+        orderItems: detailData.orderItems ?? order.orderItems ?? [],
+      });
       setIsDetailModalOpen(true);
     } catch (error) {
       console.error('주문 상세 조회 실패:', error);
-      setSelectedOrder(order);
+      // 실패해도 기본 정보로 모달 표시
+      setSelectedOrder({ ...order, orderId: order.orderId ?? order.id });
       setIsDetailModalOpen(true);
     }
   };

@@ -68,7 +68,7 @@ const Select = styled.select`
   }
 `;
 
-function SearchAndFilter({ filters, onFiltersChange }) {
+function SearchAndFilter({ filters, onFiltersChange, branchList = [] }) {
   const handleSearchChange = (e) => {
     onFiltersChange({
       ...filters,
@@ -106,18 +106,25 @@ function SearchAndFilter({ filters, onFiltersChange }) {
         onChange: handleBranchFilterChange
       },
         React.createElement('option', { value: '' }, '전체 지점'),
-        React.createElement('option', { value: '강남점' }, '강남점'),
-        React.createElement('option', { value: '신촌점' }, '신촌점'),
-        React.createElement('option', { value: '홍대점' }, '홍대점')
+        ...branchList.map(branch => 
+          React.createElement('option', { 
+            key: branch.id, 
+            value: branch.name 
+          }, branch.name)
+        )
       ),
       React.createElement(Select, {
         value: filters.statusFilter,
         onChange: handleStatusFilterChange
       },
         React.createElement('option', { value: '' }, '전체 상태'),
-        React.createElement('option', { value: 'pending' }, '대기중'),
-        React.createElement('option', { value: 'completed' }, '완료'),
-        React.createElement('option', { value: 'cancelled' }, '취소됨')
+        React.createElement('option', { value: 'PENDING' }, '대기중'),
+        React.createElement('option', { value: 'APPROVED' }, '승인됨'),
+        React.createElement('option', { value: 'REJECTED' }, '반려됨'),
+        React.createElement('option', { value: 'PARTIAL' }, '부분승인'),
+        React.createElement('option', { value: 'SHIPPED' }, '배송중'),
+        React.createElement('option', { value: 'COMPLETED' }, '완료'),
+        React.createElement('option', { value: 'CANCELLED' }, '취소됨')
       )
     )
   );

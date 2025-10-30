@@ -32,17 +32,24 @@ const PaymentSuccessPage = () => {
         // localStorage에서 저장된 주문 정보 가져오기
         const orderData = JSON.parse(localStorage.getItem('currentOrderData') || '{}');
         
-        // CAREUP_ORDER_X에서 숫자만 추출
-        const numericOrderId = orderId.replace('CAREUP_ORDER_', '');
-        const numericOrderIdInt = parseInt(numericOrderId);
+        // CAREUP_ORDER_X 또는 CAREUP_ORDER_X_timestamp 형식에서 실제 주문 ID만 추출
+        // 형식: CAREUP_ORDER_123 또는 CAREUP_ORDER_123_1234567890
+        const match = orderId.match(/^CAREUP_ORDER_(\d+)(?:_\d+)?$/);
+        const numericOrderIdInt = match ? parseInt(match[1]) : parseInt(orderId.replace('CAREUP_ORDER_', ''));
         
-        console.log('💳 결제 승인 요청 시작:', { orderId: numericOrderIdInt, paymentKey, amount });
+        console.log('💳 결제 승인 요청 시작:', { 
+          tossOrderId: orderId,  // 타임스탬프 포함 원본 (토스페이먼츠에 저장된 것)
+          dbOrderId: numericOrderIdInt,  // DB에 저장된 실제 주문 ID
+          paymentKey, 
+          amount 
+        });
         
         // 백엔드에 결제 승인 요청
-        // 백엔드는 Long.parseLong(request.getOrderId())를 사용하므로 숫자만 보내야 함
+        // 백엔드에 토스페이먼츠에 전송한 원본 orderId(tossOrderId)와 실제 DB orderId 둘 다 전달
         const paymentRequestData = {
           paymentKey: paymentKey,
-          orderId: numericOrderIdInt.toString(), // 숫자만 전송 (예: "4")
+          orderId: numericOrderIdInt.toString(), // DB 주문 ID (숫자만)
+          tossOrderId: orderId,  // 토스페이먼츠에 전송한 원본 orderId (타임스탬프 포함)
           amount: parseInt(amount)
         };
         
@@ -84,7 +91,25 @@ const PaymentSuccessPage = () => {
 
       } catch (error) {
         console.error('결제 성공 처리 실패:', error);
-        setError(error.message || '결제 처리 중 오류가 발생했습니다.');
+        
+        // 에러 상세 정보 로깅
+        if (error.response) {
+          console.error('백엔드 응답 에러:', {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers
+          });
+          
+          const errorMessage = error.response.data?.message || 
+                               error.response.data?.error || 
+                               `서버 오류 (${error.response.status})`;
+          setError(errorMessage);
+        } else if (error.request) {
+          console.error('요청 전송 실패:', error.request);
+          setError('서버에 연결할 수 없습니다. 네트워크를 확인해주세요.');
+        } else {
+          setError(error.message || '결제 처리 중 오류가 발생했습니다.');
+        }
       } finally {
         setLoading(false);
       }

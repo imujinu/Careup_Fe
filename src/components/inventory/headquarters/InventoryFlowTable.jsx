@@ -148,11 +148,38 @@ function InventoryFlowTable({
   currentPage = 1, 
   totalPages = 1, 
   pageSize = 10,
+  totalCount = null,
+  branchList = [],
   onPageChange,
   onPageSizeChange,
   onEdit,
   onDelete 
 }) {
+  const getBranchName = (branchId, itemBranchName) => {
+    // API 응답에 branchName이 포함되어 있으면 우선 사용
+    if (itemBranchName) {
+      return itemBranchName;
+    }
+    
+    if (branchId === 1) {
+      return '본사';
+    }
+    
+    // branchList에서 지점명 찾기
+    const branch = branchList.find(b => {
+      const branchIdMatch = b.id === branchId || String(b.id) === String(branchId);
+      const branchNameMatch = b.name && b.name.includes(String(branchId));
+      return branchIdMatch || branchNameMatch;
+    });
+    
+    if (branch && branch.name) {
+      return branch.name;
+    }
+    
+    // 찾지 못한 경우 fallback
+    console.warn(`지점명을 찾을 수 없습니다. branchId: ${branchId}, branchList:`, branchList);
+    return `지점-${branchId}`;
+  };
   const getStatusBadge = (item) => {
     const inQty = item.inQuantity || 0;
     const outQty = item.outQuantity || 0;
@@ -214,7 +241,7 @@ function InventoryFlowTable({
         data.map((item, index) => 
           React.createElement(TableRow, { key: item.id || index },
             React.createElement(TableCell, null, item.productName || '-'),
-            React.createElement(TableCell, null, item.branchId === 1 ? '본사' : `지점-${item.branchId}`),
+            React.createElement(TableCell, null, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
             React.createElement(TableCell, null, formatQuantity(item.inQuantity)),
             React.createElement(TableCell, null, formatQuantity(item.outQuantity)),
@@ -240,7 +267,7 @@ function InventoryFlowTable({
     ),
     totalPages > 1 && React.createElement(PaginationContainer, null,
       React.createElement(PaginationInfo, null,
-        `총 ${data.length}개 중 ${((currentPage - 1) * pageSize) + 1}-${Math.min(currentPage * pageSize, data.length)}개 표시`
+        `총 ${totalCount !== null ? totalCount : data.length}개 중 ${((currentPage - 1) * pageSize) + 1}-${Math.min(currentPage * pageSize, totalCount !== null ? totalCount : data.length)}개 표시`
       ),
       React.createElement(PaginationButtons, null,
         React.createElement(PaginationButton, {

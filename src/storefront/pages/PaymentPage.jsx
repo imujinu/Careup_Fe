@@ -15,7 +15,6 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   // orderData가 없으면 localStorage에서 복원 시도
   const [actualOrderData, setActualOrderData] = useState(() => {
     if (orderData) return orderData;
-    
     const saved = localStorage.getItem('currentOrderData');
     if (saved) {
       try {
@@ -29,10 +28,6 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     }
     return null;
   });
-  
-  // orderData에서 지점 정보 가져오기
-  const selectedBranches = actualOrderData?.selectedBranches || {};
-  const availableBranches = actualOrderData?.availableBranches || {};
 
   // 토스페이먼츠 SDK 로드 (v2)
   useEffect(() => {
@@ -67,8 +62,9 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
 
       const tossPayments = window.TossPayments(clientKey);
       
-      // 토스페이먼츠용 orderId 생성
-      const tossOrderId = `CAREUP_ORDER_${actualOrderData.orderId}`;
+      // 토스페이먼츠용 orderId 생성 (타임스탬프 추가하여 중복 방지)
+      const timestamp = Date.now();
+      const tossOrderId = `CAREUP_ORDER_${actualOrderData.orderId}_${timestamp}`;
       const actualAmount = actualOrderData.totalAmount;
       
       console.log('결제 요청:', { tossOrderId, actualAmount });
@@ -161,24 +157,10 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
               </div>
               <div className="item-info">
                 <h4 className="item-name">{item.productName}</h4>
-                <p className="item-price">
-                  {(() => {
-                    const selectedBranchId = selectedBranches[item.productId];
-                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
-                    const displayPrice = branch?.price || item.price;
-                    return displayPrice.toLocaleString();
-                  })()}원 × {item.quantity}개
-                </p>
+                <p className="item-price">{item.price.toLocaleString()}원 × {item.quantity}개</p>
               </div>
               <div className="item-total">
-                <span className="total-price">
-                  {(() => {
-                    const selectedBranchId = selectedBranches[item.productId];
-                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
-                    const displayPrice = branch?.price || item.price;
-                    return (displayPrice * item.quantity).toLocaleString();
-                  })()}원
-                </span>
+                <span className="total-price">{(item.price * item.quantity).toLocaleString()}원</span>
               </div>
             </div>
           ))}

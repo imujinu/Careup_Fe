@@ -1,4 +1,5 @@
 import axios from "../utils/axiosConfig";
+import { branchService } from "./branchService";
 
 const BRANCH_API_BASE_URL = import.meta.env.VITE_BRANCH_URL || "http://localhost:8080";
 const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL || "http://localhost:8081";
@@ -6,16 +7,42 @@ const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL || "http://local
 export const dashboardService = {
   // 전체 지점 수 조회
   getTotalBranchesCount: async () => {
-    try {
-      const response = await axios.get(`${BRANCH_API_BASE_URL}/branch?page=0&size=1`);
-      console.log("Branch API Response:", response.data);
-      console.log("Total Branches:", response.data?.result?.totalElements);
-      return response.data?.result?.totalElements || 0;
-    } catch (error) {
-      console.error("Failed to get total branches count:", error);
-      // Fallback to dummy data for demonstration
-      return 324;
+    // 여러 후보 경로 시도
+    const candidates = [
+      // 직접 호출 (게이트웨이 없이)
+      { url: `${BRANCH_API_BASE_URL}/branch`, params: { page: 0, size: 1 } },
+      // 게이트웨이를 통한 호출
+      { url: `${BRANCH_API_BASE_URL}/branch-service/branch`, params: { page: 0, size: 1 } },
+      // 공개 API 사용 (개수만 확인)
+      { url: `${BRANCH_API_BASE_URL}/branch/public/list` },
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        const response = await axios.get(candidate.url, candidate.params ? { params: candidate.params } : undefined);
+        const data = response.data?.result || response.data;
+        
+        // 페이징 응답에서 totalElements 추출
+        if (data?.totalElements !== undefined) {
+          console.log("Branch API Response:", data);
+          console.log("Total Branches:", data.totalElements);
+          return data.totalElements;
+        }
+        
+        // 리스트 응답인 경우 배열 길이 사용
+        if (Array.isArray(data)) {
+          console.log("Branch List Response (count from array):", data.length);
+          return data.length;
+        }
+      } catch (error) {
+        // 다음 후보 경로로 계속 시도
+        console.log(`Failed to get branches from ${candidate.url}, trying next...`);
+      }
     }
+    
+    // 모든 경로 실패 시 fallback
+    console.error("All branch API endpoints failed");
+    return 324;
   },
 
   // 전체 직원 수 조회
