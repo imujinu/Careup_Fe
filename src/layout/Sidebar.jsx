@@ -85,6 +85,7 @@ function Sidebar({ isVisible, userType, branchId }) {
   // 가맹점 메뉴
   const franchiseMenuItems = [
     { id: 'dashboard',     label: '대시보드', icon: mdiViewDashboardOutline, path: MENU_PATH_MAP.dashboard },
+    { id: 'branch',        label: '지점관리', icon: mdiOfficeBuilding,       path: MENU_PATH_MAP.myBranch },
     { id: 'inventory',     label: '재고관리', icon: mdiPackageVariantClosed, path: MENU_PATH_MAP.inventory },
     { id: 'purchaseOrder', label: '발주관리', icon: mdiCartOutline,          path: MENU_PATH_MAP.purchaseOrder },
     { id: 'order',         label: '주문관리', icon: mdiShoppingOutline,      path: MENU_PATH_MAP.order },
