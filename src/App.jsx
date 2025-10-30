@@ -38,11 +38,14 @@ import EmployeePasswordReset from "./pages/auth/EmployeePasswordReset";
 
 // 고객 아이디 찾기
 import FindCustomerId from "./pages/auth/FindCustomerId";
-// ★ 직원 아이디 찾기 (공개 라우트) - 파일명 FindEmployeeId.jsx 기준
+// ★ 직원 아이디 찾기 (공개 라우트)
 import EmployeeFindId from "./pages/auth/FindEmployeeId";
 
 import careupFavicon from "./assets/logos/care-up_logo_primary.svg";
 import sharkFavicon from "./assets/logos/shark-favicon.svg";
+
+// ★ 마이페이지: StaffCreate를 재사용(헤더에서 /my로 이동)
+import StaffCreate from "./pages/staff/StaffCreate";
 
 function ProtectedRoute() {
   const dispatch = useAppDispatch();
@@ -165,9 +168,13 @@ export default function App() {
 
           {/* 직원 포털: 인증 필요 */}
           <Route element={<ProtectedRoute />}>
+            {/* 동적 라우트 전체 */}
             {allPaths.map((path) => (
               <Route key={path} path={path} element={getRouteElement(path)} />
             ))}
+
+            {/* ★ 마이페이지: StaffCreate 재사용 (헤더에서 /my로 이동) */}
+            <Route path="/my" element={<StaffCreate />} />
           </Route>
 
           {/* 고객 인증/가입/리셋 */}
@@ -191,23 +198,8 @@ export default function App() {
           <Route path="*" element={<Navigate to="/shop" replace />} />
         </Routes>
 
-        {/* 챗봇 - 관리자(본사)일 때만 표시 */}
-        {/* {isAuthenticated && userType !== "headquarters" && showChatBot && (
-          <ChatBot onClose={() => setShowChatBot(false)} />
-        )} */}
-
+        {/* 챗봇 */}
         {showChatBot && <ChatBot onClose={() => dispatch(closeChatbot())} />}
-
-        {/* 챗봇 토글 버튼 - 관리자(본사)일 때만 표시 */}
-        {/* {isAuthenticated && userType !== "headquarters" && (
-          <button
-            onClick={() => setShowChatBot(!showChatBot)}
-            className="chatbot-toggle-btn"
-            title="챗봇 열기"
-          >
-            🤖
-          </button>
-        )} */}
 
         <button
           onClick={() => {

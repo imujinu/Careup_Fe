@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 const CardsContainer = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(${props => props.columnCount || 4}, 1fr);
   gap: 24px;
   margin-bottom: 32px;
 `;
@@ -52,7 +52,7 @@ const CardValue = styled.div`
   color: #1f2937;
 `;
 
-function SummaryCards({ summary }) {
+function SummaryCards({ summary, userRole }) {
   // 금액 포맷 함수
   const formatTotalValue = (value) => {
     if (value === 0) return '₩0';
@@ -60,6 +60,9 @@ function SummaryCards({ summary }) {
     if (value < 100000000) return `₩${(value / 10000).toFixed(1)}만원`;
     return `₩${(value / 100000000).toFixed(1)}억`;
   };
+
+  // 가맹점인지 확인
+  const isFranchise = userRole === 'BRANCH_MANAGER' || userRole === 'BRANCH_STAFF';
 
   const cards = [
     {
@@ -71,18 +74,19 @@ function SummaryCards({ summary }) {
     },
     {
       title: '재고 부족',
-      value: summary.lowStockItems,
+      value: summary.lowStockItems ?? summary.lowStock ?? 0,
       icon: '⚠️',
       color: '#fef2f2',
       iconColor: '#ef4444'
     },
-    {
+    // 가맹점이 아닐 때만 총 지점 수 카드 표시
+    ...(isFranchise ? [] : [{
       title: '총 지점 수',
-      value: summary.totalBranches,
+      value: summary.totalBranches ?? 0,
       icon: '🏢',
       color: '#f0fdf4',
       iconColor: '#10b981'
-    },
+    }]),
     {
       title: '총 재고 가치',
       value: formatTotalValue(summary.totalValue),
@@ -92,7 +96,9 @@ function SummaryCards({ summary }) {
     }
   ];
 
-  return React.createElement(CardsContainer, null,
+  const columnCount = cards.length;
+
+  return React.createElement(CardsContainer, { columnCount },
     cards.map((card, index) =>
       React.createElement(SummaryCard, { key: index },
         React.createElement(CardHeader, null,

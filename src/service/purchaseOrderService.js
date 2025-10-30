@@ -186,5 +186,35 @@ export const purchaseOrderService = {
 
     const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/statistics/franchise/${branchId}/product?${params}`);
     return response.data;
+  },
+
+  // 지점 목록 조회 (필터용)
+  getBranchList: async () => {
+    console.log('지점 목록 API 호출:', `${API_BASE_URL}/branch/public/list`);
+    try {
+      const response = await purchaseOrderApi.get(`${API_BASE_URL}/branch/public/list`);
+      console.log('지점 목록 API 응답 전체:', response);
+      console.log('지점 목록 API 응답 data:', response.data);
+      
+      // 응답 구조에 따라 데이터 추출
+      let branchData = response.data;
+      
+      if (branchData?.data && Array.isArray(branchData.data)) {
+        branchData = branchData.data;
+      } else if (branchData?.result && Array.isArray(branchData.result)) {
+        branchData = branchData.result;
+      } else if (branchData?.result?.data && Array.isArray(branchData.result.data)) {
+        branchData = branchData.result.data;
+      }
+      
+      // 배열이 아닌 경우 그대로 반환
+      return branchData;
+    } catch (error) {
+      console.error('지점 목록 API 호출 실패:', error);
+      console.error('요청 URL:', `${API_BASE_URL}/branch/public/list`);
+      console.error('에러 응답:', error.response?.data);
+      console.error('에러 상태:', error.response?.status);
+      throw error;
+    }
   }
 };

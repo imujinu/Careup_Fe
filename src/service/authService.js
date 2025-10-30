@@ -39,30 +39,97 @@ const pickRole = (decoded) => {
 };
 
 export const isHQAdmin = (u) =>
-  !!u && (u.role === 'HQ_ADMIN' || u.roles?.includes?.('HQ_ADMIN') || u.branchType === 'HQ' || u.branchId === 1);
+  !!u && (u.role === 'HQ_ADMIN' || u.roles?.includes?.('HQ_ADMIN') || u.branchType === 'HQ');
 
 export const getUserInfoFromToken = (token) => {
   const d = decodeToken(token);
   if (!d) return null;
 
-  const branchId = d.branchId ?? d.branch_id ?? d.branch?.id ?? d.orgId ?? null;
+  const branchId =
+    d.branchId ?? d.branch_id ?? d.branch?.id ?? d.orgId ?? null;
+  const branchType =
+    d.branchType ?? d.branch_type ?? d.branch?.type ?? d.orgType ?? null;
+  const branchName =
+    d.branchName ?? d.branch_name ?? d.branch?.name ?? d.orgName ?? undefined;
+
   const employeeId = d.employeeId ?? d.empId ?? d.userId ?? d.sub ?? null;
   const role = pickRole(d);
+  const roles = Array.isArray(d.roles) ? d.roles : (role ? [role] : []);
+
+  // 이름/직급/프로필 이미지 클레임도 최대한 수용
+  const name =
+    d.name ??
+    d.employeeName ?? d.employee_name ??
+    d.username ?? d.user_name ??
+    d.nick ?? d.nickname ??
+    d.given_name ?? d.preferred_username ?? '';
+
+  const title =
+    d.title ??
+    d.jobGradeName ?? d.job_grade_name ??
+    d.position ?? d.rank ?? '';
+
+  const profileImageUrl =
+    d.profileImageUrl ??
+    d.profile_image_url ?? d.profile_image ??
+    d.profileImage ?? d.imageUrl ?? d.image_url ??
+    d.picture ??
+    d.avatarUrl ?? d.avatar_url ?? d.avatar ?? '';
 
   const base = {
     employeeId,
     role,
+    roles,
     branchId,
+    branchType,
     sub: d.sub,
     exp: d.exp,
   };
 
   return {
     ...base,
-    userType: isHQAdmin({ ...base }) ? 'headquarters' : 'franchise',
-    roles: Array.isArray(d.roles) ? d.roles : (role ? [role] : []),
-    name: d.name ?? d.username ?? d.nick ?? undefined,
-    email: d.email ?? d.user_email ?? undefined,
+    userType: isHQAdmin(base) ? 'headquarters' : 'franchise',
+    name,
+    title,
+    email: d.email ?? d.user_email,
+    branchName,
+    profileImageUrl,
+  };
+};
+
+// 서버 응답 바디(AuthLoginResponse 등) → 표준 유저객체로 정규화
+const normalizeFromResponse = (box = {}) => {
+  const name =
+    box.name ??
+    box.employeeName ?? box.employee_name ??
+    box.username ?? box.user_name ??
+    box.nick ?? box.nickname ??
+    box.given_name ?? box.preferred_username ?? '';
+
+  const profileImageUrl =
+    box.profileImageUrl ??
+    box.profileImage ?? box.imageUrl ?? box.image_url ??
+    box.picture ??
+    box.avatarUrl ?? box.avatar_url ?? box.avatar ?? '';
+
+  // ★ 직급(title) 수용
+  const title =
+    box.title ??
+    box.jobGradeName ?? box.job_grade_name ??
+    box.position ?? box.rank ?? '';
+
+  const role = box.role || box.roleCode || box.authority || '';
+
+  return {
+    employeeId: box.employeeId ?? box.userId ?? null,
+    role,
+    roles: role ? [String(role).replace(/^ROLE_/, '')] : [],
+    branchId: box.branchId ?? null,
+    branchName: box.branchName ?? undefined,
+    name,
+    title,                // ★ 추가
+    email: box.email ?? undefined,
+    profileImageUrl,
   };
 };
 
@@ -71,7 +138,7 @@ const unwrapLoginResult = (data) => {
   return {
     accessToken: box?.accessToken ?? box?.access_token ?? box?.token,
     refreshToken: box?.refreshToken ?? box?.refresh_token,
-    user: box?.user ?? box?.profile ?? undefined,
+    payload: box, // ★ 최상위 필드 그대로 전달
     statusMessage: data?.status_message ?? data?.message,
     statusCode: data?.status_code ?? data?.status,
     errorCode: data?.error_code,
@@ -101,7 +168,18 @@ export const authService = {
     tokenStorage.setTokens(r.accessToken, r.refreshToken);
 
     const fromJwt = getUserInfoFromToken(r.accessToken) || {};
-    const userInfo = { ...fromJwt, ...(r.user || {}) };
+    const fromResp = normalizeFromResponse(r.payload || {});
+
+    // 이름/사진/직급은 응답값을 우선으로, 없으면 JWT
+    const userInfo = {
+      ...fromJwt,
+      ...fromResp,
+      name: fromResp.name || fromJwt.name || '',
+      title: fromResp.title || fromJwt.title || '',            // ★ 직급
+      profileImageUrl: fromResp.profileImageUrl || fromJwt.profileImageUrl || '',
+      // userType/branchType 재평가
+      userType: isHQAdmin({ ...fromJwt, ...fromResp }) ? 'headquarters' : 'franchise',
+    };
 
     tokenStorage.setUserInfo(userInfo);
 
@@ -140,8 +218,18 @@ export const authService = {
 
     tokenStorage.setTokens(newAT, newRT);
 
-    const userInfo = getUserInfoFromToken(newAT);
-    if (userInfo) tokenStorage.setUserInfo(userInfo);
+    // 기존 정보 유지 + JWT로 갱신 (이름/사진/직급은 기존 것이 우선)
+    const prev = tokenStorage.getUserInfo() || {};
+    const fromJwt = getUserInfoFromToken(newAT) || {};
+    const merged = {
+      ...prev,
+      ...fromJwt,
+      name: prev.name || fromJwt.name || '',
+      title: prev.title || fromJwt.title || '',                 // ★ 직급 유지
+      profileImageUrl: prev.profileImageUrl || fromJwt.profileImageUrl || '',
+      userType: isHQAdmin({ ...prev, ...fromJwt }) ? 'headquarters' : 'franchise',
+    };
+    tokenStorage.setUserInfo(merged);
 
     return newAT;
   },

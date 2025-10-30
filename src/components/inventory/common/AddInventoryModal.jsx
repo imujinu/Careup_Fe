@@ -203,6 +203,79 @@ const AddButton = styled(Button)`
   }
 `;
 
+const ImageUploadContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const FileInput = styled.input`
+  display: none;
+`;
+
+const FileInputLabel = styled.label`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 16px;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  transition: all 0.2s;
+  min-height: 120px;
+  
+  &:hover {
+    border-color: #6b46c1;
+    background-color: #f9fafb;
+  }
+`;
+
+const ImagePreview = styled.div`
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+`;
+
+const ImageOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  
+  ${FileInputLabel}:hover & {
+    opacity: 1;
+  }
+`;
+
+const ChangeText = styled.span`
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+`;
+
+const UploadIcon = styled.div`
+  font-size: 32px;
+  margin-bottom: 8px;
+`;
+
+const UploadText = styled.span`
+  color: #6b7280;
+  font-size: 14px;
+  text-align: center;
+`;
+
 function AddInventoryModal({ isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -211,10 +284,11 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     minPrice: 0,
     maxPrice: 0,
     supplyPrice: 0,
-    imageUrl: '',
     visibility: 'ALL'
   });
   
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [categories, setCategories] = useState([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
@@ -263,6 +337,42 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     }));
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // 이미지 파일만 허용
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return;
+      }
+      
+      // 파일 크기 제한 (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 파일 크기는 10MB 이하로 제한됩니다.');
+        return;
+      }
+      
+      setImageFile(file);
+      
+      // 미리보기 생성
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    // 파일 입력 초기화
+    const fileInput = document.getElementById('productImage');
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
   const handleReset = () => {
     setFormData({
       name: '',
@@ -271,15 +381,30 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
       minPrice: 0,
       maxPrice: 0,
       supplyPrice: 0,
-      imageUrl: '',
       visibility: 'ALL'
     });
+    setImageFile(null);
+    setImagePreview(null);
+    const fileInput = document.getElementById('productImage');
+    if (fileInput) {
+      fileInput.value = '';
+    }
   };
 
   const handleSave = async () => {
     try {
+      // 이미지 파일 업로드 (선택사항)
+      const saveData = {
+        ...formData,
+        categoryId: formData.category,
+        imageFile: imageFile || null
+      };
+      
       // onSave가 Promise를 반환하면 결과를 기다림
-      await onSave(formData);
+      await onSave(saveData);
+      
+      // 성공 시 초기화
+      handleReset();
       // onSave에서 성공 시 모달을 닫아줄 것임
     } catch (error) {
       // 에러 발생 시 모달은 닫지 않고 그대로 유지
@@ -397,13 +522,46 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
             })
           ),
           React.createElement(FormGroup, null,
-            React.createElement(Label, null, '이미지URL'),
-            React.createElement(Input, {
-              type: 'text',
-              placeholder: 'https://example.com/image.jpg',
-              value: formData.imageUrl,
-              onChange: (e) => handleInputChange('imageUrl', e.target.value)
-            })
+            React.createElement(Label, null, '상품 이미지'),
+            React.createElement(ImageUploadContainer, null,
+              React.createElement(FileInput, {
+                type: 'file',
+                id: 'productImage',
+                accept: 'image/*',
+                onChange: handleImageChange
+              }),
+              React.createElement(FileInputLabel, { htmlFor: 'productImage' },
+                imagePreview ? React.createElement(React.Fragment, null,
+                  React.createElement(ImagePreview, null,
+                    React.createElement('img', {
+                      src: imagePreview,
+                      alt: '상품 미리보기',
+                      style: { width: '100%', height: '100%', objectFit: 'cover' }
+                    }),
+                    React.createElement(ImageOverlay, null,
+                      React.createElement(ChangeText, null, '이미지 변경')
+                    )
+                  ),
+                  React.createElement('button', {
+                    type: 'button',
+                    onClick: handleRemoveImage,
+                    style: {
+                      padding: '6px 12px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      marginTop: '8px'
+                    }
+                  }, '이미지 제거')
+                ) : React.createElement(React.Fragment, null,
+                  React.createElement(UploadIcon, null, '📷'),
+                  React.createElement(UploadText, null, '이미지를 업로드하세요')
+                )
+              )
+            )
           )
         ),
         React.createElement(Section, null,

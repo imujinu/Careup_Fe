@@ -110,7 +110,7 @@ function SearchAndFilter({ filters, onFiltersChange, onAddInventory, onAddProduc
         React.createElement(SearchIcon, null, '🔍'),
         React.createElement(SearchInput, {
           type: 'text',
-          placeholder: '상품명, 바코드, SKU로 검색...',
+          placeholder: '상품명 검색',
           value: filters.searchTerm,
           onChange: (e) => handleSearchChange(e.target.value)
         })
