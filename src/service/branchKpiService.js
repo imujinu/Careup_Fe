@@ -17,7 +17,9 @@ export const branchKpiService = {
     const params = { page, size };
     const url = `${BASE_URL}/kpi`;
     const response = await axios.get(url, { params });
-    return response.data?.result || response.data;
+    
+    // axios는 자동으로 response.data를 반환하므로 response만 반환
+    return response;
   },
 
   // GET /kpi/{id} - KPI 단건 조회

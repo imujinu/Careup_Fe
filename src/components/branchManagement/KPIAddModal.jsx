@@ -88,8 +88,7 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
         branchKpiService.getFormulaVariables(),
         branchKpiService.getFormulaExamples(),
       ]);
-      console.log("[KPI] Loaded formula variables:", variablesData);
-      console.log("[KPI] Loaded formula examples:", examplesData);
+      
       setVariables(variablesData || {});
       setExamples(examplesData || {});
     } catch (error) {
@@ -164,8 +163,7 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
     const allowedVariables = Object.keys(variables || {});
     const usedInFormula = extractVariablesFromFormula(formData.calculationFormula);
     const unknownVars = usedInFormula.filter(v => !allowedVariables.includes(v));
-    console.log("[KPI] Validate formula - used variables:", usedInFormula);
-    console.log("[KPI] Validate formula - allowed variables:", allowedVariables);
+    
     if (unknownVars.length > 0) {
       console.warn("[KPI] Unknown variables detected:", unknownVars);
       const msg = `알 수 없는 변수: ${unknownVars.join(", ")}`;
@@ -176,9 +174,9 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
 
     setIsValidating(true);
     try {
-      console.log("[KPI] Sending validate request with formula:", formData.calculationFormula);
+      
       const result = await branchKpiService.validateFormula(formData.calculationFormula);
-      console.log("[KPI] Validate response:", result);
+      
       setValidationResult(result);
       
       if (result.valid) {
@@ -262,12 +260,9 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
         return acc;
       }, {});
 
-      console.log("[KPI] Sending test request:", {
-        formula: formData.calculationFormula,
-        variables: testVariables,
-      });
+      
       const result = await branchKpiService.testFormula(formData.calculationFormula, testVariables);
-      console.log("[KPI] Test response:", result);
+      
       setTestResult(result);
       
       if (result.success) {
@@ -320,13 +315,13 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("[KPIAddModal] handleSubmit called", formData);
+    
 
     const isValid = validateForm();
-    console.log("[KPIAddModal] Form validation result:", isValid, errors);
+    
     
     if (!isValid) {
-      console.log("[KPIAddModal] Form validation failed, errors:", errors);
+      
       return;
     }
 
@@ -338,11 +333,11 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
       calculationFormula: formData.calculationFormula,
     };
 
-    console.log("[KPIAddModal] Submitting data:", submitData);
+    
     
     try {
       await onSave(submitData);
-      console.log("[KPIAddModal] onSave completed successfully");
+      
     } catch (error) {
       // 에러는 onSave에서 이미 처리하므로 여기서는 로그만 남김
       console.error("KPI 생성 중 에러:", error);
@@ -366,11 +361,11 @@ function KPIAddModal({ isOpen, onClose, onSave, branchId, loading = false }) {
   };
 
   if (!isOpen) {
-    console.log("[KPIAddModal] Modal is closed, not rendering");
+    
     return null;
   }
 
-  console.log("[KPIAddModal] Modal is open, rendering");
+  
 
   return (
     <>

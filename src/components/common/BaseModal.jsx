@@ -22,22 +22,22 @@ const fadeOut = keyframes`
 
 const scaleIn = keyframes`
   from {
-    transform: translate(-50%, -50%) scale(0.9);
+    transform: scale(0.96);
     opacity: 0;
   }
   to {
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 `;
 
 const scaleOut = keyframes`
   from {
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
   to {
-    transform: translate(-50%, -50%) scale(0.9);
+    transform: scale(0.96);
     opacity: 0;
   }
 `;
