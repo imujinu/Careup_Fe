@@ -145,9 +145,9 @@ function Sidebar({ isVisible, userType, branchId }) {
   })();
 
   let menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
-  // STAFF는 발주관리 메뉴 비노출
+  // STAFF는 발주관리/자동발주 메뉴 비노출
   if (role === 'STAFF') {
-    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder');
+    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder' && m.id !== 'autoOrder');
   }
 
   const handleLogout = () => {
