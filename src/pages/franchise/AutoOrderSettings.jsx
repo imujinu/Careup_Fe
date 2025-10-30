@@ -295,7 +295,8 @@ const AutoOrderSettings = () => {
             return {
               ...item,
               autoOrderEnabled: productSetting ? productSetting.autoOrderEnabled : false,
-              safetyStock: productSetting ? productSetting.safetyStock : item.safetyStock
+              // 안전재고는 항상 재고 목록의 값 사용 (자동발주 설정에서 변경 불가)
+              safetyStock: item.safetyStock
             };
           });
         });
@@ -384,39 +385,6 @@ const AutoOrderSettings = () => {
     }
   };
 
-  // 안전 재고 수정
-  const handleUpdateSafetyStock = async (productId, newSafetyStock) => {
-    try {
-      // 먼저 state 업데이트
-      const updatedInventoryData = inventoryData.map(item => 
-        item.id === productId 
-          ? { ...item, safetyStock: newSafetyStock }
-          : item
-      );
-      
-      setInventoryData(updatedInventoryData);
-      
-      // 백엔드에 저장 (업데이트된 데이터 사용)
-      const transformedData = {
-        autoOrderEnabled: autoOrderEnabled,
-        products: updatedInventoryData.map(item => ({
-          productId: item.id,
-          productName: item.name,
-          autoOrderEnabled: item.autoOrderEnabled,
-          safetyStock: item.safetyStock,
-          currentStock: item.currentStock
-        }))
-      };
-      
-      await autoOrderService.updateFranchiseAutoOrderSettings(transformedData);
-      
-      console.log('안전 재고 업데이트 완료:', transformedData);
-      alert('안전 재고가 업데이트되었습니다.');
-    } catch (error) {
-      console.error('안전 재고 업데이트 실패:', error);
-      alert('안전 재고 업데이트 실패: ' + error.message);
-    }
-  };
 
   return (
     <PageContainer>
@@ -498,8 +466,13 @@ const AutoOrderSettings = () => {
                     <Input
                       type="number"
                       value={product.safetyStock}
-                      onChange={(e) => handleUpdateSafetyStock(product.id, Number(e.target.value))}
-                      min="0"
+                      readOnly
+                      disabled
+                      style={{
+                        backgroundColor: '#f9fafb',
+                        color: '#6b7280',
+                        cursor: 'not-allowed'
+                      }}
                     />
                   </TableCell>
                   <TableCell>

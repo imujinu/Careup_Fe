@@ -34,7 +34,6 @@ export const inventoryService = {
       minPrice: data.minPrice,
       maxPrice: data.maxPrice,
       supplyPrice: data.supplyPrice,
-      imageUrl: data.imageUrl,
       visibility: data.visibility
     };
     
@@ -66,6 +65,49 @@ export const inventoryService = {
   // 상품 삭제
   deleteProduct: async (productId) => {
     const response = await inventoryApi.delete(`${API_BASE_URL}/api/products/${productId}`);
+    return response.data;
+  },
+
+  // 상품 상세 조회
+  getProduct: async (productId) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/products/${productId}`);
+    return response.data;
+  },
+
+  // 상품 수정
+  updateProduct: async (productId, data) => {
+    const formData = new FormData();
+    
+    // product 객체를 JSON string으로 변환하여 FormData에 추가
+    const productData = {
+      name: data.name,
+      description: data.description,
+      categoryId: data.categoryId,
+      minPrice: data.minPrice,
+      maxPrice: data.maxPrice,
+      supplyPrice: data.supplyPrice,
+      visibility: data.visibility
+    };
+    
+    // imageUrl이 명시적으로 전달된 경우에만 추가 (undefined가 아닌 경우만)
+    if (data.imageUrl !== undefined) {
+      productData.imageUrl = data.imageUrl;
+    }
+    
+    formData.append('product', new Blob([JSON.stringify(productData)], {
+      type: 'application/json'
+    }));
+    
+    // 이미지 파일이 있으면 추가
+    if (data.imageFile) {
+      formData.append('image', data.imageFile);
+    }
+    
+    const response = await inventoryApi.put(`${API_BASE_URL}/api/products/${productId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 
