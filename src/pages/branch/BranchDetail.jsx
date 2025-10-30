@@ -13,7 +13,9 @@ function BranchDetail() {
   const { branchId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { userType } = useAppSelector((state) => state.auth);
+  const { userType, role: rawRole } = useAppSelector((state) => state.auth);
+  const role = String(rawRole || "").replace(/^ROLE_/, "").toUpperCase();
+  const isStaffReadOnly = role === "STAFF";
   const [branchData, setBranchData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -117,11 +119,18 @@ function BranchDetail() {
         branch={branchData}
         onBack={handleBackToList}
         onShowDetail={handleShowDetail}
-        onEdit={handleEdit}
-        onDelete={() => setShowDeleteModal(true)}
+        // STAFF는 단순 조회이므로 수정/삭제 버튼 숨김
+        onEdit={isStaffReadOnly ? undefined : handleEdit}
+        onDelete={isStaffReadOnly ? undefined : () => setShowDeleteModal(true)}
+        showEditButton={isStaffReadOnly}
       />
 
-      <BranchDetailTabs branchId={branchId} branch={branchData} userType={userType} />
+      <BranchDetailTabs
+        branchId={branchId}
+        branch={branchData}
+        userType={userType}
+        readOnly={isStaffReadOnly}
+      />
 
       {showDetailModal && (
         <BranchDetailModal

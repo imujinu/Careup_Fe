@@ -5,7 +5,7 @@ import { mdiDownload, mdiDelete, mdiFileDocument, mdiPencil } from '@mdi/js';
 import { DOCUMENT_TYPES } from '../../service/documentService';
 import Tooltip from '../common/Tooltip';
 
-function DocumentTable({ documents, onDownload, onDelete, onEdit, loading }) {
+function DocumentTable({ documents, onDownload, onDelete, onEdit, loading, readOnly = false }) {
   const getDocumentTypeLabel = (type) => {
     return DOCUMENT_TYPES[type] || type;
   };
@@ -141,22 +141,26 @@ function DocumentTable({ documents, onDownload, onDelete, onEdit, loading }) {
                     <Icon path={mdiDownload} size={1.2} />
                   </ActionButton>
                 </Tooltip>
-                <Tooltip content="수정" position="top">
-                  <ActionButton 
-                    onClick={() => onEdit(document)}
-                    variant="secondary"
-                  >
-                    <Icon path={mdiPencil} size={1.2} />
-                  </ActionButton>
-                </Tooltip>
-                <Tooltip content="삭제" position="top">
-                  <ActionButton 
-                    onClick={() => onDelete(document)}
-                    variant="danger"
-                  >
-                    <Icon path={mdiDelete} size={1.2} />
-                  </ActionButton>
-                </Tooltip>
+                {!readOnly && onEdit && (
+                  <Tooltip content="수정" position="top">
+                    <ActionButton 
+                      onClick={() => onEdit(document)}
+                      variant="secondary"
+                    >
+                      <Icon path={mdiPencil} size={1.2} />
+                    </ActionButton>
+                  </Tooltip>
+                )}
+                {!readOnly && onDelete && (
+                  <Tooltip content="삭제" position="top">
+                    <ActionButton 
+                      onClick={() => onDelete(document)}
+                      variant="danger"
+                    >
+                      <Icon path={mdiDelete} size={1.2} />
+                    </ActionButton>
+                  </Tooltip>
+                )}
               </CardActions>
             </DocumentCard>
           );

@@ -48,7 +48,7 @@ const periods = {
   YEARLY: "연간",
 };
 
-function KPIManagement({ branchId }) {
+function KPIManagement({ branchId, readOnly = false }) {
   const { addToast } = useToast();
   const [kpis, setKpis] = useState([]);
   const [filteredKpis, setFilteredKpis] = useState([]);
@@ -509,13 +509,14 @@ function KPIManagement({ branchId }) {
           <option value="EXPIRED">만료</option>
         </FilterSelect>
 
-        <AddButton onClick={() => {
-          
-          setShowAddModal(true);
-        }}>
-          <Icon path={mdiPlus} size={1} />
-          KPI 추가
-        </AddButton>
+        {!readOnly && (
+          <AddButton onClick={() => {
+            setShowAddModal(true);
+          }}>
+            <Icon path={mdiPlus} size={1} />
+            KPI 추가
+          </AddButton>
+        )}
       </FilterSection>
 
       {/* KPI 카드 리스트 */}
@@ -543,37 +544,39 @@ function KPIManagement({ branchId }) {
                     ).toFixed(1)}%
                   </TopRightRate>
                 </CardTopRight>
-                <CardActions>
-                  <MenuContainer onMouseLeave={closeMenu}>
-                    <MenuButton onClick={() => toggleMenu(kpi.id)} aria-label="메뉴 열기">
-                      <Icon path={mdiDotsVertical} size={1} />
-                    </MenuButton>
-                    {openMenuId === kpi.id && (
-                      <Dropdown role="menu">
-                        <MenuItem
-                          role="menuitem"
-                          onClick={() => {
-                            handleViewDetail(kpi);
-                            closeMenu();
-                          }}
-                        >
-                          <Icon path={mdiEyeOutline} size={0.9} /> 상세히 보기
-                        </MenuItem>
-                        <MenuItem
-                          role="menuitem"
-                          danger
-                          onClick={() => {
-                            setSelectedKpi(kpi);
-                            setShowDeleteModal(true);
-                            closeMenu();
-                          }}
-                        >
-                          <Icon path={mdiDelete} size={0.9} /> 삭제
-                        </MenuItem>
-                      </Dropdown>
-                    )}
-                  </MenuContainer>
-                </CardActions>
+                {!readOnly && (
+                  <CardActions>
+                    <MenuContainer onMouseLeave={closeMenu}>
+                      <MenuButton onClick={() => toggleMenu(kpi.id)} aria-label="메뉴 열기">
+                        <Icon path={mdiDotsVertical} size={1} />
+                      </MenuButton>
+                      {openMenuId === kpi.id && (
+                        <Dropdown role="menu">
+                          <MenuItem
+                            role="menuitem"
+                            onClick={() => {
+                              handleViewDetail(kpi);
+                              closeMenu();
+                            }}
+                          >
+                            <Icon path={mdiEyeOutline} size={0.9} /> 상세히 보기
+                          </MenuItem>
+                          <MenuItem
+                            role="menuitem"
+                            danger
+                            onClick={() => {
+                              setSelectedKpi(kpi);
+                              setShowDeleteModal(true);
+                              closeMenu();
+                            }}
+                          >
+                            <Icon path={mdiDelete} size={0.9} /> 삭제
+                          </MenuItem>
+                        </Dropdown>
+                      )}
+                    </MenuContainer>
+                  </CardActions>
+                )}
               </CardHeader>
 
               <CardBody>
@@ -663,7 +666,7 @@ function KPIManagement({ branchId }) {
         </PaginationContainer>
       )}
 
-      {showAddModal && (
+      {!readOnly && showAddModal && (
         <KPIAddModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
@@ -672,7 +675,7 @@ function KPIManagement({ branchId }) {
         />
       )}
 
-      {showDeleteModal && selectedKpi && (
+      {!readOnly && showDeleteModal && selectedKpi && (
         <DeleteConfirmModal
           isOpen={showDeleteModal}
           onClose={() => {

@@ -13,7 +13,7 @@ import EmployeeManagement from "./EmployeeManagement";
 import DocumentManagement from "./DocumentManagement";
 import KPIManagement from "./KPIManagement";
 
-function BranchDetailTabs({ branchId, branch, userType }) {
+function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
   // 지점/가맹점 관리자용 탭 (지점 상세 정보로 변경)
   const isBranchAdmin = userType === 'franchise';
   
@@ -35,19 +35,19 @@ function BranchDetailTabs({ branchId, branch, userType }) {
       id: "kpi",
       label: "KPI 관리",
       icon: mdiTarget,
-      component: <KPIContent branchId={branchId} />,
+      component: <KPIContent branchId={branchId} readOnly={readOnly} />,
     },
     {
       id: "owner",
       label: "점주 관리",
       icon: mdiAccountGroup,
-      component: <EmployeeManagement branchId={branchId} />,
+      component: <EmployeeManagement branchId={branchId} readOnly={readOnly} />,
     },
     {
       id: "contract",
       label: "계약 서류",
       icon: mdiFileDocument,
-      component: <DocumentManagement branchId={branchId} />,
+      component: <DocumentManagement branchId={branchId} readOnly={readOnly} />,
     },
     {
       id: "customer",
