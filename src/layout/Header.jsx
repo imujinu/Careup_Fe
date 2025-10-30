@@ -1,10 +1,12 @@
-import React from "react";
+// src/layout/Header.jsx
+import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import { getBranchName } from "../utils/branchUtils";
 import AlertsPanel from "../components/notification/AlertsPanel";
 import { useAppDispatch, useAppSelector } from "../stores/hooks";
 import { closeChatbot } from "../stores/slices/chatbotSlice";
 import { toggleAlerts, closeAlerts } from "../stores/slices/alertsSlice";
+import { tokenStorage } from "../service/authService";
+import { useNavigate } from "react-router-dom";
 
 const HeaderContainer = styled.header`
   position: fixed;
@@ -35,22 +37,15 @@ const SidebarToggle = styled.button`
   justify-content: center;
   border-radius: 4px;
 
-  &:hover {
-    background: #f3f4f6;
-  }
+  &:hover { background: #f3f4f6; }
 
-  img {
-    width: 16px;
-    height: 16px;
-    object-fit: contain;
-  }
+  img { width: 16px; height: 16px; object-fit: contain; }
 `;
 
 const SearchSection = styled.div`
   flex: 1;
-  max-width: 400px;
-  margin: 0 8px 0 8px;
   max-width: 300px;
+  margin: 0 8px 0 8px;
 `;
 
 const SearchContainer = styled.div`
@@ -69,13 +64,8 @@ const SearchInput = styled.input`
   background: #ffffff;
   outline: none;
 
-  &::placeholder {
-    color: #9ca3af;
-  }
-
-  &:focus {
-    border-color: #6b46c1;
-  }
+  &::placeholder { color: #9ca3af; }
+  &:focus { border-color: #6b46c1; }
 `;
 
 const SearchIcon = styled.div`
@@ -88,11 +78,7 @@ const SearchIcon = styled.div`
   align-items: center;
   justify-content: center;
 
-  img {
-    width: 16px;
-    height: 16px;
-    opacity: 0.6;
-  }
+  img { width: 16px; height: 16px; opacity: 0.6; }
 `;
 
 const NotificationSection = styled.div`
@@ -113,24 +99,7 @@ const NotificationIcon = styled.div`
   cursor: pointer;
   margin-right: 8px;
 
-  img {
-    width: 20px;
-    height: 20px;
-  }
-`;
-
-const NotificationBadge = styled.div`
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #ef4444;
-  color: white;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
+  img { width: 20px; height: 20px; }
 `;
 
 const NotificationBadgeStandalone = styled.div`
@@ -151,20 +120,30 @@ const UserSection = styled.div`
   gap: 12px;
 `;
 
-const ProfileImage = styled.div`
+const ProfileImage = styled.button`
   width: 40px;
   height: 40px;
+  border: 0;
+  padding: 0;
   border-radius: 50%;
   background: #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  cursor: pointer;
+
+  img { width: 100%; height: 100%; object-fit: cover; }
 `;
 
-const UserInfo = styled.div`
+const UserInfo = styled.button`
   display: flex;
   flex-direction: column;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
 `;
 
 const Greeting = styled.div`
@@ -182,29 +161,93 @@ const DateInfo = styled.div`
   color: #6b7280;
 `;
 
-function Header({ onToggleSidebar, sidebarVisible, userType, branchId }) {
+/** 상대경로 이미지 → 절대경로 보정 (중복 경로 안전) */
+const toAbsoluteUrl = (url) => {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const API = import.meta.env.VITE_BRANCH_URL || import.meta.env.VITE_API_URL || "";
+  if (!API) return url.startsWith("/") ? url : `/${url}`;
+  try {
+    const base = new URL(API, window.location.origin); // ex) http://localhost:8080/branch-service
+    const origin = `${base.protocol}//${base.host}`;   // ex) http://localhost:8080
+    const cleanJoin = (a, b) => a.replace(/\/+$/, "") + "/" + b.replace(/^\/+/, "");
+    if (url.startsWith("/branch-service")) return cleanJoin(origin, url);
+    return cleanJoin(API, url);
+  } catch {
+    return (API.replace(/\/+$/, "") + "/" + url.replace(/^\/+/, ""));
+  }
+};
+
+/** Redux user → 이름/사진만 사용 */
+const useUserView = (user) => {
+  const name =
+    user?.name ||
+    user?.username ||
+    user?.nick ||
+    user?.nickname ||
+    user?.displayName ||
+    user?.fullName ||
+    user?.employeeName ||
+    "";
+
+  const profileRaw =
+    user?.profileImageUrl ||
+    user?.profile_image_url ||
+    user?.profile_image ||
+    user?.profileImage ||
+    user?.imageUrl ||
+    user?.image_url ||
+    user?.picture ||
+    user?.avatarUrl ||
+    user?.avatar ||
+    null;
+
+  return {
+    name,
+    imageUrl: toAbsoluteUrl(profileRaw),
+  };
+};
+
+function Header({ onToggleSidebar, sidebarVisible }) {
   const dispatch = useAppDispatch();
-  const { isOpen: isAlertsOpen } = useAppSelector((state) => state.alerts);
+  const navigate = useNavigate();
+  const { isOpen: isAlertsOpen, unreadCount } = useAppSelector((s) => s.alerts);
+  const { user: reduxUser } = useAppSelector((s) => s.auth);
+
+  // 리덕스 비어있을 시 LocalStorage 폴백 → 초기 깜빡임 방지
+  const storageUser = useMemo(() => tokenStorage.getUserInfo(), []);
+  const safeUser = reduxUser || storageUser || {};
+
+  const view = useUserView(safeUser);
+
+  const today = useMemo(() => {
+    return new Date().toLocaleDateString("ko-KR", {
+      dateStyle: "full",
+      timeZone: "Asia/Seoul",
+    });
+  }, []);
+
+  const [imgOk, setImgOk] = useState(true);
+  const resolvedImg = imgOk ? view.imageUrl : null;
+
+  // ★ 프로필 이미지 URL 변경 시 로드 상태 초기화
+  React.useEffect(() => {
+    setImgOk(true);
+  }, [view.imageUrl]);
 
   const handleAlertsToggle = () => {
-    console.log("알림 버튼 클릭됨, 현재 상태:", isAlertsOpen);
-    if (!isAlertsOpen) {
-      // 알림창을 열 때 챗봇 닫기
-      dispatch(closeChatbot());
-    }
+    if (!isAlertsOpen) dispatch(closeChatbot());
     dispatch(toggleAlerts());
   };
-
-  const handleAlertsClose = () => {
-    dispatch(closeAlerts());
-  };
+  const handleAlertsClose = () => dispatch(closeAlerts());
+  const goMyPage = () => navigate("/my");
 
   return React.createElement(
     HeaderContainer,
     { sidebarVisible },
     React.createElement(
       SidebarToggle,
-      { onClick: onToggleSidebar },
+      { onClick: onToggleSidebar, "aria-label": "사이드바 열기/닫기" },
       React.createElement("img", {
         src: "/header-button.svg",
         alt: "메뉴",
@@ -234,41 +277,48 @@ function Header({ onToggleSidebar, sidebarVisible, userType, branchId }) {
       null,
       React.createElement(
         NotificationIcon,
-        { onClick: handleAlertsToggle },
+        { onClick: handleAlertsToggle, "aria-label": "알림 열기/닫기" },
         React.createElement("img", {
           src: "/notification-icon.svg",
           alt: "알림",
         })
       ),
-      React.createElement(NotificationBadgeStandalone, null, "10+"),
+      (unreadCount ?? 0) > 0 &&
+        React.createElement(
+          NotificationBadgeStandalone,
+          null,
+          unreadCount
+        ),
       React.createElement(
         UserSection,
         null,
         React.createElement(
           ProfileImage,
-          null,
-          React.createElement("img", {
-            src: "/api/placeholder/40/40",
-            alt: "Profile",
-            style: { width: "100%", height: "100%", objectFit: "cover" },
-          })
+          { onClick: goMyPage, "aria-label": "마이페이지로 이동" },
+          resolvedImg &&
+            React.createElement("img", {
+              src: resolvedImg,
+              alt: "Profile",
+              style: { width: "100%", height: "100%", objectFit: "cover" },
+              onError: () => setImgOk(false),
+            })
         ),
         React.createElement(
           UserInfo,
-          null,
+          { onClick: goMyPage, "aria-label": "마이페이지로 이동" },
           React.createElement(
             Greeting,
             null,
             "안녕하세요, ",
-            React.createElement(
-              "span",
-              { className: "highlight" },
-              userType === "headquarters"
-                ? "이승지 대표님"
-                : `이승지 점장님 (${getBranchName(branchId)})`
-            )
+            view.name
+              ? React.createElement(
+                  "span",
+                  { className: "highlight" },
+                  `${view.name}님`
+                )
+              : "사용자님"
           ),
-          React.createElement(DateInfo, null, "2025년 09월 20일 토요일")
+          React.createElement(DateInfo, null, today)
         )
       )
     ),
