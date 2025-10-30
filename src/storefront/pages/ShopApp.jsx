@@ -237,7 +237,6 @@ function ShopLayout() {
           { name: "카테고리", value: item.categoryName || "정보 없음" },
         ],
         images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
-        reviews: [],
         relatedProducts: [],
         availableBranches: [],
         availableBranchCount: 0
@@ -370,7 +369,6 @@ function ShopLayout() {
               { name: "카테고리", value: item.categoryName || "정보 없음" },
             ],
             images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
-            reviews: [],
             relatedProducts: [],
             // 백엔드에서 제공하는 지점 정보
             availableBranches: item.availableBranches || [],
