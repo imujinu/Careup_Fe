@@ -1,5 +1,5 @@
 // src/pages/staff/StaffDetail.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
 import { mdiUpload } from '@mdi/js';
@@ -416,7 +416,6 @@ const TopPreview = styled.div`
   place-items:center;
   overflow:hidden;
   background:#fff;
-  /* hover 효과 제거, 커서 기본 */
   img{width:100%;height:100%;object-fit:cover;}
 `;
 

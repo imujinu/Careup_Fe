@@ -14,8 +14,19 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/common/Toast';
 import { fetchBranchOptions } from '../../service/staffService';
+import { fetchJobGradeOptions } from '../../service/jobGradeService'; // ✅ 직급 변경 즉시 반영용
 
 const g = (k, s) => new URLSearchParams(s).get(k);
+
+// ✅ orderIndex 정렬 유틸(없으면 뒤로), 동률은 name 사전순 (fallback용)
+const ORDER_MAX = 2147483647;
+const sortByOrderIndexAsc = (arr = []) =>
+  [...arr].sort((a, b) => {
+    const ai = Number.isFinite(a?.orderIndex) ? a.orderIndex : ORDER_MAX;
+    const bi = Number.isFinite(b?.orderIndex) ? b.orderIndex : ORDER_MAX;
+    if (ai !== bi) return ai - bi;
+    return String(a?.name || '').localeCompare(String(b?.name || ''));
+  });
 
 export default function StaffCreate() {
   const dispatch = useAppDispatch();
@@ -87,6 +98,9 @@ export default function StaffCreate() {
   const [doneOpen, setDoneOpen] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
+  // ✅ 직급 즉시반영용 로컬 오버레이
+  const [jobGradeOverlay, setJobGradeOverlay] = useState([]);
+
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -108,6 +122,41 @@ export default function StaffCreate() {
       if (!isGeneralStaff && !isSelfRestricted) dispatch(fetchJobGradesAction());
     }
   }, [dispatch, jobGrades, isGeneralStaff, isSelfRestricted]);
+
+  // ✅ 직급 변경 브로드캐스트/탭 전환 시 재조회 + 로컬 즉시반영
+  useEffect(() => {
+    const refetch = async () => {
+      try {
+        // 로컬 즉시 반영(캐시우회)
+        const res = await fetchJobGradeOptions(true);
+        const data = res?.data?.result ?? res?.data?.data ?? res?.data;
+        const arr = Array.isArray(data) ? data : (data?.items ?? data?.content ?? []);
+        if (Array.isArray(arr)) setJobGradeOverlay(arr);
+      } catch {}
+      try { dispatch(fetchJobGradesAction()); } catch {}
+    };
+
+    const onLocalStorage = (e) => { if (e?.key === 'jobGrade:ping') refetch(); };
+    let ch = null;
+    const onBc = () => refetch();
+    const onCustom = () => refetch();
+    const onVisible = () => { if (document.visibilityState === 'visible') refetch(); };
+
+    window.addEventListener('jobGrade:changed', onCustom);
+    window.addEventListener('storage', onLocalStorage);
+    if ('BroadcastChannel' in window) {
+      ch = new BroadcastChannel('jobGrade');
+      ch.onmessage = onBc;
+    }
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.removeEventListener('jobGrade:changed', onCustom);
+      window.removeEventListener('storage', onLocalStorage);
+      document.removeEventListener('visibilitychange', onVisible);
+      if (ch) { ch.close(); ch = null; }
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     (async () => {
@@ -155,7 +204,8 @@ export default function StaffCreate() {
     }
   }, [detail, isEdit]);
 
-  const rawJobGradeOptions = useMemo(() => {
+  // ✅ store 기반 + overlay 즉시반영 옵션 병합
+  const normalizedStoreJobGrades = useMemo(() => {
     const jg = jobGrades;
     if (Array.isArray(jg)) return jg;
     if (jg?.content && Array.isArray(jg.content)) return jg.content;
@@ -163,6 +213,11 @@ export default function StaffCreate() {
     if (jg?.items && Array.isArray(jg.items)) return jg.items;
     return [];
   }, [jobGrades]);
+
+  const rawJobGradeOptions = useMemo(() => {
+    if (Array.isArray(jobGradeOverlay) && jobGradeOverlay.length > 0) return jobGradeOverlay;
+    return normalizedStoreJobGrades;
+  }, [jobGradeOverlay, normalizedStoreJobGrades]);
 
   const currentJobGradeId = useMemo(() => {
     return String(form.jobGradeId || detail?.jobGradeId || detail?.jobGrade?.id || '');
@@ -173,22 +228,39 @@ export default function StaffCreate() {
     return found?.name || detail?.jobGrade?.name || detail?.jobGradeName || '';
   }, [rawJobGradeOptions, currentJobGradeId, detail?.jobGrade?.name, detail?.jobGradeName]);
 
-  const jobGradeOptionsWithCurrent = useMemo(() => {
-    let opts = [...rawJobGradeOptions];
-    const exists = opts.some(o => String(o?.id) === String(currentJobGradeId));
-    if (!exists && currentJobGradeId) {
-      opts = [{ id: Number(currentJobGradeId), name: currentJobGradeName || '(현재 직급)', authorityType: targetAuthorityType }, ...opts];
-    }
-    return opts;
-  }, [rawJobGradeOptions, currentJobGradeId, currentJobGradeName, targetAuthorityType]);
+  // ✅ overlay(옵션 API) 순서가 있으면 그대로 보존, 없으면 fallback 정렬
+  const preferServerOrder = useMemo(
+    () => Array.isArray(jobGradeOverlay) && jobGradeOverlay.length > 0,
+    [jobGradeOverlay]
+  );
 
+  // ✅ 현재값이 목록에 없으면 "맨 끝"에만 추가하고, 정렬은 더 이상 강제하지 않음
+  const jobGradeOptionsWithCurrent = useMemo(() => {
+    const opts = Array.isArray(rawJobGradeOptions) ? [...rawJobGradeOptions] : [];
+    const exists = opts.some(o => String(o?.id) === String(currentJobGradeId));
+
+    if (!exists && currentJobGradeId) {
+      opts.push({
+        id: Number(currentJobGradeId),
+        name: currentJobGradeName || '(현재 직급)',
+        authorityType: targetAuthorityType,
+      });
+    }
+    return preferServerOrder ? opts : sortByOrderIndexAsc(opts);
+  }, [rawJobGradeOptions, currentJobGradeId, currentJobGradeName, targetAuthorityType, preferServerOrder]);
+
+  // ✅ 권한 필터 후에도 overlay 순서를 보존(없을 때만 정렬)
   const effectiveJobGradeOptions = useMemo(() => {
-    if (isHqAdmin) return jobGradeOptionsWithCurrent;
-    if (isSelf) return jobGradeOptionsWithCurrent;
-    return jobGradeOptionsWithCurrent.filter(
-      o => (o?.authorityType || 'STAFF') === 'STAFF' || String(o?.id) === String(currentJobGradeId)
-    );
-  }, [isHqAdmin, isSelf, jobGradeOptionsWithCurrent, currentJobGradeId]);
+    const base = jobGradeOptionsWithCurrent;
+    const arr = (isHqAdmin || isSelf)
+      ? base
+      : base.filter(
+          o =>
+            (o?.authorityType || 'STAFF') === 'STAFF' ||
+            String(o?.id) === String(currentJobGradeId)
+        );
+    return preferServerOrder ? arr : sortByOrderIndexAsc(arr);
+  }, [isHqAdmin, isSelf, jobGradeOptionsWithCurrent, currentJobGradeId, preferServerOrder]);
 
   useEffect(() => {
     if (!canEditAuthorityType && detail?.authorityType) {
@@ -361,6 +433,12 @@ export default function StaffCreate() {
     if (isSelfRestricted) return;
     setDispatches(arr => arr.map((it, i) => i === idx ? { ...it, [key]: val } : it));
   };
+
+  // ✅ 모달 확인 버튼 이동 경로: (마이페이지) /dashboard, 그 외 /staff
+  const afterConfirmPath = useMemo(() => {
+    if (pathIsMy) return '/dashboard';
+    return '/staff';
+  }, [pathIsMy]);
 
   return (
     <Wrap>
@@ -733,12 +811,12 @@ export default function StaffCreate() {
           <ModalCard>
             <ModalTitle>{isEdit ? '수정이 완료되었습니다' : '등록이 완료되었습니다'}</ModalTitle>
             <ModalSub>
-              {isSelfRestricted
-                ? '확인을 누르면 내 정보 페이지로 이동합니다.'
+              {pathIsMy
+                ? '확인을 누르면 대시보드로 이동합니다.'
                 : '확인을 누르면 직원 목록으로 이동합니다.'}
             </ModalSub>
             <ModalActions>
-              <Primary onClick={() => navigate(pathIsMy ? '/my' : '/staff', { replace: true })}>
+              <Primary onClick={() => navigate(afterConfirmPath, { replace: true })}>
                 확인
               </Primary>
             </ModalActions>

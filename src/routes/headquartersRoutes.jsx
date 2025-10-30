@@ -1,3 +1,4 @@
+// src/routes/headquartersRoutes.jsx
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import HeadquartersBranchList from '../pages/branch/HeadquartersBranchList';
@@ -13,6 +14,9 @@ import StaffCreate from '../pages/staff/StaffCreate';
 import HeadquartersDashboard from '../pages/admin/HeadquartersDashboard';
 import OrderManagement from '../pages/admin/OrderManagement';
 import StaffDetail from '../pages/staff/StaffDetail';
+
+// 직급관리 페이지가 이미 있다면 경로를 맞춰 import 하세요.
+import JobGradeManagement from '../pages/settings/JobGradeManagement';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -36,7 +40,10 @@ export const headquartersRoutes = [
   { path: 'purchase-order', element: <PurchaseOrderManagement /> },
   { path: 'order', element: <OrderManagement /> },
   { path: 'sales-report', element: <SalesReport /> },
+
+  // 설정
   { path: 'settings', element: <div>설정 (준비중)</div> },
+  { path: 'settings/job-grades', element: <JobGradeManagement /> }, // ← 직급관리 라우트 추가
 ];
 
 export default headquartersRoutes;

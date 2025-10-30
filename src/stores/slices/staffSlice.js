@@ -11,6 +11,9 @@ import {
   fetchJobGrades,
 } from '../../service/staffService';
 
+/**
+ * 직원 목록
+ */
 export const fetchStaffListAction = createAsyncThunk(
   'staff/fetchList',
   async (arg, { rejectWithValue }) => {
@@ -26,6 +29,9 @@ export const fetchStaffListAction = createAsyncThunk(
   }
 );
 
+/**
+ * 지점별 직원 목록
+ */
 export const fetchStaffListByBranchAction = createAsyncThunk(
   'staff/fetchListByBranch',
   async (arg, { rejectWithValue }) => {
@@ -45,6 +51,9 @@ export const fetchStaffListByBranchAction = createAsyncThunk(
   }
 );
 
+/**
+ * 직원 상세
+ */
 export const fetchStaffDetailAction = createAsyncThunk(
   'staff/fetchDetail',
   async (staffId, { rejectWithValue }) => {
@@ -58,6 +67,9 @@ export const fetchStaffDetailAction = createAsyncThunk(
   }
 );
 
+/**
+ * 직원 등록
+ */
 export const createStaffAction = createAsyncThunk(
   'staff/create',
   async ({ payload, profileImage }, { rejectWithValue }) => {
@@ -71,6 +83,9 @@ export const createStaffAction = createAsyncThunk(
   }
 );
 
+/**
+ * 직원 수정
+ */
 export const updateStaffAction = createAsyncThunk(
   'staff/update',
   async ({ staffId, payload, profileImage }, { rejectWithValue }) => {
@@ -84,6 +99,9 @@ export const updateStaffAction = createAsyncThunk(
   }
 );
 
+/**
+ * 퇴사 처리
+ */
 export const deactivateStaffAction = createAsyncThunk(
   'staff/deactivate',
   async (staffId, { rejectWithValue }) => {
@@ -97,6 +115,9 @@ export const deactivateStaffAction = createAsyncThunk(
   }
 );
 
+/**
+ * 재입사 처리
+ */
 export const rehireStaffAction = createAsyncThunk(
   'staff/rehire',
   async (staffId, { rejectWithValue }) => {
@@ -110,12 +131,21 @@ export const rehireStaffAction = createAsyncThunk(
   }
 );
 
+/**
+ * 직급 목록
+ * - noCache: true 로 호출 시 캐시 우회(옵션 즉시 갱신용)
+ *   (service 함수가 파라미터를 지원하지 않는 경우에도 boolean 인자 전달은 무해)
+ */
 export const fetchJobGradesAction = createAsyncThunk(
   'staff/fetchJobGrades',
-  async (_, { rejectWithValue }) => {
+  async (arg, { rejectWithValue }) => {
     try {
-      const data = await fetchJobGrades();
-      return Array.isArray(data) ? data : (data?.content || []);
+      const noCache = !!(arg && typeof arg === 'object' && arg.noCache);
+      const data = await fetchJobGrades(noCache);
+      // 응답 포맷 다양성 수용
+      return Array.isArray(data)
+        ? data
+        : (data?.content || data?.items || data?.result || []);
     } catch (e) {
       const m = e?.response?.data?.status_message || e.message || '직급 목록 조회 실패';
       return rejectWithValue(m);
@@ -148,6 +178,7 @@ const initialState = {
   jobGrades: [],
   jobGradeLoading: false,
   jobGradeError: null,
+  jobGradeLoadedAt: 0, // ✅ 직급 옵션 로드 시각(캐시 무효화 용도)
 };
 
 const staffSlice = createSlice({
@@ -170,8 +201,27 @@ const staffSlice = createSlice({
       s.rehireError = null;
       s.jobGradeError = null;
     },
+    /**
+     * ✅ 직급 캐시 무효화(브로드캐스트/다른 탭 변경 감지 시 사용)
+     * - UI에서 dispatch(invalidateJobGrades()) 후
+     *   dispatch(fetchJobGradesAction({ noCache:true })) 호출 권장
+     */
+    invalidateJobGrades: (s) => {
+      s.jobGrades = [];
+      s.jobGradeLoadedAt = 0;
+      s.jobGradeError = null;
+    },
+    /**
+     * (선택) 외부에서 직급 배열을 직접 주입해야 할 때 사용 가능
+     */
+    setJobGrades: (s, a) => {
+      s.jobGrades = Array.isArray(a.payload) ? a.payload : [];
+      s.jobGradeLoadedAt = Date.now();
+      s.jobGradeError = null;
+    },
   },
   extraReducers: (b) => {
+    // 목록
     b.addCase(fetchStaffListAction.pending, (s) => {
       s.loading = true;
       s.error = null;
@@ -205,6 +255,7 @@ const staffSlice = createSlice({
       s.error = a.payload;
     });
 
+    // 지점 목록
     b.addCase(fetchStaffListByBranchAction.pending, (s) => {
       s.loading = true;
       s.error = null;
@@ -238,6 +289,7 @@ const staffSlice = createSlice({
       s.error = a.payload;
     });
 
+    // 상세
     b.addCase(fetchStaffDetailAction.pending, (s) => {
       s.detailLoading = true;
       s.detailError = null;
@@ -251,6 +303,7 @@ const staffSlice = createSlice({
       s.detailError = a.payload;
     });
 
+    // 등록
     b.addCase(createStaffAction.pending, (s) => {
       s.createLoading = true;
       s.createError = null;
@@ -267,6 +320,7 @@ const staffSlice = createSlice({
       s.createError = a.payload;
     });
 
+    // 수정
     b.addCase(updateStaffAction.pending, (s) => {
       s.updateLoading = true;
       s.updateError = null;
@@ -282,6 +336,7 @@ const staffSlice = createSlice({
       s.updateError = a.payload;
     });
 
+    // 퇴사
     b.addCase(deactivateStaffAction.pending, (s) => {
       s.deactivateLoading = true;
       s.deactivateError = null;
@@ -305,6 +360,7 @@ const staffSlice = createSlice({
       s.deactivateError = a.payload;
     });
 
+    // 재입사
     b.addCase(rehireStaffAction.pending, (s) => {
       s.rehireLoading = true;
       s.rehireError = null;
@@ -321,6 +377,7 @@ const staffSlice = createSlice({
       s.rehireError = a.payload;
     });
 
+    // 직급
     b.addCase(fetchJobGradesAction.pending, (s) => {
       s.jobGradeLoading = true;
       s.jobGradeError = null;
@@ -328,6 +385,7 @@ const staffSlice = createSlice({
     b.addCase(fetchJobGradesAction.fulfilled, (s, a) => {
       s.jobGradeLoading = false;
       s.jobGrades = a.payload || [];
+      s.jobGradeLoadedAt = Date.now(); // ✅ 최근 로드 시각 기록
     });
     b.addCase(fetchJobGradesAction.rejected, (s, a) => {
       s.jobGradeLoading = false;
@@ -336,5 +394,12 @@ const staffSlice = createSlice({
   },
 });
 
-export const { setParams, clearDetail, clearErrors } = staffSlice.actions;
+export const {
+  setParams,
+  clearDetail,
+  clearErrors,
+  invalidateJobGrades, // ✅ 추가
+  setJobGrades,        // (선택) 추가
+} = staffSlice.actions;
+
 export default staffSlice.reducer;

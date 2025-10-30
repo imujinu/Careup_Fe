@@ -60,6 +60,42 @@ const SidebarHeader = styled.div`padding: 20px 24px; border-bottom: 1px solid #e
 const Logo = styled.div`width: 32px; height: 32px; background: #6b46c1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; margin-bottom: 8px;`;
 const AppTitle = styled.h2`font-size: 16px; font-weight: 600; color: #1f2937; margin: 0;`;
 
+// ▼ 플라이아웃 전용 요소
+const FlyoutWrapper = styled.li`
+  position: relative;
+  /* Hover 시에만 패널 표시 */
+  &:hover > div[data-flyout="panel"] {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+`;
+
+const FlyoutPanel = styled.div`
+  position: absolute;
+  top: 0; /* 설정 항목의 상단에 맞춰 뜨게 함 */
+  left: calc(100% + 8px); /* 사이드바 오른쪽으로 살짝 띄움 */
+  min-width: 180px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  padding: 8px 8px;
+  z-index: 1000; /* 사이드바(999)보다 위 */
+  opacity: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+`;
+
+const FlyoutLink = styled(StyledNavLink)`
+  border-right: none;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+  &:hover { background: #f9fafb; }
+`;
+
 const Mdi = ({ path }) => <Icon path={path} size={0.95} />;
 
 function Sidebar({ isVisible, userType, branchId }) {
@@ -68,6 +104,11 @@ function Sidebar({ isVisible, userType, branchId }) {
   const rawRole = useAppSelector((s) => s.auth.role);
   const role = String(rawRole || '').replace(/^ROLE_/, '').toUpperCase();
   const canManageStaff = role === 'BRANCH_ADMIN' || role === 'FRANCHISE_OWNER';
+
+  // 직급관리 경로: 존재하면 사용, 없으면 폴백
+  const JOB_GRADE_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.jobGrade) || '/settings/job-grades';
+  // 플라이아웃 노출 조건: 본사 항상, 가맹점은 관리자급만
+  const showJobGradeFlyout = userType === 'headquarters' || canManageStaff;
 
   const headquartersMenuItems = [
     { id: 'dashboard',     label: '대시보드',     icon: mdiViewDashboardOutline, path: MENU_PATH_MAP.dashboard },
@@ -126,21 +167,48 @@ function Sidebar({ isVisible, userType, branchId }) {
 
       <MenuSection>
         <MenuList>
-          {menuItems.map((item) => (
-            <MenuItem key={item.id}>
-              {item.isButton ? (
-                <MenuButton onClick={handleLogout}>
-                  <Mdi path={item.icon} />
-                  {item.label}
-                </MenuButton>
-              ) : (
+          {menuItems.map((item) => {
+            // 로그아웃 버튼
+            if (item.isButton) {
+              return (
+                <MenuItem key={item.id}>
+                  <MenuButton onClick={handleLogout}>
+                    <Mdi path={item.icon} />
+                    {item.label}
+                  </MenuButton>
+                </MenuItem>
+              );
+            }
+
+            // 설정 항목 + 플라이아웃(직급관리)
+            if (item.id === 'settings' && showJobGradeFlyout) {
+              return (
+                <FlyoutWrapper key={item.id}>
+                  <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                    <Mdi path={item.icon} />
+                    {item.label}
+                  </StyledNavLink>
+
+                  <FlyoutPanel data-flyout="panel" aria-label="설정 확장 메뉴">
+                    <FlyoutLink to={JOB_GRADE_PATH} className={({ isActive }) => (isActive ? 'active' : '')}>
+                      <Mdi path={mdiAccountGroupOutline} />
+                      직급관리
+                    </FlyoutLink>
+                  </FlyoutPanel>
+                </FlyoutWrapper>
+              );
+            }
+
+            // 기본 항목
+            return (
+              <MenuItem key={item.id}>
                 <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
                   <Mdi path={item.icon} />
                   {item.label}
                 </StyledNavLink>
-              )}
-            </MenuItem>
-          ))}
+              </MenuItem>
+            );
+          })}
         </MenuList>
       </MenuSection>
     </SidebarContainer>
