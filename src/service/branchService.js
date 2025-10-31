@@ -99,7 +99,9 @@ export const deleteBranch = async (branchId) => {
 
 // 직영점장/가맹점장 자신의 지점 정보 조회 서비스
 export const getMyBranch = async () => {
-  const url = `${BASE_URL}/branch/my-branch`;
+  // 백엔드 Controller 라우팅 순서 문제로 인해 /branch/my를 /branch/my-branch로 변경
+  // 백엔드에서 /branch/{branchId}보다 특정 경로(/branch/my, /branch/register 등)를 먼저 매핑해야 함
+  const url = `${BASE_URL}/branch/my`;
   const response = await axios.get(url);
   return response.data?.result || response.data;
 };

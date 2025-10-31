@@ -20,7 +20,8 @@ function EmployeeTable({
   onViewDetail, 
   onEdit, 
   onDelete, 
-  onRehire 
+  onRehire,
+  readOnly = false,
 }) {
   const [hoveredRow, setHoveredRow] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -132,7 +133,7 @@ function EmployeeTable({
                   </ProfileInfo>
                 </ProfileSection>
                 
-                {hoveredRow === employee.id && (
+                {!readOnly && hoveredRow === employee.id && (
                   <ActionButton
                     onClick={(e) => handleContextMenu(e, employee)}
                   >
@@ -188,7 +189,7 @@ function EmployeeTable({
         </EmployeeGrid>
       </TableContainer>
 
-      {contextMenu && (
+      {!readOnly && contextMenu && (
         <ContextMenuOverlay onClick={handleContextMenuClose}>
           <ContextMenu
             style={{
@@ -200,24 +201,28 @@ function EmployeeTable({
               <Icon path={mdiEye} size={1} />
               상세보기
             </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleAction(onEdit, contextMenu.employee)}>
-              <Icon path={mdiPencil} size={1} />
-              수정
-            </ContextMenuItem>
-            {contextMenu.employee.employmentStatus === 'TERMINATED' ? (
-              <ContextMenuItem onClick={() => handleAction(onRehire, contextMenu.employee)}>
-                <Icon path={mdiAccountReactivate} size={1} />
-                재입사
-              </ContextMenuItem>
-            ) : (
-              <ContextMenuItem 
-                onClick={() => handleAction(onDelete, contextMenu.employee)}
-                danger
-              >
-                <Icon path={mdiDelete} size={1} />
-                퇴사 처리
+            {onEdit && (
+              <ContextMenuItem onClick={() => handleAction(onEdit, contextMenu.employee)}>
+                <Icon path={mdiPencil} size={1} />
+                수정
               </ContextMenuItem>
             )}
+            {contextMenu.employee.employmentStatus === 'TERMINATED'
+              ? (onRehire && (
+                  <ContextMenuItem onClick={() => handleAction(onRehire, contextMenu.employee)}>
+                    <Icon path={mdiAccountReactivate} size={1} />
+                    재입사
+                  </ContextMenuItem>
+                ))
+              : (onDelete && (
+                  <ContextMenuItem 
+                    onClick={() => handleAction(onDelete, contextMenu.employee)}
+                    danger
+                  >
+                    <Icon path={mdiDelete} size={1} />
+                    퇴사 처리
+                  </ContextMenuItem>
+                ))}
           </ContextMenu>
         </ContextMenuOverlay>
       )}

@@ -8,7 +8,7 @@ import DeleteConfirmModal from '../common/DeleteConfirmModal';
 import { documentService } from '../../service/documentService';
 import { useToast } from '../common/Toast';
 
-function DocumentManagement({ branchId }) {
+function DocumentManagement({ branchId, readOnly = false }) {
   const { addToast } = useToast();
   
   // 상태 관리
@@ -211,18 +211,20 @@ function DocumentManagement({ branchId }) {
         onDocumentTypeFilterChange={setDocumentTypeFilter}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onUploadClick={() => setShowUploadModal(true)}
+        onUploadClick={readOnly ? undefined : () => setShowUploadModal(true)}
+        readOnly={readOnly}
       />
 
       <DocumentTable
         documents={filteredDocuments}
         onDownload={handleDownload}
-        onEdit={handleEditClick}
-        onDelete={handleDeleteClick}
+        onEdit={readOnly ? undefined : handleEditClick}
+        onDelete={readOnly ? undefined : handleDeleteClick}
         loading={loading}
+        readOnly={readOnly}
       />
 
-      {showUploadModal && (
+      {!readOnly && showUploadModal && (
         <DocumentUploadModal
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
@@ -231,7 +233,7 @@ function DocumentManagement({ branchId }) {
         />
       )}
 
-      {showEditModal && (
+      {!readOnly && showEditModal && (
         <DocumentEditModal
           isOpen={showEditModal}
           onClose={() => {
@@ -244,7 +246,7 @@ function DocumentManagement({ branchId }) {
         />
       )}
 
-      {showDeleteModal && (
+      {!readOnly && showDeleteModal && (
         <DeleteConfirmModal
           isOpen={showDeleteModal}
           onClose={handleDeleteCancel}

@@ -260,8 +260,25 @@ const SORTABLE_COLUMNS = {
   zipcode: 'zipcode',
 };
 
-function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onViewDetail }) {
+// 기본 컬럼 가시성 (사진/이름/조치는 고정 표시)
+const DEFAULT_VISIBLE_COLUMNS = {
+  photo: true, // fixed
+  id: true,
+  name: true, // fixed
+  businessDomain: true,
+  status: true,
+  openDate: true,
+  phone: true,
+  businessNumber: true,
+  corporationNumber: true,
+  zipcode: true,
+  address: true,
+  actions: true, // fixed
+};
+
+function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onViewDetail, visibleColumns }) {
   const [tooltip, setTooltip] = useState({ visible: false, content: '', x: 0, y: 0 });
+  const columns = { ...DEFAULT_VISIBLE_COLUMNS, ...(visibleColumns || {}) };
 
   const handleSort = (field) => {
     if (!onSort) return;
@@ -368,14 +385,19 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
         <Table>
           <thead>
             <tr>
-              <Th $minWidth="60px">사진</Th>
-              <Th 
+              {columns.photo && (
+                <Th $minWidth="60px">사진</Th>
+              )}
+              {columns.id && (
+                <Th 
                 $sortable 
                 $minWidth="60px"
                 onClick={() => handleSort(SORTABLE_COLUMNS.id)}
               >
                 ID{getSortIndicator(SORTABLE_COLUMNS.id)}
               </Th>
+              )}
+              {columns.name && (
               <Th 
                 $sortable 
                 $minWidth="100px"
@@ -383,6 +405,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 지점명{getSortIndicator(SORTABLE_COLUMNS.name)}
               </Th>
+              )}
+              {columns.businessDomain && (
               <Th 
                 $sortable 
                 $minWidth="100px"
@@ -390,6 +414,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 업종{getSortIndicator(SORTABLE_COLUMNS.businessDomain)}
               </Th>
+              )}
+              {columns.status && (
               <Th 
                 $sortable 
                 $minWidth="80px"
@@ -397,6 +423,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 지점상태{getSortIndicator(SORTABLE_COLUMNS.status)}
               </Th>
+              )}
+              {columns.openDate && (
               <Th 
                 $sortable 
                 $minWidth="100px"
@@ -404,6 +432,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 개업일{getSortIndicator(SORTABLE_COLUMNS.openDate)}
               </Th>
+              )}
+              {columns.phone && (
               <Th 
                 $sortable 
                 $minWidth="120px"
@@ -411,6 +441,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 지점 전화번호{getSortIndicator(SORTABLE_COLUMNS.phone)}
               </Th>
+              )}
+              {columns.businessNumber && (
               <Th 
                 $sortable 
                 $minWidth="140px"
@@ -418,6 +450,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 사업자등록번호{getSortIndicator(SORTABLE_COLUMNS.businessNumber)}
               </Th>
+              )}
+              {columns.corporationNumber && (
               <Th 
                 $sortable 
                 $minWidth="140px"
@@ -425,6 +459,8 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 법인등록번호{getSortIndicator(SORTABLE_COLUMNS.corporationNumber)}
               </Th>
+              )}
+              {columns.zipcode && (
               <Th 
                 $sortable 
                 $minWidth="100px"
@@ -432,17 +468,27 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
               >
                 지점 우편번호{getSortIndicator(SORTABLE_COLUMNS.zipcode)}
               </Th>
-              <Th $minWidth="200px">지점 주소</Th>
-              <Th $minWidth="120px">조치</Th>
+              )}
+              {columns.address && (
+                <Th $minWidth="200px">지점 주소</Th>
+              )}
+              {columns.actions && (
+                <Th $minWidth="120px">조치</Th>
+              )}
             </tr>
           </thead>
           <tbody>
             {branches.map((b) => (
               <Tr key={b.id}>
-                <Td>
-                  <Avatar src={b.profileImageUrl || '/vite.svg'} alt={b.name} />
-                </Td>
-                <Td $maxWidth="60px">{b.id}</Td>
+                {columns.photo && (
+                  <Td>
+                    <Avatar src={b.profileImageUrl || '/vite.svg'} alt={b.name} />
+                  </Td>
+                )}
+                {columns.id && (
+                  <Td $maxWidth="60px">{b.id}</Td>
+                )}
+                {columns.name && (
                 <NameCell 
                   $maxWidth="100px" 
                   onMouseEnter={(e) => handleCellHover(e, b.name)}
@@ -451,12 +497,16 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
                 >
                   {b.name}
                 </NameCell>
+                )}
+                {columns.businessDomain && (
                 <Td $maxWidth="100px"
                   onMouseEnter={(e) => handleCellHover(e, b.businessDomain)}
                   onMouseLeave={handleCellLeave}
                 >
                   {b.businessDomain}
                 </Td>
+                )}
+                {columns.status && (
                 <Td $maxWidth="80px">
                   <StatusBadge
                     $bgColor={getStatusInfo(b.status).bgColor}
@@ -466,21 +516,36 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
                     {getStatusInfo(b.status).text}
                   </StatusBadge>
                 </Td>
-                <Td $maxWidth="100px">{b.openDate || '-'}</Td>
-                <Td $maxWidth="120px">{formatPhoneDisplay(b.phone)}</Td>
-                <Td $maxWidth="140px">{b.businessNumber || '-'}</Td>
-                <Td $maxWidth="140px">{b.corporationNumber || '-'}</Td>
-                <Td $maxWidth="100px">{b.zipcode || '-'}</Td>
+                )}
+                {columns.openDate && (
+                  <Td $maxWidth="100px">{b.openDate || '-'}</Td>
+                )}
+                {columns.phone && (
+                  <Td $maxWidth="120px">{formatPhoneDisplay(b.phone)}</Td>
+                )}
+                {columns.businessNumber && (
+                  <Td $maxWidth="140px">{b.businessNumber || '-'}</Td>
+                )}
+                {columns.corporationNumber && (
+                  <Td $maxWidth="140px">{b.corporationNumber || '-'}</Td>
+                )}
+                {columns.zipcode && (
+                  <Td $maxWidth="100px">{b.zipcode || '-'}</Td>
+                )}
+                {columns.address && (
                 <Td $maxWidth="200px"
                   onMouseEnter={(e) => handleCellHover(e, formatAddress(b.address, b.addressDetail))}
                   onMouseLeave={handleCellLeave}
                 >
                   {formatAddress(b.address, b.addressDetail)}
                 </Td>
-                <Td $maxWidth="120px">
-                  <ActionButton onClick={() => onEdit && onEdit(b)}>수정</ActionButton>
-                  <DangerButton onClick={() => onDelete && onDelete(b)}>삭제</DangerButton>
-                </Td>
+                )}
+                {columns.actions && (
+                  <Td $maxWidth="120px">
+                    <ActionButton onClick={() => onEdit && onEdit(b)}>수정</ActionButton>
+                    <DangerButton onClick={() => onDelete && onDelete(b)}>삭제</DangerButton>
+                  </Td>
+                )}
               </Tr>
             ))}
           </tbody>
@@ -492,57 +557,81 @@ function BranchTable({ branches = [], onEdit, onDelete, onSort, currentSort, onV
         {branches.map((b) => (
           <MobileCardItem key={b.id}>
             <MobileCardHeader>
-              <MobileCardAvatar src={b.profileImageUrl || '/vite.svg'} alt={b.name} />
+              {columns.photo && (
+                <MobileCardAvatar src={b.profileImageUrl || '/vite.svg'} alt={b.name} />
+              )}
               <MobileCardInfo>
-                <MobileCardTitle onClick={() => onViewDetail && onViewDetail(b)}>{b.name}</MobileCardTitle>
-                <MobileCardSubtitle>ID: {b.id} | {b.businessDomain}</MobileCardSubtitle>
+                {columns.name && (
+                  <MobileCardTitle onClick={() => onViewDetail && onViewDetail(b)}>{b.name}</MobileCardTitle>
+                )}
+                <MobileCardSubtitle>
+                  {columns.id && <>ID: {b.id}</>}
+                  {columns.id && columns.businessDomain && ' | '}
+                  {columns.businessDomain && <>{b.businessDomain}</>}
+                </MobileCardSubtitle>
               </MobileCardInfo>
             </MobileCardHeader>
             
             <MobileCardContent>
-              <MobileCardField>
-                <MobileCardLabel>지점상태</MobileCardLabel>
-                <MobileCardValue>
-                  <StatusBadge
-                    $bgColor={getStatusInfo(b.status).bgColor}
-                    $textColor={getStatusInfo(b.status).textColor}
-                    $borderColor={getStatusInfo(b.status).borderColor}
-                  >
-                    {getStatusInfo(b.status).text}
-                  </StatusBadge>
-                </MobileCardValue>
-              </MobileCardField>
-              <MobileCardField>
-                <MobileCardLabel>개업일</MobileCardLabel>
-                <MobileCardValue>{b.openDate || '-'}</MobileCardValue>
-              </MobileCardField>
-              <MobileCardField>
-                <MobileCardLabel>전화번호</MobileCardLabel>
-                <MobileCardValue>{formatPhoneDisplay(b.phone)}</MobileCardValue>
-              </MobileCardField>
-              <MobileCardField>
-                <MobileCardLabel>사업자등록번호</MobileCardLabel>
-                <MobileCardValue>{b.businessNumber || '-'}</MobileCardValue>
-              </MobileCardField>
-              <MobileCardField>
-                <MobileCardLabel>법인등록번호</MobileCardLabel>
-                <MobileCardValue>{b.corporationNumber || '-'}</MobileCardValue>
-              </MobileCardField>
-              <MobileCardField>
-                <MobileCardLabel>우편번호</MobileCardLabel>
-                <MobileCardValue>{b.zipcode || '-'}</MobileCardValue>
-              </MobileCardField>
+              {columns.status && (
+                <MobileCardField>
+                  <MobileCardLabel>지점상태</MobileCardLabel>
+                  <MobileCardValue>
+                    <StatusBadge
+                      $bgColor={getStatusInfo(b.status).bgColor}
+                      $textColor={getStatusInfo(b.status).textColor}
+                      $borderColor={getStatusInfo(b.status).borderColor}
+                    >
+                      {getStatusInfo(b.status).text}
+                    </StatusBadge>
+                  </MobileCardValue>
+                </MobileCardField>
+              )}
+              {columns.openDate && (
+                <MobileCardField>
+                  <MobileCardLabel>개업일</MobileCardLabel>
+                  <MobileCardValue>{b.openDate || '-'}</MobileCardValue>
+                </MobileCardField>
+              )}
+              {columns.phone && (
+                <MobileCardField>
+                  <MobileCardLabel>전화번호</MobileCardLabel>
+                  <MobileCardValue>{formatPhoneDisplay(b.phone)}</MobileCardValue>
+                </MobileCardField>
+              )}
+              {columns.businessNumber && (
+                <MobileCardField>
+                  <MobileCardLabel>사업자등록번호</MobileCardLabel>
+                  <MobileCardValue>{b.businessNumber || '-'}</MobileCardValue>
+                </MobileCardField>
+              )}
+              {columns.corporationNumber && (
+                <MobileCardField>
+                  <MobileCardLabel>법인등록번호</MobileCardLabel>
+                  <MobileCardValue>{b.corporationNumber || '-'}</MobileCardValue>
+                </MobileCardField>
+              )}
+              {columns.zipcode && (
+                <MobileCardField>
+                  <MobileCardLabel>우편번호</MobileCardLabel>
+                  <MobileCardValue>{b.zipcode || '-'}</MobileCardValue>
+                </MobileCardField>
+              )}
             </MobileCardContent>
             
-            <MobileCardField>
-              <MobileCardLabel>지점 주소</MobileCardLabel>
-              <MobileCardValue>{formatAddress(b.address, b.addressDetail)}</MobileCardValue>
-            </MobileCardField>
+            {columns.address && (
+              <MobileCardField>
+                <MobileCardLabel>지점 주소</MobileCardLabel>
+                <MobileCardValue>{formatAddress(b.address, b.addressDetail)}</MobileCardValue>
+              </MobileCardField>
+            )}
             
-            <MobileCardActions>
-              <ActionButton onClick={() => onEdit && onEdit(b)}>수정</ActionButton>
-              <DangerButton onClick={() => onDelete && onDelete(b)}>삭제</DangerButton>
-            </MobileCardActions>
+            {columns.actions && (
+              <MobileCardActions>
+                <ActionButton onClick={() => onEdit && onEdit(b)}>수정</ActionButton>
+                <DangerButton onClick={() => onDelete && onDelete(b)}>삭제</DangerButton>
+              </MobileCardActions>
+            )}
           </MobileCardItem>
         ))}
       </MobileCard>

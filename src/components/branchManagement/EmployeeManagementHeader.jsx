@@ -11,7 +11,8 @@ import {
 function EmployeeManagementHeader({ 
   summary, 
   onAddEmployee, 
-  loading = false 
+  loading = false,
+  readOnly = false,
 }) {
   const { totalEmployees = 0, activeEmployees = 0, recentlyAdded = 0 } = summary;
 
@@ -22,10 +23,12 @@ function EmployeeManagementHeader({
           <HeaderTitle>점주 관리</HeaderTitle>
           <HeaderDescription>지점의 점주 정보를 관리합니다</HeaderDescription>
         </HeaderInfo>
-        <AddButton onClick={onAddEmployee} disabled={loading}>
-          <Icon path={mdiPlus} size={1.2} />
-          점주 추가
-        </AddButton>
+        {!readOnly && (
+          <AddButton onClick={onAddEmployee} disabled={loading}>
+            <Icon path={mdiPlus} size={1.2} />
+            점주 추가
+          </AddButton>
+        )}
       </HeaderContent>
       
       <SummaryCards>

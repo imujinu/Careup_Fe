@@ -2,6 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiClose } from '@mdi/js';
+import BaseModal from '../common/BaseModal';
 
 function BranchDetailModal({ branch, isOpen, onClose }) {
   if (!isOpen || !branch) return null;
@@ -38,14 +39,18 @@ function BranchDetailModal({ branch, isOpen, onClose }) {
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
-      <ModalContent onClick={(e) => e.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>지점 상세 정보</ModalTitle>
-          <CloseButton onClick={onClose}>
-            <Icon path={mdiClose} size={1.2} />
-          </CloseButton>
-        </ModalHeader>
+    <BaseModal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      maxWidth="600px"
+      allowBackdropClose={false}
+    >
+      <ModalHeader>
+        <ModalTitle>지점 상세 정보</ModalTitle>
+        <CloseButton onClick={onClose}>
+          <Icon path={mdiClose} size={1.2} />
+        </CloseButton>
+      </ModalHeader>
         
         <ModalBody>
           <InfoSection>
@@ -160,38 +165,11 @@ function BranchDetailModal({ branch, isOpen, onClose }) {
         <ModalFooter>
           <CloseModalButton onClick={onClose}>닫기</CloseModalButton>
         </ModalFooter>
-      </ModalContent>
-    </ModalOverlay>
+    </BaseModal>
   );
 }
 
 export default BranchDetailModal;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-`;
 
 const ModalHeader = styled.div`
   display: flex;
