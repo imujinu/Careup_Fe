@@ -147,6 +147,12 @@ export const inventoryService = {
     });
   },
 
+  // 지점 상품 삭제
+  deleteBranchProduct: async (branchProductId) => {
+    const response = await inventoryApi.delete(`${API_BASE_URL}/inventory/branch-products/${branchProductId}`);
+    return response.data;
+  },
+
   // 재고 증감
   adjustStock: async (data) => {
     await inventoryApi.post(`${API_BASE_URL}/inventory/adjust`, data);

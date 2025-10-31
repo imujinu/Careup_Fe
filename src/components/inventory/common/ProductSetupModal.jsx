@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { inventoryService } from '../../../service/inventoryService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -84,6 +85,13 @@ const FormGroup = styled.div`
   margin-bottom: 20px;
 `;
 
+const FormRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+`;
+
 const Label = styled.label`
   display: block;
   font-size: 14px;
@@ -151,17 +159,46 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
     serialNumber: '',
     stockQuantity: 0,
     safetyStock: 0,
-    price: 0
+    supplyPrice: 0,
+    sellingPrice: 0
   });
 
-  React.useEffect(() => {
-    if (product && isOpen) {
+  const [productInfo, setProductInfo] = useState({
+    minPrice: 0,
+    maxPrice: 0
+  });
+
+  useEffect(() => {
+    if (product && isOpen && product.productId) {
       setFormData({
         serialNumber: `BR-${product.productId}-${Date.now()}`,
-        stockQuantity: 0, // 상품 등록 시 재고는 항상 0
+        stockQuantity: 0,
         safetyStock: 0,
-        price: product.price || 0
+        supplyPrice: product.price || product.supplyPrice || 0,
+        sellingPrice: 0
       });
+
+      // 상품 상세 정보 가져오기 (최저가격, 최고가격)
+      const fetchProductDetails = async () => {
+        try {
+          const response = await inventoryService.getProduct(product.productId);
+          const productData = response.data?.data || response.data;
+          
+          setProductInfo({
+            minPrice: productData?.minPrice || product?.minPrice || 0,
+            maxPrice: productData?.maxPrice || product?.maxPrice || 0
+          });
+        } catch (err) {
+          console.error('상품 상세 정보 조회 실패:', err);
+          // product prop에서 직접 가져오기
+          setProductInfo({
+            minPrice: product?.minPrice || 0,
+            maxPrice: product?.maxPrice || 0
+          });
+        }
+      };
+
+      fetchProductDetails();
     }
   }, [product, isOpen]);
 
@@ -173,9 +210,19 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
   };
 
   const handleSave = () => {
-    if (!formData.serialNumber || formData.safetyStock < 0 || formData.price < 0) {
+    // 필수 항목 검증
+    if (!formData.serialNumber || formData.safetyStock < 0) {
       alert('모든 필드를 올바르게 입력해주세요.');
       return;
+    }
+
+    // 판매가 검증 (최저가격 ~ 최고가격 사이)
+    if (productInfo.minPrice > 0 && productInfo.maxPrice > 0) {
+      const sellingPrice = parseInt(formData.sellingPrice) || 0;
+      if (sellingPrice < productInfo.minPrice || sellingPrice > productInfo.maxPrice) {
+        alert(`판매가는 ${productInfo.minPrice.toLocaleString()}원 ~ ${productInfo.maxPrice.toLocaleString()}원 사이로 입력해주세요.`);
+        return;
+      }
     }
 
     onSave({
@@ -183,7 +230,8 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
       serialNumber: formData.serialNumber,
       stockQuantity: 0,
       safetyStock: parseInt(formData.safetyStock),
-      price: parseInt(formData.price)
+      price: formData.sellingPrice ? parseInt(formData.sellingPrice) : parseInt(formData.supplyPrice),  // 판매가를 price로 매핑 (판매가가 없으면 공급가 사용)
+      sellingPrice: formData.sellingPrice ? parseInt(formData.sellingPrice) : null
     });
     
     handleClose();
@@ -194,7 +242,12 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
       serialNumber: '',
       stockQuantity: 0,
       safetyStock: 0,
-      price: 0
+      supplyPrice: 0,
+      sellingPrice: 0
+    });
+    setProductInfo({
+      minPrice: 0,
+      maxPrice: 0
     });
     onClose();
   };
@@ -210,7 +263,6 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
       React.createElement(ModalBody, null,
         React.createElement(ProductInfo, null,
           React.createElement(ProductName, null, product.productName || '알 수 없음'),
-          React.createElement(ProductDetails, null, `ID: ${product.productId}`),
           React.createElement(ProductDetails, null, `카테고리: ${product.categoryName || '미분류'}`),
           React.createElement(ProductDetails, null, `설명: ${product.productDescription || '-'}`)
         ),
@@ -245,17 +297,62 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
             type: 'number',
             min: '0',
             value: formData.safetyStock,
-            onChange: (e) => handleInputChange('safetyStock', e.target.value)
+            onChange: (e) => {
+              const v = e.target.value;
+              if (v === '') return handleInputChange('safetyStock', '');
+              const n = parseInt(v, 10);
+              if (n < 0) return;
+              handleInputChange('safetyStock', isNaN(n) ? 0 : n);
+            }
           })
         ),
         React.createElement(FormGroup, null,
-          React.createElement(Label, null, '판매 가격 (원)'),
+          React.createElement(Label, null, '공급가 (원)'),
           React.createElement(Input, {
             type: 'number',
-            min: '0',
-            value: formData.price,
-            onChange: (e) => handleInputChange('price', e.target.value)
+            value: formData.supplyPrice,
+            disabled: true,
+            style: { backgroundColor: '#f9fafb', color: '#6b7280', cursor: 'not-allowed' }
           })
+        ),
+        productInfo.minPrice > 0 && productInfo.maxPrice > 0 && React.createElement(React.Fragment, null,
+          React.createElement(FormRow, null,
+            React.createElement(FormGroup, null,
+              React.createElement(Label, null, '최저가격 (원)'),
+              React.createElement(Input, {
+                type: 'number',
+                value: productInfo.minPrice,
+                disabled: true,
+                style: { backgroundColor: '#f9fafb', color: '#6b7280', cursor: 'not-allowed' }
+              })
+            ),
+            React.createElement(FormGroup, null,
+              React.createElement(Label, null, '최고가격 (원)'),
+              React.createElement(Input, {
+                type: 'number',
+                value: productInfo.maxPrice,
+                disabled: true,
+                style: { backgroundColor: '#f9fafb', color: '#6b7280', cursor: 'not-allowed' }
+              })
+            )
+          ),
+          React.createElement(FormGroup, null,
+            React.createElement(Label, null, '판매가 (원)'),
+            React.createElement(Input, {
+              type: 'number',
+              min: Math.max(productInfo.minPrice || 0, 0),
+              max: productInfo.maxPrice || undefined,
+              value: formData.sellingPrice,
+              onChange: (e) => {
+                const v = e.target.value;
+                if (v === '') return handleInputChange('sellingPrice', '');
+                const n = parseInt(v, 10);
+                if (n < 0) return;
+                handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
+              },
+              placeholder: `${productInfo.minPrice.toLocaleString()}원 ~ ${productInfo.maxPrice.toLocaleString()}원 사이로 입력`
+            })
+          )
         )
       ),
       React.createElement(ButtonGroup, null,

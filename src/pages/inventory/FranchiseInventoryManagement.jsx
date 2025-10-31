@@ -8,7 +8,6 @@ import ProductSelectionModal from '../../components/inventory/common/ProductSele
 import ProductSetupModal from '../../components/inventory/common/ProductSetupModal';
 import { inventoryService } from '../../service/inventoryService';
 import { authService } from '../../service/authService';
-import { getBranchName } from '../../utils/branchUtils';
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -58,6 +57,8 @@ function FranchiseInventoryManagement() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [categoryList, setCategoryList] = useState([]);
+  const [sort, setSort] = useState(null); // { field, direction }
 
   // 가맹점: 자신의 지점 재고만 조회
   const fetchInventoryData = async () => {
@@ -83,7 +84,8 @@ function FranchiseInventoryManagement() {
         currentStock: item.stockQuantity || 0,
         safetyStock: item.safetyStock || 0,
         status: (item.stockQuantity || 0) < (item.safetyStock || 0) ? 'low' : 'normal',
-        unitPrice: item.price || 0,
+        unitPrice: item.price || 0,  // 공급가 (원래는 Product.supplyPrice)
+        salesPrice: item.price || null,  // 판매가 (BranchProduct.price가 판매가)
         totalValue: (item.stockQuantity || 0) * (item.price || 0)
       }));
       
@@ -121,9 +123,27 @@ function FranchiseInventoryManagement() {
     }
   };
 
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      const categories = Array.isArray(data) ? data : (data?.data || data?.result || []);
+      if (categories.length > 0) {
+        setCategoryList(categories.map(cat => ({
+          id: cat.categoryId || cat.id,
+          name: cat.name || cat.categoryName
+        })));
+      }
+    } catch (err) {
+      console.error('카테고리 목록 조회 실패:', err);
+      setCategoryList([]);
+    }
+  };
+
   // 컴포넌트 마운트 시 데이터 조회
   useEffect(() => {
     fetchInventoryData();
+    fetchCategories();
   }, []);
 
   const handleFiltersChange = (newFilters) => {
@@ -146,6 +166,33 @@ function FranchiseInventoryManagement() {
     setIsEditModalOpen(true);
   };
 
+  const handleDelete = async (item) => {
+    if (!item.id) {
+      alert('삭제할 상품 정보가 없습니다.');
+      return;
+    }
+
+    const productName = item.product?.name || '상품';
+    const confirmMessage = `정말로 "${productName}"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      await inventoryService.deleteBranchProduct(item.id);
+      alert('상품이 삭제되었습니다.');
+      await fetchInventoryData();
+    } catch (err) {
+      console.error('상품 삭제 실패:', err);
+      alert('상품 삭제에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
+    }
+  };
+
+  const handleSort = (field, direction) => {
+    setSort({ field, direction });
+  };
+
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setSelectedItem(null);
@@ -162,51 +209,14 @@ function FranchiseInventoryManagement() {
   };
 
   const handleProductSelect = async (products) => {
-    // 상품 개수에 따라 처리
+    // 단일 상품만 설정 모달 표시
     if (products.length === 1) {
-      // 단일 상품: 설정 모달 표시
       setSelectedProduct(products[0]);
       setIsProductSelectionModalOpen(false);
       setIsProductSetupModalOpen(true);
-    } else {
-      // 여러 상품: 기본값으로 일괄 등록
-      try {
-        let successCount = 0;
-        let failCount = 0;
-        
-        for (const product of products) {
-          try {
-            // 각 상품을 가맹점에 등록
-            await inventoryService.createBranchProduct({
-              branchId: branchId,
-              productId: product.productId,
-              serialNumber: `${product.productId}-${Date.now()}`, // 고유 일련번호
-              stockQuantity: 0,
-              safetyStock: 10,
-              price: product.price
-            });
-            successCount++;
-          } catch (error) {
-            console.error(`상품 ${product.productName} 등록 실패:`, error);
-            // 중복 등록 에러는 무시 (이미 등록된 것이므로)
-            if (!error.response?.data?.status_message?.includes('이미 등록된')) {
-              failCount++;
-            }
-          }
-        }
-        
-        setIsProductSelectionModalOpen(false);
-        
-        if (successCount > 0) {
-          alert(`${successCount}개 상품이 등록되었습니다.${failCount > 0 ? ` (${failCount}개 실패)` : ''}`);
-          await fetchInventoryData();
-        } else {
-          alert('상품 등록에 실패했습니다.');
-        }
-      } catch (error) {
-        console.error('상품 등록 실패:', error);
-        alert('상품 등록 중 오류가 발생했습니다.');
-      }
+    } else if (products.length > 1) {
+      // 여러 개 선택 시 경고
+      alert('상품은 한 번에 하나씩만 등록할 수 있습니다. 하나의 상품만 선택해주세요.');
     }
   };
 
@@ -229,7 +239,7 @@ function FranchiseInventoryManagement() {
         serialNumber: setupData.serialNumber || `${currentProduct.productId}-${Date.now()}`,
         stockQuantity: setupData.stockQuantity || 0,
         safetyStock: setupData.safetyStock,
-        price: setupData.price || 0
+        price: setupData.sellingPrice || setupData.price || 0  // 판매가를 price로 매핑
       });
       
       alert('상품이 등록되었습니다.');
@@ -255,12 +265,12 @@ function FranchiseInventoryManagement() {
     try {
       console.log('Saving inventory data:', formData);
       
-      // 재고 정보 업데이트
+      // 안전재고와 판매가 업데이트 (공급가는 수정 불가)
       if (selectedItem?.id) {
         await inventoryService.updateInventoryInfo(
           selectedItem.id,
           formData.safetyStock,
-          formData.unitPrice
+          formData.sellingPrice  // 판매가를 unitPrice로 전달 (BranchProduct.price가 판매가)
         );
         
         alert('재고 정보가 성공적으로 수정되었습니다.');
@@ -277,15 +287,63 @@ function FranchiseInventoryManagement() {
 
 
   // 필터링된 데이터
-  const filteredData = inventoryItems.filter(item => {
-    const matchesSearch = !filters.searchTerm || 
-      item.product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      item.product.id.toString().includes(filters.searchTerm);
-    
-    const matchesCategory = !filters.categoryFilter || item.category === filters.categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const filteredData = React.useMemo(() => {
+    let filtered = inventoryItems.filter(item => {
+      const matchesSearch = !filters.searchTerm || 
+        item.product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        item.product.id.toString().includes(filters.searchTerm);
+      
+      const matchesCategory = !filters.categoryFilter || item.category === filters.categoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    });
+
+    // 정렬 적용
+    if (sort && sort.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sort.field) {
+          case 'productName':
+            aValue = a.product.name || '';
+            bValue = b.product.name || '';
+            break;
+          case 'category':
+            aValue = a.category || '';
+            bValue = b.category || '';
+            break;
+          case 'currentStock':
+            aValue = a.currentStock || 0;
+            bValue = b.currentStock || 0;
+            break;
+          case 'safetyStock':
+            aValue = a.safetyStock || 0;
+            bValue = b.safetyStock || 0;
+            break;
+          case 'supplyPrice':
+            aValue = a.unitPrice || 0;
+            bValue = b.unitPrice || 0;
+            break;
+          case 'salesPrice':
+            aValue = a.salesPrice || 0;
+            bValue = b.salesPrice || 0;
+            break;
+          case 'totalValue':
+            aValue = a.totalValue || 0;
+            bValue = b.totalValue || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [inventoryItems, filters, sort]);
 
   // 페이지네이션
   const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -295,7 +353,7 @@ function FranchiseInventoryManagement() {
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
-      React.createElement(PageTitle, null, `재고관리 - ${getBranchName(branchId)}`),
+      React.createElement(PageTitle, null, '재고관리'),
       React.createElement(PageSubtitle, null, '가맹점 재고 조회, 수정 및 발주 추천')
     ),
     React.createElement(SummaryCards, { 
@@ -306,7 +364,8 @@ function FranchiseInventoryManagement() {
       filters,
       onFiltersChange: handleFiltersChange,
       onAddProduct: handleAddProduct,
-      userRole: 'BRANCH_MANAGER'
+      userRole: 'BRANCH_MANAGER',
+      categoryList: categoryList
     }),
     React.createElement(FranchiseInventoryTable, {
       data: paginatedData,
@@ -315,7 +374,10 @@ function FranchiseInventoryManagement() {
       pageSize,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
-      onModify: handleModify
+      onModify: handleModify,
+      onDelete: handleDelete,
+      onSort: handleSort,
+      currentSort: sort
     }),
     React.createElement(EditInventoryModal, {
       isOpen: isEditModalOpen,

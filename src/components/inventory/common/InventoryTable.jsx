@@ -25,6 +25,23 @@ const TableHeaderCell = styled.th`
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  cursor: ${props => props.$sortable ? 'pointer' : 'default'};
+  user-select: none;
+  position: relative;
+  transition: all 0.2s;
+  
+  &:hover {
+    ${props => props.$sortable && `
+      color: #6d28d9;
+      background: #f9fafb;
+    `}
+  }
+`;
+
+const SortIndicator = styled.span`
+  margin-left: 4px;
+  font-size: 10px;
+  color: ${props => props.$active ? '#6d28d9' : '#d1d5db'};
 `;
 
 const TableBody = styled.tbody``;
@@ -126,6 +143,18 @@ const PageButton = styled.button`
   }
 `;
 
+// 정렬 가능한 컬럼 정의
+const SORTABLE_COLUMNS = {
+  productName: 'productName',
+  category: 'category',
+  branch: 'branch',
+  currentStock: 'currentStock',
+  safetyStock: 'safetyStock',
+  unitPrice: 'unitPrice',
+  salesPrice: 'salesPrice',
+  totalValue: 'totalValue',
+};
+
 function InventoryTable({
   data,
   currentPage,
@@ -135,20 +164,68 @@ function InventoryTable({
   onPageSizeChange,
   onModify,
   onDetail,
-  onDelete
+  onDelete,
+  onSort,
+  currentSort
 }) {
+  const handleSort = (field) => {
+    if (!onSort) return;
+    
+    let direction = 'asc';
+    
+    // 현재 정렬 필드와 동일하면 방향 토글
+    if (currentSort?.field === field) {
+      direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    }
+    
+    onSort(field, direction);
+  };
+
+  const getSortIndicator = (field) => {
+    if (!currentSort || currentSort.field !== field) {
+      return React.createElement(SortIndicator, null, '⇅');
+    }
+    return React.createElement(SortIndicator, { $active: true },
+      currentSort.direction === 'asc' ? '↑' : '↓'
+    );
+  };
   return React.createElement(TableContainer, null,
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
-          React.createElement(TableHeaderCell, null, '상품'),
-          React.createElement(TableHeaderCell, null, '카테고리'),
-          React.createElement(TableHeaderCell, null, '지점'),
-          React.createElement(TableHeaderCell, null, '현재고'),
-          React.createElement(TableHeaderCell, null, '안전재고'),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.productName)
+          }, '상품', getSortIndicator(SORTABLE_COLUMNS.productName)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.category)
+          }, '카테고리', getSortIndicator(SORTABLE_COLUMNS.category)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.branch)
+          }, '지점', getSortIndicator(SORTABLE_COLUMNS.branch)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.currentStock)
+          }, '현재고', getSortIndicator(SORTABLE_COLUMNS.currentStock)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.safetyStock)
+          }, '안전재고', getSortIndicator(SORTABLE_COLUMNS.safetyStock)),
           React.createElement(TableHeaderCell, null, '상태'),
-          React.createElement(TableHeaderCell, null, '단가'),
-          React.createElement(TableHeaderCell, null, '총 가치'),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.unitPrice)
+          }, '공급가', getSortIndicator(SORTABLE_COLUMNS.unitPrice)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.salesPrice)
+          }, '판매가', getSortIndicator(SORTABLE_COLUMNS.salesPrice)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.totalValue)
+          }, '총 가치', getSortIndicator(SORTABLE_COLUMNS.totalValue)),
           React.createElement(TableHeaderCell, null, '작업')
         )
       ),
@@ -170,6 +247,7 @@ function InventoryTable({
               )
             ),
             React.createElement(TableCell, null, `₩${item.unitPrice.toLocaleString()}`),
+            React.createElement(TableCell, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-'),
             React.createElement(TableCell, null, `₩${item.totalValue.toLocaleString()}`),
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,
