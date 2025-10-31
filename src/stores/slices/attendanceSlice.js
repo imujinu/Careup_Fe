@@ -1,7 +1,8 @@
-// src/stores/slices/attendanceSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { fetchScheduleCalendar, fetchKoreanHolidays } from '../../service/scheduleService';
+import { fetchScheduleCalendar } from '../../service/scheduleService';
+import { fetchKoreanHolidays } from '../../service/holidayService';
 
+/** YYYY-MM-DD (today) */
 const todayYMD = () => {
   const d = new Date();
   const y = d.getFullYear();
@@ -10,13 +11,15 @@ const todayYMD = () => {
   return `${y}-${m}-${day}`;
 };
 
+/** 초기 월 범위 (해당 달의 1일 ~ 말일) */
 const initialToday = todayYMD();
 const initialYear = Number(initialToday.slice(0, 4));
 const initialMonth = Number(initialToday.slice(5, 7));
 const initialViewFrom = `${initialYear}-${String(initialMonth).padStart(2, '0')}-01`;
-const initialLast = new Date(initialYear, initialMonth, 0).getDate();
+const initialLast = new Date(initialYear, initialMonth, 0).getDate(); // month: 다음달 인덱스로 넣고 day=0 → 해당 달 말일
 const initialViewTo = `${initialYear}-${String(initialMonth).padStart(2, '0')}-${String(initialLast).padStart(2, '0')}`;
 
+/** 일정 로딩 */
 export const loadCalendarEvents = createAsyncThunk(
   'attendance/loadCalendarEvents',
   async (_, { getState, rejectWithValue }) => {
@@ -36,12 +39,24 @@ export const loadCalendarEvents = createAsyncThunk(
   }
 );
 
+/**
+ * 공휴일 로딩
+ * BE: [{ ymd, name }] or { "YYYY-MM-DD": "휴일명" }
+ * FE state: 항상 { "YYYY-MM-DD": "휴일명" } 맵으로 저장
+ */
 export const loadHolidays = createAsyncThunk(
   'attendance/loadHolidays',
   async ({ viewFrom, viewTo }, { rejectWithValue }) => {
     try {
-      const list = await fetchKoreanHolidays({ from: viewFrom, to: viewTo });
-      return Array.isArray(list) ? list : [];
+      const data = await fetchKoreanHolidays({ from: viewFrom, to: viewTo });
+      // data가 배열이든 맵이든 맵으로 정규화
+      let map = {};
+      if (Array.isArray(data)) {
+        data.forEach(h => { if (h?.ymd && h?.name) map[h.ymd] = h.name; });
+      } else if (data && typeof data === 'object') {
+        map = data;
+      }
+      return map; // { ymd: name }
     } catch (e) {
       return rejectWithValue(e?.response?.data?.message || '공휴일 로딩 실패');
     }
@@ -51,46 +66,59 @@ export const loadHolidays = createAsyncThunk(
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState: {
-    view: { viewFrom: initialViewFrom, viewTo: initialViewTo },
+    view: { viewFrom: initialViewFrom, viewTo: initialViewTo }, // 달력 뷰 범위
     filters: {
-      rangeFrom: initialToday,
-      rangeTo: initialToday,
+      rangeFrom: initialToday, // 검색 기간 시작(일정 조회용)
+      rangeTo: initialToday,   // 검색 기간 종료(일정 조회용)
       branchId: null,
       employeeId: null,
     },
-    events: [],
-    holidays: {}, // ✅ 직렬화 가능한 객체로 유지
-    loading: false,
-    error: '',
+    events: [],              // 일정 배열
+    holidays: {},            // 공휴일 맵: { "YYYY-MM-DD": "휴일명" }
+    loading: false,          // 일정 로딩 스피너에만 사용
+    error: '',               // 에러 메시지(토스트에서 사용)
   },
   reducers: {
+    /** 월 전/후/오늘로 이동 (달력 뷰 범위만 변경) */
     moveMonth(state, action) {
       const delta = action.payload || 0;
+
+      // 오늘 달로 이동
       if (delta === 0) {
         const t = todayYMD();
         const y = Number(t.slice(0, 4));
         const m = Number(t.slice(5, 7));
         const from = `${y}-${String(m).padStart(2, '0')}-01`;
-        const last = new Date(y, m, 0).getDate();
+        const last = new Date(y, m, 0).getDate(); // m은 다음달 인덱스로 넣고 day=0 → 해당 달 말일
         const to = `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
         state.view.viewFrom = from;
         state.view.viewTo = to;
         return;
       }
-      const [y, m] = state.view.viewFrom.split('-').map(Number);
-      const base = new Date(y, m - 1, 1);
+
+      // 현재 뷰 기준으로 delta개월 이동
+      const [yStr, mStr] = state.view.viewFrom.split('-');
+      const y = Number(yStr);
+      const m = Number(mStr);
+      const base = new Date(y, m - 1, 1); // monthIndex: 0~11
       base.setMonth(base.getMonth() + delta);
+
       const ny = base.getFullYear();
-      const nm = base.getMonth() + 1;
+      const nm = base.getMonth() + 1; // 1~12
       const from = `${ny}-${String(nm).padStart(2, '0')}-01`;
-      const last = new Date(ny, nm, 0).getDate();
+      const last = new Date(ny, nm, 0).getDate(); // nm을 다음달 인덱스로 넣고 day=0 → 해당 달 말일
       const to = `${ny}-${String(nm).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+
       state.view.viewFrom = from;
       state.view.viewTo = to;
     },
+
+    /** 필터 병합 업데이트 */
     setFilters(state, action) {
       state.filters = { ...state.filters, ...action.payload };
     },
+
+    /** 검색 기간 설정 (부분 갱신 허용) */
     setRange(state, action) {
       const { rangeFrom, rangeTo } = action.payload || {};
       if (rangeFrom) state.filters.rangeFrom = rangeFrom;
@@ -99,7 +127,7 @@ const attendanceSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // events
+      /** ===== 일정 로딩 ===== */
       .addCase(loadCalendarEvents.pending, (state) => {
         state.loading = true;
         state.error = '';
@@ -112,22 +140,18 @@ const attendanceSlice = createSlice({
         state.loading = false;
         state.error = action.payload || '일정 로딩 실패';
       })
-      // holidays
+
+      /** ===== 공휴일 로딩 ===== */
+      // pending 시 기존 holidays 유지 → 깜빡임 방지
       .addCase(loadHolidays.pending, (state) => {
         state.error = '';
-        state.holidays = {}; // ✅ 남아있던 Set 잔재 제거
       })
       .addCase(loadHolidays.fulfilled, (state, action) => {
-        const map = {};
-        (action.payload || []).forEach((d) => {
-          const ymd = String(d).slice(0, 10);
-          if (ymd) map[ymd] = true;
-        });
-        state.holidays = map; // ✅ POJO
+        const incoming = action.payload || {};
+        state.holidays = { ...state.holidays, ...incoming };
       })
       .addCase(loadHolidays.rejected, (state, action) => {
         state.error = action.payload || '공휴일 로딩 실패';
-        state.holidays = {}; // ✅ 실패 시도 초기화
       });
   },
 });

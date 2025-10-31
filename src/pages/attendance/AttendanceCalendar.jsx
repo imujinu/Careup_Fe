@@ -1,4 +1,3 @@
-// src/pages/attendance/AttendanceCalendar.jsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
@@ -69,19 +68,42 @@ const Cell = styled.div`
   background: ${(p) => (p.$other ? '#fafafa' : '#fff')};
   &:nth-child(7n) { border-right: 0; }
 `;
+
+/* 날짜 라벨: 주말/휴일 색을 prop으로 주입 */
 const DateBadge = styled.div`
   font-size: 12px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
-  color: ${(p) => (p.$holiday ? '#ef4444' : '#374151')};
-`;
-const BadgeHoliday = styled.span`
-  font-size: 11px; color: #ef4444; background: #fee2e2; border: 1px solid #fecaca; padding: 1px 4px; border-radius: 6px;
+  color: ${(p) => p.$color || '#374151'};
 `;
 
-const Event = styled.div`
-  font-size: 12px; line-height: 1.3; padding: 6px 8px; border: 1px solid #dbeafe; border-radius: 8px; margin-bottom: 6px;
-  background: #eef2ff; color: #1e3a8a;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+/* 휴일 동그라미 배지: "휴" */
+const BadgeHolidayCircle = styled.span`
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  background: #ef4444; color: #fff; border: 1px solid #dc2626;
 `;
+
+/* 휴일 명칭 */
+const HolidayName = styled.div`
+  font-size: 11px; color: #b91c1c; margin-bottom: 6px;
+`;
+
+/* 이벤트 카드 */
+const Event = styled.div`
+  padding: 6px 8px; border-radius: 8px; margin-bottom: 6px; border: 1px solid;
+  background: ${(p) => (p.$leave ? '#f5f3ff' : '#eef2ff')};      /* 휴가=연보라, 기본=연한 파랑 */
+  border-color: ${(p) => (p.$leave ? '#ddd6fe' : '#dbeafe')};
+  color: ${(p) => (p.$leave ? '#6b21a8' : '#1e3a8a')};
+`;
+const EventTitle = styled.div`
+  font-size: 12px; line-height: 1.28; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+`;
+const EventSub = styled.div`
+  font-size: 11px; line-height: 1.2; color: #4b5563;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+`;
+
 const Legend = styled.div`display: flex; gap: 12px; align-items: center; font-size: 12px; color: #6b7280;`;
 
 /* ===== 로컬 날짜 유틸 ===== */
@@ -106,21 +128,31 @@ const daysMatrix = (viewFrom) => {
   }
   return cells;
 };
-const fmt12 = (iso) => {
+
+/* ===== 시간 포맷: 24시간제 HH:mm ===== */
+const fmt24 = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
-  let h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12; if (h === 0) h = 12;
-  const mm = String(m).padStart(2, '0');
-  return `${h} ${ampm}${mm !== '00' ? `:${mm}` : ''}`;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
 };
-const labelFrom = (ev) => {
+const fmtRange = (startIso, endIso, allDay) => {
+  if (allDay) return '종일';
+  const s = fmt24(startIso);
+  const e = fmt24(endIso);
+  if (s && e) return `${s} - ${e}`;
+  if (s) return `${s} -`;
+  if (e) return `- ${e}`;
+  return '';
+};
+
+/* 카드 표기: 1줄(이름 | 시간), 2줄(지점) */
+const labelParts = (ev) => {
   const name = ev?.employeeName || ev?.title || '스케줄';
-  const range = ev?.allDay ? '종일' : `${fmt12(ev?.startAt)} - ${fmt12(ev?.endAt)}`;
-  const branch = ev?.branchName ? ` | ${ev.branchName}` : '';
-  return `${name} | ${range}${branch}`;
+  const range = fmtRange(ev?.startAt, ev?.endAt, ev?.allDay);
+  const branch = ev?.branchName || '';
+  return { title: range ? `${name} | ${range}` : name, subtitle: branch };
 };
 
 export default function AttendanceCalendar() {
@@ -191,8 +223,7 @@ export default function AttendanceCalendar() {
       }
     })();
     return () => { mounted = false; };
-    // ✅ addToast를 deps에서 제외해 StrictMode 재호출 루프 방지
-  }, [filters.branchId, filters.rangeFrom, filters.rangeTo, empKeyword, isHQ]);
+  }, [filters.branchId, filters.rangeFrom, filters.rangeTo, empKeyword, isHQ, addToast]);
 
   // 일정 데이터 로딩(중복 요청 방지)
   useEffect(() => {
@@ -212,16 +243,16 @@ export default function AttendanceCalendar() {
     }
   }, [dispatch, view.viewFrom, view.viewTo]);
 
-  // 에러 토스트(같은 문자열은 1번만) — ✅ addToast 제외
+  // 에러 토스트(같은 문자열은 1번만)
   useEffect(() => {
     const msg = String(error || '');
     if (msg && msg !== lastErrorRef.current) {
       lastErrorRef.current = msg;
       addToast(msg, { color: 'error' });
     }
-  }, [error]); // ✅
+  }, [error, addToast]);
 
-  // 지점 선택 → 직원 초기화 후 반영
+  // 지점/직원 선택
   const onChangeBranch = (e) => {
     const v = e.target.value ? Number(e.target.value) : null;
     dispatch(setFilters({ branchId: v, employeeId: null }));
@@ -264,7 +295,12 @@ export default function AttendanceCalendar() {
   const onUpload = () => addToast('업로드는 다음 단계에서 연결합니다.', { color: 'info' });
 
   const baseMonth = useMemo(() => parseYMDParts(view.viewFrom).m, [view.viewFrom]);
-  const isHoliday = useCallback((ymd) => !!holidays?.[ymd], [holidays]);
+
+  // 공휴일 이름(문자열 맵: { ymd: "휴일명" })
+  const holidayNameOf = useCallback((ymd) => {
+    const name = holidays?.[ymd];
+    return typeof name === 'string' && name ? name : '';
+  }, [holidays]);
 
   return (
     <Page>
@@ -367,20 +403,39 @@ export default function AttendanceCalendar() {
             const ymd = toYMD(d);
             const evs = mapByDate[ymd] || [];
             const other = d.getMonth() !== baseMonth;
-            const holiday = isHoliday(ymd);
+            const dw = d.getDay();
+            const isSun = dw === 0;
+            const isSat = dw === 6;
+            const holidayName = holidayNameOf(ymd);
+            const isHoliday = !!holidayName;
+
+            // 날짜 색상 규칙: 휴일/일요일=빨강, 토요일=파랑, 평일=기본
+            const dateColor = isHoliday || isSun ? '#ef4444' : (isSat ? '#2563eb' : '#374151');
 
             return (
               <Cell key={`${ymd}-${idx}`} $other={other}>
-                <DateBadge $holiday={holiday}>
+                <DateBadge $color={dateColor}>
                   {ymd}
-                  {holiday && <BadgeHoliday>[휴]</BadgeHoliday>}
+                  {isHoliday && (
+                    <BadgeHolidayCircle title={holidayName}>휴</BadgeHolidayCircle>
+                  )}
                 </DateBadge>
 
-                {evs.map((ev) => (
-                  <Event key={ev.id} title={labelFrom(ev)}>
-                    {labelFrom(ev)}
-                  </Event>
-                ))}
+                {isHoliday && (
+                  <HolidayName title={holidayName}>{holidayName}</HolidayName>
+                )}
+
+                {evs.map((ev) => {
+                  const { title, subtitle } = labelParts(ev);
+                  const isLeave = String(ev?.category || '').toUpperCase() === 'LEAVE';
+                  const tooltip = subtitle ? `${title}\n${subtitle}` : title;
+                  return (
+                    <Event key={ev.id} $leave={isLeave} title={tooltip}>
+                      <EventTitle>{title}</EventTitle>
+                      {subtitle && <EventSub>{subtitle}</EventSub>}
+                    </Event>
+                  );
+                })}
               </Cell>
             );
           })}
