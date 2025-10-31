@@ -165,6 +165,29 @@ function FranchiseInventoryManagement() {
     setIsEditModalOpen(true);
   };
 
+  const handleDelete = async (item) => {
+    if (!item.id) {
+      alert('삭제할 상품 정보가 없습니다.');
+      return;
+    }
+
+    const productName = item.product?.name || '상품';
+    const confirmMessage = `정말로 "${productName}"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      await inventoryService.deleteBranchProduct(item.id);
+      alert('상품이 삭제되었습니다.');
+      await fetchInventoryData();
+    } catch (err) {
+      console.error('상품 삭제 실패:', err);
+      alert('상품 삭제에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
+    }
+  };
+
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setSelectedItem(null);
@@ -298,7 +321,8 @@ function FranchiseInventoryManagement() {
       pageSize,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
-      onModify: handleModify
+      onModify: handleModify,
+      onDelete: handleDelete
     }),
     React.createElement(EditInventoryModal, {
       isOpen: isEditModalOpen,

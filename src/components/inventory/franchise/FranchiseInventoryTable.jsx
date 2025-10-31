@@ -86,6 +86,20 @@ const ActionLink = styled.button`
   }
 `;
 
+const DeleteLink = styled.button`
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  
+  &:hover {
+    color: #dc2626;
+  }
+`;
+
 const PaginationContainer = styled.div`
   display: flex;
   justify-content: space-between;
@@ -130,7 +144,8 @@ function FranchiseInventoryTable({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onModify
+  onModify,
+  onDelete
 }) {
   return React.createElement(TableContainer, null,
     React.createElement(Table, null,
@@ -168,7 +183,8 @@ function FranchiseInventoryTable({
             React.createElement(TableCell, null, `₩${item.totalValue.toLocaleString()}`),
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,
-                React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정')
+                React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정'),
+                React.createElement(DeleteLink, { onClick: () => onDelete(item) }, '삭제')
               )
             )
           )
