@@ -184,11 +184,13 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
   const [selectedProducts, setSelectedProducts] = useState([]); // 여러개 선택 가능
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryList, setCategoryList] = useState([]); // 카테고리 목록
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchProducts();
+      fetchCategories();
     }
   }, [isOpen]);
 
@@ -207,6 +209,23 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
       setProducts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      const categories = Array.isArray(data) ? data : (data?.data || data?.result || []);
+      if (categories.length > 0) {
+        setCategoryList(categories.map(cat => ({
+          id: cat.categoryId || cat.id,
+          name: cat.name || cat.categoryName
+        })));
+      }
+    } catch (err) {
+      console.error('카테고리 목록 조회 실패:', err);
+      setCategoryList([]);
     }
   };
 
@@ -281,10 +300,16 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
             onChange: (e) => setCategoryFilter(e.target.value)
           },
             React.createElement('option', { value: '' }, '전체 카테고리'),
-            React.createElement('option', { value: '음료' }, '음료'),
-            React.createElement('option', { value: '디저트' }, '디저트'),
-            React.createElement('option', { value: '빵' }, '빵'),
-            React.createElement('option', { value: '원두' }, '원두')
+            ...(categoryList.length > 0
+              ? categoryList.map(category =>
+                  React.createElement('option', { key: category.id, value: category.name }, category.name)
+                )
+              : [
+                  // fallback: 카테고리 로드 실패 시 기본 옵션
+                  React.createElement('option', { key: '음료', value: '음료' }, '음료'),
+                  React.createElement('option', { key: '디저트', value: '디저트' }, '디저트')
+                ]
+            )
           )
         ),
         loading ? 

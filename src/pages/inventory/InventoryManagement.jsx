@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import SummaryCards from '../../components/inventory/common/SummaryCards';
@@ -95,7 +95,7 @@ function InventoryManagement() {
   const [filters, setFilters] = useState({
     searchTerm: '',
     categoryFilter: '',
-    branchFilter: '',
+    branchFilter: '본점', // 기본값: 본점
     statusFilter: ''
   });
 
@@ -115,14 +115,17 @@ function InventoryManagement() {
   const [isFlowAddModalOpen, setIsFlowAddModalOpen] = useState(false);
   const [selectedFlowItem, setSelectedFlowItem] = useState(null);
   const [branchProducts, setBranchProducts] = useState([]);
+  const [flowSort, setFlowSort] = useState(null); // { field, direction }
   const [flowFilters, setFlowFilters] = useState({
     searchTerm: '',
     startDate: '',
     endDate: '',
-    branchFilter: '',
+    branchFilter: '본점', // 기본값: 본점
     typeFilter: ''
   });
   const [branchList, setBranchList] = useState([]);
+  const [categoryList, setCategoryList] = useState([]);
+  const [inventorySort, setInventorySort] = useState(null); // { field, direction }
 
   // 본사: 전체 지점 재고 조회
   const fetchInventoryData = async (branchId = null) => {
@@ -130,39 +133,97 @@ function InventoryManagement() {
       setLoading(true);
       setError(null);
       
-      // 본사는 여러 지점의 데이터를 조회해야 하므로 지점별로 조회
-      // TODO: 백엔드에 전체 지점 재고 조회 API 추가 필요
       const userInfo = authService.getCurrentUser();
-      const targetBranchId = branchId || userInfo?.branchId || 1;
       
-      // 본사 재고 조회 (BranchProduct 데이터 가져오기)
-      const branchProducts = await inventoryService.getBranchProducts(1);
-      console.log('본사 BranchProduct 데이터:', branchProducts);
+      // 지점 목록 가져오기
+      let branches = [];
+      try {
+        const branchResponse = await branchService.fetchBranches({ page: 0, size: 100 });
+        if (branchResponse?.data && Array.isArray(branchResponse.data)) {
+          branches = branchResponse.data;
+        } else if (branchResponse?.content && Array.isArray(branchResponse.content)) {
+          branches = branchResponse.content;
+        } else if (Array.isArray(branchResponse)) {
+          branches = branchResponse;
+        } else if (branchResponse?.result?.data && Array.isArray(branchResponse.result.data)) {
+          branches = branchResponse.result.data;
+        }
+      } catch (err) {
+        console.warn('지점 목록 조회 실패, purchaseOrderService 시도:', err);
+        try {
+          branches = await purchaseOrderService.getBranchList();
+        } catch (e) {
+          console.error('지점 목록 API 모두 실패:', e);
+          branches = [{ id: 1, name: '본점' }];
+        }
+      }
       
-      // 본사가 본사 재고 관리 탭인 경우, 본사에 BranchProduct가 없는 상품도 표시
+      // 지점 데이터 정규화 및 branchId 추출
+      const normalizedBranches = branches.map(branch => {
+        let branchName = branch.name || branch.branchName || String(branch.id || branch.branchId);
+        // 본사가 들어오면 본점으로 변경
+        if (branchName === '본사' || branchName.includes('본사')) {
+          branchName = '본점';
+        }
+        // branchId가 1이면 본점으로 설정
+        const branchId = branch.id || branch.branchId;
+        if (branchId === 1 || String(branchId) === '1') {
+          branchName = '본점';
+        }
+        return {
+          id: branch.id || branch.branchId || branch.name,
+          name: branchName
+        };
+      });
+      
+      const branchIds = normalizedBranches.map(b => b.id).filter(id => id != null);
+      
+      console.log('조회할 지점 목록:', normalizedBranches);
+      
+      // 모든 지점의 재고를 병렬로 조회
+      const allBranchProductsPromises = branchIds.map(async (bid) => {
+        try {
+          const products = await inventoryService.getBranchProducts(bid);
+          return products.map(item => ({
+            ...item,
+            branchId: bid,
+            branchName: normalizedBranches.find(b => b.id === bid)?.name || (bid === 1 ? '본사' : `지점-${bid}`)
+          }));
+        } catch (err) {
+          console.error(`지점 ${bid} 재고 조회 실패:`, err);
+          return [];
+        }
+      });
+      
+      const allBranchProductsResults = await Promise.all(allBranchProductsPromises);
+      const allBranchProducts = allBranchProductsResults.flat();
+      
+      console.log('모든 지점 재고 데이터:', allBranchProducts);
+      
+      // 전체 상품 목록 가져오기 (재고가 없는 상품도 표시하기 위해)
       let allProducts = [];
       try {
         const productsResponse = await inventoryService.getAllProducts();
-        console.log('본사 전체 상품 API 응답:', productsResponse);
-        
         const pageData = productsResponse.data?.data || productsResponse.data;
         allProducts = pageData?.content || [];
-        
-        console.log('본사 전체 상품 데이터 (content):', allProducts);
       } catch (err) {
-        console.error('getAllProducts 실패 (서버가 꺼져있거나 엔드포인트 없음):', err);
-        // 일단 빈 배열로 진행
+        console.error('getAllProducts 실패:', err);
       }
       
-      // BranchProduct가 있는 상품
-      const productsWithStock = branchProducts.map(item => {
+      // 모든 지점의 재고 데이터 변환
+      const productsWithStock = allBranchProducts.map(item => {
         const currentStock = item.stockQuantity || 0;
         const safetyStock = item.safetyStock || 0;
         const unitPrice = item.price || 0;
         const status = currentStock < safetyStock ? 'low' : 'normal';
+        let branchName = item.branchName || (item.branchId === 1 ? '본점' : `지점-${item.branchId}`);
+        // 본사가 들어오면 본점으로 변경
+        if (branchName === '본사' || branchName.includes('본사')) {
+          branchName = '본점';
+        }
         
         return {
-          id: item.branchProductId,
+          id: `${item.branchId}-${item.branchProductId}`, // 지점별로 고유한 ID
           branchProductId: item.branchProductId,
           product: { 
             name: item.productName || '알 수 없음', 
@@ -170,7 +231,7 @@ function InventoryManagement() {
           },
           category: item.categoryName || '미분류',
           branchId: item.branchId,
-          branch: '본사',
+          branch: branchName,
           currentStock: currentStock,
           safetyStock: safetyStock,
           status: status,
@@ -179,12 +240,12 @@ function InventoryManagement() {
         };
       });
       
-      // BranchProduct가 없는 상품 찾기
-      const branchProductIds = new Set(branchProducts.map(bp => bp.productId));
+      // 각 지점별로 재고가 없는 상품 추가 (본사 기준)
+      const allProductIds = new Set(allBranchProducts.map(bp => bp.productId));
       const productsWithoutStock = allProducts
-        .filter(product => !branchProductIds.has(product.productId))
+        .filter(product => !allProductIds.has(product.productId))
         .map(product => ({
-          id: `product-${product.productId}`, // 임시 ID
+          id: `1-product-${product.productId}`, // 본점 임시 ID
           branchProductId: null,
           product: { 
             name: product.name || '알 수 없음', 
@@ -192,7 +253,7 @@ function InventoryManagement() {
           },
           category: product.categoryName || '미분류',
           branchId: 1,
-          branch: '본사',
+          branch: '본점',
           currentStock: 0,
           safetyStock: 0,
           status: 'normal',
@@ -203,20 +264,23 @@ function InventoryManagement() {
       // 전체 데이터 합치기
       const formattedData = [...productsWithStock, ...productsWithoutStock];
       
-      
       setInventoryData(formattedData);
       
-      // Summary 계산
+      // Summary 계산 (필터된 데이터 기준이 아닌 전체 데이터 기준)
       const totalItems = formattedData.length;
       const lowStockItems = formattedData.filter(item => item.status === 'low').length;
       const totalValue = formattedData.reduce((sum, item) => sum + item.totalValue, 0);
-      const branches = [...new Set(formattedData.map(item => item.branch))];
       
+      // 지점 목록도 업데이트
+      if (normalizedBranches.length > 0) {
+        setBranchList(normalizedBranches);
+      }
       
+      // 총 지점 수는 모든 지점 목록 기준으로 계산 (재고가 없는 지점도 포함)
       setSummary({
         totalItems,
         lowStockItems,
-        totalBranches: branches.length,
+        totalBranches: normalizedBranches.length > 0 ? normalizedBranches.length : 1, // 최소 본사 1개
         totalValue
       });
     } catch (err) {
@@ -344,8 +408,12 @@ function InventoryManagement() {
           const branchId = item.branchId;
           if (!uniqueBranches[branchId]) {
             // 우선순위: 1) item.branchName, 2) 발주 목록의 branchName, 3) fallback
-            const branchName = item.branchName || branchNameMap[branchId] || 
-              (branchId === 1 ? '본사' : `지점-${branchId}`);
+            let branchName = item.branchName || branchNameMap[branchId] || 
+              (branchId === 1 ? '본점' : `지점-${branchId}`);
+            // 본사가 들어오면 본점으로 변경
+            if (branchName === '본사' || branchName.includes('본사')) {
+              branchName = '본점';
+            }
             uniqueBranches[branchId] = {
               id: branchId,
               name: branchName
@@ -359,11 +427,11 @@ function InventoryManagement() {
       if (extractedBranches.length > 0) {
         setBranchList(extractedBranches);
       } else {
-        setBranchList([{ id: 1, name: '본사' }]);
+        setBranchList([{ id: 1, name: '본점' }]);
       }
     } catch (err) {
       console.error('지점 목록 조회 실패:', err);
-      setBranchList([{ id: 1, name: '본사' }]);
+      setBranchList([{ id: 1, name: '본점' }]);
     }
   };
 
@@ -377,19 +445,60 @@ function InventoryManagement() {
     setActiveTab(tabFromUrl);
   }, [searchParams]);
 
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      // API 응답 구조에 따라 데이터 추출
+      const categories = Array.isArray(data) ? data : (data?.data || data?.result || []);
+      if (categories.length > 0) {
+        setCategoryList(categories.map(cat => ({
+          id: cat.categoryId || cat.id,
+          name: cat.name || cat.categoryName
+        })));
+      }
+    } catch (err) {
+      console.error('카테고리 목록 조회 실패:', err);
+      setCategoryList([]);
+    }
+  };
+
   // 컴포넌트 마운트 시 데이터 조회
   useEffect(() => {
     fetchInventoryData();
     fetchInventoryFlowData();
     fetchBranchList();
+    fetchCategories();
   }, []);
+
+  // branchList가 로드되면 본점을 찾아서 기본 필터로 설정
+  useEffect(() => {
+    if (branchList.length > 0 && filters.branchFilter === '본점') {
+      const mainBranch = branchList.find(b => 
+        b.name.includes('본점') || b.name.includes('본사') || b.id === 1
+      );
+      if (mainBranch) {
+        setFilters(prev => ({ ...prev, branchFilter: mainBranch.name }));
+      }
+    }
+    
+    // 입출고 기록 필터도 본점으로 설정
+    if (branchList.length > 0 && flowFilters.branchFilter === '본점') {
+      const mainBranch = branchList.find(b => 
+        b.name.includes('본점') || b.name.includes('본사') || b.id === 1
+      );
+      if (mainBranch) {
+        setFlowFilters(prev => ({ ...prev, branchFilter: mainBranch.name }));
+      }
+    }
+  }, [branchList]);
   
   useEffect(() => {
     if (inventoryFlowData.length > 0 && branchList.length <= 1) {
       // API에서 지점 목록을 가져오지 못한 경우에만 발주 목록에서 추출
       const uniqueBranches = {};
       inventoryFlowData.forEach(item => {
-        const branchName = item.branchId === 1 ? '본사' : `지점-${item.branchId}`;
+        const branchName = item.branchId === 1 ? '본점' : `지점-${item.branchId}`;
         if (!uniqueBranches[branchName]) {
           uniqueBranches[branchName] = {
             id: item.branchId,
@@ -408,6 +517,11 @@ function InventoryManagement() {
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
     setCurrentPage(1);
+  };
+
+  const handleInventorySort = (field, direction) => {
+    setInventorySort({ field, direction });
+    setCurrentPage(1); // 정렬 변경시 첫 페이지로 이동
   };
 
   const handleAddInventory = () => {
@@ -612,8 +726,10 @@ function InventoryManagement() {
   // 입출고 기록 관련 핸들러들
   const handleFlowAdd = async () => {
     try {
-      // inventoryData에서 branchProductId가 있는 항목만 필터링
-      const productsWithBranchProduct = inventoryData.filter(item => item.branchProductId != null);
+      // inventoryData에서 본점(branchId === 1) 상품만 필터링하고 branchProductId가 있는 항목만 선택
+      const productsWithBranchProduct = inventoryData.filter(item => 
+        item.branchProductId != null && item.branchId === 1
+      );
       
       // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환
       const formattedBranchProducts = productsWithBranchProduct.map(item => ({
@@ -701,22 +817,86 @@ function InventoryManagement() {
     setFlowCurrentPage(1);
   };
 
-  const filteredData = inventoryData.filter(item => {
-    const matchesSearch = filters.searchTerm === '' || 
-      item.product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      (item.product.id && item.product.id.toString().includes(filters.searchTerm));
+  // 필터된 데이터 계산 및 정렬
+  const filteredData = useMemo(() => {
+    let filtered = inventoryData.filter(item => {
+      const matchesSearch = filters.searchTerm === '' || 
+        item.product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        (item.product.id && item.product.id.toString().includes(filters.searchTerm));
+      
+      const matchesCategory = filters.categoryFilter === '' ||
+        (item.category && item.category.includes(filters.categoryFilter));
+      
+      const matchesBranch = filters.branchFilter === '' || 
+        item.branch === filters.branchFilter ||
+        (filters.branchFilter === '본점' && (item.branch === '본점' || item.branch === '본사' || item.branchId === 1));
+      
+      const matchesStatus = filters.statusFilter === '' ||
+        item.status === filters.statusFilter;
+      
+      return matchesSearch && matchesCategory && matchesBranch && matchesStatus;
+    });
+
+    // 정렬 적용
+    if (inventorySort && inventorySort.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue;
+
+        switch (inventorySort.field) {
+          case 'productName':
+            aValue = (a.product.name || '').toLowerCase();
+            bValue = (b.product.name || '').toLowerCase();
+            break;
+          case 'category':
+            aValue = (a.category || '').toLowerCase();
+            bValue = (b.category || '').toLowerCase();
+            break;
+          case 'branch':
+            aValue = (a.branch || '').toLowerCase();
+            bValue = (b.branch || '').toLowerCase();
+            break;
+          case 'currentStock':
+            aValue = a.currentStock || 0;
+            bValue = b.currentStock || 0;
+            break;
+          case 'safetyStock':
+            aValue = a.safetyStock || 0;
+            bValue = b.safetyStock || 0;
+            break;
+          case 'unitPrice':
+            aValue = a.unitPrice || 0;
+            bValue = b.unitPrice || 0;
+            break;
+          case 'totalValue':
+            aValue = a.totalValue || 0;
+            bValue = b.totalValue || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return inventorySort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return inventorySort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [inventoryData, filters, inventorySort]);
+
+  // 필터된 데이터 기준으로 Summary 계산
+  const filteredSummary = useMemo(() => {
+    const totalItems = filteredData.length;
+    const lowStockItems = filteredData.filter(item => item.status === 'low').length;
+    const totalValue = filteredData.reduce((sum, item) => sum + item.totalValue, 0);
     
-    const matchesCategory = filters.categoryFilter === '' ||
-      (item.category && item.category.includes(filters.categoryFilter));
-    
-    const matchesBranch = filters.branchFilter === '' || 
-      item.branch === filters.branchFilter;
-    
-    const matchesStatus = filters.statusFilter === '' || 
-      item.status === filters.statusFilter;
-    
-    return matchesSearch && matchesCategory && matchesBranch && matchesStatus;
-  });
+    return {
+      totalItems,
+      lowStockItems,
+      totalBranches: summary.totalBranches, // 항상 전체 지점 수로 고정
+      totalValue
+    };
+  }, [filteredData, summary.totalBranches]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
@@ -725,49 +905,92 @@ function InventoryManagement() {
 
   // 입출고 기록 필터링
   const getBranchNameFromId = (branchId, itemBranchName) => {
-    // API 응답에 branchName이 포함되어 있으면 우선 사용
-    if (itemBranchName) {
-      return itemBranchName;
+    // branchId가 1이면 항상 본점으로 표시
+    if (branchId === 1) {
+      return '본점';
     }
     
-    if (branchId === 1) {
-      return '본사';
+    // API 응답에 branchName이 포함되어 있으면 사용 (본사가 들어올 경우 본점으로 변경)
+    if (itemBranchName) {
+      return itemBranchName === '본사' ? '본점' : itemBranchName;
     }
     
     // branchList에서 지점명 찾기
     const branch = branchList.find(b => b.id === branchId || String(b.id) === String(branchId));
     if (branch && branch.name) {
-      return branch.name;
+      // branchList에서 찾은 이름도 본사면 본점으로 변경
+      return branch.name === '본사' ? '본점' : branch.name;
     }
     
     // 찾지 못한 경우 fallback
     return `지점-${branchId}`;
   };
 
-  const filteredFlowData = inventoryFlowData.filter(item => {
-    // 상품명 검색
-    const matchesSearch = !flowFilters.searchTerm || 
-      (item.productName || '').toLowerCase().includes(flowFilters.searchTerm.toLowerCase());
-    
-    // 날짜 범위 필터
-    const matchesStartDate = !flowFilters.startDate || 
-      (item.createdAt && new Date(item.createdAt) >= new Date(flowFilters.startDate));
-    const matchesEndDate = !flowFilters.endDate || 
-      (item.createdAt && new Date(item.createdAt) <= new Date(flowFilters.endDate + 'T23:59:59'));
-    
-    // 지점 필터
-    const branchName = getBranchNameFromId(item.branchId, item.branchName);
-    const matchesBranch = !flowFilters.branchFilter || 
-      branchName === flowFilters.branchFilter ||
-      String(item.branchId) === flowFilters.branchFilter;
-    
-    // 구분 필터 (입고/출고)
-    const matchesType = !flowFilters.typeFilter || 
-      (flowFilters.typeFilter === 'in' && (item.inQuantity || 0) > 0 && (item.outQuantity || 0) === 0) ||
-      (flowFilters.typeFilter === 'out' && (item.outQuantity || 0) > 0 && (item.inQuantity || 0) === 0);
-    
-    return matchesSearch && matchesStartDate && matchesEndDate && matchesBranch && matchesType;
-  });
+  const filteredFlowData = useMemo(() => {
+    let filtered = inventoryFlowData.filter(item => {
+      // 상품명 검색
+      const matchesSearch = !flowFilters.searchTerm || 
+        (item.productName || '').toLowerCase().includes(flowFilters.searchTerm.toLowerCase());
+      
+      // 날짜 범위 필터
+      const matchesStartDate = !flowFilters.startDate || 
+        (item.createdAt && new Date(item.createdAt) >= new Date(flowFilters.startDate));
+      const matchesEndDate = !flowFilters.endDate || 
+        (item.createdAt && new Date(item.createdAt) <= new Date(flowFilters.endDate + 'T23:59:59'));
+      
+      // 지점 필터
+      const branchName = getBranchNameFromId(item.branchId, item.branchName);
+      const matchesBranch = !flowFilters.branchFilter || 
+        branchName === flowFilters.branchFilter ||
+        String(item.branchId) === flowFilters.branchFilter ||
+        (flowFilters.branchFilter === '본점' && (branchName === '본점' || branchName === '본사' || item.branchId === 1));
+      
+      // 구분 필터 (입고/출고)
+      const matchesType = !flowFilters.typeFilter || 
+        (flowFilters.typeFilter === 'in' && (item.inQuantity || 0) > 0 && (item.outQuantity || 0) === 0) ||
+        (flowFilters.typeFilter === 'out' && (item.outQuantity || 0) > 0 && (item.inQuantity || 0) === 0);
+      
+      return matchesSearch && matchesStartDate && matchesEndDate && matchesBranch && matchesType;
+    });
+
+    // 정렬 적용
+    if (flowSort && flowSort.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue;
+
+        switch (flowSort.field) {
+          case 'productName':
+            aValue = (a.productName || '').toLowerCase();
+            bValue = (b.productName || '').toLowerCase();
+            break;
+          case 'branch':
+            aValue = getBranchNameFromId(a.branchId, a.branchName).toLowerCase();
+            bValue = getBranchNameFromId(b.branchId, b.branchName).toLowerCase();
+            break;
+          case 'createdAt':
+            aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            break;
+          case 'inQuantity':
+            aValue = a.inQuantity || 0;
+            bValue = b.inQuantity || 0;
+            break;
+          case 'outQuantity':
+            aValue = a.outQuantity || 0;
+            bValue = b.outQuantity || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return flowSort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return flowSort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [inventoryFlowData, flowFilters, flowSort]);
 
   // 입출고 기록 페이징
   const flowTotalPages = Math.ceil(filteredFlowData.length / flowPageSize);
@@ -778,6 +1001,11 @@ function InventoryManagement() {
   const handleFlowFiltersChange = (newFilters) => {
     setFlowFilters(newFilters);
     setFlowCurrentPage(1);
+  };
+
+  const handleFlowSort = (field, direction) => {
+    setFlowSort({ field, direction });
+    setFlowCurrentPage(1); // 정렬 변경시 첫 페이지로 이동
   };
 
   // 재고 상품 목록 (입출고 등록용)
@@ -813,14 +1041,16 @@ function InventoryManagement() {
     React.createElement(TabContent, null,
       activeTab === 'inventory' ? React.createElement(React.Fragment, null,
         React.createElement(SummaryCards, { 
-          summary,
+          summary: filteredSummary,
           userRole: authService.getCurrentUser()?.role
         }),
         React.createElement(SearchAndFilter, {
           filters,
           onFiltersChange: handleFiltersChange,
           onAddInventory: handleAddInventory,
-          userRole: authService.getCurrentUser()?.role
+          userRole: authService.getCurrentUser()?.role,
+          branchList: branchList,
+          categoryList: categoryList
         }),
         React.createElement(InventoryTable, {
           data: paginatedData,
@@ -831,7 +1061,9 @@ function InventoryManagement() {
           onPageSizeChange: handlePageSizeChange,
           onModify: handleModify,
           onDetail: handleDetail,
-          onDelete: handleDelete
+          onDelete: handleDelete,
+          onSort: handleInventorySort,
+          currentSort: inventorySort
         })
       ) : React.createElement(React.Fragment, null,
         React.createElement('div', { style: { marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -865,7 +1097,9 @@ function InventoryManagement() {
           onPageChange: handleFlowPageChange,
           onPageSizeChange: handleFlowPageSizeChange,
           onEdit: handleFlowEdit,
-          onDelete: handleFlowDelete
+          onDelete: handleFlowDelete,
+          onSort: handleFlowSort,
+          currentSort: flowSort
         })
       )
     ),

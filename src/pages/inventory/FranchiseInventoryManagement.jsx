@@ -8,7 +8,6 @@ import ProductSelectionModal from '../../components/inventory/common/ProductSele
 import ProductSetupModal from '../../components/inventory/common/ProductSetupModal';
 import { inventoryService } from '../../service/inventoryService';
 import { authService } from '../../service/authService';
-import { getBranchName } from '../../utils/branchUtils';
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -58,6 +57,7 @@ function FranchiseInventoryManagement() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [categoryList, setCategoryList] = useState([]);
 
   // 가맹점: 자신의 지점 재고만 조회
   const fetchInventoryData = async () => {
@@ -121,9 +121,27 @@ function FranchiseInventoryManagement() {
     }
   };
 
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      const categories = Array.isArray(data) ? data : (data?.data || data?.result || []);
+      if (categories.length > 0) {
+        setCategoryList(categories.map(cat => ({
+          id: cat.categoryId || cat.id,
+          name: cat.name || cat.categoryName
+        })));
+      }
+    } catch (err) {
+      console.error('카테고리 목록 조회 실패:', err);
+      setCategoryList([]);
+    }
+  };
+
   // 컴포넌트 마운트 시 데이터 조회
   useEffect(() => {
     fetchInventoryData();
+    fetchCategories();
   }, []);
 
   const handleFiltersChange = (newFilters) => {
@@ -295,7 +313,7 @@ function FranchiseInventoryManagement() {
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
-      React.createElement(PageTitle, null, `재고관리 - ${getBranchName(branchId)}`),
+      React.createElement(PageTitle, null, '재고관리'),
       React.createElement(PageSubtitle, null, '가맹점 재고 조회, 수정 및 발주 추천')
     ),
     React.createElement(SummaryCards, { 
@@ -306,7 +324,8 @@ function FranchiseInventoryManagement() {
       filters,
       onFiltersChange: handleFiltersChange,
       onAddProduct: handleAddProduct,
-      userRole: 'BRANCH_MANAGER'
+      userRole: 'BRANCH_MANAGER',
+      categoryList: categoryList
     }),
     React.createElement(FranchiseInventoryTable, {
       data: paginatedData,
