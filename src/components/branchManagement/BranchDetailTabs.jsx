@@ -12,6 +12,7 @@ import {
 import EmployeeManagement from "./EmployeeManagement";
 import DocumentManagement from "./DocumentManagement";
 import KPIManagement from "./KPIManagement";
+import BranchDashboard from "./BranchDashboard";
 
 function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
   // 지점/가맹점 관리자용 탭 (지점 상세 정보로 변경)
@@ -28,7 +29,7 @@ function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
       component: isBranchAdmin ? (
         <DetailInfoContent branch={branch} />
       ) : (
-        <DashboardContent branchId={branchId} />
+        <BranchDashboard branchId={branchId} />
       ),
     },
     {

@@ -20,7 +20,6 @@ function DocumentManagement({ branchId, readOnly = false }) {
   
   // 필터 및 검색 상태
   const [searchTerm, setSearchTerm] = useState('');
-  const [branchFilter, setBranchFilter] = useState('');
   const [documentTypeFilter, setDocumentTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   
@@ -30,8 +29,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   
-  // 임시 employeeId (실제로는 지점 정보에서 가져와야 함)
-  const employeeId = 1; // TODO: 실제 employeeId로 변경
+  // 문서 단건 작업은 각 문서의 employeeId를 사용합니다.
 
   useEffect(() => {
     if (branchId) {
@@ -42,7 +40,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const response = await documentService.getDocumentsList(employeeId, currentPage, 10);
+      const response = await documentService.getDocumentsList(branchId, currentPage, 10);
       
       if (response) {
         setDocuments(response.data || []);
@@ -94,7 +92,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
 
   const handleDownload = async (document) => {
     try {
-      const downloadUrl = await documentService.getDocumentDownloadUrl(employeeId, document.id);
+      const downloadUrl = await documentService.getDocumentDownloadUrl(document.employeeId, document.id);
       
       if (downloadUrl) {
         window.open(downloadUrl, '_blank');
@@ -125,7 +123,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
 
   const handleDeleteConfirm = async () => {
     try {
-      await documentService.deleteDocument(employeeId, selectedDocument.id);
+      await documentService.deleteDocument(selectedDocument.employeeId, selectedDocument.id);
       
       setShowDeleteModal(false);
       setSelectedDocument(null);
@@ -205,8 +203,6 @@ function DocumentManagement({ branchId, readOnly = false }) {
       <DocumentSearchAndFilter
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        branchFilter={branchFilter}
-        onBranchFilterChange={setBranchFilter}
         documentTypeFilter={documentTypeFilter}
         onDocumentTypeFilterChange={setDocumentTypeFilter}
         statusFilter={statusFilter}
@@ -228,7 +224,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
         <DocumentUploadModal
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
-          employeeId={employeeId}
+          branchId={branchId}
           onSuccess={handleUploadSuccess}
         />
       )}
