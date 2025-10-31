@@ -16,6 +16,7 @@ import OrderManagement from '../pages/admin/OrderManagement';
 import StaffDetail from '../pages/staff/StaffDetail';
 import AttendanceCalendar from '../pages/attendance/AttendanceCalendar';
 import JobGradeManagement from '../pages/settings/JobGradeManagement';
+import AttendanceTemplateManagement from '../pages/attendance/AttendanceTemplateManagement';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -36,7 +37,8 @@ export const headquartersRoutes = [
   // 기능별 메뉴
   { path: 'client', element: <div>거래처 관리 (준비중)</div> },
   { path: 'task', element: <div>작업 관리 (준비중)</div> },
-  { path: 'attendance', element: <AttendanceCalendar /> }, // ← 캘린더로 연결
+  { path: 'attendance', element: <AttendanceCalendar /> },                // 근태 캘린더
+  { path: 'attendance/templates', element: <AttendanceTemplateManagement /> }, // 템플릿 관리
   { path: 'inventory', element: <InventoryManagement /> },
   { path: 'purchase-order', element: <PurchaseOrderManagement /> },
   { path: 'order', element: <OrderManagement /> },

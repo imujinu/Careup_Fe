@@ -5,11 +5,11 @@ import Icon from '@mdi/react';
 import {
   mdiChevronLeft,
   mdiChevronRight,
-  mdiCalendarToday,
   mdiPlus,
   mdiUpload,
   mdiDotsVertical,
   mdiClose,
+  mdiChevronDown,
 } from '@mdi/js';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { useToast } from '../../components/common/Toast';
@@ -22,7 +22,8 @@ import { decodeToken } from '../../utils/jwt';
 // ✅ 분리한 모달
 import { ScheduleBulkModal } from '../../components/attendance/ScheduleBulkModal';
 
-const MAX_VISIBLE = 3;
+const MAX_VISIBLE_MONTH = 3; // 월간: 날짜칸 내 최대 3건
+const MAX_VISIBLE_WEEK = 10; // 주간: 날짜칸 내 최대 10건
 
 /* ===== 스타일 ===== */
 const Page = styled.div`padding: 28px;`;
@@ -58,15 +59,22 @@ const Filters = styled.div`
   margin: 14px 0;
 `;
 
-/* 🔽 선택 컴포넌트: 기본 화살표 사용(커스텀 아이콘 제거) */
+/* 🔽 선택 / 입력 공통 */
+const SelectWrap = styled.div`
+  position: relative; width: 100%;
+  & > svg {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; opacity: 0.8;
+  }
+`;
 const Select = styled.select`
-  height: 36px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 13px;
+  height: 36px; padding: 0 34px 0 10px; /* 오른쪽 여백 확대로 화살표가 테두리와 붙지 않게 */
+  border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 13px;
   outline: 0; width: 100%;
+  appearance: none; /* 기본 화살표 숨기고 커스텀 아이콘 오버레이 */
   transition: box-shadow .15s ease, border-color .15s ease;
   &:focus { border-color: #6d28d9; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15); }
 `;
-
-/* 🔤 Input 공통: 포커스 보라 글로우 */
 const Input = styled.input`
   height: 36px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 13px;
   outline: 0;
@@ -74,16 +82,15 @@ const Input = styled.input`
   &:focus { border-color: #6d28d9; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15); }
 `;
 
-/* 우측 끝 ‘기간 from ~ to + 버튼’ 묶음 — span 동적 적용 */
+/* 우측 끝 기간 묶음 */
 const RightCluster = styled.div`
   grid-column: span ${(p) => p.$span || 6};
   display: flex; align-items: center; justify-content: flex-end; gap: 8px;
   min-width: 0;
 `;
-const RangeTilde = styled.span`
-  color: #9ca3af; font-size: 12px; user-select: none;
-`;
+const RangeTilde = styled.span`color: #9ca3af; font-size: 12px; user-select: none;`;
 
+/* 캘린더 */
 const CalendarWrap = styled.div`
   border: 1px solid #d1d5db;
   border-radius: 14px;
@@ -111,7 +118,7 @@ const Cell = styled.div`
   &:nth-child(7n) { border-right: 0; }
 `;
 
-/* 🔧 날짜/공휴일 라인 — 왼쪽: 날짜+휴 아이콘, 오른쪽: 공휴일명(우측 정렬) */
+/* 날짜 헤더 */
 const DateHeadRow = styled.div`
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 6px;
@@ -126,8 +133,6 @@ const HolidayNameRight = styled.div`
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   text-align: right;
 `;
-
-/* 휴 아이콘 */
 const BadgeHolidayCircle = styled.span`
   width: 18px; height: 18px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
@@ -135,7 +140,7 @@ const BadgeHolidayCircle = styled.span`
   background: #ef4444; color: #fff; border: 1px solid #dc2626;
 `;
 
-/* 이벤트 카드 */
+/* 이벤트 */
 const Event = styled.div`
   padding: 6px 8px; border-radius: 8px; margin-bottom: 6px; border: 1px solid;
   background: ${(p) => (p.$leave ? '#f5f3ff' : '#eef2ff')};
@@ -150,31 +155,20 @@ const EventSub = styled.div`
   font-size: 11px; line-height: 1.2; color: #4b5563;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 `;
-
-/* 휴가 칩 */
 const TypeChip = styled.span`
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  line-height: 1;
-  border: 1px solid #c4b5fd;
-  background: #ede9fe;
-  color: #5b21b6;
+  flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; font-size: 10px; line-height: 1;
+  border: 1px solid #c4b5fd; background: #ede9fe; color: #5b21b6;
 `;
-
-/* ‘더보기’ 버튼 */
 const MoreBtn = styled.button`
   position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
   width: 28px; height: 28px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   &:hover { background: #f3f4f6; }
-  &:focus { outline: none; box-shadow: none; }
-  &:active { outline: none; box-shadow: none; }
+  &:focus, &:active { outline: none; box-shadow: none; }
 `;
 
-/* 공용 모달(더보기) */
+/* 공용 모달 */
 const ModalOverlay = styled.div`
   position: fixed; inset: 0; z-index: 1000;
   background: rgba(17,24,39,0.5);
@@ -202,6 +196,16 @@ const CloseBtn = styled.button`
   &:hover { background: #f9fafb; }
 `;
 const ModalBody = styled.div`padding: 14px 16px; overflow: auto;`;
+const ModalFooter = styled.div`padding: 12px 16px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px;`;
+const HelperError = styled.div`margin-top: 10px; font-size: 12px; color: #dc2626;`;
+
+/* 네비게이션 라벨 */
+const LabelBox = styled.div`margin-left: 8px; font-weight: 700; font-size: 16px;`;
+const LabelButton = styled.button`
+  border: none; background: transparent; padding: 4px 8px; margin: -4px -8px;
+  border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 16px;
+  &:hover { background: #f3f4f6; }
+`;
 
 /* ===== 유틸 ===== */
 const toYMD = (date) => {
@@ -287,6 +291,14 @@ const fmtKDate = (ymd) => {
   const DOW = ['일','월','화','수','목','금','토'];
   return `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${DOW[dt.getDay()]})`;
 };
+const daysBetween = (from, to) => {
+  const ms = new Date(to).getTime() - new Date(from).getTime();
+  return Math.floor(ms / (24 * 60 * 60 * 1000));
+};
+const toYearMonth = (ymd) => {
+  const { y, m } = parseYMDParts(ymd);
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+};
 
 export default function AttendanceCalendar() {
   const dispatch = useAppDispatch();
@@ -337,7 +349,18 @@ export default function AttendanceCalendar() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreDate, setMoreDate] = useState('');
   const [moreEvents, setMoreEvents] = useState([]);
+
   const [bulkOpen, setBulkOpen] = useState(false);
+
+  // ▶ 월간 라벨 전용 모달
+  const [monthModalOpen, setMonthModalOpen] = useState(false);
+  const [monthInput, setMonthInput] = useState(toYearMonth(new Date().toISOString().slice(0, 10)));
+
+  // ▶ 주간 라벨 전용 모달(하단 오류 안내 포함)
+  const [weekModalOpen, setWeekModalOpen] = useState(false);
+  const [weekFromInput, setWeekFromInput] = useState('');
+  const [weekToInput, setWeekToInput] = useState('');
+  const [weekError, setWeekError] = useState('');
 
   // 중복 호출 방지 키
   const lastEvtKeyRef = useRef('');
@@ -483,11 +506,10 @@ export default function AttendanceCalendar() {
     dispatch(setFilters({ employeeId: v }));
   };
 
-  // 직원 검색 Enter → 입력 비었으면 "직원 전체"로 초기화, 아니면 가장 먼저 일치하는 직원 적용
+  // 직원 검색 Enter
   const applyEmployeeSearch = useCallback(() => {
     const kw = (empKeyword || '').trim();
 
-    // 🔹 빈 입력 → 전체 초기화
     if (!kw) {
       dispatch(setFilters({ employeeId: null }));
       addToast('직원 전체로 초기화했어요.', { color: 'info' });
@@ -537,22 +559,53 @@ export default function AttendanceCalendar() {
       dispatch(moveMonth(1));
     }
   };
-  const goThis = () => {
+
+  // 퀵 점프
+  const jumpToday = () => {
     if (viewMode === 'week') {
       setWeekAnchor(toYMD(new Date()));
     } else {
       dispatch(moveMonth(0));
     }
   };
+  const jumpLastMonth = () => {
+    if (viewMode === 'week') {
+      const base = new Date(weekAnchor);
+      const prevMonth = new Date(base.getFullYear(), base.getMonth() - 1, 1);
+      setWeekAnchor(toYMD(startOfWeek(prevMonth)));
+    } else {
+      dispatch(moveMonth(-1));
+    }
+  };
+  const jumpLastYear = () => {
+    if (viewMode === 'week') {
+      const base = new Date(weekAnchor);
+      const prevYearSameMonth = new Date(base.getFullYear() - 1, base.getMonth(), 1);
+      setWeekAnchor(toYMD(startOfWeek(prevYearSameMonth)));
+    } else {
+      dispatch(moveMonth(-12));
+    }
+  };
+  const jumpNextMonth = () => {
+    if (viewMode === 'week') {
+      const base = new Date(weekAnchor);
+      const nextMonth = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+      setWeekAnchor(toYMD(startOfWeek(nextMonth)));
+    } else {
+      dispatch(moveMonth(1));
+    }
+  };
+  const jumpNextYear = () => {
+    if (viewMode === 'week') {
+      const base = new Date(weekAnchor);
+      const nextYearSameMonth = new Date(base.getFullYear() + 1, base.getMonth(), 1);
+      setWeekAnchor(toYMD(startOfWeek(nextYearSameMonth)));
+    } else {
+      dispatch(moveMonth(12));
+    }
+  };
 
-  const onSearch = useCallback(() => {
-    dispatch(setRange({ rangeFrom: localFrom, rangeTo: localTo }));
-    dispatch(loadCalendarEvents());
-  }, [dispatch, localFrom, localTo]);
-
-  const onKeyDown = (e) => { if (e.key === 'Enter') onSearch(); };
-
-  // 셀 목록: 월/주 모드 별도 생성
+  // 셀 목록: 월/주 모드
   const cells = useMemo(() => (
     viewMode === 'week' ? weekCells(weekAnchor) : daysMatrix(view.viewFrom)
   ), [viewMode, weekAnchor, view.viewFrom]);
@@ -604,6 +657,90 @@ export default function AttendanceCalendar() {
   // RightCluster span 동적 계산 (지점 2 + 직원 4 + 오른쪽 ? = 12)
   const rightSpan = !isStaff ? (12 - 2 - 4) : (12 - 2);
 
+  // 모드별 최대 표시 개수
+  const maxVisiblePerCell = viewMode === 'week' ? MAX_VISIBLE_WEEK : MAX_VISIBLE_MONTH;
+
+  /* ===== 월 → 주 전환 우선 로직(상위) ===== */
+  // 현재 월(view.viewFrom)의 '첫째 날'이 포함된 주의 시작(일요일)로 weekAnchor 계산
+  const firstWeekOfMonthAnchor = useCallback(() => {
+    const { y, m } = parseYMDParts(view.viewFrom);
+    const first = new Date(y, m, 1);
+    return toYMD(startOfWeek(first));
+  }, [view.viewFrom]);
+
+  // ‘주’ 버튼 클릭 시: 월간에서 주간으로 전환될 때 먼저 첫째 주로 맞춘 후 주간 보기로 전환
+  const onViewWeek = useCallback(() => {
+    if (viewMode !== 'week') {
+      setWeekAnchor(firstWeekOfMonthAnchor());
+    }
+    setViewMode('week');
+  }, [viewMode, firstWeekOfMonthAnchor]);
+
+  /* ===== 월간/주간 라벨 전용 모달 로직 ===== */
+  const openMonthLabelModal = useCallback(() => {
+    if (viewMode !== 'month') return;
+    setMonthInput(toYearMonth(view.viewFrom));
+    setMonthModalOpen(true);
+  }, [viewMode, view.viewFrom]);
+
+  const applyMonthJump = useCallback(() => {
+    const m = String(monthInput || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(m)) {
+      addToast('연-월 형식이 올바르지 않습니다. 예) 2025-11', { color: 'warning' });
+      return;
+    }
+    const [yy, mm] = m.split('-').map(Number);
+    const target = new Date(yy, (mm || 1) - 1, 1);
+    const { y: cy, m: cm } = parseYMDParts(view.viewFrom);
+    const delta = (target.getFullYear() - cy) * 12 + (target.getMonth() - cm);
+    dispatch(moveMonth(delta));
+    setMonthModalOpen(false);
+    addToast(`${yy}년 ${String(mm).padStart(2,'0')}월로 이동했습니다.`, { color: 'success' });
+  }, [monthInput, view.viewFrom, dispatch, addToast]);
+
+  const openWeekLabelModal = useCallback(() => {
+    if (viewMode !== 'week') return;
+    setWeekFromInput(toYMD(weekStart));
+    setWeekToInput(toYMD(weekEnd));
+    setWeekError('');
+    setWeekModalOpen(true);
+  }, [viewMode, weekStart, weekEnd]);
+
+  // 주간 기간 검색(하위): 사용자가 ‘적용’할 때에만 weekAnchor를 명시적으로 덮어씀
+  const applyRangeToWeek = useCallback(() => {
+    const f = String(weekFromInput || '').trim();
+    const t = String(weekToInput || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f) || !/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+      setWeekError('기간 형식이 올바르지 않습니다. 예) 2025-11-02 ~ 2025-11-08');
+      return;
+    }
+    const from = new Date(f);
+    const to = new Date(t);
+    if (from > to) {
+      setWeekError('시작일이 종료일보다 늦을 수 없습니다.');
+      return;
+    }
+    const diff = daysBetween(f, t); // 일수 차이
+    if (diff !== 6) {
+      setWeekError('기간은 정확히 1주(7일) 단위로만 입력할 수 있습니다. 예: 2025-11-02 ~ 2025-11-08');
+      return;
+    }
+    const anchor = toYMD(startOfWeek(from));
+    setWeekAnchor(anchor);  // ← 하위에서 명시적 덮어쓰기
+    setViewMode('week');
+    setWeekModalOpen(false);
+    addToast('입력한 기간을 기준으로 주간 보기로 이동했습니다.', { color: 'success' });
+  }, [weekFromInput, weekToInput, addToast]);
+
+  const onMonthModalKeyDown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); setMonthModalOpen(false); }
+    if (e.key === 'Enter') { e.preventDefault(); applyMonthJump(); }
+  };
+  const onWeekModalKeyDown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); setWeekModalOpen(false); }
+    if (e.key === 'Enter') { e.preventDefault(); applyRangeToWeek(); }
+  };
+
   return (
     <Page>
       {/* 상단 타이틀 & 우측 액션 */}
@@ -627,22 +764,42 @@ export default function AttendanceCalendar() {
             <Icon path={mdiUpload} size={0.9} />
             업로드
           </Ghost>
+
+          {/* 🔹 퀵 점프: 작년 / 지난 달 / 오늘 / 다음 달 / 내년 */}
           <SegWrap>
-            <Seg onClick={() => setViewMode('week')} $active={viewMode === 'week'}>주</Seg>
+            <Seg onClick={jumpLastYear}>작년</Seg>
+            <Seg onClick={jumpLastMonth}>지난 달</Seg>
+            <Seg onClick={jumpToday}>오늘</Seg>
+            <Seg onClick={jumpNextMonth}>다음 달</Seg>
+            <Seg onClick={jumpNextYear}>내년</Seg>
+          </SegWrap>
+
+          {/* 🔹 보기 모드: 주 / 월 */}
+          <SegWrap>
+            <Seg onClick={onViewWeek} $active={viewMode === 'week'}>주</Seg>
             <Seg onClick={() => setViewMode('month')} $active={viewMode === 'month'}>월</Seg>
           </SegWrap>
         </Toolbar>
       </Row>
 
-      {/* 월/주 네비게이션 */}
+      {/* 월/주 네비게이션 (← →, 라벨 클릭 시 모달) */}
       <Row style={{ marginBottom: 8 }}>
         <Toolbar>
           <Ghost onClick={goPrev}><Icon path={mdiChevronLeft} size={0.9} /></Ghost>
-          <Ghost onClick={goThis}><Icon path={mdiCalendarToday} size={0.9} /> 오늘</Ghost>
           <Ghost onClick={goNext}><Icon path={mdiChevronRight} size={0.9} /></Ghost>
-          <div style={{ marginLeft: 8, fontWeight: 700, fontSize: 16 }}>
-            {viewMode === 'week' ? weekLabel : monthLabel}
-          </div>
+
+          {/* ▶ 라벨(월간/주간 각각 별도 모달) */}
+          <LabelBox>
+            {viewMode === 'week' ? (
+              <LabelButton onClick={openWeekLabelModal} title="클릭하여 기간(7일)을 직접 입력">
+                {weekLabel}
+              </LabelButton>
+            ) : (
+              <LabelButton onClick={openMonthLabelModal} title="클릭하여 연/월을 직접 입력">
+                {monthLabel}
+              </LabelButton>
+            )}
+          </LabelBox>
         </Toolbar>
 
         <div style={{ display:'flex', alignItems:'center', gap:12, fontSize:12, color:'#6b7280' }}>
@@ -652,30 +809,36 @@ export default function AttendanceCalendar() {
 
       {/* 필터 바 */}
       <Filters>
-        {/* 지점: HQ는 '지점 전체', 비-HQ는 배치 지점 2곳 이상이면 '내 지점 전체' 노출 */}
+        {/* 지점 */}
         <div style={{ gridColumn: 'span 2' }}>
-          <Select value={filters.branchId || ''} onChange={onChangeBranch}>
-            {isHQ
-              ? <option value="">지점 전체</option>
-              : (branchOpts.length > 1 && <option value="">내 지점 전체</option>)
-            }
-            {branchOpts.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </Select>
-        </div>
-
-        {/* 직원: 일반 직원(STAFF)은 미노출, 관리자/HQ만 표시 — 너비 축소(span 4) */}
-        {!isStaff && (
-          <div style={{ gridColumn: 'span 4', display: 'flex', gap: 8, minWidth: 0 }}>
-            <Select value={filters.employeeId || ''} onChange={onChangeEmployee} style={{ minWidth: 0, flex: 1 }}>
-              <option value="">직원 전체</option>
-              {empOpts.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}{e.employeeNumber ? ` (${e.employeeNumber})` : ''}
-                </option>
+          <SelectWrap>
+            <Select value={filters.branchId || ''} onChange={onChangeBranch}>
+              {isHQ
+                ? <option value="">지점 전체</option>
+                : (branchOpts.length > 1 && <option value="">내 지점 전체</option>)
+              }
+              {branchOpts.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </Select>
+            <Icon path={mdiChevronDown} size={0.9} />
+          </SelectWrap>
+        </div>
+
+        {/* 직원(관리권한 전용) */}
+        {!isStaff && (
+          <div style={{ gridColumn: 'span 4', display: 'flex', gap: 8, minWidth: 0 }}>
+            <SelectWrap style={{ flex: 1, minWidth: 0 }}>
+              <Select value={filters.employeeId || ''} onChange={onChangeEmployee}>
+                <option value="">직원 전체</option>
+                {empOpts.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}{e.employeeNumber ? ` (${e.employeeNumber})` : ''}
+                  </option>
+                ))}
+              </Select>
+              <Icon path={mdiChevronDown} size={0.9} />
+            </SelectWrap>
             <Input
               placeholder="직원 검색"
               value={empKeyword}
@@ -687,12 +850,12 @@ export default function AttendanceCalendar() {
         )}
 
         {/* 👉 오른쪽 끝: 기간 from ~ to + 검색 버튼 */}
-        <RightCluster $span={rightSpan}>
+        <RightCluster $span={!isStaff ? (12 - 2 - 4) : (12 - 2)}>
           <Input
             type="date"
             value={localFrom}
             onChange={(e) => setLocalFrom(e.target.value)}
-            onKeyDown={onKeyDown}
+            onKeyDown={(e) => { if (e.key === 'Enter') { dispatch(setRange({ rangeFrom: localFrom, rangeTo: localTo })); dispatch(loadCalendarEvents()); } }}
             style={{ width: 130 }}
           />
           <RangeTilde>~</RangeTilde>
@@ -700,10 +863,12 @@ export default function AttendanceCalendar() {
             type="date"
             value={localTo}
             onChange={(e) => setLocalTo(e.target.value)}
-            onKeyDown={onKeyDown}
+            onKeyDown={(e) => { if (e.key === 'Enter') { dispatch(setRange({ rangeFrom: localFrom, rangeTo: localTo })); dispatch(loadCalendarEvents()); } }}
             style={{ width: 130 }}
           />
-          <Primary onClick={onSearch}>기간 검색</Primary>
+          <Primary onClick={() => { dispatch(setRange({ rangeFrom: localFrom, rangeTo: localTo })); dispatch(loadCalendarEvents()); }}>
+            기간 검색
+          </Primary>
         </RightCluster>
       </Filters>
 
@@ -718,7 +883,7 @@ export default function AttendanceCalendar() {
           {cells.map((d, idx) => {
             const ymd = toYMD(d);
             const evs = mapByDate[ymd] || [];
-            const visible = evs.slice(0, MAX_VISIBLE);
+            const visible = evs.slice(0, maxVisiblePerCell);
             const hiddenCount = evs.length - visible.length;
 
             const other = (viewMode === 'month') && (d.getMonth() !== parseYMDParts(view.viewFrom).m);
@@ -730,7 +895,7 @@ export default function AttendanceCalendar() {
 
             return (
               <Cell key={`${ymd}-${idx}`} $other={other} $week={viewMode === 'week'}>
-                {/* 🔧 상단 라인: 왼쪽(날짜 + 휴), 오른쪽(공휴일명 우측 정렬) */}
+                {/* 상단 날짜/공휴일 */}
                 <DateHeadRow>
                   <DateHeadLeft $color={dateColor}>
                     {d.getDate()}
@@ -795,6 +960,51 @@ export default function AttendanceCalendar() {
                   </Event>
                 );
               })}
+            </ModalBody>
+          </ModalCard>
+        </ModalOverlay>
+      )}
+
+      {/* ✅ 월간 라벨 모달: 연/월 입력 */}
+      {monthModalOpen && viewMode === 'month' && (
+        <ModalOverlay onClick={() => setMonthModalOpen(false)}>
+          <ModalCard onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <div>
+                <ModalTitle>연도와 월을 입력해주세요.</ModalTitle>
+                <ModalSub>예: 2025-11</ModalSub>
+              </div>
+              <CloseBtn onClick={() => setMonthModalOpen(false)} aria-label="닫기"><Icon path={mdiClose} size={0.9} /></CloseBtn>
+            </ModalHeader>
+            <ModalBody onKeyDown={onMonthModalKeyDown}>
+              <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+                <Input type="month" value={monthInput} onChange={(e) => setMonthInput(e.target.value)} style={{ flex: 1 }} />
+                <Primary onClick={applyMonthJump}>적용</Primary>
+              </div>
+            </ModalBody>
+          </ModalCard>
+        </ModalOverlay>
+      )}
+
+      {/* ✅ 주간 라벨 모달: 기간(7일) → 주간 보기, 하단에 오류 안내 */}
+      {weekModalOpen && viewMode === 'week' && (
+        <ModalOverlay onClick={() => setWeekModalOpen(false)}>
+          <ModalCard onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <div>
+                <ModalTitle>원하시는 주간을 검색해주세요.</ModalTitle>
+                <ModalSub>정확히 7일(예: 2025-11-02 ~ 2025-11-08)</ModalSub>
+              </div>
+              <CloseBtn onClick={() => setWeekModalOpen(false)} aria-label="닫기"><Icon path={mdiClose} size={0.9} /></CloseBtn>
+            </ModalHeader>
+            <ModalBody onKeyDown={onWeekModalKeyDown}>
+              <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+                <Input type="date" value={weekFromInput} onChange={(e) => { setWeekFromInput(e.target.value); setWeekError(''); }} style={{ width: 150 }} />
+                <span style={{ color:'#9ca3af', fontSize:12 }}>~</span>
+                <Input type="date" value={weekToInput} onChange={(e) => { setWeekToInput(e.target.value); setWeekError(''); }} style={{ width: 150 }} />
+                <Primary onClick={applyRangeToWeek}>적용</Primary>
+              </div>
+              {weekError && <HelperError>{weekError}</HelperError>}
             </ModalBody>
           </ModalCard>
         </ModalOverlay>

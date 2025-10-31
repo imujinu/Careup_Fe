@@ -103,8 +103,11 @@ function Sidebar({ isVisible, userType, branchId }) {
   const branchName = useAppSelector((s) => s.auth.branchName);
   const role = String(rawRole || '').replace(/^ROLE_/, '').toUpperCase();
   const canManageStaff = role === 'BRANCH_ADMIN' || role === 'FRANCHISE_OWNER';
+  const canViewTemplates = ['HQ_ADMIN','BRANCH_ADMIN','FRANCHISE_OWNER'].includes(role);
 
   const JOB_GRADE_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.jobGrade) || '/settings/job-grades';
+  const ATTENDANCE_TEMPLATES_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.attendanceTemplates) || '/attendance/templates';
+
   const showJobGradeFlyout = userType === 'headquarters' || canManageStaff;
 
   const headquartersMenuItems = [
@@ -181,6 +184,37 @@ function Sidebar({ isVisible, userType, branchId }) {
               );
             }
 
+            // ✅ 근태관리 플라이아웃: 템플릿 관리(권한 보유자에게만 노출)
+            if (item.id === 'attendance') {
+              if (canViewTemplates) {
+                return (
+                  <FlyoutWrapper key={item.id}>
+                    <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                      <Mdi path={item.icon} />
+                      {item.label}
+                    </StyledNavLink>
+
+                    <FlyoutPanel data-flyout="panel" aria-label="근태 확장 메뉴">
+                      <FlyoutLink to={ATTENDANCE_TEMPLATES_PATH} className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <Mdi path={mdiClipboardTextOutline} />
+                        템플릿 관리
+                      </FlyoutLink>
+                    </FlyoutPanel>
+                  </FlyoutWrapper>
+                );
+              }
+              // 권한 없으면 플라이아웃 없이 기본 링크만
+              return (
+                <MenuItem key={item.id}>
+                  <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                    <Mdi path={item.icon} />
+                    {item.label}
+                  </StyledNavLink>
+                </MenuItem>
+              );
+            }
+
+            // 설정 플라이아웃(직급관리)
             if (item.id === 'settings' && showJobGradeFlyout) {
               return (
                 <FlyoutWrapper key={item.id}>

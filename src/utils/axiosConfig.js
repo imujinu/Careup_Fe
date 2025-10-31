@@ -1,8 +1,16 @@
-/// src/utils/axiosConfig.js
-/// 직원용 axios 전역 설정
+// src/utils/axiosConfig.js
+// 직원용 axios 전역 설정
 
 import axios from 'axios';
 import { tokenStorage, authService } from '../service/authService';
+
+// ✅ 게이트웨이 baseURL (Vite .env에서 VITE_API_URL 제공 권장)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+axios.defaults.baseURL = API_BASE_URL;
+
+// 공용 기본값
+axios.defaults.withCredentials = true;
+axios.defaults.timeout = 30000;
 
 // ---- 단일 비행 리프레시 상태 ----
 let refreshPromise = null;
@@ -16,10 +24,10 @@ axios.interceptors.request.use(
     if (token) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
-      
+
       // 디버깅: 주문 API 호출 시 토큰 확인
       if (config.url && config.url.includes('/api/orders')) {
-        console.log('🔐 [관리자 axiosConfig] Authorization 헤더 설정:', {
+        console.log('[axiosConfig] Authorization 헤더 설정:', {
           url: config.url,
           tokenPrefix: token.substring(0, 20) + '...',
           tokenLength: token.length
@@ -28,15 +36,15 @@ axios.interceptors.request.use(
     } else {
       // 토큰이 없을 때 경고
       if (config.url && config.url.includes('/api/orders')) {
-        console.warn('⚠️ [관리자 axiosConfig] accessToken이 없습니다!');
+        console.warn('[axiosConfig] accessToken이 없습니다!');
       }
     }
-    
+
     // FormData인 경우 Content-Type을 설정하지 않음 (브라우저가 자동으로 multipart/form-data 설정)
     if (config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
+      if (config.headers) delete config.headers['Content-Type'];
     }
-    
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -75,7 +83,7 @@ axios.interceptors.response.use(
     // 리프레시 호출 그 자체의 401은 즉시 로그아웃
     const reqUrl = (originalRequest.url || '').toString();
     if (reqUrl.includes(REFRESH_PATH)) {
-      authService.logout();
+      await authService.logout();
       window.location.href = '/login';
       return Promise.reject(error);
     }
@@ -95,7 +103,7 @@ axios.interceptors.response.use(
     } catch (refreshError) {
       refreshPromise = null;
       // 갱신 실패 → 로그아웃 후 로그인 페이지로
-      authService.logout();
+      await authService.logout();
       window.location.href = '/login';
       return Promise.reject(refreshError);
     }
