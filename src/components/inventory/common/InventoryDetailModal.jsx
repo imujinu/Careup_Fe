@@ -65,20 +65,15 @@ const PrintButton = styled.button`
 `;
 
 const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  background: #ef4444;
-  color: white;
+  background: none;
   border: none;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 24px;
+  color: #6b7280;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
   
   &:hover {
-    background: #dc2626;
+    color: #374151;
   }
 `;
 
