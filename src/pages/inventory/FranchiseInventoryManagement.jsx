@@ -58,6 +58,7 @@ function FranchiseInventoryManagement() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [categoryList, setCategoryList] = useState([]);
+  const [sort, setSort] = useState(null); // { field, direction }
 
   // 가맹점: 자신의 지점 재고만 조회
   const fetchInventoryData = async () => {
@@ -188,6 +189,10 @@ function FranchiseInventoryManagement() {
     }
   };
 
+  const handleSort = (field, direction) => {
+    setSort({ field, direction });
+  };
+
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setSelectedItem(null);
@@ -282,15 +287,63 @@ function FranchiseInventoryManagement() {
 
 
   // 필터링된 데이터
-  const filteredData = inventoryItems.filter(item => {
-    const matchesSearch = !filters.searchTerm || 
-      item.product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      item.product.id.toString().includes(filters.searchTerm);
-    
-    const matchesCategory = !filters.categoryFilter || item.category === filters.categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const filteredData = React.useMemo(() => {
+    let filtered = inventoryItems.filter(item => {
+      const matchesSearch = !filters.searchTerm || 
+        item.product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        item.product.id.toString().includes(filters.searchTerm);
+      
+      const matchesCategory = !filters.categoryFilter || item.category === filters.categoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    });
+
+    // 정렬 적용
+    if (sort && sort.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sort.field) {
+          case 'productName':
+            aValue = a.product.name || '';
+            bValue = b.product.name || '';
+            break;
+          case 'category':
+            aValue = a.category || '';
+            bValue = b.category || '';
+            break;
+          case 'currentStock':
+            aValue = a.currentStock || 0;
+            bValue = b.currentStock || 0;
+            break;
+          case 'safetyStock':
+            aValue = a.safetyStock || 0;
+            bValue = b.safetyStock || 0;
+            break;
+          case 'supplyPrice':
+            aValue = a.unitPrice || 0;
+            bValue = b.unitPrice || 0;
+            break;
+          case 'salesPrice':
+            aValue = a.salesPrice || 0;
+            bValue = b.salesPrice || 0;
+            break;
+          case 'totalValue':
+            aValue = a.totalValue || 0;
+            bValue = b.totalValue || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [inventoryItems, filters, sort]);
 
   // 페이지네이션
   const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -322,7 +375,9 @@ function FranchiseInventoryManagement() {
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
       onModify: handleModify,
-      onDelete: handleDelete
+      onDelete: handleDelete,
+      onSort: handleSort,
+      currentSort: sort
     }),
     React.createElement(EditInventoryModal, {
       isOpen: isEditModalOpen,
