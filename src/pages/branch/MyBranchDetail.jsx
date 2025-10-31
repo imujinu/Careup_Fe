@@ -134,7 +134,7 @@ function MyBranchDetail() {
         showEditButton={true}
       />
 
-      <BranchDetailTabs branchId={branchData.id || branchData.branchId} />
+      <BranchDetailTabs branchId={branchData.id || branchData.branchId} branch={branchData} userType={userType} />
 
       {showDetailModal && (
         <BranchDetailModal
