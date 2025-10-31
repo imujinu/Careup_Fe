@@ -284,6 +284,7 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     minPrice: 0,
     maxPrice: 0,
     supplyPrice: 0,
+    sellingPrice: 0,
     visibility: 'ALL'
   });
   
@@ -381,6 +382,7 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
       minPrice: 0,
       maxPrice: 0,
       supplyPrice: 0,
+      sellingPrice: 0,
       visibility: 'ALL'
     });
     setImageFile(null);
@@ -393,6 +395,44 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
 
   const handleSave = async () => {
     try {
+      // 필수 항목 검증
+      const minPrice = parseInt(formData.minPrice) || 0;
+      const maxPrice = parseInt(formData.maxPrice) || 0;
+      const supplyPrice = parseInt(formData.supplyPrice) || 0;
+      const sellingPrice = parseInt(formData.sellingPrice) || 0;
+      
+      if (minPrice <= 0) {
+        alert('최저 가격을 입력해주세요.');
+        return;
+      }
+      
+      if (maxPrice <= 0) {
+        alert('최고 가격을 입력해주세요.');
+        return;
+      }
+      
+      if (maxPrice < minPrice) {
+        alert('최고 가격은 최저 가격보다 크거나 같아야 합니다.');
+        return;
+      }
+      
+      if (supplyPrice <= 0) {
+        alert('공급가를 입력해주세요.');
+        return;
+      }
+      
+      // 판매가 필수 입력 검증
+      if (sellingPrice <= 0) {
+        alert('판매가를 입력해주세요.');
+        return;
+      }
+      
+      // 판매가 검증 (최저가격 ~ 최고가격 사이)
+      if (sellingPrice < minPrice || sellingPrice > maxPrice) {
+        alert(`판매가는 ${minPrice.toLocaleString()}원 ~ ${maxPrice.toLocaleString()}원 사이로 입력해주세요.`);
+        return;
+      }
+      
       // 이미지 파일 업로드 (선택사항)
       const saveData = {
         ...formData,
@@ -568,7 +608,10 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
           React.createElement(SectionTitle, null, '가격 정보'),
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
-              React.createElement(Label, null, '최저 가격 (원)'),
+              React.createElement(Label, null,
+                '최저 가격 (원)',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
               React.createElement(Input, {
                 type: 'number',
                 value: formData.minPrice,
@@ -576,7 +619,10 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               })
             ),
             React.createElement(FormGroup, null,
-              React.createElement(Label, null, '최고 가격 (원)'),
+              React.createElement(Label, null,
+                '최고 가격 (원)',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
               React.createElement(Input, {
                 type: 'number',
                 value: formData.maxPrice,
@@ -586,13 +632,37 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
           ),
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
-              React.createElement(Label, null, '공급가 (원)'),
+              React.createElement(Label, null,
+                '공급가 (원)',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
               React.createElement(Input, {
                 type: 'number',
                 value: formData.supplyPrice,
                 onChange: (e) => handleInputChange('supplyPrice', e.target.value)
               })
             ),
+            React.createElement(FormGroup, null,
+              React.createElement(Label, null,
+                '판매가 (원)',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
+              React.createElement(Input, {
+                type: 'number',
+                min: formData.minPrice > 0 ? formData.minPrice : undefined,
+                max: formData.maxPrice > 0 ? formData.maxPrice : undefined,
+                value: formData.sellingPrice,
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('sellingPrice', '');
+                  const n = parseInt(v, 10);
+                  handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
+                },
+                placeholder: formData.minPrice > 0 && formData.maxPrice > 0 
+                  ? `${formData.minPrice.toLocaleString()}원 ~ ${formData.maxPrice.toLocaleString()}원 사이로 입력`
+                  : '판매가를 입력하세요'
+              })
+            )
           ),
           React.createElement(FormGroup, null,
             React.createElement(Label, null, '공개범위'),

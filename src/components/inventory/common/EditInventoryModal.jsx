@@ -276,6 +276,7 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     productName: '',
     safetyStock: 0,
     unitPrice: 0,
+    sellingPrice: 0,
     minPrice: 0,
     maxPrice: 0,
     description: '',
@@ -331,6 +332,7 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
         productName: item.product?.name || '',
         safetyStock: item.safetyStock || 0,
         unitPrice: item.unitPrice || 0,
+        sellingPrice: item.salesPrice || item.price || item.unitPrice || 0,
         minPrice: item.product?.minPrice || item.minPrice || 0,
         maxPrice: item.product?.maxPrice || item.maxPrice || 0,
         description: item.product?.description || item.description || '',
@@ -358,7 +360,8 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
             maxPrice: productData?.maxPrice || prev.maxPrice || 0,
             description: productData?.description || prev.description || '',
             category: productData?.categoryId || productData?.category?.categoryId || prev.category || '',
-            visibility: productData?.visibility || prev.visibility || 'ALL'
+            visibility: productData?.visibility || prev.visibility || 'ALL',
+            sellingPrice: item.salesPrice || item.price || prev.sellingPrice || 0
           }));
         } catch (err) {
           console.error('상품 정보 조회 실패:', err);
@@ -467,7 +470,38 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     }
     
     if (!formData.unitPrice || formData.unitPrice === '' || formData.unitPrice < 0) {
-      errors.push('단가');
+      errors.push('공급가');
+    }
+    
+    if (!formData.minPrice || formData.minPrice === '' || formData.minPrice <= 0) {
+      errors.push('최저 가격');
+    }
+    
+    if (!formData.maxPrice || formData.maxPrice === '' || formData.maxPrice <= 0) {
+      errors.push('최고 가격');
+    }
+    
+    // 최고가격이 최저가격보다 크거나 같은지 검증
+    if (formData.minPrice > 0 && formData.maxPrice > 0) {
+      const minPrice = parseInt(formData.minPrice) || 0;
+      const maxPrice = parseInt(formData.maxPrice) || 0;
+      if (maxPrice < minPrice) {
+        alert('최고 가격은 최저 가격보다 크거나 같아야 합니다.');
+        return;
+      }
+    }
+    
+    if (!formData.sellingPrice || formData.sellingPrice === '' || formData.sellingPrice < 0) {
+      errors.push('판매가');
+    }
+    
+    // 판매가 검증 (최저가격 ~ 최고가격 사이)
+    if (formData.minPrice > 0 && formData.maxPrice > 0) {
+      const sellingPrice = parseInt(formData.sellingPrice) || 0;
+      if (sellingPrice > 0 && (sellingPrice < formData.minPrice || sellingPrice > formData.maxPrice)) {
+        alert(`판매가는 ${formData.minPrice.toLocaleString()}원 ~ ${formData.maxPrice.toLocaleString()}원 사이로 입력해주세요.`);
+        return;
+      }
     }
     
     if (!formData.category || formData.category === '') {
@@ -640,7 +674,7 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
               React.createElement(Label, null, 
-                '단가 (원) ',
+                '공급가 (원) ',
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
@@ -654,11 +688,34 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 }
               })
             ),
-            React.createElement(FormGroup, null)
+            React.createElement(FormGroup, null,
+              React.createElement(Label, null,
+                '판매가 (원) ',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
+              React.createElement(Input, {
+                type: 'number',
+                min: formData.minPrice > 0 ? formData.minPrice : undefined,
+                max: formData.maxPrice > 0 ? formData.maxPrice : undefined,
+                value: formData.sellingPrice,
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('sellingPrice', '');
+                  const n = parseInt(v, 10);
+                  handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
+                },
+                placeholder: formData.minPrice > 0 && formData.maxPrice > 0 
+                  ? `${formData.minPrice.toLocaleString()}원 ~ ${formData.maxPrice.toLocaleString()}원 사이로 입력`
+                  : '판매가를 입력하세요'
+              })
+            )
           ),
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
-              React.createElement(Label, null, '최저 가격 (원)'),
+              React.createElement(Label, null,
+                '최저 가격 (원)',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
               React.createElement(Input, {
                 type: 'number',
                 value: formData.minPrice,
@@ -671,7 +728,10 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               })
             ),
             React.createElement(FormGroup, null,
-              React.createElement(Label, null, '최고 가격 (원)'),
+              React.createElement(Label, null,
+                '최고 가격 (원)',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
               React.createElement(Input, {
                 type: 'number',
                 value: formData.maxPrice,

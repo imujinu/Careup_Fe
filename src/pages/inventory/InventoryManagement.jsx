@@ -570,13 +570,15 @@ function InventoryManagement() {
         
         if (productId) {
           // 본사 지점에 재고 추가 (초기 재고 0)
+          // 판매가가 있으면 판매가를 price로 사용, 없으면 공급가 사용
+          const price = formData.sellingPrice ? parseInt(formData.sellingPrice) : (formData.supplyPrice || 0);
           await inventoryService.createBranchProduct({
             productId: productId,
             branchId: userInfo.branchId || 1, // 본사 branchId
             serialNumber: `HQ-${productId}-${Date.now()}`,
             stockQuantity: 0,
             safetyStock: 0,
-            price: formData.supplyPrice
+            price: price
           });
         }
         
@@ -693,13 +695,37 @@ function InventoryManagement() {
         }
       }
       
-      // 재고 정보 업데이트 (안전재고, 단가)
+      // 재고 정보 업데이트 (안전재고, 판매가)
+      // 공급가는 상품 정보로 관리되므로 별도 업데이트 필요
       if (branchProductId) {
+        // 판매가를 unitPrice로 전달 (BranchProduct.price가 판매가)
         await inventoryService.updateInventoryInfo(
           branchProductId,
           formData.safetyStock,
-          formData.unitPrice
+          formData.sellingPrice || formData.unitPrice
         );
+        
+        // 공급가가 변경된 경우 상품 정보도 업데이트
+        if (formData.unitPrice && productId) {
+          try {
+            const productResponse = await inventoryService.getProduct(productId);
+            const existingProduct = productResponse.data?.data || productResponse.data;
+            
+            await inventoryService.updateProduct(productId, {
+              name: existingProduct.name,
+              description: existingProduct.description || '',
+              categoryId: existingProduct.categoryId || existingProduct.category?.categoryId,
+              minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
+              maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),
+              supplyPrice: formData.unitPrice,
+              visibility: existingProduct.visibility || 'ALL',
+              imageFile: null,
+              imageUrl: existingProduct.imageUrl
+            });
+          } catch (err) {
+            console.error('공급가 업데이트 실패:', err);
+          }
+        }
         
         alert('재고 정보가 성공적으로 수정되었습니다.');
         handleCloseEditModal();
