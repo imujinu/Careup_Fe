@@ -215,7 +215,7 @@ function ShopLayout() {
         id: item.productId ?? Math.random(),
         productId: item.productId,
         name: item.name || item.productName || "상품",
-        price: Number(item.minPrice || 0),
+        price: Number(item.maxPrice || item.minPrice || 0),
         minPrice: Number(item.minPrice || 0),
         maxPrice: Number(item.maxPrice || 0),
         promotionPrice: null,
@@ -347,7 +347,7 @@ function ShopLayout() {
             id: item.productId ?? Math.random(),
             productId: item.productId,
             name: item.productName || "상품",
-            price: Number(item.minPrice || 0),
+            price: Number(item.maxPrice || item.minPrice || 0),
             minPrice: Number(item.minPrice || 0),  // 권장 최소 판매가
             maxPrice: Number(item.maxPrice || 0),  // 권장 최대 판매가
             promotionPrice: null,
@@ -436,50 +436,52 @@ function ShopLayout() {
     }
 
     try {
-      
-      // branchProductId 결정
-      // 지점이 선택된 경우 해당 지점의 branchProductId 사용, 없으면 첫 번째 지점 사용
-      let branchProductId = product.branchProductId || product.id;
-      
+      // branchProductId 및 branchId 결정 (선택 지점 우선)
+      let resolvedBranchProductId = product.branchProductId || product.id;
+      let resolvedBranchId = product.selectedBranchId || null;
+
       if (product.availableBranches && product.availableBranches.length > 0) {
-        if (product.selectedBranchId) {
-          // 선택된 지점의 branchProductId 사용
-          const selectedBranch = product.availableBranches.find(b => b.branchId === product.selectedBranchId);
-          if (selectedBranch && selectedBranch.branchProductId) {
-            branchProductId = selectedBranch.branchProductId;
+        if (product.selectedBranchId != null) {
+          const selectedBranch = product.availableBranches.find(
+            (b) => String(b.branchId) === String(product.selectedBranchId)
+          );
+          if (selectedBranch) {
+            resolvedBranchProductId = selectedBranch.branchProductId || resolvedBranchProductId;
+            resolvedBranchId = selectedBranch.branchId;
           }
         } else {
-          // 지점이 선택되지 않으면 첫 번째 지점 사용
           const firstBranch = product.availableBranches[0];
-          if (firstBranch && firstBranch.branchProductId) {
-            branchProductId = firstBranch.branchProductId;
+          if (firstBranch) {
+            resolvedBranchProductId = firstBranch.branchProductId || resolvedBranchProductId;
+            resolvedBranchId = firstBranch.branchId;
           }
         }
       }
-      
-      
+
       // 백엔드 API를 통한 장바구니 추가
       const cartData = {
         memberId: currentUser.memberId,
-        branchProductId: branchProductId,
+        branchProductId: resolvedBranchProductId,
         quantity: 1,
         attributeName: null,
         attributeValue: null
       };
 
       await cartService.addToCart(cartData);
-      
-      // Redux 상태 업데이트
+
+      // Redux 상태 업데이트 (API에 사용된 동일 값 사용)
       dispatch(addToCart({
-        productId: product.productId,  // productId 추가
-        branchProductId: product.branchProductId || product.id,
-        branchId: product.selectedBranchId || 1, // 선택한 지점 ID 사용
+        productId: product.productId,
+        branchProductId: resolvedBranchProductId,
+        branchId: resolvedBranchId || 1,
         productName: product.name,
         price: product.promotionPrice || product.price,
         quantity: 1,
         imageUrl: product.image
       }));
-      
+
+      // 장바구니 페이지로 이동
+      setPage("cart");
       alert(`${product.name}이(가) 장바구니에 추가되었습니다.`);
     } catch (error) {
       console.error('장바구니 추가 실패:', error);

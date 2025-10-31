@@ -114,10 +114,20 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               <div className="instant-price">
                 <span className="price-label">즉시 구매가</span>
                 <span className="price-value">
-                  {product?.minPrice ? `₩${product.minPrice?.toLocaleString()} ~ ₩${product.maxPrice?.toLocaleString()}` : 
-                   product?.availableBranches?.[0]?.price ? `${product.availableBranches[0].price.toLocaleString()}원` : 
-                   '가격 문의'}
+                  {product?.maxPrice
+                    ? `₩${product.maxPrice?.toLocaleString()}`
+                    : (product?.availableBranches && product.availableBranches.length > 0)
+                    ? (() => {
+                        const max = product.availableBranches
+                          .map(b => Number(b?.price || 0))
+                          .reduce((acc, v) => (v > acc ? v : acc), 0);
+                        return max > 0 ? `₩${max.toLocaleString()}` : '가격 문의';
+                      })()
+                    : '가격 문의'}
                 </span>
+                <div className="price-note" style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
+                  지점별 가격에 따라 달라질 수 있습니다.
+                </div>
               </div>
             </div>
 
@@ -147,7 +157,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   <option value="">구매할 지점을 선택하세요</option>
                   {product.availableBranches.map(branch => (
                     <option key={branch.branchId} value={branch.branchId}>
-                      {branch.branchName || `지점 ${branch.branchId}`} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
+                      {branch.branchName} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
                     </option>
                   ))}
                 </select>
@@ -182,8 +192,15 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 <div className="btn-price">
                   {selectedBranchId && product?.availableBranches?.[selectedBranchId]?.price 
                     ? `${product.availableBranches[selectedBranchId].price.toLocaleString()}원`
-                    : product?.minPrice 
-                    ? `₩${product.minPrice.toLocaleString()}원~`
+                    : product?.maxPrice
+                    ? `₩${product.maxPrice.toLocaleString()}`
+                    : (product?.availableBranches && product.availableBranches.length > 0)
+                    ? (() => {
+                        const max = product.availableBranches
+                          .map(b => Number(b?.price || 0))
+                          .reduce((acc, v) => (v > acc ? v : acc), 0);
+                        return max > 0 ? `₩${max.toLocaleString()}` : '구매하기';
+                      })()
                     : '구매하기'}
                 </div>
                 <div className="btn-label">구매</div>
@@ -195,8 +212,15 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 <div className="btn-price">
                   {selectedBranchId && product?.availableBranches?.[selectedBranchId]?.price 
                     ? `${product.availableBranches[selectedBranchId].price.toLocaleString()}원`
-                    : product?.minPrice 
-                    ? `₩${product.minPrice.toLocaleString()}원~`
+                    : product?.maxPrice
+                    ? `₩${product.maxPrice.toLocaleString()}`
+                    : (product?.availableBranches && product.availableBranches.length > 0)
+                    ? (() => {
+                        const max = product.availableBranches
+                          .map(b => Number(b?.price || 0))
+                          .reduce((acc, v) => (v > acc ? v : acc), 0);
+                        return max > 0 ? `₩${max.toLocaleString()}` : '가격보기';
+                      })()
                     : '가격보기'}
                 </div>
                 <div className="btn-label">
@@ -237,16 +261,17 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
             <div className="price-info-item">
               <span className="info-label">판매가격</span>
               <span className="info-value">
-                {product?.minPrice && product?.maxPrice 
-                  ? `₩${product.minPrice.toLocaleString()} ~ ₩${product.maxPrice.toLocaleString()}`
-                  : product?.availableBranches?.[0]?.price 
-                  ? `${product.availableBranches[0].price.toLocaleString()}원`
+                {product?.maxPrice
+                  ? `₩${product.maxPrice.toLocaleString()}`
+                  : (product?.availableBranches && product.availableBranches.length > 0)
+                  ? (() => {
+                      const max = product.availableBranches
+                        .map(b => Number(b?.price || 0))
+                        .reduce((acc, v) => (v > acc ? v : acc), 0);
+                      return max > 0 ? `₩${max.toLocaleString()}` : '가격 문의';
+                    })()
                   : '가격 문의'}
               </span>
-            </div>
-            <div className="price-info-item">
-              <span className="info-label">공급가격</span>
-              <span className="info-value">{product?.supplyPrice?.toLocaleString() || '-'}원</span>
             </div>
             <div className="price-info-item">
               <span className="info-label">상품ID</span>

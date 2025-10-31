@@ -309,7 +309,22 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
                   })()}원
                 </div>
                 
-                {/* 지점 선택 UI 제거 (장바구니는 단일 지점) */}
+                {/* 지점 선택 드롭다운 */}
+                <div className="branch-selection" style={{ marginTop: 8 }}>
+                  <label style={{ marginRight: 8 }}>구매 지점:</label>
+                  <select
+                    value={selectedBranches[item.productId] || ''}
+                    onChange={(e) => handleBranchSelect(item.productId, e.target.value)}
+                    className="branch-select"
+                  >
+                    <option value="">지점을 선택하세요</option>
+                    {availableBranches[item.productId]?.map(branch => (
+                      <option key={`${item.productId}-${branch.branchId}`} value={branch.branchId}>
+                        {branch.branchName || `지점 ${branch.branchId}`} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="item-quantity">
                   <button 
                     className="quantity-btn"
