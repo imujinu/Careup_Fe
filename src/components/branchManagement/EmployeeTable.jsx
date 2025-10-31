@@ -40,8 +40,14 @@ function EmployeeTable({
     setContextMenu(null);
   };
 
-  const handleAction = (action, employee) => {
-    action(employee);
+  const handleAction = (e, action, employee) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (action) {
+      action(employee);
+    }
     setContextMenu(null);
   };
 
@@ -115,6 +121,7 @@ function EmployeeTable({
               onMouseEnter={() => setHoveredRow(employee.id)}
               onMouseLeave={() => setHoveredRow(null)}
               onContextMenu={(e) => handleContextMenu(e, employee)}
+              onClick={() => onViewDetail && onViewDetail(employee)}
             >
               <CardHeader>
                 <ProfileSection>
@@ -197,26 +204,26 @@ function EmployeeTable({
               top: contextMenu.y
             }}
           >
-            <ContextMenuItem onClick={() => handleAction(onViewDetail, contextMenu.employee)}>
+            <ContextMenuItem onClick={(e) => handleAction(e, onViewDetail, contextMenu.employee)}>
               <Icon path={mdiEye} size={1} />
               상세보기
             </ContextMenuItem>
             {onEdit && (
-              <ContextMenuItem onClick={() => handleAction(onEdit, contextMenu.employee)}>
+              <ContextMenuItem onClick={(e) => handleAction(e, onEdit, contextMenu.employee)}>
                 <Icon path={mdiPencil} size={1} />
                 수정
               </ContextMenuItem>
             )}
             {contextMenu.employee.employmentStatus === 'TERMINATED'
               ? (onRehire && (
-                  <ContextMenuItem onClick={() => handleAction(onRehire, contextMenu.employee)}>
+                  <ContextMenuItem onClick={(e) => handleAction(e, onRehire, contextMenu.employee)}>
                     <Icon path={mdiAccountReactivate} size={1} />
                     재입사
                   </ContextMenuItem>
                 ))
               : (onDelete && (
                   <ContextMenuItem 
-                    onClick={() => handleAction(onDelete, contextMenu.employee)}
+                    onClick={(e) => handleAction(e, onDelete, contextMenu.employee)}
                     danger
                   >
                     <Icon path={mdiDelete} size={1} />
