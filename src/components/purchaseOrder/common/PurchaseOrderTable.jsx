@@ -25,6 +25,23 @@ const TableHeaderCell = styled.th`
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  cursor: ${props => props.$sortable ? 'pointer' : 'default'};
+  user-select: none;
+  position: relative;
+  transition: all 0.2s;
+  
+  &:hover {
+    ${props => props.$sortable && `
+      color: #6d28d9;
+      background: #f9fafb;
+    `}
+  }
+`;
+
+const SortIndicator = styled.span`
+  margin-left: 4px;
+  font-size: 10px;
+  color: ${props => props.$active ? '#6d28d9' : '#d1d5db'};
 `;
 
 const TableBody = styled.tbody``;
@@ -98,6 +115,17 @@ const PaginationContainer = styled.div`
   border-top: 1px solid #e5e7eb;
 `;
 
+// 정렬 가능한 컬럼 정의
+const SORTABLE_COLUMNS = {
+  orderNo: 'orderNo',
+  branch: 'branch',
+  orderDate: 'orderDate',
+  productCount: 'productCount',
+  totalAmount: 'totalAmount',
+  status: 'status',
+  deliveryDate: 'deliveryDate',
+};
+
 const PageSizeContainer = styled.div`
   display: flex;
   align-items: center;
@@ -155,7 +183,7 @@ const PaginationButton = styled.button.attrs(props => ({
   }
 `;
 
-function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageChange, onPageSizeChange, onDetail }) {
+function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageChange, onPageSizeChange, onDetail, onSort, currentSort }) {
   const formatAmount = (amount) => {
     return new Intl.NumberFormat('ko-KR').format(amount);
   };
@@ -175,17 +203,60 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
     }
   };
 
+  const handleSort = (field) => {
+    if (!onSort) return;
+    
+    let direction = 'asc';
+    
+    // 현재 정렬 필드와 동일하면 방향 토글
+    if (currentSort?.field === field) {
+      direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    }
+    
+    onSort(field, direction);
+  };
+
+  const getSortIndicator = (field) => {
+    if (!currentSort || currentSort.field !== field) {
+      return React.createElement(SortIndicator, null, '⇅');
+    }
+    return React.createElement(SortIndicator, { $active: true },
+      currentSort.direction === 'asc' ? '↑' : '↓'
+    );
+  };
+
   return React.createElement(TableContainer, null,
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
-          React.createElement(TableHeaderCell, null, '발주번호'),
-          React.createElement(TableHeaderCell, null, '지점명'),
-          React.createElement(TableHeaderCell, null, '발주일'),
-          React.createElement(TableHeaderCell, null, '상품 수'),
-          React.createElement(TableHeaderCell, null, '총 금액'),
-          React.createElement(TableHeaderCell, null, '상태'),
-          React.createElement(TableHeaderCell, null, '배송예정일'),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.orderNo)
+          }, '발주번호', getSortIndicator(SORTABLE_COLUMNS.orderNo)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.branch)
+          }, '지점명', getSortIndicator(SORTABLE_COLUMNS.branch)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.orderDate)
+          }, '발주일', getSortIndicator(SORTABLE_COLUMNS.orderDate)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.productCount)
+          }, '상품 수', getSortIndicator(SORTABLE_COLUMNS.productCount)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.totalAmount)
+          }, '총 금액', getSortIndicator(SORTABLE_COLUMNS.totalAmount)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.status)
+          }, '상태', getSortIndicator(SORTABLE_COLUMNS.status)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.deliveryDate)
+          }, '배송예정일', getSortIndicator(SORTABLE_COLUMNS.deliveryDate)),
           React.createElement(TableHeaderCell, null, '작업')
         )
       ),

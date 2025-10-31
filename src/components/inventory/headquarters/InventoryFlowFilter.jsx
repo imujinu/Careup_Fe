@@ -162,12 +162,32 @@ function InventoryFlowFilter({ filters, onFiltersChange, branchList = [] }) {
         value: filters.branchFilter || '',
         onChange: handleBranchFilterChange
       },
+        // 전체 지점 옵션을 맨 위에 추가
         React.createElement('option', { value: '' }, '전체 지점'),
-        ...branchList.map(branch => 
-          React.createElement('option', {
-            key: branch.id || branch.name,
-            value: branch.name || branch.id
-          }, branch.name || `지점-${branch.id}`)
+        ...(branchList.length > 0
+          ? (() => {
+              // 본점을 먼저, 나머지를 역순으로 정렬
+              const sortedList = [...branchList].sort((a, b) => {
+                const aName = a.name || '';
+                const bName = b.name || '';
+                const aIsMain = aName.includes('본점') || aName.includes('본사') || a.id === 1;
+                const bIsMain = bName.includes('본점') || bName.includes('본사') || b.id === 1;
+                
+                if (aIsMain && !bIsMain) return -1;
+                if (!aIsMain && bIsMain) return 1;
+                
+                // 둘 다 본점이거나 둘 다 일반 지점인 경우, 이름 역순
+                return bName.localeCompare(aName, 'ko');
+              });
+              
+              return sortedList.map(branch => 
+                React.createElement('option', {
+                  key: branch.id || branch.name,
+                  value: branch.name || branch.id
+                }, branch.name || `지점-${branch.id}`)
+              );
+            })()
+          : []
         )
       ),
       React.createElement(Select, {

@@ -5,7 +5,6 @@ import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
 import { MENU_PATH_MAP } from '../routes/routePaths';
-import { getBranchName } from '../utils/branchUtils';
 
 import Icon from '@mdi/react';
 import {
@@ -102,6 +101,7 @@ function Sidebar({ isVisible, userType, branchId }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const rawRole = useAppSelector((s) => s.auth.role);
+  const branchName = useAppSelector((s) => s.auth.branchName);
   const role = String(rawRole || '').replace(/^ROLE_/, '').toUpperCase();
   const canManageStaff = role === 'BRANCH_ADMIN' || role === 'FRANCHISE_OWNER';
 
@@ -146,9 +146,9 @@ function Sidebar({ isVisible, userType, branchId }) {
   })();
 
   let menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
-  // STAFF는 발주관리 메뉴 비노출
+  // STAFF는 발주관리/자동발주 메뉴 비노출
   if (role === 'STAFF') {
-    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder');
+    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder' && m.id !== 'autoOrder');
   }
 
   const handleLogout = () => {
@@ -162,9 +162,9 @@ function Sidebar({ isVisible, userType, branchId }) {
         <Logo>H</Logo>
         <AppTitle>
           한솔도시락
-          {userType === 'franchise' && (
+          {userType === 'franchise' && branchName && (
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', fontWeight: 400 }}>
-              {getBranchName(branchId)}
+              {branchName}
             </div>
           )}
         </AppTitle>

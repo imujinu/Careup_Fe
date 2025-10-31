@@ -32,6 +32,23 @@ const TableHeaderCell = styled.th`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  cursor: ${props => props.$sortable ? 'pointer' : 'default'};
+  user-select: none;
+  position: relative;
+  transition: all 0.2s;
+  
+  &:hover {
+    ${props => props.$sortable && `
+      color: #6d28d9;
+      background: #f9fafb;
+    `}
+  }
+`;
+
+const SortIndicator = styled.span`
+  margin-left: 4px;
+  font-size: 10px;
+  color: ${props => props.$active ? '#6d28d9' : '#d1d5db'};
 `;
 
 const TableCell = styled.td`
@@ -143,6 +160,15 @@ const PaginationButton = styled.button`
   }
 `;
 
+// 정렬 가능한 컬럼 정의
+const SORTABLE_COLUMNS = {
+  productName: 'productName',
+  branch: 'branch',
+  createdAt: 'createdAt',
+  inQuantity: 'inQuantity',
+  outQuantity: 'outQuantity',
+};
+
 function InventoryFlowTable({ 
   data = [], 
   currentPage = 1, 
@@ -153,16 +179,41 @@ function InventoryFlowTable({
   onPageChange,
   onPageSizeChange,
   onEdit,
-  onDelete 
+  onDelete,
+  onSort,
+  currentSort
 }) {
-  const getBranchName = (branchId, itemBranchName) => {
-    // API 응답에 branchName이 포함되어 있으면 우선 사용
-    if (itemBranchName) {
-      return itemBranchName;
+  const handleSort = (field) => {
+    if (!onSort) return;
+    
+    let direction = 'asc';
+    
+    // 현재 정렬 필드와 동일하면 방향 토글
+    if (currentSort?.field === field) {
+      direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
     }
     
+    onSort(field, direction);
+  };
+
+  const getSortIndicator = (field) => {
+    if (!currentSort || currentSort.field !== field) {
+      return React.createElement(SortIndicator, null, '⇅');
+    }
+    return React.createElement(SortIndicator, { $active: true },
+      currentSort.direction === 'asc' ? '↑' : '↓'
+    );
+  };
+
+  const getBranchName = (branchId, itemBranchName) => {
+    // branchId가 1이면 항상 본점으로 표시
     if (branchId === 1) {
-      return '본사';
+      return '본점';
+    }
+    
+    // API 응답에 branchName이 포함되어 있으면 사용 (본사가 들어올 경우 본점으로 변경)
+    if (itemBranchName) {
+      return itemBranchName === '본사' ? '본점' : itemBranchName;
     }
     
     // branchList에서 지점명 찾기
@@ -173,7 +224,8 @@ function InventoryFlowTable({
     });
     
     if (branch && branch.name) {
-      return branch.name;
+      // branchList에서 찾은 이름도 본사면 본점으로 변경
+      return branch.name === '본사' ? '본점' : branch.name;
     }
     
     // 찾지 못한 경우 fallback
@@ -227,13 +279,28 @@ function InventoryFlowTable({
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement(TableRow, null,
-          React.createElement(TableHeaderCell, null, '상품명'),
-          React.createElement(TableHeaderCell, null, '지점'),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.productName)
+          }, '상품명', getSortIndicator(SORTABLE_COLUMNS.productName)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.branch)
+          }, '지점', getSortIndicator(SORTABLE_COLUMNS.branch)),
           React.createElement(TableHeaderCell, null, '구분'),
-          React.createElement(TableHeaderCell, null, '입고수량'),
-          React.createElement(TableHeaderCell, null, '출고수량'),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.inQuantity)
+          }, '입고수량', getSortIndicator(SORTABLE_COLUMNS.inQuantity)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.outQuantity)
+          }, '출고수량', getSortIndicator(SORTABLE_COLUMNS.outQuantity)),
           React.createElement(TableHeaderCell, null, '비고'),
-          React.createElement(TableHeaderCell, null, '등록일시'),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.createdAt)
+          }, '등록일시', getSortIndicator(SORTABLE_COLUMNS.createdAt)),
           React.createElement(TableHeaderCell, null, '작업')
         )
       ),

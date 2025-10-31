@@ -58,6 +58,7 @@ const initialState = {
   errorCode: '',
   userType: bootUser?.userType || 'franchise',
   branchId: bootUser?.branchId ?? null,
+  branchName: bootUser?.branchName ?? null,
   role: pickRole(bootUser),
 };
 
@@ -74,6 +75,9 @@ const authSlice = createSlice({
     },
     setBranchId: (state, action) => {
       state.branchId = action.payload;
+    },
+    setBranchName: (state, action) => {
+      state.branchName = action.payload;
     },
     setRole: (state, action) => {
       state.role = action.payload || '';
@@ -100,6 +104,7 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.userType = userInfo?.userType || 'franchise';
         state.branchId = userInfo?.branchId ?? null;
+        state.branchName = userInfo?.branchName ?? null;
         state.role = pickRole(userInfo);
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -110,6 +115,7 @@ const authSlice = createSlice({
         state.user = null;
         state.userType = 'franchise';
         state.branchId = null;
+        state.branchName = null;
         state.role = '';
       })
       .addCase(logoutUser.fulfilled, (state) => {
@@ -120,6 +126,7 @@ const authSlice = createSlice({
         state.errorCode = '';
         state.userType = 'franchise';
         state.branchId = null;
+        state.branchName = null;
         state.role = '';
       })
       .addCase(checkAuthStatus.fulfilled, (state, action) => {
@@ -129,17 +136,19 @@ const authSlice = createSlice({
           state.isAuthenticated = true;
           state.userType = userInfo.userType || 'franchise';
           state.branchId = userInfo.branchId ?? null;
+          state.branchName = userInfo.branchName ?? null;
           state.role = pickRole(userInfo);
         } else {
           state.user = null;
           state.isAuthenticated = false;
           state.userType = 'franchise';
           state.branchId = null;
+          state.branchName = null;
           state.role = '';
         }
       });
   },
 });
 
-export const { clearError, setUserType, setBranchId, setRole, mergeUser } = authSlice.actions;
+export const { clearError, setUserType, setBranchId, setBranchName, setRole, mergeUser } = authSlice.actions;
 export default authSlice.reducer;

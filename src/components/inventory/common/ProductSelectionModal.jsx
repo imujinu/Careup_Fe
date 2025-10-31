@@ -181,14 +181,15 @@ const NextButton = styled.button`
 function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] }) {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]); // 여러개 선택 가능
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryList, setCategoryList] = useState([]); // 카테고리 목록
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchProducts();
+      fetchCategories();
     }
   }, [isOpen]);
 
@@ -207,6 +208,23 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
       setProducts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      const categories = Array.isArray(data) ? data : (data?.data || data?.result || []);
+      if (categories.length > 0) {
+        setCategoryList(categories.map(cat => ({
+          id: cat.categoryId || cat.id,
+          name: cat.name || cat.categoryName
+        })));
+      }
+    } catch (err) {
+      console.error('카테고리 목록 조회 실패:', err);
+      setCategoryList([]);
     }
   };
 
@@ -235,26 +253,11 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
   };
 
   const handleProductSelect = (product) => {
-    setSelectedProducts(prev => {
-      const isSelected = prev.find(p => p.productId === product.productId);
-      if (isSelected) {
-        // 이미 선택된 상품이면 제거
-        return prev.filter(p => p.productId !== product.productId);
-      } else {
-        // 선택되지 않은 상품이면 추가
-        return [...prev, product];
-      }
-    });
-  };
-
-  const handleNext = () => {
-    if (selectedProducts.length > 0) {
-      onNext(selectedProducts);
-    }
+    // 상품 클릭 시 바로 선택하고 설정 모달로 이동
+    onNext([product]);
   };
 
   const handleClose = () => {
-    setSelectedProducts([]);
     setSearchTerm('');
     setCategoryFilter('');
     onClose();
@@ -281,10 +284,16 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
             onChange: (e) => setCategoryFilter(e.target.value)
           },
             React.createElement('option', { value: '' }, '전체 카테고리'),
-            React.createElement('option', { value: '음료' }, '음료'),
-            React.createElement('option', { value: '디저트' }, '디저트'),
-            React.createElement('option', { value: '빵' }, '빵'),
-            React.createElement('option', { value: '원두' }, '원두')
+            ...(categoryList.length > 0
+              ? categoryList.map(category =>
+                  React.createElement('option', { key: category.id, value: category.name }, category.name)
+                )
+              : [
+                  // fallback: 카테고리 로드 실패 시 기본 옵션
+                  React.createElement('option', { key: '음료', value: '음료' }, '음료'),
+                  React.createElement('option', { key: '디저트', value: '디저트' }, '디저트')
+                ]
+            )
           )
         ),
         loading ? 
@@ -303,10 +312,9 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
             ) :
             React.createElement(ProductGrid, null,
               filteredProducts.map((product) => {
-                const isSelected = selectedProducts.find(p => p.productId === product.productId);
                 return React.createElement(ProductCard, {
                   key: product.productId,
-                  $selected: !!isSelected,
+                  $selected: false,
                   onClick: () => handleProductSelect(product)
                 },
                   React.createElement(ProductName, null, product.productName || '알 수 없음'),
@@ -317,11 +325,7 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
               })
             ),
         React.createElement(ButtonGroup, null,
-          React.createElement(CancelButton, { onClick: handleClose }, '취소'),
-          React.createElement(NextButton, {
-            onClick: handleNext,
-            disabled: selectedProducts.length === 0
-          }, `등록 (${selectedProducts.length})`)
+          React.createElement(CancelButton, { onClick: handleClose }, '취소')
         )
       )
     )

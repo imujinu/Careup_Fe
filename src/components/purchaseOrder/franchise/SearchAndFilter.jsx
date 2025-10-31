@@ -62,6 +62,20 @@ const FilterContainer = styled.div`
   align-items: center;
 `;
 
+const Input = styled.input`
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  background: #ffffff;
+  
+  &:focus {
+    border-color: #6b46c1;
+  }
+`;
+
 const Select = styled.select`
   height: 44px;
   padding: 0 16px;
@@ -125,10 +139,24 @@ const OrderAutomationButton = styled(Button)`
 `;
 
 function SearchAndFilter({ filters, onFiltersChange, onOrderRequest, onOrderRecommendation, onOrderAutomation }) {
-  const handleSearchChange = (e) => {
+  const handleProductNameChange = (e) => {
     onFiltersChange({
       ...filters,
-      searchTerm: e.target.value
+      productName: e.target.value
+    });
+  };
+
+  const handleStartDateChange = (e) => {
+    onFiltersChange({
+      ...filters,
+      startDate: e.target.value
+    });
+  };
+
+  const handleEndDateChange = (e) => {
+    onFiltersChange({
+      ...filters,
+      endDate: e.target.value
     });
   };
 
@@ -150,12 +178,23 @@ function SearchAndFilter({ filters, onFiltersChange, onOrderRequest, onOrderReco
       ),
       React.createElement(SearchInput, {
         type: 'text',
-        placeholder: '발주번호로 검색...',
-        value: filters.searchTerm,
-        onChange: handleSearchChange
+        placeholder: '상품명으로 검색...',
+        value: filters.productName || '',
+        onChange: handleProductNameChange
       })
     ),
     React.createElement(FilterContainer, null,
+      React.createElement(Input, {
+        type: 'date',
+        value: filters.startDate || '',
+        onChange: handleStartDateChange
+      }),
+      React.createElement('span', null, '~'),
+      React.createElement(Input, {
+        type: 'date',
+        value: filters.endDate || '',
+        onChange: handleEndDateChange
+      }),
       React.createElement(Select, {
         value: filters.statusFilter,
         onChange: handleStatusFilterChange

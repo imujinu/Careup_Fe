@@ -221,13 +221,16 @@ export const authService = {
     // 기존 정보 유지 + JWT로 갱신 (이름/사진/직급은 기존 것이 우선)
     const prev = tokenStorage.getUserInfo() || {};
     const fromJwt = getUserInfoFromToken(newAT) || {};
+    const fromResp = normalizeFromResponse(box || {});
     const merged = {
       ...prev,
       ...fromJwt,
-      name: prev.name || fromJwt.name || '',
-      title: prev.title || fromJwt.title || '',                 // ★ 직급 유지
-      profileImageUrl: prev.profileImageUrl || fromJwt.profileImageUrl || '',
-      userType: isHQAdmin({ ...prev, ...fromJwt }) ? 'headquarters' : 'franchise',
+      ...fromResp,
+      name: prev.name || fromResp.name || fromJwt.name || '',
+      title: prev.title || fromResp.title || fromJwt.title || '',                 // ★ 직급 유지
+      branchName: prev.branchName || fromResp.branchName || fromJwt.branchName || undefined,
+      profileImageUrl: prev.profileImageUrl || fromResp.profileImageUrl || fromJwt.profileImageUrl || '',
+      userType: isHQAdmin({ ...prev, ...fromJwt, ...fromResp }) ? 'headquarters' : 'franchise',
     };
     tokenStorage.setUserInfo(merged);
 
