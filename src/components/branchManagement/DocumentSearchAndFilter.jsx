@@ -6,8 +6,6 @@ import { mdiMagnify, mdiChevronDown, mdiFileDocumentPlus } from '@mdi/js';
 function DocumentSearchAndFilter({ 
   searchTerm, 
   onSearchChange, 
-  branchFilter, 
-  onBranchFilterChange,
   documentTypeFilter,
   onDocumentTypeFilterChange,
   statusFilter,
@@ -58,18 +56,6 @@ function DocumentSearchAndFilter({
         </SearchInputContainer>
 
         <FilterGroup>
-          <FilterSelectContainer>
-            <FilterSelect
-              value={branchFilter}
-              onChange={(e) => onBranchFilterChange(e.target.value)}
-            >
-              <option value="">강남점 (BR001)</option>
-            </FilterSelect>
-            <FilterSelectIcon>
-              <Icon path={mdiChevronDown} size={1} />
-            </FilterSelectIcon>
-          </FilterSelectContainer>
-
           <FilterSelectContainer>
             <FilterSelect
               value={documentTypeFilter}
@@ -193,6 +179,7 @@ const FilterSelect = styled.select`
   background: white;
   cursor: pointer;
   min-width: 150px;
+  appearance: none;
   
   &:focus {
     outline: none;
