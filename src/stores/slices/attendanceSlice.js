@@ -1,3 +1,4 @@
+// src/stores/slices/attendanceSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { fetchScheduleCalendar } from '../../service/scheduleService';
 import { fetchKoreanHolidays } from '../../service/holidayService';
@@ -41,7 +42,7 @@ export const loadCalendarEvents = createAsyncThunk(
 
 /**
  * 공휴일 로딩
- * BE: [{ ymd, name }] or { "YYYY-MM-DD": "휴일명" }
+ * BE: ["YYYY-MM-DD", ...] 또는 [{ ymd, name }, ...] 또는 { "YYYY-MM-DD": "휴일명" }
  * FE state: 항상 { "YYYY-MM-DD": "휴일명" } 맵으로 저장
  */
 export const loadHolidays = createAsyncThunk(
@@ -49,12 +50,22 @@ export const loadHolidays = createAsyncThunk(
   async ({ viewFrom, viewTo }, { rejectWithValue }) => {
     try {
       const data = await fetchKoreanHolidays({ from: viewFrom, to: viewTo });
-      // data가 배열이든 맵이든 맵으로 정규화
-      let map = {};
+      // 어떤 형태가 와도 { ymd: name }으로 정규화
+      const map = {};
       if (Array.isArray(data)) {
-        data.forEach(h => { if (h?.ymd && h?.name) map[h.ymd] = h.name; });
+        data.forEach((h) => {
+          if (typeof h === 'string') {
+            map[h] = '공휴일';
+          } else if (h && typeof h === 'object') {
+            const ymd = h.ymd || h.date || h.day || '';
+            const name = h.name || h.title || '공휴일';
+            if (ymd) map[ymd] = name;
+          }
+        });
       } else if (data && typeof data === 'object') {
-        map = data;
+        Object.entries(data).forEach(([k, v]) => {
+          map[k] = v || '공휴일';
+        });
       }
       return map; // { ymd: name }
     } catch (e) {

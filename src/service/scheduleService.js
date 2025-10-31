@@ -3,9 +3,6 @@ import axios from '../utils/axiosConfig';
 
 /**
  * BASE_URL을 항상 "브랜치 서비스 루트"로 맞춥니다.
- * - VITE_BRANCH_URL이 있으면 그것을 사용(보통 http://localhost:8080/branch-service)
- * - 없으면 VITE_API_URL + '/branch-service'로 구성
- * - 마지막 슬래시는 제거해 일관성 유지
  */
 const BASE_URL = (() => {
   const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
@@ -23,11 +20,7 @@ const unwrap = (res) => {
 
 /**
  * 달력 데이터 조회(기간 기반)
- * GET /schedule/calendar-range?from=YYYY-MM-DD&to=YYYY-MM-DD&employeeIds=1&employeeIds=2...
- * - 기존 /schedule/calendar?from&to 호출을 /schedule/calendar-range로 변경
- * - params.employeeId 가 오면 employeeIds=[employeeId]로 변환
- * - Axios 배열 직렬화 호환을 위해 URLSearchParams로 직접 구성
- * 응답: ScheduleCalendarDto[]
+ * GET /schedule/calendar-range?from=YYYY-MM-DD&to=YYYY-MM-DD&employeeIds=1...
  */
 export const fetchScheduleCalendar = async ({ from, to, employeeIds, employeeId } = {}) => {
   const q = new URLSearchParams();
@@ -47,29 +40,84 @@ export const fetchScheduleCalendar = async ({ from, to, employeeIds, employeeId 
   return unwrap(res) || [];
 };
 
-/**
- * 직원 옵션 조회 (OptionController)
- * GET /api/employees/options?branchIds&from&to&keyword&all
- * 응답: EmployeeOptionDto[]
- */
+/** 직원 옵션 */
 export const fetchEmployeeOptions = async (params = {}) => {
   const res = await axios.get(`${BASE_URL}/api/employees/options`, { params });
   return unwrap(res) || [];
 };
 
-/* ====== 스케줄 작성/수정 API (백엔드 시그니처에 맞춤) ====== */
+/** 지점 옵션 */
+export const fetchBranchOptions = async (keyword = '') => {
+  const res = await axios.get(`${BASE_URL}/api/branches/options`, { params: { keyword } });
+  return unwrap(res) || [];
+};
 
-/** 단건 생성: POST /schedule/create */
+/**
+ * 근무종류 옵션
+ * 1순위: GET /api/work-types/options → [{ id, name, geofenceRequired }]
+ * 폴백 : GET /work-type/list?page=0&size=1000 → Page<WorkTypeDetailDto>.content 매핑
+ */
+export const fetchWorkTypeOptions = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/api/work-types/options`);
+    const data = unwrap(res) || [];
+    if (Array.isArray(data) && data.length >= 0) return data;
+  } catch { /* fallthrough */ }
+  // fallback
+  const res2 = await axios.get(`${BASE_URL}/work-type/list`, { params: { page: 0, size: 1000 } });
+  const page = unwrap(res2);
+  const content = page?.content || page?.data?.content || [];
+  return content.map(x => ({
+    id: x.id,
+    name: x.name,
+    geofenceRequired: !!x.geofenceRequired,
+  }));
+};
+
+/**
+ * 휴가종류 옵션
+ * 1순위: GET /api/leave-types/options → [{ id, name, paid }]
+ * 폴백 : GET /leave-type/list?page=0&size=1000 → Page<LeaveTypeDetailDto>.content 매핑
+ */
+export const fetchLeaveTypeOptions = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/api/leave-types/options`);
+    const data = unwrap(res) || [];
+    if (Array.isArray(data) && data.length >= 0) return data;
+  } catch { /* fallthrough */ }
+  // fallback
+  const res2 = await axios.get(`${BASE_URL}/leave-type/list`, { params: { page: 0, size: 1000 } });
+  const page = unwrap(res2);
+  const content = page?.content || page?.data?.content || [];
+  return content.map(x => ({
+    id: x.id,
+    name: x.name,
+    paid: !!x.paid,
+  }));
+};
+
+/* ====== 스케줄 작성/수정 API ====== */
+
+/** 단건 생성: POST /schedule/create
+ * 서버는 workTypeId 또는 leaveTypeId의 존재 여부로 종류(근무/휴가)를 판정합니다.
+ */
 export const createSchedule = async (payload) => {
   const res = await axios.post(`${BASE_URL}/schedule/create`, payload);
   return unwrap(res);
 };
 
-/** 대량 생성: POST /schedule/mass-create  (하이픈 주의) */
-export const createSchedulesBulk = async (payload) => {
+/**
+ * 대량 생성: POST /schedule/mass-create
+ * - 서버가 종류(근무/휴가)를 자동 판정합니다.
+ * - 규격: { items: [{ branchId, employeeId, date, workTypeId?|leaveTypeId?, registeredClockInTime?, registeredBreakStartTime?, registeredBreakEndTime?, registeredClockOutTime?, attendanceTemplateId? }...] }
+ * - 시간 필드는 "HH:mm" (LocalTime) 형식
+ */
+export const massCreateSchedules = async (payload) => {
   const res = await axios.post(`${BASE_URL}/schedule/mass-create`, payload);
   return unwrap(res);
 };
+
+export const createSchedulesBulk = massCreateSchedules;
 
 /** 단건 수정: PATCH /schedule/update/{id} */
 export const updateSchedule = async (id, payload) => {
@@ -77,19 +125,7 @@ export const updateSchedule = async (id, payload) => {
   return unwrap(res);
 };
 
-/**
- * (선택) 이벤트 단건 수정: 백엔드 엔드포인트 준비되면 연결
- * 현재 컨트롤러에 매핑이 없으므로 보류/플레이스홀더
- */
-// export const updateScheduleEvent = async (payload) => {
-//   const res = await axios.put(`${BASE_URL}/schedule/event/update`, payload);
-//   return unwrap(res);
-// };
-
-/**
- * (선택) 캘린더 엑셀 내보내기: 백엔드 구현 시 연결
- * GET /schedule/calendar/export (blob)
- */
+/** 캘린더 엑셀 내보내기 */
 export const exportScheduleCalendar = async (params = {}) => {
   const res = await axios.get(`${BASE_URL}/schedule/calendar/export`, {
     params,
