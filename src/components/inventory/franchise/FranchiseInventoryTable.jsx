@@ -141,7 +141,8 @@ function FranchiseInventoryTable({
           React.createElement(TableHeaderCell, null, '현재고'),
           React.createElement(TableHeaderCell, null, '안전재고'),
           React.createElement(TableHeaderCell, null, '상태'),
-          React.createElement(TableHeaderCell, null, '단가'),
+          React.createElement(TableHeaderCell, null, '공급가'),
+          React.createElement(TableHeaderCell, null, '판매가'),
           React.createElement(TableHeaderCell, null, '총 가치'),
           React.createElement(TableHeaderCell, null, '작업')
         )
@@ -163,6 +164,7 @@ function FranchiseInventoryTable({
               )
             ),
             React.createElement(TableCell, null, `₩${item.unitPrice.toLocaleString()}`),
+            React.createElement(TableCell, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-'),
             React.createElement(TableCell, null, `₩${item.totalValue.toLocaleString()}`),
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,

@@ -181,7 +181,6 @@ const NextButton = styled.button`
 function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] }) {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]); // 여러개 선택 가능
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categoryList, setCategoryList] = useState([]); // 카테고리 목록
@@ -254,26 +253,11 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
   };
 
   const handleProductSelect = (product) => {
-    setSelectedProducts(prev => {
-      const isSelected = prev.find(p => p.productId === product.productId);
-      if (isSelected) {
-        // 이미 선택된 상품이면 제거
-        return prev.filter(p => p.productId !== product.productId);
-      } else {
-        // 선택되지 않은 상품이면 추가
-        return [...prev, product];
-      }
-    });
-  };
-
-  const handleNext = () => {
-    if (selectedProducts.length > 0) {
-      onNext(selectedProducts);
-    }
+    // 상품 클릭 시 바로 선택하고 설정 모달로 이동
+    onNext([product]);
   };
 
   const handleClose = () => {
-    setSelectedProducts([]);
     setSearchTerm('');
     setCategoryFilter('');
     onClose();
@@ -328,10 +312,9 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
             ) :
             React.createElement(ProductGrid, null,
               filteredProducts.map((product) => {
-                const isSelected = selectedProducts.find(p => p.productId === product.productId);
                 return React.createElement(ProductCard, {
                   key: product.productId,
-                  $selected: !!isSelected,
+                  $selected: false,
                   onClick: () => handleProductSelect(product)
                 },
                   React.createElement(ProductName, null, product.productName || '알 수 없음'),
@@ -342,11 +325,7 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
               })
             ),
         React.createElement(ButtonGroup, null,
-          React.createElement(CancelButton, { onClick: handleClose }, '취소'),
-          React.createElement(NextButton, {
-            onClick: handleNext,
-            disabled: selectedProducts.length === 0
-          }, `등록 (${selectedProducts.length})`)
+          React.createElement(CancelButton, { onClick: handleClose }, '취소')
         )
       )
     )

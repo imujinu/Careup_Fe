@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { inventoryService } from '../../../service/inventoryService';
+import AddCategoryModal from './AddCategoryModal';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -145,6 +146,20 @@ const Select = styled.select`
   }
 `;
 
+const TextArea = styled.textarea`
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  
+  &:focus {
+    border-color: #6b46c1;
+  }
+`;
+
 const ButtonGroup = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -260,15 +275,54 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   const [formData, setFormData] = useState({
     productName: '',
     safetyStock: 0,
-    unitPrice: 0
+    unitPrice: 0,
+    minPrice: 0,
+    maxPrice: 0,
+    description: '',
+    category: '',
+    visibility: 'ALL'
   });
   
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [removeImage, setRemoveImage] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      console.log('카테고리 목록 조회 시작...');
+      const data = await inventoryService.getCategories();
+      console.log('카테고리 API 응답:', data);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        console.log('카테고리 목록 설정:', data);
+        setCategories(data);
+      } else {
+        console.warn('API 응답이 비어있거나 잘못된 구조:', data);
+        setCategories([
+          { categoryId: 1, name: '음료' },
+          { categoryId: 2, name: '디저트' },
+          { categoryId: 3, name: '빵' }
+        ]);
+      }
+    } catch (error) {
+      console.error('카테고리 조회 실패:', error);
+      setCategories([
+        { categoryId: 1, name: '음료' },
+        { categoryId: 2, name: '디저트' },
+        { categoryId: 3, name: '빵' }
+      ]);
+    }
+  };
 
   // 모달이 열릴 때마다 상품 정보와 재고 정보 로드
   useEffect(() => {
+    if (isOpen) {
+      fetchCategories();
+    }
+    
     if (item && isOpen && item.product?.id) {
       const productId = item.product.id;
       
@@ -276,10 +330,15 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
       setFormData({
         productName: item.product?.name || '',
         safetyStock: item.safetyStock || 0,
-        unitPrice: item.unitPrice || 0
+        unitPrice: item.unitPrice || 0,
+        minPrice: item.product?.minPrice || item.minPrice || 0,
+        maxPrice: item.product?.maxPrice || item.maxPrice || 0,
+        description: item.product?.description || item.description || '',
+        category: item.product?.categoryId || item.categoryId || item.category || '',
+        visibility: item.product?.visibility || item.visibility || 'ALL'
       });
       
-      // 상품 상세 정보 가져오기 (이미지 URL만 필요)
+      // 상품 상세 정보 가져오기 (이미지 URL 및 추가 정보)
       const fetchProductInfo = async () => {
         try {
           const response = await inventoryService.getProduct(productId);
@@ -291,6 +350,16 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           } else {
             setImagePreview(null);
           }
+          
+          // 상품 상세 정보 업데이트
+          setFormData(prev => ({
+            ...prev,
+            minPrice: productData?.minPrice || prev.minPrice || 0,
+            maxPrice: productData?.maxPrice || prev.maxPrice || 0,
+            description: productData?.description || prev.description || '',
+            category: productData?.categoryId || productData?.category?.categoryId || prev.category || '',
+            visibility: productData?.visibility || prev.visibility || 'ALL'
+          }));
         } catch (err) {
           console.error('상품 정보 조회 실패:', err);
         }
@@ -350,7 +419,66 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     }
   };
 
+  const handleCategorySave = async (categoryData) => {
+    try {
+      const result = await inventoryService.createCategory(categoryData);
+      console.log('카테고리 등록 성공:', result);
+      
+      if (result && result.categoryId) {
+        const newCategory = {
+          categoryId: result.categoryId,
+          name: result.name || categoryData.name
+        };
+        
+        setCategories(prevCategories => {
+          const exists = prevCategories.some(cat => 
+            cat.categoryId === newCategory.categoryId || cat.name === newCategory.name
+          );
+          
+          if (!exists) {
+            console.log('새 카테고리를 로컬 상태에 추가:', newCategory);
+            return [...prevCategories, newCategory];
+          }
+          
+          return prevCategories;
+        });
+      } else {
+        console.warn('카테고리 등록 응답에서 categoryId를 찾을 수 없음:', result);
+      }
+      
+      alert('카테고리가 성공적으로 등록되었습니다.');
+      await fetchCategories();
+    } catch (error) {
+      console.error('카테고리 등록 실패:', error);
+      alert('카테고리 등록에 실패했습니다: ' + (error.response?.data?.status_message || error.message));
+    }
+  };
+
   const handleSave = () => {
+    // 필수 항목 검증
+    const errors = [];
+    
+    if (!formData.productName || formData.productName.trim() === '') {
+      errors.push('상품명');
+    }
+    
+    if (!formData.safetyStock || formData.safetyStock === '' || formData.safetyStock < 0) {
+      errors.push('안전재고');
+    }
+    
+    if (!formData.unitPrice || formData.unitPrice === '' || formData.unitPrice < 0) {
+      errors.push('단가');
+    }
+    
+    if (!formData.category || formData.category === '') {
+      errors.push('카테고리');
+    }
+    
+    if (errors.length > 0) {
+      alert(`다음 필수 항목을 입력해주세요:\n${errors.join(', ')}`);
+      return;
+    }
+    
     onSave({
       ...formData,
       imageFile: imageFile || null,
@@ -381,6 +509,40 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               onChange: (e) => handleInputChange('productName', e.target.value),
               placeholder: '상품명을 입력하세요'
             })
+          ),
+          React.createElement(FormGroup, null,
+            React.createElement(Label, null,
+              '카테고리 ',
+              React.createElement('span', { className: 'required' }, '*')
+            ),
+            React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+              React.createElement(Select, {
+                value: formData.category,
+                onChange: (e) => handleInputChange('category', e.target.value),
+                style: { flex: 1 }
+              },
+                React.createElement('option', { value: '' }, `카테고리 선택 (${categories.length}개)`),
+                ...(Array.isArray(categories) ? categories.map(category => 
+                  React.createElement('option', { 
+                    key: category.categoryId || category.id, 
+                    value: category.categoryId || category.id 
+                  }, category.name)
+                ) : [])
+              ),
+              React.createElement('button', {
+                type: 'button',
+                onClick: () => setIsCategoryModalOpen(true),
+                style: {
+                  padding: '8px 12px',
+                  backgroundColor: '#6b46c1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }
+              }, '+ 카테고리 추가')
+            )
           ),
           React.createElement(FormGroup, null,
             React.createElement(Label, null, '상품 이미지'),
@@ -434,6 +596,14 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 )
               )
             )
+          ),
+          React.createElement(FormGroup, null,
+            React.createElement(Label, null, '상품설명'),
+            React.createElement(TextArea, {
+              placeholder: '상품에 대한 설명을 입력하세요',
+              value: formData.description,
+              onChange: (e) => handleInputChange('description', e.target.value)
+            })
           )
         ),
         React.createElement(Section, null,
@@ -463,11 +633,14 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 }
               })
             )
-          ),
+          )
+        ),
+        React.createElement(Section, null,
+          React.createElement(SectionTitle, null, '가격 정보'),
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
               React.createElement(Label, null, 
-                '단가 ',
+                '단가 (원) ',
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
@@ -482,13 +655,58 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               })
             ),
             React.createElement(FormGroup, null)
+          ),
+          React.createElement(FormRow, null,
+            React.createElement(FormGroup, null,
+              React.createElement(Label, null, '최저 가격 (원)'),
+              React.createElement(Input, {
+                type: 'number',
+                value: formData.minPrice,
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('minPrice', '');
+                  const n = parseInt(v, 10);
+                  handleInputChange('minPrice', isNaN(n) ? 0 : n);
+                }
+              })
+            ),
+            React.createElement(FormGroup, null,
+              React.createElement(Label, null, '최고 가격 (원)'),
+              React.createElement(Input, {
+                type: 'number',
+                value: formData.maxPrice,
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('maxPrice', '');
+                  const n = parseInt(v, 10);
+                  handleInputChange('maxPrice', isNaN(n) ? 0 : n);
+                }
+              })
+            )
+          )
+        ),
+        React.createElement(Section, null,
+          React.createElement(FormGroup, null,
+            React.createElement(Label, null, '공개범위'),
+            React.createElement(Select, {
+              value: formData.visibility,
+              onChange: (e) => handleInputChange('visibility', e.target.value)
+            },
+              React.createElement('option', { value: 'ALL' }, '전체 공개'),
+              React.createElement('option', { value: 'LIMITED' }, '제한 공개')
+            )
           )
         ),
         React.createElement(ButtonGroup, null,
           React.createElement(CancelButton, { onClick: onClose }, '취소'),
           React.createElement(SaveButton, { onClick: handleSave }, '저장')
         )
-      )
+      ),
+      React.createElement(AddCategoryModal, {
+        isOpen: isCategoryModalOpen,
+        onClose: () => setIsCategoryModalOpen(false),
+        onSave: handleCategorySave
+      })
     )
   );
 }

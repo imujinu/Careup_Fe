@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { inventoryService } from '../../../service/inventoryService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -124,6 +125,12 @@ const Input = styled.input`
   &:focus {
     border-color: #6b46c1;
   }
+  
+  &:disabled {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    cursor: not-allowed;
+  }
 `;
 
 const Select = styled.select`
@@ -211,22 +218,50 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     safetyStock: 0,
     unitPrice: 0,
     category: '',
-    notes: ''
+    notes: '',
+    sellingPrice: 0
+  });
+  const [productInfo, setProductInfo] = useState({
+    minPrice: 0,
+    maxPrice: 0,
+    supplyPrice: 0
   });
 
-  // item이 변경될 때 formData 초기화
+  // item이 변경될 때 formData 초기화 및 상품 정보 조회
   useEffect(() => {
-    if (item) {
+    if (item && isOpen) {
       console.log('EditInventoryModal에서 받은 item:', item); // 디버깅용
       setFormData({
         currentStock: item.currentStock || item.stockQuantity || 0,
         safetyStock: item.safetyStock || 0,
         unitPrice: item.unitPrice || item.price || 0,
         category: item.category || item.categoryName || '',
-        notes: ''
+        notes: '',
+        sellingPrice: item.salesPrice || item.price || 0
       });
+
+      // 상품 상세 정보 가져오기 (최저가격, 최고가격, 공급가)
+      const fetchProductDetails = async () => {
+        try {
+          const productId = item.product?.id || item.productId;
+          if (productId) {
+            const response = await inventoryService.getProduct(productId);
+            const productData = response.data?.data || response.data;
+            
+            setProductInfo({
+              minPrice: productData?.minPrice || 0,
+              maxPrice: productData?.maxPrice || 0,
+              supplyPrice: productData?.supplyPrice || 0
+            });
+          }
+        } catch (err) {
+          console.error('상품 상세 정보 조회 실패:', err);
+        }
+      };
+
+      fetchProductDetails();
     }
-  }, [item]);
+  }, [item, isOpen]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -236,11 +271,19 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   };
 
   const handleSave = () => {
-    // 현재고는 제외하고 안전재고와 단가만 전송
+    // 판매가 검증 (최저가격 ~ 최고가격 사이)
+    if (productInfo.minPrice > 0 && productInfo.maxPrice > 0) {
+      const sellingPrice = parseInt(formData.sellingPrice) || 0;
+      if (sellingPrice < productInfo.minPrice || sellingPrice > productInfo.maxPrice) {
+        alert(`판매가는 ${productInfo.minPrice.toLocaleString()}원 ~ ${productInfo.maxPrice.toLocaleString()}원 사이로 입력해주세요.`);
+        return;
+      }
+    }
+
+    // 현재고는 제외하고 안전재고와 판매가만 전송 (공급가는 수정 불가)
     const saveData = {
       safetyStock: formData.safetyStock === '' ? 0 : formData.safetyStock,
-      unitPrice: formData.unitPrice === '' ? 0 : formData.unitPrice,
-      category: formData.category,
+      sellingPrice: formData.sellingPrice === '' ? 0 : formData.sellingPrice,
       notes: formData.notes
     };
     onSave(saveData);
@@ -266,6 +309,10 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '상품명:'),
               React.createElement(InfoValue, null, item.product?.name || item.productName || item.name || '-')
+            ),
+            React.createElement(InfoRow, null,
+              React.createElement(InfoLabel, null, '카테고리:'),
+              React.createElement(InfoValue, null, item.category || item.categoryName || '미분류')
             ),
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '현재 재고:'),
@@ -311,34 +358,52 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               })
             )
           ),
-          React.createElement(FormRow, null,
-            React.createElement(FormGroup, null,
-              React.createElement(Label, null,
-                '단가 (원) ',
-                React.createElement('span', { className: 'required' }, '*')
+          React.createElement(Section, null,
+            React.createElement(SectionTitle, null, '가격 정보'),
+            React.createElement(FormRow, null,
+              React.createElement(FormGroup, null,
+                React.createElement(Label, null, '공급가 (원)'),
+                React.createElement(Input, {
+                  type: 'number',
+                  value: productInfo.supplyPrice || 0,
+                  disabled: true
+                })
               ),
-              React.createElement(Input, {
-                type: 'number',
-                value: formData.unitPrice === 0 ? (formData.unitPrice === '' ? '' : formData.unitPrice) : formData.unitPrice,
-                onChange: (e) => {
-                  const v = e.target.value;
-                  if (v === '') return handleInputChange('unitPrice', '');
-                  const n = parseInt(v, 10);
-                  handleInputChange('unitPrice', isNaN(n) ? 0 : n);
-                },
-                min: 0
-              })
+              React.createElement(FormGroup, null,
+                React.createElement(Label, null,
+                  '판매가 (원) ',
+                  React.createElement('span', { className: 'required' }, '*')
+                ),
+                React.createElement(Input, {
+                  type: 'number',
+                  value: formData.sellingPrice === 0 ? (formData.sellingPrice === '' ? '' : formData.sellingPrice) : formData.sellingPrice,
+                  onChange: (e) => {
+                    const v = e.target.value;
+                    if (v === '') return handleInputChange('sellingPrice', '');
+                    const n = parseInt(v, 10);
+                    handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
+                  },
+                  min: productInfo.minPrice || 0,
+                  max: productInfo.maxPrice || undefined
+                })
+              )
             ),
-            React.createElement(FormGroup, null,
-              React.createElement(Label, null, '카테고리'),
-              React.createElement(Select, {
-                value: formData.category,
-                onChange: (e) => handleInputChange('category', e.target.value)
-              },
-                React.createElement('option', { value: '' }, '카테고리 선택'),
-                React.createElement('option', { value: '원재료' }, '원재료'),
-                React.createElement('option', { value: '음료' }, '음료'),
-                React.createElement('option', { value: '디저트' }, '디저트')
+            React.createElement(FormRow, null,
+              React.createElement(FormGroup, null,
+                React.createElement(Label, null, '최저가격 (원)'),
+                React.createElement(Input, {
+                  type: 'number',
+                  value: productInfo.minPrice || 0,
+                  disabled: true
+                })
+              ),
+              React.createElement(FormGroup, null,
+                React.createElement(Label, null, '최고가격 (원)'),
+                React.createElement(Input, {
+                  type: 'number',
+                  value: productInfo.maxPrice || 0,
+                  disabled: true
+                })
               )
             )
           ),
@@ -363,12 +428,12 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
             borderRadius: '4px',
             border: '1px solid #e5e7eb'
           }}, 
-            '💡 현재고는 발주나 입출고를 통해서만 변경됩니다. 여기서는 안전재고와 단가만 수정할 수 있습니다.'
+            '💡 현재고는 발주나 입출고를 통해서만 변경됩니다. 여기서는 안전재고와 판매가만 수정할 수 있습니다. 공급가는 본사에서 정하므로 수정할 수 없습니다.'
           ),
           React.createElement(InfoCard, null,
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '총 가치:'),
-              React.createElement(InfoValue, null, `₩${formatAmount(formData.currentStock * formData.unitPrice)}`)
+              React.createElement(InfoValue, null, `₩${formatAmount((formData.currentStock || 0) * (productInfo.supplyPrice || 0))}`)
             ),
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '재고 상태:'),
