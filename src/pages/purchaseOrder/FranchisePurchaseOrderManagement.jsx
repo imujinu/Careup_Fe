@@ -99,7 +99,9 @@ function FranchisePurchaseOrderManagement() {
   });
 
   const [filters, setFilters] = useState({
-    searchTerm: '',
+    productName: '',
+    startDate: '',
+    endDate: '',
     statusFilter: ''
   });
 
@@ -115,6 +117,7 @@ function FranchisePurchaseOrderManagement() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [productStatistics, setProductStatistics] = useState([]);
+  const [sort, setSort] = useState(null); // { field, direction }
 
   // 가맹점용 발주 목록 조회
   const fetchPurchaseOrders = async () => {
@@ -129,14 +132,23 @@ function FranchisePurchaseOrderManagement() {
       console.log('가맹점 발주 목록 API 응답:', data);
       
       // 데이터 변환 (백엔드 API 응답 필드명에 맞게 수정)
-      const formattedData = data.map(item => ({
-        id: item.purchaseOrderId,
-        orderDate: item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
-        productCount: item.productCount || 0,
-        totalAmount: item.totalPrice || 0, // totalPrice로 수정
-        status: item.orderStatus || 'PENDING', // orderStatus로 수정
-        deliveryDate: item.deliveryDate || '-'
-      }));
+      const formattedData = data.map(item => {
+        const orderDate = item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0];
+        const serial = String(item.purchaseOrderId || 0).padStart(6, '0');
+        const yyyymmdd = orderDate.replace(/-/g, '');
+        const displayOrderNo = `PO-${yyyymmdd}-${serial}`;
+        return ({
+          id: item.purchaseOrderId,
+          displayOrderNo,
+          orderDate,
+          productCount: item.productCount || 0,
+          totalAmount: item.totalPrice || 0,
+          status: item.orderStatus || 'PENDING',
+          deliveryDate: item.deliveryDate || '-',
+          // 검색용 필드(상세 조회 후 채움)
+          productNames: ''
+        });
+      });
       
       // ID 기반 중복 데이터 제거 (더 안전한 방식)
       const uniqueData = formattedData.reduce((acc, current) => {
@@ -151,6 +163,24 @@ function FranchisePurchaseOrderManagement() {
       }, []);
       
       setPurchaseOrders(uniqueData);
+
+      // 상세 조회로 상품명 보강 (검색용)
+      try {
+        const detailed = await Promise.all(uniqueData.map(async (po) => {
+          try {
+            const detail = await purchaseOrderService.getPurchaseOrder(po.id);
+            const names = Array.isArray(detail.orderDetails)
+              ? detail.orderDetails.map(d => d.productName).filter(Boolean).join(', ')
+              : '';
+            return { ...po, productNames: names, products: detail.orderDetails };
+          } catch (e) {
+            return po;
+          }
+        }));
+        setPurchaseOrders(detailed);
+      } catch (e) {
+        // ignore enrichment errors
+      }
       
       const totalOrders = uniqueData.length;
       const pending = uniqueData.filter(item => item.status === 'PENDING').length;
@@ -245,17 +275,78 @@ function FranchisePurchaseOrderManagement() {
     // TODO: 자동화 설정 저장 로직 구현
   };
 
-
+  const handleSort = (field, direction) => {
+    setSort({ field, direction });
+  };
 
   // 필터링된 데이터
-  const filteredData = purchaseOrders.filter(item => {
-    const matchesSearch = !filters.searchTerm || 
-      item.id.toLowerCase().includes(filters.searchTerm.toLowerCase());
-    
-    const matchesStatus = !filters.statusFilter || item.status === filters.statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredData = React.useMemo(() => {
+    let filtered = purchaseOrders.filter(item => {
+    // 상품명 필터
+    const nameTerm = (filters.productName || '').trim().toLowerCase();
+    const matchProductName = nameTerm === '' ||
+      (Array.isArray(item.products) && item.products.some(p => String(p.productName || p.name || '').toLowerCase().includes(nameTerm))) ||
+      (typeof item.productNames === 'string' && item.productNames.toLowerCase().includes(nameTerm));
+
+    // 날짜 범위 필터
+    const matchDate = (() => {
+      if (!filters.startDate && !filters.endDate) return true;
+      const d = new Date(item.orderDate);
+      if (filters.startDate && d < new Date(filters.startDate)) return false;
+      if (filters.endDate && d > new Date(filters.endDate)) return false;
+      return true;
+    })();
+
+    const matchStatus = !filters.statusFilter || item.status === filters.statusFilter;
+
+    return matchProductName && matchDate && matchStatus;
+    });
+
+    // 정렬 적용
+    if (sort && sort.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sort.field) {
+          case 'orderNo':
+            // 발주번호를 숫자로 변환하여 정렬 (PO-YYYYMMDD-###### 형식)
+            const aOrderNo = String(a.displayOrderNo || a.id || '').split('-').pop() || '';
+            const bOrderNo = String(b.displayOrderNo || b.id || '').split('-').pop() || '';
+            aValue = parseInt(aOrderNo) || 0;
+            bValue = parseInt(bOrderNo) || 0;
+            break;
+          case 'orderDate':
+            aValue = new Date(a.orderDate || 0);
+            bValue = new Date(b.orderDate || 0);
+            break;
+          case 'productCount':
+            aValue = a.productCount || 0;
+            bValue = b.productCount || 0;
+            break;
+          case 'totalAmount':
+            aValue = a.totalAmount || 0;
+            bValue = b.totalAmount || 0;
+            break;
+          case 'status':
+            aValue = a.status || '';
+            bValue = b.status || '';
+            break;
+          case 'deliveryDate':
+            aValue = a.deliveryDate ? new Date(a.deliveryDate) : new Date(0);
+            bValue = b.deliveryDate ? new Date(b.deliveryDate) : new Date(0);
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [purchaseOrders, filters, sort]);
 
   // 페이지네이션
   const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -307,7 +398,9 @@ function FranchisePurchaseOrderManagement() {
       pageSize,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
-      onDetail: handleDetail
+      onDetail: handleDetail,
+      onSort: handleSort,
+      currentSort: sort
     }),
     React.createElement(FranchisePurchaseOrderDetailModal, {
       isOpen: isDetailModalOpen,

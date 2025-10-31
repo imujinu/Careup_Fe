@@ -232,7 +232,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
               React.createElement('option', { 
                 key: product.id, 
                 value: product.id 
-              }, `${product.productName} (${product.branchId === 1 ? '본사' : `지점-${product.branchId}`})`)
+              }, `${product.productName} (본점)`)
             )
           )
         ),

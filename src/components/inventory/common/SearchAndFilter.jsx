@@ -87,7 +87,7 @@ const AddButton = styled.button`
   }
 `;
 
-function SearchAndFilter({ filters, onFiltersChange, onAddInventory, onAddProduct, userRole }) {
+function SearchAndFilter({ filters, onFiltersChange, onAddInventory, onAddProduct, userRole, branchList = [], categoryList = [] }) {
   const handleSearchChange = (value) => {
     onFiltersChange({ ...filters, searchTerm: value });
   };
@@ -120,20 +120,49 @@ function SearchAndFilter({ filters, onFiltersChange, onAddInventory, onAddProduc
         onChange: (e) => handleCategoryFilterChange(e.target.value)
       },
         React.createElement('option', { value: '' }, '전체 카테고리'),
-        React.createElement('option', { value: '음료' }, '음료'),
-        React.createElement('option', { value: '디저트' }, '디저트'),
-        React.createElement('option', { value: '빵' }, '빵'),
-        React.createElement('option', { value: '원두' }, '원두')
+        ...(categoryList.length > 0
+          ? categoryList.map(category => 
+              React.createElement('option', { key: category.id, value: category.name }, category.name)
+            )
+          : [
+              // fallback: 카테고리 목록이 없을 때 기본 옵션
+              React.createElement('option', { key: '음료', value: '음료' }, '음료'),
+              React.createElement('option', { key: '디저트', value: '디저트' }, '디저트')
+            ]
+        )
       ),
-      React.createElement(Select, {
+      // 본사 관리자는 지점 필터 표시, 지점 관리자는 표시하지 않음
+      userRole === 'HQ_ADMIN' && React.createElement(Select, {
         value: filters.branchFilter,
         onChange: (e) => handleBranchFilterChange(e.target.value)
       },
-        React.createElement('option', { value: '' }, '전체 지점'),
-        React.createElement('option', { value: '본사' }, '본사'),
-        React.createElement('option', { value: '강남점' }, '강남점'),
-        React.createElement('option', { value: '신촌점' }, '신촌점'),
-        React.createElement('option', { value: '홍대점' }, '홍대점')
+        // 전체 지점 옵션을 맨 위에 추가
+        React.createElement('option', { key: 'all', value: '' }, '전체 지점'),
+        ...(branchList.length > 0 
+          ? (() => {
+              // 본점/본사를 먼저, 나머지를 역순으로 정렬
+              const sortedList = [...branchList].sort((a, b) => {
+                const aName = a.name || '';
+                const bName = b.name || '';
+                const aIsMain = aName.includes('본점') || aName.includes('본사') || a.id === 1;
+                const bIsMain = bName.includes('본점') || bName.includes('본사') || b.id === 1;
+                
+                if (aIsMain && !bIsMain) return -1;
+                if (!aIsMain && bIsMain) return 1;
+                
+                // 둘 다 본점이거나 둘 다 일반 지점인 경우, 이름 역순
+                return bName.localeCompare(aName, 'ko');
+              });
+              
+              // 본점이 먼저, 그 다음 나머지 지점들
+              return sortedList.map(branch => 
+                React.createElement('option', { key: branch.id, value: branch.name }, branch.name)
+              );
+            })()
+          : [
+              React.createElement('option', { key: 1, value: '본사' }, '본사')
+            ]
+        )
       ),
       React.createElement(Select, {
         value: filters.statusFilter,

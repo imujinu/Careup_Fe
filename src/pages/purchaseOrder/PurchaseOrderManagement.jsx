@@ -95,6 +95,7 @@ function PurchaseOrderManagement() {
   const [branchStatistics, setBranchStatistics] = useState([]);
   const [productStatistics, setProductStatistics] = useState([]);
   const [branchList, setBranchList] = useState([]);
+  const [sort, setSort] = useState(null); // { field, direction }
 
   // 상태 한글 변환 함수
   const getStatusText = (status) => {
@@ -315,8 +316,13 @@ function PurchaseOrderManagement() {
     }
   };
 
+  const handleSort = (field, direction) => {
+    setSort({ field, direction });
+  };
+
   // 필터링된 데이터
-  const filteredData = purchaseOrders.filter(item => {
+  const filteredData = React.useMemo(() => {
+    let filtered = purchaseOrders.filter(item => {
     const matchesSearch = !filters.searchTerm || 
       String(item.id).toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
       item.branch.toLowerCase().includes(filters.searchTerm.toLowerCase());
@@ -326,7 +332,55 @@ function PurchaseOrderManagement() {
       (item.status || item.orderStatus || '').toUpperCase() === filters.statusFilter.toUpperCase();
     
     return matchesSearch && matchesBranch && matchesStatus;
-  });
+    });
+
+    // 정렬 적용
+    if (sort && sort.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sort.field) {
+          case 'orderNo':
+            // 발주번호를 숫자로 변환하여 정렬
+            aValue = parseInt(String(a.id || '')) || 0;
+            bValue = parseInt(String(b.id || '')) || 0;
+            break;
+          case 'branch':
+            aValue = a.branch || '';
+            bValue = b.branch || '';
+            break;
+          case 'orderDate':
+            aValue = new Date(a.orderDate || 0);
+            bValue = new Date(b.orderDate || 0);
+            break;
+          case 'productCount':
+            aValue = a.productCount || 0;
+            bValue = b.productCount || 0;
+            break;
+          case 'totalAmount':
+            aValue = a.totalAmount || 0;
+            bValue = b.totalAmount || 0;
+            break;
+          case 'status':
+            aValue = a.status || a.orderStatus || '';
+            bValue = b.status || b.orderStatus || '';
+            break;
+          case 'deliveryDate':
+            aValue = a.deliveryDate ? new Date(a.deliveryDate) : new Date(0);
+            bValue = b.deliveryDate ? new Date(b.deliveryDate) : new Date(0);
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [purchaseOrders, filters, sort]);
 
   // 페이지네이션
   const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -365,7 +419,9 @@ function PurchaseOrderManagement() {
       pageSize,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
-      onDetail: handleDetail
+      onDetail: handleDetail,
+      onSort: handleSort,
+      currentSort: sort
     }),
     React.createElement(PurchaseOrderDetailModal, {
       isOpen: isDetailModalOpen,

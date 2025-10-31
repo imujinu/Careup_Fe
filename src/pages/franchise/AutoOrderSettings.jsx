@@ -385,6 +385,43 @@ const AutoOrderSettings = () => {
     }
   };
 
+  // 모든 상품 자동 발주 활성화
+  const handleEnableAllProducts = async () => {
+    try {
+      if (!autoOrderEnabled) {
+        alert('전체 자동 발주 시스템이 비활성화되어 있습니다. 먼저 전체 시스템을 활성화해주세요.');
+        return;
+      }
+
+      const updatedInventoryData = inventoryData.map(item => ({
+        ...item,
+        autoOrderEnabled: true
+      }));
+
+      setInventoryData(updatedInventoryData);
+
+      const transformedData = {
+        autoOrderEnabled: autoOrderEnabled,
+        products: updatedInventoryData.map(item => ({
+          productId: item.id,
+          productName: item.name,
+          autoOrderEnabled: true,
+          safetyStock: item.safetyStock,
+          currentStock: item.currentStock
+        }))
+      };
+
+      await autoOrderService.updateFranchiseAutoOrderSettings(transformedData);
+
+      console.log('모든 상품 자동 발주 활성화 완료:', transformedData);
+      alert('모든 상품의 자동 발주가 활성화되었습니다.');
+    } catch (error) {
+      console.error('모든 상품 자동 발주 활성화 실패:', error);
+      alert('모든 상품 자동 발주 활성화 실패: ' + error.message);
+      await fetchAutoOrderStatus();
+    }
+  };
+
 
   return (
     <PageContainer>
@@ -434,6 +471,15 @@ const AutoOrderSettings = () => {
       <Card>
         <CardHeader>
           <CardTitle>상품별 자동 발주 설정</CardTitle>
+          {autoOrderEnabled && inventoryData.length > 0 && (
+            <Button
+              primary
+              onClick={handleEnableAllProducts}
+              disabled={loading}
+            >
+              전체 켜기
+            </Button>
+          )}
         </CardHeader>
         
         {loading ? (
