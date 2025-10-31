@@ -5,7 +5,26 @@ import { mdiClose } from "@mdi/js";
 import InfoModal from "../common/InfoModal";
 
 function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
-  const [formData, setFormData] = useState({});
+  // controlled component로 시작하기 위해 모든 필드를 초기값으로 설정
+  const [formData, setFormData] = useState({
+    name: "",
+    businessDomain: "",
+    ownershipType: "",
+    openDate: "",
+    businessNumber: "",
+    corporationNumber: "",
+    zipcode: "",
+    address: "",
+    addressDetail: "",
+    phone: "",
+    email: "",
+    geofenceRadius: "",
+    remark: "",
+    latitude: "",
+    longitude: "",
+    attorneyName: "",
+    attorneyPhoneNumber: "",
+  });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
@@ -763,7 +782,9 @@ const FormGrid = styled.div`
   margin-bottom: 24px;
 `;
 
-const FormField = styled.div`
+const FormField = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'fullWidth',
+})`
   display: flex;
   flex-direction: column;
   ${(props) => props.fullWidth && "grid-column: 1 / -1;"}
@@ -776,7 +797,9 @@ const Label = styled.label`
   font-size: 14px;
 `;
 
-const Input = styled.input`
+const Input = styled.input.withConfig({
+  shouldForwardProp: (prop) => prop !== 'hasError',
+})`
   padding: 10px;
   border: 1px solid ${(props) => (props.hasError ? "#ef4444" : "#e5e7eb")};
   border-radius: 8px;
@@ -791,7 +814,9 @@ const Input = styled.input`
   }
 `;
 
-const Select = styled.select`
+const Select = styled.select.withConfig({
+  shouldForwardProp: (prop) => prop !== 'hasError',
+})`
   padding: 10px;
   border: 1px solid ${(props) => (props.hasError ? "#ef4444" : "#e5e7eb")};
   border-radius: 8px;

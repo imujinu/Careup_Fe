@@ -17,7 +17,7 @@ import DeleteConfirmModal from '../common/DeleteConfirmModal';
 import { useToast } from '../common/Toast';
 import styled from 'styled-components';
 
-function EmployeeManagement({ branchId }) {
+function EmployeeManagement({ branchId, readOnly = false }) {
   const dispatch = useAppDispatch();
   const { addToast } = useToast();
   
@@ -314,8 +314,9 @@ function EmployeeManagement({ branchId }) {
     <Container>
       <EmployeeManagementHeader
         summary={summary}
-        onAddEmployee={handleAddEmployee}
+        onAddEmployee={readOnly ? undefined : handleAddEmployee}
         loading={loading}
+        readOnly={readOnly}
       />
       
       <EmployeeSearchAndFilter
@@ -330,12 +331,13 @@ function EmployeeManagement({ branchId }) {
         employees={filteredEmployees}
         loading={loading}
         onViewDetail={handleViewDetail}
-        onEdit={handleEditEmployee}
-        onDelete={handleTerminateEmployee}
-        onRehire={handleRehireEmployee}
+        onEdit={readOnly ? undefined : handleEditEmployee}
+        onDelete={readOnly ? undefined : handleTerminateEmployee}
+        onRehire={readOnly ? undefined : handleRehireEmployee}
+        readOnly={readOnly}
       />
 
-      {showModal && (
+      {(!readOnly) && showModal && (
         <EmployeeModal
           isOpen={showModal}
           onClose={handleCloseModal}
@@ -346,7 +348,7 @@ function EmployeeManagement({ branchId }) {
         />
       )}
 
-      {showDeleteModal && deletingEmployee && (
+      {(!readOnly) && showDeleteModal && deletingEmployee && (
         <DeleteConfirmModal
           isOpen={showDeleteModal}
           onClose={handleCloseDeleteModal}

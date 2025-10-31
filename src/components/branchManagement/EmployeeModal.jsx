@@ -9,6 +9,7 @@ import {
   mdiEye,
   mdiEyeOff,
 } from "@mdi/js";
+import BaseModal from "../common/BaseModal";
 
 function EmployeeModal({
   isOpen,
@@ -335,17 +336,21 @@ function EmployeeModal({
   if (!isOpen) return null;
 
   return (
-    <ModalOverlay onClick={handleClose}>
-      <ModalContent onClick={(e) => e.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>{isEdit ? "점주 정보 수정" : "점주 등록"}</ModalTitle>
-          <ModalSubtitle>
-            {isEdit ? "점주의 정보를 수정합니다" : "새로운 점주를 등록합니다"}
-          </ModalSubtitle>
-          <CloseButton onClick={handleClose}>
-            <Icon path={mdiClose} size={1.2} />
-          </CloseButton>
-        </ModalHeader>
+    <BaseModal 
+      isOpen={isOpen} 
+      onClose={handleClose}
+      maxWidth="800px"
+      allowBackdropClose={false}
+    >
+      <ModalHeader>
+        <ModalTitle>{isEdit ? "점주 정보 수정" : "점주 등록"}</ModalTitle>
+        <ModalSubtitle>
+          {isEdit ? "점주의 정보를 수정합니다" : "새로운 점주를 등록합니다"}
+        </ModalSubtitle>
+        <CloseButton onClick={handleClose}>
+          <Icon path={mdiClose} size={1.2} />
+        </CloseButton>
+      </ModalHeader>
 
         <Form onSubmit={handleSubmit}>
           <FormSection>
@@ -775,36 +780,11 @@ function EmployeeModal({
             </SubmitButton>
           </ModalFooter>
         </Form>
-      </ModalContent>
-    </ModalOverlay>
+    </BaseModal>
   );
 }
 
 export default EmployeeModal;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-`;
 
 const ModalHeader = styled.div`
   padding: 24px 32px;

@@ -12,7 +12,8 @@ function DocumentSearchAndFilter({
   onDocumentTypeFilterChange,
   statusFilter,
   onStatusFilterChange,
-  onUploadClick 
+  onUploadClick,
+  readOnly = false,
 }) {
   const documentTypeOptions = [
     { value: '', label: '전체 문서 유형' },
@@ -101,10 +102,12 @@ function DocumentSearchAndFilter({
             </FilterSelectIcon>
           </FilterSelectContainer>
 
-          <UploadButton onClick={onUploadClick}>
-            <Icon path={mdiFileDocumentPlus} size={1} />
-            문서 업로드
-          </UploadButton>
+          {!readOnly && (
+            <UploadButton onClick={onUploadClick}>
+              <Icon path={mdiFileDocumentPlus} size={1} />
+              문서 업로드
+            </UploadButton>
+          )}
         </FilterGroup>
       </SearchAndFilterBar>
     </SearchAndFilterContainer>

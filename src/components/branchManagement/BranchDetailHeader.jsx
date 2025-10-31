@@ -25,6 +25,7 @@ function BranchDetailHeader({
   const getStatusColor = (status) => {
     switch (status) {
       case "OPERATING":
+      case "OPENED":
       case "운영중":
         return "#a78bfa";
       case "CLOSED":
@@ -41,6 +42,7 @@ function BranchDetailHeader({
   const getStatusText = (status) => {
     switch (status) {
       case "OPERATING":
+      case "OPENED":
         return "운영중";
       case "CLOSED":
         return "폐점";
@@ -50,6 +52,28 @@ function BranchDetailHeader({
         return status || "알 수 없음";
     }
   };
+
+  // 점주 정보 추출 (ownerInfo 우선, 없으면 attorneyName 사용)
+  const getManagerInfo = () => {
+    if (branch.ownerInfo) {
+      return {
+        name: branch.ownerInfo.name || "지점장 정보 없음",
+        phone: branch.ownerInfo.mobile || branch.ownerInfo.phone || "연락처 없음",
+        email: branch.ownerInfo.email || "이메일 없음",
+        profileImageUrl: branch.ownerInfo.profileImageUrl,
+      };
+    }
+    
+    // 기존 attorneyName 방식 (하위 호환성)
+    return {
+      name: branch.attorneyName || "지점장 정보 없음",
+      phone: branch.attorneyPhoneNumber || "연락처 없음",
+      email: branch.email || "이메일 없음",
+      profileImageUrl: null,
+    };
+  };
+
+  const managerInfo = getManagerInfo();
 
   return (
     <HeaderContainer>
@@ -89,12 +113,19 @@ function BranchDetailHeader({
           <ManagerCard>
             <ManagerTitle>지점장 정보</ManagerTitle>
             <ManagerInfo>
-              <ManagerName>
-                {branch.attorneyName || "지점장 정보 없음"}
-              </ManagerName>
-              <ManagerPhone>
-                {branch.attorneyPhoneNumber || "연락처 없음"}
-              </ManagerPhone>
+              {managerInfo.profileImageUrl && (
+                <ManagerProfileImage
+                  src={managerInfo.profileImageUrl}
+                  alt="지점장 프로필"
+                />
+              )}
+              <ManagerDetails>
+                <ManagerName>{managerInfo.name}</ManagerName>
+                <ManagerPhone>{managerInfo.phone}</ManagerPhone>
+                {managerInfo.email && managerInfo.email !== "이메일 없음" && (
+                  <ManagerEmail>{managerInfo.email}</ManagerEmail>
+                )}
+              </ManagerDetails>
             </ManagerInfo>
 
             <ActionButtons>
@@ -237,6 +268,21 @@ const ManagerTitle = styled.h3`
 
 const ManagerInfo = styled.div`
   margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+`;
+
+const ManagerProfileImage = styled.img`
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+`;
+
+const ManagerDetails = styled.div`
+  flex: 1;
 `;
 
 const ManagerName = styled.div`
@@ -249,6 +295,12 @@ const ManagerName = styled.div`
 const ManagerPhone = styled.div`
   color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
+  margin-bottom: 4px;
+`;
+
+const ManagerEmail = styled.div`
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
 `;
 
 const ActionButtons = styled.div`
