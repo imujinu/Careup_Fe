@@ -297,7 +297,13 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
             type: 'number',
             min: '0',
             value: formData.safetyStock,
-            onChange: (e) => handleInputChange('safetyStock', e.target.value)
+            onChange: (e) => {
+              const v = e.target.value;
+              if (v === '') return handleInputChange('safetyStock', '');
+              const n = parseInt(v, 10);
+              if (n < 0) return;
+              handleInputChange('safetyStock', isNaN(n) ? 0 : n);
+            }
           })
         ),
         React.createElement(FormGroup, null,
@@ -334,13 +340,14 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
             React.createElement(Label, null, '판매가 (원)'),
             React.createElement(Input, {
               type: 'number',
-              min: productInfo.minPrice,
-              max: productInfo.maxPrice,
+              min: Math.max(productInfo.minPrice || 0, 0),
+              max: productInfo.maxPrice || undefined,
               value: formData.sellingPrice,
               onChange: (e) => {
                 const v = e.target.value;
                 if (v === '') return handleInputChange('sellingPrice', '');
                 const n = parseInt(v, 10);
+                if (n < 0) return;
                 handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
               },
               placeholder: `${productInfo.minPrice.toLocaleString()}원 ~ ${productInfo.maxPrice.toLocaleString()}원 사이로 입력`

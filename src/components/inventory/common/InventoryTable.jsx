@@ -151,6 +151,7 @@ const SORTABLE_COLUMNS = {
   currentStock: 'currentStock',
   safetyStock: 'safetyStock',
   unitPrice: 'unitPrice',
+  salesPrice: 'salesPrice',
   totalValue: 'totalValue',
 };
 
@@ -216,7 +217,11 @@ function InventoryTable({
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.unitPrice)
-          }, '단가', getSortIndicator(SORTABLE_COLUMNS.unitPrice)),
+          }, '공급가', getSortIndicator(SORTABLE_COLUMNS.unitPrice)),
+          React.createElement(TableHeaderCell, { 
+            $sortable: true,
+            onClick: () => handleSort(SORTABLE_COLUMNS.salesPrice)
+          }, '판매가', getSortIndicator(SORTABLE_COLUMNS.salesPrice)),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.totalValue)
@@ -242,6 +247,7 @@ function InventoryTable({
               )
             ),
             React.createElement(TableCell, null, `₩${item.unitPrice.toLocaleString()}`),
+            React.createElement(TableCell, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-'),
             React.createElement(TableCell, null, `₩${item.totalValue.toLocaleString()}`),
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,

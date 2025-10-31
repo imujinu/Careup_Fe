@@ -215,12 +215,26 @@ const TypeBadge = styled.span`
 function InventoryDetailModal({ isOpen, onClose, item }) {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [productInfo, setProductInfo] = useState(null);
 
   useEffect(() => {
     if (isOpen && item) {
       fetchInventoryFlows();
+      fetchProductDetails();
     }
   }, [isOpen, item]);
+  
+  const fetchProductDetails = async () => {
+    if (!item?.product?.id) return;
+    
+    try {
+      const response = await inventoryService.getProduct(item.product.id);
+      const productData = response.data?.data || response.data;
+      setProductInfo(productData);
+    } catch (error) {
+      console.error('상품 상세 정보 조회 실패:', error);
+    }
+  };
 
   const fetchInventoryFlows = async () => {
     if (!item) return;
@@ -228,9 +242,25 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
     setLoading(true);
     try {
       console.log('상세보기 - 상품 정보:', item); // 디버깅용
-      const data = await inventoryService.getInventoryFlows(item.branchId || 1, item.productId);
+      // productId를 올바르게 가져오기
+      const productId = item.productId || item.product?.id;
+      if (!productId) {
+        console.warn('상품 ID를 찾을 수 없습니다.');
+        setHistoryData([]);
+        return;
+      }
+      
+      const data = await inventoryService.getInventoryFlows(item.branchId || 1, productId);
       console.log('상세보기 - 입출고 내역 데이터:', data); // 디버깅용
-      setHistoryData(data || []);
+      
+      // 추가 필터링: 받은 데이터가 해당 상품의 것인지 확인
+      const filteredData = (data || []).filter(flow => {
+        // flow에 productId 필드가 있으면 확인
+        const flowProductId = flow.productId || flow.branchProduct?.productId || flow.product?.id;
+        return !flowProductId || flowProductId === productId;
+      });
+      
+      setHistoryData(filteredData);
     } catch (error) {
       console.error('입출고 내역 조회 실패:', error);
       setHistoryData([]);
@@ -244,7 +274,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
   return React.createElement(ModalOverlay, { onClick: onClose },
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
-        React.createElement(ModalTitle, null, `재고 상세보기 ${item.product.name}`),
+        React.createElement(ModalTitle, null, '재고 상세보기'),
         React.createElement(HeaderButtons, null,
           React.createElement(PrintButton, null,
             React.createElement('span', null, '🖨️'),
@@ -266,8 +296,20 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(InfoValue, null, item.product.name)
               ),
               React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '상품 ID:'),
-                React.createElement(InfoValue, null, item.product.id)
+                React.createElement(InfoLabel, null, '카테고리명:'),
+                React.createElement(InfoValue, null, productInfo?.category?.name || item.category || '미분류')
+              ),
+              React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '최저가격:'),
+                React.createElement(InfoValue, null, `₩${(productInfo?.minPrice || item.product?.minPrice || 0).toLocaleString()}`)
+              ),
+              React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '최고가격:'),
+                React.createElement(InfoValue, null, `₩${(productInfo?.maxPrice || item.product?.maxPrice || 0).toLocaleString()}`)
+              ),
+              React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '판매가:'),
+                React.createElement(InfoValue, null, `₩${(item.salesPrice || item.price || 0).toLocaleString()}`)
               ),
             )
           ),
@@ -302,7 +344,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(InfoValue, null, `${item.safetyStock}개`)
               ),
               React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '단가:'),
+                React.createElement(InfoLabel, null, '공급가:'),
                 React.createElement(InfoValue, null, `₩${item.unitPrice?.toLocaleString() || 0}`)
               ),
               React.createElement(InfoRow, null,
@@ -323,18 +365,17 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(TableHeaderCell, null, '구분'),
                 React.createElement(TableHeaderCell, null, '수량'),
                 React.createElement(TableHeaderCell, null, '사유'),
-                React.createElement(TableHeaderCell, null, '담당자'),
                 React.createElement(TableHeaderCell, null, '비고')
               )
             ),
             React.createElement(TableBody, null,
               loading ? 
                 React.createElement(TableRow, null,
-                  React.createElement(TableCell, { colSpan: 6, style: { textAlign: 'center', padding: '20px' } }, '로딩 중...')
+                  React.createElement(TableCell, { colSpan: 5, style: { textAlign: 'center', padding: '20px' } }, '로딩 중...')
                 ) :
                 historyData.length === 0 ?
                   React.createElement(TableRow, null,
-                    React.createElement(TableCell, { colSpan: 6, style: { textAlign: 'center', padding: '20px' } }, '입출고 내역이 없습니다.')
+                    React.createElement(TableCell, { colSpan: 5, style: { textAlign: 'center', padding: '20px' } }, '입출고 내역이 없습니다.')
                   ) :
                   historyData.map((history, index) => {
                     const inQty = history.inQuantity || 0;
@@ -364,7 +405,6 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                       ),
                       React.createElement(TableCell, null, quantity),
                       React.createElement(TableCell, null, history.reason || '-'),
-                      React.createElement(TableCell, null, '시스템'),
                       React.createElement(TableCell, null, history.remark || '-')
                     );
                   })

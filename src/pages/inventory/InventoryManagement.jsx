@@ -210,11 +210,21 @@ function InventoryManagement() {
         console.error('getAllProducts 실패:', err);
       }
       
+      // 상품 ID로 상품 정보를 빠르게 찾기 위한 Map 생성
+      const productMap = new Map();
+      allProducts.forEach(product => {
+        productMap.set(product.productId, product);
+      });
+      
       // 모든 지점의 재고 데이터 변환
       const productsWithStock = allBranchProducts.map(item => {
         const currentStock = item.stockQuantity || 0;
         const safetyStock = item.safetyStock || 0;
-        const unitPrice = item.price || 0;
+        // 공급가는 Product.supplyPrice에서 가져오기
+        const product = productMap.get(item.productId);
+        const unitPrice = product?.supplyPrice || 0;
+        // 판매가는 BranchProduct.price에서 가져오기
+        const salesPrice = item.price || 0;
         const status = currentStock < safetyStock ? 'low' : 'normal';
         let branchName = item.branchName || (item.branchId === 1 ? '본점' : `지점-${item.branchId}`);
         // 본사가 들어오면 본점으로 변경
@@ -236,6 +246,7 @@ function InventoryManagement() {
           safetyStock: safetyStock,
           status: status,
           unitPrice: unitPrice,
+          salesPrice: salesPrice,
           totalValue: currentStock * unitPrice
         };
       });
@@ -258,6 +269,7 @@ function InventoryManagement() {
           safetyStock: 0,
           status: 'normal',
           unitPrice: product.supplyPrice || 0,
+          salesPrice: null, // 재고가 없는 상품은 판매가 없음
           totalValue: 0
         }));
       
@@ -892,6 +904,10 @@ function InventoryManagement() {
           case 'unitPrice':
             aValue = a.unitPrice || 0;
             bValue = b.unitPrice || 0;
+            break;
+          case 'salesPrice':
+            aValue = a.salesPrice || 0;
+            bValue = b.salesPrice || 0;
             break;
           case 'totalValue':
             aValue = a.totalValue || 0;

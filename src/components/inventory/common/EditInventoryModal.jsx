@@ -658,11 +658,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.safetyStock,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('safetyStock', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('safetyStock', isNaN(n) ? 0 : n);
                 }
               })
@@ -679,11 +681,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.unitPrice,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('unitPrice', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('unitPrice', isNaN(n) ? 0 : n);
                 }
               })
@@ -695,13 +699,14 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
-                min: formData.minPrice > 0 ? formData.minPrice : undefined,
+                min: formData.minPrice > 0 ? formData.minPrice : '0',
                 max: formData.maxPrice > 0 ? formData.maxPrice : undefined,
                 value: formData.sellingPrice,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('sellingPrice', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
                 },
                 placeholder: formData.minPrice > 0 && formData.maxPrice > 0 
@@ -712,17 +717,19 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           ),
           React.createElement(FormRow, null,
             React.createElement(FormGroup, null,
-              React.createElement(Label, null,
+              React.createElement(Label, null, 
                 '최저 가격 (원)',
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.minPrice,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('minPrice', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('minPrice', isNaN(n) ? 0 : n);
                 }
               })
@@ -734,11 +741,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.maxPrice,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('maxPrice', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('maxPrice', isNaN(n) ? 0 : n);
                 }
               })

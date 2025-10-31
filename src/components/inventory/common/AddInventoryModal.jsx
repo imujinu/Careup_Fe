@@ -614,8 +614,15 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.minPrice,
-                onChange: (e) => handleInputChange('minPrice', e.target.value)
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('minPrice', '');
+                  const n = parseInt(v, 10);
+                  if (n < 0) return;
+                  handleInputChange('minPrice', isNaN(n) ? 0 : n);
+                }
               })
             ),
             React.createElement(FormGroup, null,
@@ -625,8 +632,15 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.maxPrice,
-                onChange: (e) => handleInputChange('maxPrice', e.target.value)
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('maxPrice', '');
+                  const n = parseInt(v, 10);
+                  if (n < 0) return;
+                  handleInputChange('maxPrice', isNaN(n) ? 0 : n);
+                }
               })
             )
           ),
@@ -638,8 +652,15 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.supplyPrice,
-                onChange: (e) => handleInputChange('supplyPrice', e.target.value)
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('supplyPrice', '');
+                  const n = parseInt(v, 10);
+                  if (n < 0) return;
+                  handleInputChange('supplyPrice', isNaN(n) ? 0 : n);
+                }
               })
             ),
             React.createElement(FormGroup, null,
@@ -649,13 +670,14 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
-                min: formData.minPrice > 0 ? formData.minPrice : undefined,
+                min: formData.minPrice > 0 ? formData.minPrice : '0',
                 max: formData.maxPrice > 0 ? formData.maxPrice : undefined,
                 value: formData.sellingPrice,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('sellingPrice', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
                 },
                 placeholder: formData.minPrice > 0 && formData.maxPrice > 0 

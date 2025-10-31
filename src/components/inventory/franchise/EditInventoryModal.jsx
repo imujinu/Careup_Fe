@@ -342,14 +342,15 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
+                min: '0',
                 value: formData.safetyStock === 0 ? (formData.safetyStock === '' ? '' : formData.safetyStock) : formData.safetyStock,
                 onChange: (e) => {
                   const v = e.target.value;
                   if (v === '') return handleInputChange('safetyStock', '');
                   const n = parseInt(v, 10);
+                  if (n < 0) return;
                   handleInputChange('safetyStock', isNaN(n) ? 0 : n);
-                },
-                min: 0
+                }
               })
             )
           ),
@@ -371,15 +372,16 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 ),
                 React.createElement(Input, {
                   type: 'number',
+                  min: Math.max(productInfo.minPrice || 0, 0),
+                  max: productInfo.maxPrice || undefined,
                   value: formData.sellingPrice === 0 ? (formData.sellingPrice === '' ? '' : formData.sellingPrice) : formData.sellingPrice,
                   onChange: (e) => {
                     const v = e.target.value;
                     if (v === '') return handleInputChange('sellingPrice', '');
                     const n = parseInt(v, 10);
+                    if (n < 0) return;
                     handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
-                  },
-                  min: productInfo.minPrice || 0,
-                  max: productInfo.maxPrice || undefined
+                  }
                 })
               )
             ),
