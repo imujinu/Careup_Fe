@@ -182,6 +182,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
+          React.createElement(TableHeaderCell, null, '목록번호'),
           React.createElement(TableHeaderCell, null, '발주번호'),
           React.createElement(TableHeaderCell, null, '발주일'),
           React.createElement(TableHeaderCell, null, '상품 수'),
@@ -194,7 +195,8 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
       React.createElement(TableBody, null,
         data.map((item, index) =>
           React.createElement(TableRow, { key: index },
-            React.createElement(TableCell, null, item.id),
+            React.createElement(TableCell, null, index + 1),
+            React.createElement(TableCell, null, item.displayOrderNo || item.id),
             React.createElement(TableCell, null, item.orderDate),
             React.createElement(TableCell, null, `${item.productCount}개`),
             React.createElement(TableCell, null, `₩${formatAmount(item.totalAmount)}`),

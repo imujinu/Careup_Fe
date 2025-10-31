@@ -238,8 +238,8 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   const handleSave = () => {
     // 현재고는 제외하고 안전재고와 단가만 전송
     const saveData = {
-      safetyStock: formData.safetyStock,
-      unitPrice: formData.unitPrice,
+      safetyStock: formData.safetyStock === '' ? 0 : formData.safetyStock,
+      unitPrice: formData.unitPrice === '' ? 0 : formData.unitPrice,
       category: formData.category,
       notes: formData.notes
     };
@@ -253,10 +253,10 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
 
   if (!isOpen || !item) return null;
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
-    React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
+  return React.createElement(ModalOverlay, null,
+    React.createElement(ModalContainer, null,
       React.createElement(ModalHeader, null,
-        React.createElement(ModalTitle, null, `재고 수정 - ${item.product?.name || item.productName || item.name || '상품명 없음'}`),
+        React.createElement(ModalTitle, null, '재고 수정'),
         React.createElement(CloseButton, { onClick: onClose }, '×')
       ),
       React.createElement(ModalBody, null,
@@ -274,10 +274,6 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
             React.createElement(InfoRow, null,
               React.createElement(InfoLabel, null, '안전 재고:'),
               React.createElement(InfoValue, null, `${item.safetyStock || 0}개`)
-            ),
-            React.createElement(InfoRow, null,
-              React.createElement(InfoLabel, null, '상품 ID:'),
-              React.createElement(InfoValue, null, item.product?.id || item.id || '-')
             )
           )
         ),
@@ -304,8 +300,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
-                value: formData.safetyStock,
-                onChange: (e) => handleInputChange('safetyStock', parseInt(e.target.value) || 0),
+                value: formData.safetyStock === 0 ? (formData.safetyStock === '' ? '' : formData.safetyStock) : formData.safetyStock,
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('safetyStock', '');
+                  const n = parseInt(v, 10);
+                  handleInputChange('safetyStock', isNaN(n) ? 0 : n);
+                },
                 min: 0
               })
             )
@@ -318,8 +319,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               ),
               React.createElement(Input, {
                 type: 'number',
-                value: formData.unitPrice,
-                onChange: (e) => handleInputChange('unitPrice', parseInt(e.target.value) || 0),
+                value: formData.unitPrice === 0 ? (formData.unitPrice === '' ? '' : formData.unitPrice) : formData.unitPrice,
+                onChange: (e) => {
+                  const v = e.target.value;
+                  if (v === '') return handleInputChange('unitPrice', '');
+                  const n = parseInt(v, 10);
+                  handleInputChange('unitPrice', isNaN(n) ? 0 : n);
+                },
                 min: 0
               })
             ),
