@@ -71,23 +71,45 @@ function FranchiseInventoryManagement() {
       
       const data = await inventoryService.getBranchProducts(branchId);
       
+      // 전체 상품 목록 가져오기
+      let allProducts = [];
+      try {
+        const productsResponse = await inventoryService.getAllProducts();
+        const pageData = productsResponse.data?.data || productsResponse.data;
+        allProducts = pageData?.content || [];
+      } catch (err) {
+        console.error('getAllProducts 실패:', err);
+      }
+      
+      // 상품 ID로 상품 정보를 빠르게 찾기 위한 Map 생성
+      const productMap = new Map();
+      allProducts.forEach(product => {
+        productMap.set(product.productId, product);
+      });
+      
       // 데이터 변환
-      const formattedData = data.map(item => ({
-        id: item.branchProductId,
-        product: { 
-          name: item.productName || '알 수 없음', 
-          id: item.productId || 'N/A'
-        },
-        category: item.categoryName || '미분류',
-        branchId: item.branchId,
-        branch: item.branchId === 1 ? '본사' : `지점-${item.branchId}`,
-        currentStock: item.stockQuantity || 0,
-        safetyStock: item.safetyStock || 0,
-        status: (item.stockQuantity || 0) < (item.safetyStock || 0) ? 'low' : 'normal',
-        unitPrice: item.price || 0,  // 공급가 (원래는 Product.supplyPrice)
-        salesPrice: item.price || null,  // 판매가 (BranchProduct.price가 판매가)
-        totalValue: (item.stockQuantity || 0) * (item.price || 0)
-      }));
+      const formattedData = data.map(item => {
+        const product = productMap.get(item.productId);
+        const unitPrice = product?.supplyPrice || 0;  // 공급가는 Product.supplyPrice
+        const salesPrice = item.price || null;  // 판매가는 BranchProduct.price
+        
+        return {
+          id: item.branchProductId,
+          product: { 
+            name: item.productName || '알 수 없음', 
+            id: item.productId || 'N/A'
+          },
+          category: item.categoryName || '미분류',
+          branchId: item.branchId,
+          branch: item.branchId === 1 ? '본사' : `지점-${item.branchId}`,
+          currentStock: item.stockQuantity || 0,
+          safetyStock: item.safetyStock || 0,
+          status: (item.stockQuantity || 0) < (item.safetyStock || 0) ? 'low' : 'normal',
+          unitPrice: unitPrice,
+          salesPrice: salesPrice,
+          totalValue: (item.stockQuantity || 0) * unitPrice
+        };
+      });
       
       // 중복 데이터 제거
       const uniqueData = formattedData.reduce((acc, current) => {

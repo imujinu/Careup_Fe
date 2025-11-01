@@ -184,17 +184,39 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
           const response = await inventoryService.getProduct(product.productId);
           const productData = response.data?.data || response.data;
           
+          const minPrice = productData?.minPrice || product?.minPrice || 0;
+          const maxPrice = productData?.maxPrice || product?.maxPrice || 0;
+          
           setProductInfo({
-            minPrice: productData?.minPrice || product?.minPrice || 0,
-            maxPrice: productData?.maxPrice || product?.maxPrice || 0
+            minPrice: minPrice,
+            maxPrice: maxPrice
           });
+          
+          // 판매가를 최대가격으로 초기 설정
+          if (maxPrice > 0) {
+            setFormData(prev => ({
+              ...prev,
+              sellingPrice: maxPrice
+            }));
+          }
         } catch (err) {
           console.error('상품 상세 정보 조회 실패:', err);
           // product prop에서 직접 가져오기
+          const minPrice = product?.minPrice || 0;
+          const maxPrice = product?.maxPrice || 0;
+          
           setProductInfo({
-            minPrice: product?.minPrice || 0,
-            maxPrice: product?.maxPrice || 0
+            minPrice: minPrice,
+            maxPrice: maxPrice
           });
+          
+          // 판매가를 최대가격으로 초기 설정
+          if (maxPrice > 0) {
+            setFormData(prev => ({
+              ...prev,
+              sellingPrice: maxPrice
+            }));
+          }
         }
       };
 

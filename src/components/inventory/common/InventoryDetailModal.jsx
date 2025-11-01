@@ -309,7 +309,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '판매가:'),
-                React.createElement(InfoValue, null, `₩${(item.salesPrice || item.price || 0).toLocaleString()}`)
+                React.createElement(InfoValue, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-')
               ),
             )
           ),
