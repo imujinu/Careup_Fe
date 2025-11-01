@@ -2,17 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { 
   fetchEmployeeListAction,
-  fetchEmployeeListByBranchAction, 
+  fetchEmployeeListByBranchAction,
+  fetchEmployeeDetailAction,
   createEmployeeAction, 
   updateEmployeeAction, 
   deactivateEmployeeAction, 
   rehireEmployeeAction,
-  clearErrors 
+  clearErrors,
+  clearDetail
 } from '../../stores/slices/employeeSlice';
 import EmployeeManagementHeader from './EmployeeManagementHeader';
 import EmployeeSearchAndFilter from './EmployeeSearchAndFilter';
 import EmployeeTable from './EmployeeTable';
 import EmployeeModal from './EmployeeModal';
+import EmployeeDetailModal from './EmployeeDetailModal';
 import DeleteConfirmModal from '../common/DeleteConfirmModal';
 import { useToast } from '../common/Toast';
 import styled from 'styled-components';
@@ -23,13 +26,16 @@ function EmployeeManagement({ branchId, readOnly = false }) {
   
   const {
     list: employees,
+    detail: employeeDetail,
     loading,
+    detailLoading,
     createLoading,
     updateLoading,
     deactivateLoading,
     rehireLoading,
     summary,
     error,
+    detailError,
     createError,
     updateError,
     deactivateError,
@@ -39,7 +45,9 @@ function EmployeeManagement({ branchId, readOnly = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [viewingEmployeeId, setViewingEmployeeId] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState(null);
   const [modalAction, setModalAction] = useState('terminate'); // 'terminate' or 'rehire'
@@ -117,6 +125,18 @@ function EmployeeManagement({ branchId, readOnly = false }) {
     }
   }, [rehireError, addToast, dispatch]);
 
+  useEffect(() => {
+    if (detailError) {
+      addToast({
+        type: 'error',
+        title: '상세 조회 실패',
+        message: detailError,
+        duration: 3000
+      });
+      dispatch(clearErrors());
+    }
+  }, [detailError, addToast, dispatch]);
+
   const handleSearch = (term) => {
     setSearchTerm(term);
     // 검색어가 변경되면 API 호출
@@ -179,9 +199,15 @@ function EmployeeManagement({ branchId, readOnly = false }) {
     setShowModal(true);
   };
 
-  const handleViewDetail = (employee) => {
-    // 상세보기 로직 (추후 구현)
-    console.log('View detail:', employee);
+  const handleViewDetail = async (employee) => {
+    setViewingEmployeeId(employee.id);
+    setShowDetailModal(true);
+    try {
+      await dispatch(fetchEmployeeDetailAction(employee.id)).unwrap();
+    } catch (error) {
+      // 에러는 useEffect에서 처리됨
+      console.error('직원 상세 조회 실패:', error);
+    }
   };
 
   const handleTerminateEmployee = (employee) => {
@@ -307,6 +333,12 @@ function EmployeeManagement({ branchId, readOnly = false }) {
     setModalAction('terminate');
   };
 
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setViewingEmployeeId(null);
+    dispatch(clearDetail());
+  };
+
   // 백엔드에서 필터링된 직원 목록을 그대로 사용
   const filteredEmployees = employees;
 
@@ -360,6 +392,15 @@ function EmployeeManagement({ branchId, readOnly = false }) {
           }
           confirmText={modalAction === 'terminate' ? '퇴사 처리' : '재입사 처리'}
           loading={modalAction === 'terminate' ? deactivateLoading : rehireLoading}
+        />
+      )}
+
+      {showDetailModal && (
+        <EmployeeDetailModal
+          isOpen={showDetailModal}
+          onClose={handleCloseDetailModal}
+          employee={employeeDetail}
+          loading={detailLoading}
         />
       )}
     </Container>

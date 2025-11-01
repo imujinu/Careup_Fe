@@ -110,7 +110,7 @@ function DocumentTable({ documents, onDownload, onDelete, onEdit, loading, readO
               <CardContent>
                 <FileName>{document.title || '제목 없음'}</FileName>
                 <DocumentType>{getDocumentTypeLabel(document.documentType)}</DocumentType>
-                <BranchCode>강남점 (BR001)</BranchCode>
+                <BranchCode>{document.branchName || '-'}</BranchCode>
                 
                 <DocumentDetails>
                   <DetailItem>

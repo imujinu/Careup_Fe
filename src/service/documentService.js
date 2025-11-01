@@ -19,8 +19,8 @@ export const DOCUMENT_TYPES = {
 
 export const documentService = {
   // 서류 생성(업로드)
-  async createDocument(employeeId, formData) {
-    const url = `${BASE_URL}/documents/${employeeId}`;
+  async createDocument(branchId, formData) {
+    const url = `${BASE_URL}/documents/branch/${branchId}`;
     const response = await axios.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -30,9 +30,9 @@ export const documentService = {
   },
 
   // 서류 목록 조회 (페이지네이션)
-  async getDocumentsList(employeeId, page = 0, size = 10, sort = 'id,desc') {
+  async getDocumentsList(branchId, page = 0, size = 10, sort = 'id,desc') {
     const params = { page, size, sort };
-    const url = `${BASE_URL}/documents/${employeeId}`;
+    const url = `${BASE_URL}/documents/branch/${branchId}`;
     const response = await axios.get(url, { params });
     return response.data?.result || response.data;
   },

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
-import { mdiClose, mdiCalendar, mdiChevronDown } from '@mdi/js';
+import { mdiClose, mdiChevronDown } from '@mdi/js';
 import { documentService, DOCUMENT_TYPES } from '../../service/documentService';
 
-function DocumentUploadModal({ isOpen, onClose, employeeId, onSuccess }) {
+function DocumentUploadModal({ isOpen, onClose, branchId, onSuccess }) {
   const [formData, setFormData] = useState({
     documentType: '',
     title: '',
@@ -19,6 +19,7 @@ function DocumentUploadModal({ isOpen, onClose, employeeId, onSuccess }) {
     value: key,
     label: value
   }));
+
 
   const handleInputChange = (e) => {
     const { name, value, files } = e.target;
@@ -82,7 +83,7 @@ function DocumentUploadModal({ isOpen, onClose, employeeId, onSuccess }) {
         uploadFormData.append('expiryDate', formData.expirationDate);
       }
 
-      await documentService.createDocument(employeeId, uploadFormData);
+      await documentService.createDocument(branchId, uploadFormData);
       
       onSuccess?.();
       handleClose();
@@ -119,6 +120,7 @@ function DocumentUploadModal({ isOpen, onClose, employeeId, onSuccess }) {
         </ModalHeader>
 
         <Form onSubmit={handleSubmit}>
+          {/* 직원 선택 제거: 생성 시 직원 불필요 */}
           <FormGroup>
             <Label htmlFor="documentType">
               문서 유형 <Required>*</Required>
@@ -181,19 +183,14 @@ function DocumentUploadModal({ isOpen, onClose, employeeId, onSuccess }) {
 
           <FormGroup>
             <Label htmlFor="expirationDate">만료일</Label>
-            <DateInputContainer>
-              <Input
-                type="date"
-                id="expirationDate"
-                name="expirationDate"
-                value={formData.expirationDate}
-                onChange={handleInputChange}
-                placeholder="연도-월-일"
-              />
-              <DateIcon>
-                <Icon path={mdiCalendar} size={1} />
-              </DateIcon>
-            </DateInputContainer>
+            <Input
+              type="date"
+              id="expirationDate"
+              name="expirationDate"
+              value={formData.expirationDate}
+              onChange={handleInputChange}
+              placeholder="연도-월-일"
+            />
           </FormGroup>
 
           <FormGroup>
@@ -308,6 +305,7 @@ const Select = styled.select.withConfig({
   font-size: 14px;
   background: white;
   cursor: pointer;
+  appearance: none;
   
   &:focus {
     outline: none;
@@ -363,24 +361,17 @@ const Input = styled.input`
   border-radius: 8px;
   font-size: 14px;
   
+  &[type="date"] {
+    &::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+    }
+  }
+  
   &:focus {
     outline: none;
     border-color: #8b5cf6;
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
   }
-`;
-
-const DateInputContainer = styled.div`
-  position: relative;
-`;
-
-const DateIcon = styled.div`
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #6b7280;
-  pointer-events: none;
 `;
 
 const TextArea = styled.textarea`
