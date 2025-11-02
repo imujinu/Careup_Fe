@@ -173,6 +173,7 @@ function FranchiseInventoryTable({
   onPageChange,
   onPageSizeChange,
   onModify,
+  onViewDetail,
   onDelete,
   onSort,
   currentSort
@@ -256,6 +257,7 @@ function FranchiseInventoryTable({
             React.createElement(TableCell, null,
               React.createElement(ActionLinks, null,
                 React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정'),
+                onViewDetail && React.createElement(ActionLink, { onClick: () => onViewDetail(item) }, '상세'),
                 React.createElement(DeleteLink, { onClick: () => onDelete(item) }, '삭제')
               )
             )

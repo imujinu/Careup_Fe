@@ -4,6 +4,7 @@ import SummaryCards from '../../components/inventory/common/SummaryCards';
 import SearchAndFilter from '../../components/inventory/common/SearchAndFilter';
 import FranchiseInventoryTable from '../../components/inventory/franchise/FranchiseInventoryTable';
 import EditInventoryModal from '../../components/inventory/franchise/EditInventoryModal';
+import FranchiseInventoryDetailModal from '../../components/inventory/franchise/FranchiseInventoryDetailModal';
 import ProductSelectionModal from '../../components/inventory/common/ProductSelectionModal';
 import ProductSetupModal from '../../components/inventory/common/ProductSetupModal';
 import { inventoryService } from '../../service/inventoryService';
@@ -50,6 +51,7 @@ function FranchiseInventoryManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [isProductSelectionModalOpen, setIsProductSelectionModalOpen] = useState(false);
   const [isProductSetupModalOpen, setIsProductSetupModalOpen] = useState(false);
@@ -188,6 +190,12 @@ function FranchiseInventoryManagement() {
     setIsEditModalOpen(true);
   };
 
+  const handleViewDetail = (item) => {
+    console.log('상세보기 상품 데이터:', item);
+    setSelectedItem(item);
+    setIsDetailModalOpen(true);
+  };
+
   const handleDelete = async (item) => {
     if (!item.id) {
       alert('삭제할 상품 정보가 없습니다.');
@@ -217,6 +225,11 @@ function FranchiseInventoryManagement() {
 
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
+    setSelectedItem(null);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
     setSelectedItem(null);
   };
 
@@ -397,6 +410,7 @@ function FranchiseInventoryManagement() {
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
       onModify: handleModify,
+      onViewDetail: handleViewDetail,
       onDelete: handleDelete,
       onSort: handleSort,
       currentSort: sort
@@ -406,6 +420,11 @@ function FranchiseInventoryManagement() {
       onClose: handleCloseEditModal,
       item: selectedItem,
       onSave: handleSaveEdit
+    }),
+    React.createElement(FranchiseInventoryDetailModal, {
+      isOpen: isDetailModalOpen,
+      onClose: handleCloseDetailModal,
+      item: selectedItem
     }),
     React.createElement(ProductSelectionModal, {
       isOpen: isProductSelectionModalOpen,
