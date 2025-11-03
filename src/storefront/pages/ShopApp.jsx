@@ -56,6 +56,7 @@ function ShopLayout() {
     setCurrentPage(0); // 탭 변경 시 첫 페이지로 리셋
   };
   const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | order | payment | payment-success | order-complete | search
+  const [myPageTab, setMyPageTab] = useState("profile"); // 마이페이지 활성 탭 (profile | purchase | favorites | reviews | inquiries)
   const [activeCategoryPage, setActiveCategoryPage] = useState("의류");
   const [favorites, setFavorites] = useState(new Set());
   const [products, setProducts] = useState([]);
@@ -108,11 +109,12 @@ function ShopLayout() {
             return;
           } catch (error) {
             console.error('결제 완료 정보 파싱 실패:', error);
+            // 파싱 실패 시 localStorage 정리
+            localStorage.removeItem('paymentCompleted');
           }
         } else {
-          setTimeout(() => {
-            window.location.href = `${window.location.origin}/shop`;
-          }, 3000);
+          // paymentCompleted가 없으면 쇼핑몰로 리다이렉트 (타임아웃 없이 즉시)
+          window.location.href = `${window.location.origin}/shop`;
         }
       }
     };
@@ -215,7 +217,7 @@ function ShopLayout() {
         id: item.productId ?? Math.random(),
         productId: item.productId,
         name: item.name || item.productName || "상품",
-        price: Number(item.minPrice || 0),
+        price: Number(item.maxPrice || item.minPrice || 0),
         minPrice: Number(item.minPrice || 0),
         maxPrice: Number(item.maxPrice || 0),
         promotionPrice: null,
@@ -237,7 +239,6 @@ function ShopLayout() {
           { name: "카테고리", value: item.categoryName || "정보 없음" },
         ],
         images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
-        reviews: [],
         relatedProducts: [],
         availableBranches: [],
         availableBranchCount: 0
@@ -348,7 +349,7 @@ function ShopLayout() {
             id: item.productId ?? Math.random(),
             productId: item.productId,
             name: item.productName || "상품",
-            price: Number(item.minPrice || 0),
+            price: Number(item.maxPrice || item.minPrice || 0),
             minPrice: Number(item.minPrice || 0),  // 권장 최소 판매가
             maxPrice: Number(item.maxPrice || 0),  // 권장 최대 판매가
             promotionPrice: null,
@@ -370,7 +371,6 @@ function ShopLayout() {
               { name: "카테고리", value: item.categoryName || "정보 없음" },
             ],
             images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
-            reviews: [],
             relatedProducts: [],
             // 백엔드에서 제공하는 지점 정보
             availableBranches: item.availableBranches || [],
@@ -438,50 +438,50 @@ function ShopLayout() {
     }
 
     try {
-      
-      // branchProductId 결정
-      // 지점이 선택된 경우 해당 지점의 branchProductId 사용, 없으면 첫 번째 지점 사용
-      let branchProductId = product.branchProductId || product.id;
-      
+      // branchProductId 및 branchId 결정 (선택 지점 우선)
+      let resolvedBranchProductId = product.branchProductId || product.id;
+      let resolvedBranchId = product.selectedBranchId || null;
+
       if (product.availableBranches && product.availableBranches.length > 0) {
-        if (product.selectedBranchId) {
-          // 선택된 지점의 branchProductId 사용
-          const selectedBranch = product.availableBranches.find(b => b.branchId === product.selectedBranchId);
-          if (selectedBranch && selectedBranch.branchProductId) {
-            branchProductId = selectedBranch.branchProductId;
+        if (product.selectedBranchId != null) {
+          const selectedBranch = product.availableBranches.find(
+            (b) => String(b.branchId) === String(product.selectedBranchId)
+          );
+          if (selectedBranch) {
+            resolvedBranchProductId = selectedBranch.branchProductId || resolvedBranchProductId;
+            resolvedBranchId = selectedBranch.branchId;
           }
         } else {
-          // 지점이 선택되지 않으면 첫 번째 지점 사용
           const firstBranch = product.availableBranches[0];
-          if (firstBranch && firstBranch.branchProductId) {
-            branchProductId = firstBranch.branchProductId;
+          if (firstBranch) {
+            resolvedBranchProductId = firstBranch.branchProductId || resolvedBranchProductId;
+            resolvedBranchId = firstBranch.branchId;
           }
         }
       }
-      
-      
+
       // 백엔드 API를 통한 장바구니 추가
       const cartData = {
         memberId: currentUser.memberId,
-        branchProductId: branchProductId,
+        branchProductId: resolvedBranchProductId,
         quantity: 1,
         attributeName: null,
         attributeValue: null
       };
 
       await cartService.addToCart(cartData);
-      
-      // Redux 상태 업데이트
+
+      // Redux 상태 업데이트 (API에 사용된 동일 값 사용)
       dispatch(addToCart({
-        productId: product.productId,  // productId 추가
-        branchProductId: product.branchProductId || product.id,
-        branchId: product.selectedBranchId || 1, // 선택한 지점 ID 사용
+        productId: product.productId,
+        branchProductId: resolvedBranchProductId,
+        branchId: resolvedBranchId || 1,
         productName: product.name,
         price: product.promotionPrice || product.price,
         quantity: 1,
         imageUrl: product.image
       }));
-      
+
       alert(`${product.name}이(가) 장바구니에 추가되었습니다.`);
     } catch (error) {
       console.error('장바구니 추가 실패:', error);
@@ -533,6 +533,58 @@ function ShopLayout() {
     setPage("payment");
   };
 
+  // 상품 상세에서 바로 구매 (단일 주문) → OrderPage로 이동
+  const handleBuyNow = (product) => {
+    // 로그인 체크
+    if (!isLoggedIn || !currentUser) {
+      alert('구매하려면 로그인이 필요합니다.');
+      setPage("login");
+      return;
+    }
+
+    // 지점 선택 확인
+    if (!product.selectedBranchId) {
+      alert('구매 지점을 선택해주세요.');
+      return;
+    }
+
+    // 선택된 지점 정보 찾기
+    const selectedBranch = product.availableBranches?.find(
+      (b) => String(b.branchId) === String(product.selectedBranchId)
+    );
+
+    if (!selectedBranch) {
+      alert('선택한 지점 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (!selectedBranch.branchProductId) {
+      alert('지점별 상품 정보가 없습니다.');
+      return;
+    }
+
+    // 단일 상품 정보로 orderData 구성 (주문은 OrderPage에서 생성)
+    const orderData = {
+      isSingleOrder: true, // 단일 주문 플래그
+      product: product,
+      selectedBranch: selectedBranch,
+      items: [{
+        productId: product.productId,
+        branchProductId: selectedBranch.branchProductId,
+        branchId: selectedBranch.branchId,
+        productName: product.name || product.productName,
+        price: selectedBranch.price,
+        quantity: 1,
+        imageUrl: product.image
+      }],
+      branchId: Number(selectedBranch.branchId),
+      totalAmount: selectedBranch.price
+    };
+
+    setOrderData(orderData);
+    setPage("order");
+  };
+
   // 결제 페이지로 이동
   const handleProceedToPayment = (order) => {
     setOrderData(order);
@@ -556,6 +608,8 @@ function ShopLayout() {
   const handleBackToHome = () => {
     setOrderData(null);
     setPaymentData(null);
+    // 주문 완료 정보 삭제 (새로고침 시 주문 완료 페이지가 다시 나타나지 않도록)
+    localStorage.removeItem('paymentCompleted');
     setPage("home");
   };
 
@@ -598,13 +652,17 @@ function ShopLayout() {
           <ProductDetail
             product={detailProduct}
             onBack={() => setDetailProduct(null)}
-            onBuy={() => setCheckoutProduct(detailProduct)}
+            onBuy={handleBuyNow}
             onAddToCart={handleAddToCart}
           />
          ) : page === "login" ? (
            <CustomerLogin />
         ) : page === "mypage" ? (
-          <MyPage onBack={() => setPage("home")} currentUser={currentUser} />
+          <MyPage 
+            onBack={() => setPage("home")} 
+            currentUser={currentUser}
+            initialTab={myPageTab}
+          />
         ) : page === "products" ? (
            <ProductsPage
              favorites={favorites}
@@ -700,6 +758,10 @@ function ShopLayout() {
              orderData={orderData}
              paymentData={paymentData}
              onBackToHome={handleBackToHome}
+             onViewOrders={() => {
+               setMyPageTab("purchase");
+               setPage("mypage");
+             }}
            />
          ) : (
            <>

@@ -326,7 +326,7 @@ const HeadquartersDashboard = () => {
   const [kpiData, setKpiData] = useState({
     totalBranches: 324,
     totalEmployees: 1247,
-    avgMonthlySales: 240,
+    avgMonthlySales: 24000000, // 원 단위 (2,400만원)
     branchGrowthRate: 12.5,
     employeeGrowthRate: 8.2,
     salesGrowthRate: 23.1,
@@ -373,11 +373,34 @@ const HeadquartersDashboard = () => {
     }
   }, [salesPeriod]);
 
+  // 원 → 만원 → 억 자동 변환 포맷팅 함수
   const formatCurrency = (value) => {
-    if (value >= 10000) {
-      return `₩${value / 10000}만`;
+    if (!value && value !== 0) return '₩0';
+    
+    const numValue = typeof value === 'number' ? value : Number(value);
+    
+    // 1억 이상이면 억 단위로 표시
+    if (numValue >= 100000000) {
+      const eok = Math.floor(numValue / 100000000);
+      const remainder = Math.floor((numValue % 100000000) / 10000);
+      if (remainder > 0) {
+        return `₩${eok}억 ${remainder}만`;
+      }
+      return `₩${eok}억`;
     }
-    return `₩${value}`;
+    
+    // 1만원 이상이면 만원 단위로 표시
+    if (numValue >= 10000) {
+      const man = Math.floor(numValue / 10000);
+      const remainder = numValue % 10000;
+      if (remainder > 0) {
+        return `₩${man}만 ${remainder.toLocaleString()}원`;
+      }
+      return `₩${man}만`;
+    }
+    
+    // 그 외는 원 단위로 표시
+    return `₩${numValue.toLocaleString()}`;
   };
 
   const formatLargeNumber = (value) => {
@@ -448,7 +471,7 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiCash} size={1.5} color="#10b981" />
           </KPIIcon>
           <KPILabel>평균 월간 매출</KPILabel>
-          <KPIValue>₩ {kpiData.avgMonthlySales}억</KPIValue>
+          <KPIValue>{formatCurrency(kpiData.avgMonthlySales)}</KPIValue>
           <KPIChange $positive>+{kpiData.salesGrowthRate}% 전월 대비</KPIChange>
         </KPICard>
 

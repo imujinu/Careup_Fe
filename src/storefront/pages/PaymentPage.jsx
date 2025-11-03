@@ -5,7 +5,10 @@ import { cartService } from '../../service/cartService';
 
 const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   const dispatch = useDispatch();
-  const { items, totalAmount } = useSelector(state => state.cart);
+  const { items: cartItems, totalAmount } = useSelector(state => state.cart);
+  
+  // orderData에 items가 있으면 단일 주문 (구매하기), 없으면 장바구니 주문
+  const items = orderData?.items || cartItems;
   
   const [loading, setLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
@@ -76,6 +79,11 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
       const payment = tossPayments.payment({ customerKey });
       
       // 결제 요청 (v2 방식)
+      const orderItemCount = items?.length || 1;
+      const orderItemName = orderItemCount === 1 
+        ? items[0]?.productName || '상품'
+        : `${orderItemCount}개 상품`;
+      
       await payment.requestPayment({
         method: 'CARD',
         amount: {
@@ -83,7 +91,7 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
           value: actualAmount,
         },
         orderId: tossOrderId,
-        orderName: `Care Up 주문 (${items.length}개 상품)`,
+        orderName: `Care Up 주문 (${orderItemName})`,
         customerEmail: currentUser?.email || 'customer@example.com',
         customerName: currentUser?.name || currentUser?.nickname || '고객',
         successUrl: `${window.location.origin}/shop/payment-success`,

@@ -15,19 +15,37 @@ const PaymentSuccessPage = () => {
   useEffect(() => {
     const handlePaymentSuccess = async () => {
       if (hasProcessedRef.current) return;
+      
+      // URL 파라미터에서 결제 정보 가져오기
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentKey = urlParams.get('paymentKey');
+      const amount = urlParams.get('amount');
+      const orderId = urlParams.get('orderId'); // v2에서는 단일 orderId만 전달
+
+      // URL 파라미터가 없으면 이미 처리된 것으로 간주하고 주문 완료 페이지로 리다이렉트
+      if (!paymentKey || !orderId || !amount) {
+        const paymentCompleted = localStorage.getItem('paymentCompleted');
+        if (paymentCompleted) {
+          // 이미 결제가 완료된 경우 주문 완료 페이지로 리다이렉트
+          window.location.href = `/shop/order-complete`;
+          return;
+        }
+        // 결제 정보도 없고 완료 정보도 없으면 쇼핑몰로 리다이렉트
+        window.location.href = '/shop';
+        return;
+      }
+
+      // 이미 처리된 결제인지 확인 (같은 paymentKey로 이미 처리했는지)
+      const processedPayments = JSON.parse(localStorage.getItem('processedPayments') || '[]');
+      if (processedPayments.includes(paymentKey)) {
+        // 이미 처리된 결제면 주문 완료 페이지로 리다이렉트
+        window.location.href = `/shop/order-complete`;
+        return;
+      }
+
       hasProcessedRef.current = true;
       try {
         setLoading(true);
-        
-        // URL 파라미터에서 결제 정보 가져오기
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentKey = urlParams.get('paymentKey');
-        const amount = urlParams.get('amount');
-        const orderId = urlParams.get('orderId'); // v2에서는 단일 orderId만 전달
-
-        if (!paymentKey || !orderId || !amount) {
-          throw new Error('결제 정보가 올바르지 않습니다.');
-        }
 
         // localStorage에서 저장된 주문 정보 가져오기
         const orderData = JSON.parse(localStorage.getItem('currentOrderData') || '{}');
@@ -84,9 +102,13 @@ const PaymentSuccessPage = () => {
         localStorage.setItem('paymentCompleted', JSON.stringify(paymentResult));
         localStorage.removeItem('currentOrderData');
         
+        // 처리된 결제 키 저장 (중복 처리 방지)
+        processedPayments.push(paymentKey);
+        localStorage.setItem('processedPayments', JSON.stringify(processedPayments.slice(-10))); // 최근 10개만 유지
+        
         console.log('🎉 결제 완료! 주문 완료 페이지로 이동합니다.');
         
-        // 주문 완료 페이지로 이동
+        // 주문 완료 페이지로 이동 (URL 파라미터 없이 이동하여 새로고침 시 재처리 방지)
         window.location.href = `/shop/order-complete`;
 
       } catch (error) {
