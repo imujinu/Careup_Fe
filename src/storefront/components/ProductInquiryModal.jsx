@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { productInquiryService } from "../../service/productInquiryService";
+import "./ProductInquiryModal.css";
 
-function ProductInquiryModal({ product, isOpen, onClose }) {
-  const [inquiryData, setInquiryData] = useState({ title: '', content: '', inquiryType: 'PRODUCT', isSecret: false });
+function ProductInquiryModal({ product, memberId, isOpen, onClose, onSuccess }) {
+  const [inquiryData, setInquiryData] = useState({ title: '', content: '', inquiryType: 'PRODUCT_INFO', isSecret: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   
@@ -11,16 +13,41 @@ function ProductInquiryModal({ product, isOpen, onClose }) {
       setError('제목과 내용을 모두 입력해주세요.');
       return;
     }
+    if (!memberId) {
+      setError('로그인이 필요합니다.');
+      return;
+    }
+    if (!product.branchProductId) {
+      setError('상품 정보가 올바르지 않습니다.');
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       setError(null);
-      console.log('문의 제출:', { productId: product.productId, branchProductId: product.branchProductId, ...inquiryData });
+      
+      const requestData = {
+        memberId: memberId,
+        branchProductId: product.branchProductId,
+        title: inquiryData.title.trim(),
+        content: inquiryData.content.trim(),
+        inquiryType: inquiryData.inquiryType,
+        isSecret: inquiryData.isSecret || false,
+        // status는 백엔드에서 자동으로 PENDING으로 설정되지만, 명시적으로 보내면 더 안전함
+        // status: 'PENDING' // 백엔드에서 자동 설정됨
+      };
+      
+      await productInquiryService.createInquiry(requestData);
       alert('문의가 성공적으로 등록되었습니다.');
+      if (onSuccess) {
+        onSuccess();
+      }
       onClose();
-      setInquiryData({ title: '', content: '', inquiryType: 'PRODUCT', isSecret: false });
+      setInquiryData({ title: '', content: '', inquiryType: 'PRODUCT_INFO', isSecret: false });
     } catch (err) {
       console.error('문의 제출 실패:', err);
-      setError('문의 등록 중 오류가 발생했습니다. 다시 시도해주세요.');
+      const errorMessage = err.response?.data?.status_message || err.message || '문의 등록 중 오류가 발생했습니다. 다시 시도해주세요.';
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -51,10 +78,9 @@ function ProductInquiryModal({ product, isOpen, onClose }) {
           <div className="form-group">
             <label htmlFor="inquiryType">문의 유형</label>
             <select id="inquiryType" value={inquiryData.inquiryType} onChange={(e) => handleInputChange('inquiryType', e.target.value)} className="form-select">
-              <option value="PRODUCT">상품 문의</option>
+              <option value="PRODUCT_INFO">상품 문의</option>
               <option value="DELIVERY">배송 문의</option>
-              <option value="EXCHANGE">교환 문의</option>
-              <option value="REFUND">환불 문의</option>
+              <option value="RETURN">반품/환불 문의</option>
               <option value="ETC">기타 문의</option>
             </select>
           </div>
