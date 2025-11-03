@@ -199,6 +199,12 @@ function InventoryManagement() {
       const allBranchProducts = allBranchProductsResults.flat();
       
       console.log('모든 지점 재고 데이터:', allBranchProducts);
+      console.log('첫 번째 재고 항목 상세:', allBranchProducts[0]);
+      if (allBranchProducts[0]) {
+        console.log('reservedQuantity:', allBranchProducts[0].reservedQuantity);
+        console.log('availableQuantity:', allBranchProducts[0].availableQuantity);
+        console.log('stockQuantity:', allBranchProducts[0].stockQuantity);
+      }
       
       // 전체 상품 목록 가져오기 (재고가 없는 상품도 표시하기 위해)
       let allProducts = [];
@@ -219,6 +225,8 @@ function InventoryManagement() {
       // 모든 지점의 재고 데이터 변환
       const productsWithStock = allBranchProducts.map(item => {
         const currentStock = item.stockQuantity || 0;
+        const reservedStock = item.reservedQuantity || 0;  // 예약재고
+        const availableStock = item.availableQuantity !== undefined ? item.availableQuantity : (currentStock - reservedStock);  // 사용 가능한 재고
         const safetyStock = item.safetyStock || 0;
         // 공급가는 Product.supplyPrice에서 가져오기
         const product = productMap.get(item.productId);
@@ -243,6 +251,8 @@ function InventoryManagement() {
           branchId: item.branchId,
           branch: branchName,
           currentStock: currentStock,
+          reservedStock: reservedStock,  // 예약재고 추가
+          availableStock: availableStock,  // 사용 가능한 재고 추가
           safetyStock: safetyStock,
           status: status,
           unitPrice: unitPrice,

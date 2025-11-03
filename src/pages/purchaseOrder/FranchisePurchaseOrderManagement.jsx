@@ -293,7 +293,27 @@ function FranchisePurchaseOrderManagement() {
       return true;
     })();
 
-    const matchStatus = !filters.statusFilter || item.status === filters.statusFilter;
+    // 상태 필터 매칭 (소문자 필터를 대문자 상태와 비교)
+    const matchStatus = !filters.statusFilter || (() => {
+      const filterStatus = filters.statusFilter.toLowerCase();
+      const itemStatus = (item.status || '').toUpperCase();
+      
+      switch(filterStatus) {
+        case 'pending':
+          return itemStatus === 'PENDING';
+        case 'inprogress':
+          // 처리 중 = 승인됨, 부분승인, 배송중
+          return itemStatus === 'APPROVED' || itemStatus === 'PARTIAL' || itemStatus === 'SHIPPED';
+        case 'completed':
+          return itemStatus === 'COMPLETED';
+        case 'rejected':
+          return itemStatus === 'REJECTED';
+        case 'cancelled':
+          return itemStatus === 'CANCELLED';
+        default:
+          return false;
+      }
+    })();
 
     return matchProductName && matchDate && matchStatus;
     });

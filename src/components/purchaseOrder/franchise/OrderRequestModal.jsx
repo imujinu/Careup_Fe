@@ -581,6 +581,29 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
         errorMessage = '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
       }
       
+      // 예약재고 확보 실패 메시지 파싱 및 개선
+      const reservationFailedMatch = errorMessage.match(/예약재고 확보 실패: productId=(\d+), 요청수량=(\d+), 최대가능수량=(\d+)/);
+      if (reservationFailedMatch) {
+        const productId = reservationFailedMatch[1];
+        const requestedQty = reservationFailedMatch[2];
+        const availableQty = reservationFailedMatch[3];
+        
+        // 상품명 찾기
+        const product = products.find(p => String(p.productId) === String(productId));
+        const productName = product ? product.name : `상품 ID: ${productId}`;
+        
+        errorMessage = `${productName}의 예약재고 확보에 실패했습니다.\n요청 수량: ${requestedQty}개\n최대 가능 수량: ${availableQty}개\n\n최대 ${availableQty}개까지만 발주 가능합니다.`;
+      } else {
+        // 기존 형식 (productId만 있는 경우) 파싱
+        const oldFormatMatch = errorMessage.match(/예약재고 확보 실패: productId=(\d+)/);
+        if (oldFormatMatch) {
+          const productId = oldFormatMatch[1];
+          const product = products.find(p => String(p.productId) === String(productId));
+          const productName = product ? product.name : `상품 ID: ${productId}`;
+          errorMessage = `${productName}의 예약재고 확보에 실패했습니다.\n재고가 부족합니다.`;
+        }
+      }
+      
       alert(errorMessage);
     } finally {
       setLoading(false);

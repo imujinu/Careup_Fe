@@ -263,10 +263,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.totalAmount)
           }, '총 금액', getSortIndicator(SORTABLE_COLUMNS.totalAmount)),
-          React.createElement(TableHeaderCell, { 
-            $sortable: true,
-            onClick: () => handleSort(SORTABLE_COLUMNS.status)
-          }, '상태', getSortIndicator(SORTABLE_COLUMNS.status)),
+          React.createElement(TableHeaderCell, null, '상태'), // 정렬 불가
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.deliveryDate)

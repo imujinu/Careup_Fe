@@ -229,6 +229,12 @@ function InventoryTable({
             onClick: () => handleSort(SORTABLE_COLUMNS.currentStock)
           }, '현재고', getSortIndicator(SORTABLE_COLUMNS.currentStock)),
           React.createElement(TableHeaderCell, { 
+            $center: true
+          }, '예약재고'),
+          React.createElement(TableHeaderCell, { 
+            $center: true
+          }, '사용가능'),
+          React.createElement(TableHeaderCell, { 
             $sortable: true,
             $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.safetyStock)
@@ -263,6 +269,14 @@ function InventoryTable({
             React.createElement(TableCell, { $category: true }, item.category || '미분류'),
             React.createElement(TableCell, { $center: true, $branch: true }, item.branch),
             React.createElement(TableCell, { $center: true }, `${item.currentStock}개`),
+            React.createElement(TableCell, { $center: true, style: { color: '#6b7280' } }, `${item.reservedStock || 0}개`),
+            React.createElement(TableCell, { 
+              $center: true, 
+              style: { 
+                color: (item.availableStock || 0) <= 0 ? '#dc2626' : '#059669',
+                fontWeight: 600
+              } 
+            }, `${item.availableStock || 0}개`),
             React.createElement(TableCell, { $center: true }, `${item.safetyStock}개`),
             React.createElement(TableCell, { $center: true },
               React.createElement(StatusBadge, { $status: item.status },
