@@ -1,6 +1,6 @@
 import React from 'react';
 
-const OrderCompletePage = ({ orderData, paymentData, onBackToHome }) => {
+const OrderCompletePage = ({ orderData, paymentData, onBackToHome, onViewOrders }) => {
   return (
     <div className="container order-complete-page">
       <div className="complete-header">
@@ -104,8 +104,11 @@ const OrderCompletePage = ({ orderData, paymentData, onBackToHome }) => {
         <button 
           className="btn-secondary"
           onClick={() => {
-            // 마이페이지로 이동 (구현 필요)
-            alert('마이페이지 기능은 준비 중입니다.');
+            if (onViewOrders) {
+              onViewOrders();
+            } else {
+              alert('마이페이지로 이동합니다.');
+            }
           }}
         >
           주문 내역 보기

@@ -680,15 +680,22 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
-                type: 'number',
-                min: '0',
-                value: formData.unitPrice,
+                type: 'text',
+                inputMode: 'numeric',
+                maxLength: 16,
+                value: formData.unitPrice === 0 ? '' : String(formData.unitPrice),
                 onChange: (e) => {
-                  const v = e.target.value;
-                  if (v === '') return handleInputChange('unitPrice', '');
-                  const n = parseInt(v, 10);
-                  if (n < 0) return;
-                  handleInputChange('unitPrice', isNaN(n) ? 0 : n);
+                  let v = e.target.value.replace(/[^0-9]/g, '');
+                  if (v.length > 16) {
+                    v = v.slice(0, 16);
+                  }
+                  if (v === '') {
+                    handleInputChange('unitPrice', 0);
+                    return;
+                  }
+                  const n = Number(v);
+                  if (isNaN(n) || n < 0) return;
+                  handleInputChange('unitPrice', n);
                 }
               })
             ),
@@ -698,16 +705,22 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
-                type: 'number',
-                min: formData.minPrice > 0 ? formData.minPrice : '0',
-                max: formData.maxPrice > 0 ? formData.maxPrice : undefined,
-                value: formData.sellingPrice,
+                type: 'text',
+                inputMode: 'numeric',
+                maxLength: 16,
+                value: formData.sellingPrice === 0 ? '' : String(formData.sellingPrice),
                 onChange: (e) => {
-                  const v = e.target.value;
-                  if (v === '') return handleInputChange('sellingPrice', '');
-                  const n = parseInt(v, 10);
-                  if (n < 0) return;
-                  handleInputChange('sellingPrice', isNaN(n) ? 0 : n);
+                  let v = e.target.value.replace(/[^0-9]/g, '');
+                  if (v.length > 16) {
+                    v = v.slice(0, 16);
+                  }
+                  if (v === '') {
+                    handleInputChange('sellingPrice', 0);
+                    return;
+                  }
+                  const n = Number(v);
+                  if (isNaN(n) || n < 0) return;
+                  handleInputChange('sellingPrice', n);
                 },
                 placeholder: formData.minPrice > 0 && formData.maxPrice > 0 
                   ? `${formData.minPrice.toLocaleString()}원 ~ ${formData.maxPrice.toLocaleString()}원 사이로 입력`
@@ -722,15 +735,22 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
-                type: 'number',
-                min: '0',
-                value: formData.minPrice,
+                type: 'text',
+                inputMode: 'numeric',
+                maxLength: 16,
+                value: formData.minPrice === 0 ? '' : String(formData.minPrice),
                 onChange: (e) => {
-                  const v = e.target.value;
-                  if (v === '') return handleInputChange('minPrice', '');
-                  const n = parseInt(v, 10);
-                  if (n < 0) return;
-                  handleInputChange('minPrice', isNaN(n) ? 0 : n);
+                  let v = e.target.value.replace(/[^0-9]/g, '');
+                  if (v.length > 16) {
+                    v = v.slice(0, 16);
+                  }
+                  if (v === '') {
+                    handleInputChange('minPrice', 0);
+                    return;
+                  }
+                  const n = Number(v);
+                  if (isNaN(n) || n < 0) return;
+                  handleInputChange('minPrice', n);
                 }
               })
             ),
@@ -740,15 +760,22 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(Input, {
-                type: 'number',
-                min: '0',
-                value: formData.maxPrice,
+                type: 'text',
+                inputMode: 'numeric',
+                maxLength: 16,
+                value: formData.maxPrice === 0 ? '' : String(formData.maxPrice),
                 onChange: (e) => {
-                  const v = e.target.value;
-                  if (v === '') return handleInputChange('maxPrice', '');
-                  const n = parseInt(v, 10);
-                  if (n < 0) return;
-                  handleInputChange('maxPrice', isNaN(n) ? 0 : n);
+                  let v = e.target.value.replace(/[^0-9]/g, '');
+                  if (v.length > 16) {
+                    v = v.slice(0, 16);
+                  }
+                  if (v === '') {
+                    handleInputChange('maxPrice', 0);
+                    return;
+                  }
+                  const n = Number(v);
+                  if (isNaN(n) || n < 0) return;
+                  handleInputChange('maxPrice', n);
                 }
               })
             )

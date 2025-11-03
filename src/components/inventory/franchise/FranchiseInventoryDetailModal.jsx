@@ -39,31 +39,6 @@ const ModalTitle = styled.h2`
   margin: 0;
 `;
 
-const HeaderButtons = styled.div`
-  display: flex;
-  gap: 12px;
-  align-items: center;
-`;
-
-const PrintButton = styled.button`
-  height: 36px;
-  padding: 0 16px;
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  &:hover {
-    background: #e5e7eb;
-  }
-`;
-
 const CloseButton = styled.button`
   background: none;
   border: none;
@@ -83,7 +58,7 @@ const ModalBody = styled.div`
 
 const InfoPanels = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
   margin-bottom: 32px;
 `;
@@ -136,8 +111,8 @@ const StatusBadge = styled.span`
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  background: #dcfce7;
-  color: #166534;
+  background: ${props => props.$status === 'normal' ? '#dcfce7' : '#fef2f2'};
+  color: ${props => props.$status === 'normal' ? '#166534' : '#dc2626'};
 `;
 
 const HistorySection = styled.div`
@@ -202,17 +177,21 @@ const TypeBadge = styled.span`
     if (props.type === '입고') return '#dcfce7';
     if (props.type === '출고') return '#fef2f2';
     if (props.type === '조정') return '#eff6ff';
+    if (props.type === '예약') return '#fef3c7';
+    if (props.type === '예약해제') return '#f3f4f6';
     return '#f3f4f6';
   }};
   color: ${props => {
     if (props.type === '입고') return '#166534';
     if (props.type === '출고') return '#dc2626';
     if (props.type === '조정') return '#2563eb';
+    if (props.type === '예약') return '#92400e';
+    if (props.type === '예약해제') return '#374151';
     return '#374151';
   }};
 `;
 
-function InventoryDetailModal({ isOpen, onClose, item }) {
+function FranchiseInventoryDetailModal({ isOpen, onClose, item }) {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [productInfo, setProductInfo] = useState(null);
@@ -241,8 +220,6 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
     
     setLoading(true);
     try {
-      console.log('상세보기 - 상품 정보:', item); // 디버깅용
-      // productId를 올바르게 가져오기
       const productId = item.productId || item.product?.id;
       if (!productId) {
         console.warn('상품 ID를 찾을 수 없습니다.');
@@ -250,12 +227,10 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
         return;
       }
       
-      const data = await inventoryService.getInventoryFlows(item.branchId || 1, productId);
-      console.log('상세보기 - 입출고 내역 데이터:', data); // 디버깅용
+      const branchId = item.branchId || 1;
+      const data = await inventoryService.getInventoryFlows(branchId, productId);
       
-      // 추가 필터링: 받은 데이터가 해당 상품의 것인지 확인
       const filteredData = (data || []).filter(flow => {
-        // flow에 productId 필드가 있으면 확인
         const flowProductId = flow.productId || flow.branchProduct?.productId || flow.product?.id;
         return !flowProductId || flowProductId === productId;
       });
@@ -275,13 +250,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '재고 상세보기'),
-        React.createElement(HeaderButtons, null,
-          React.createElement(PrintButton, null,
-            React.createElement('span', null, '🖨️'),
-            '인쇄'
-          ),
-          React.createElement(CloseButton, { onClick: onClose }, '×')
-        )
+        React.createElement(CloseButton, { onClick: onClose }, '×')
       ),
       React.createElement(ModalBody, null,
         React.createElement(InfoPanels, null,
@@ -293,40 +262,20 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
             React.createElement(PanelContent, null,
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '상품명:'),
-                React.createElement(InfoValue, null, item.product.name)
+                React.createElement(InfoValue, null, item.product?.name || '알 수 없음')
               ),
               React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '카테고리명:'),
-                React.createElement(InfoValue, null, productInfo?.category?.name || item.category || '미분류')
+                React.createElement(InfoLabel, null, '카테고리:'),
+                React.createElement(InfoValue, null, item.category || '미분류')
               ),
               React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '최저가격:'),
-                React.createElement(InfoValue, null, `₩${(productInfo?.minPrice || item.product?.minPrice || 0).toLocaleString()}`)
-              ),
-              React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '최고가격:'),
-                React.createElement(InfoValue, null, `₩${(productInfo?.maxPrice || item.product?.maxPrice || 0).toLocaleString()}`)
+                React.createElement(InfoLabel, null, '공급가:'),
+                React.createElement(InfoValue, null, `₩${(item.unitPrice || 0).toLocaleString()}`)
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '판매가:'),
                 React.createElement(InfoValue, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-')
               ),
-            )
-          ),
-          React.createElement(InfoPanel, null,
-            React.createElement(PanelHeader, null,
-              React.createElement('span', null, '🏢'),
-              '지점 정보'
-            ),
-            React.createElement(PanelContent, null,
-              React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '지점명:'),
-                React.createElement(InfoValue, null, item.branch)
-              ),
-              React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '지점 ID:'),
-                React.createElement(InfoValue, null, item.branchId || 1)
-              )
             )
           ),
           React.createElement(InfoPanel, null,
@@ -337,19 +286,21 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
             React.createElement(PanelContent, null,
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '현재고:'),
-                React.createElement(InfoValue, null, `${item.currentStock}개`)
+                React.createElement(InfoValue, null, `${item.currentStock || 0}개`)
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '안전재고:'),
-                React.createElement(InfoValue, null, `${item.safetyStock}개`)
-              ),
-              React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '공급가:'),
-                React.createElement(InfoValue, null, `₩${item.unitPrice?.toLocaleString() || 0}`)
+                React.createElement(InfoValue, null, `${item.safetyStock || 0}개`)
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '상태:'),
-                React.createElement(StatusBadge, null, item.status === 'normal' ? '정상' : '부족')
+                React.createElement(StatusBadge, { $status: item.status || 'normal' }, 
+                  item.status === 'low' ? '부족' : '정상'
+                )
+              ),
+              React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '총 가치:'),
+                React.createElement(InfoValue, null, `₩${(item.totalValue || 0).toLocaleString()}`)
               )
             )
           )
@@ -364,26 +315,38 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(TableHeaderCell, null, '일시'),
                 React.createElement(TableHeaderCell, null, '구분'),
                 React.createElement(TableHeaderCell, null, '수량'),
-                React.createElement(TableHeaderCell, null, '사유'),
                 React.createElement(TableHeaderCell, null, '비고')
               )
             ),
             React.createElement(TableBody, null,
               loading ? 
                 React.createElement(TableRow, null,
-                  React.createElement(TableCell, { colSpan: 5, style: { textAlign: 'center', padding: '20px' } }, '로딩 중...')
+                  React.createElement(TableCell, { colSpan: 4, style: { textAlign: 'center', padding: '20px' } }, '로딩 중...')
                 ) :
                 historyData.length === 0 ?
                   React.createElement(TableRow, null,
-                    React.createElement(TableCell, { colSpan: 5, style: { textAlign: 'center', padding: '20px' } }, '입출고 내역이 없습니다.')
+                    React.createElement(TableCell, { colSpan: 4, style: { textAlign: 'center', padding: '20px' } }, '변동 이력이 없습니다.')
                   ) :
                   historyData.map((history, index) => {
                     const inQty = history.inQuantity || 0;
                     const outQty = history.outQuantity || 0;
                     const netChange = inQty - outQty;
+                    const remark = history.remark || '-';
                     
                     let type, quantity;
-                    if (netChange > 0) {
+                    
+                    // 예약 관련 처리
+                    if (remark.includes('예약:') || remark.includes('예약')) {
+                      if (remark.includes('해제')) {
+                        type = '예약해제';
+                        const match = remark.match(/\(수량:\s*(\d+)\)/);
+                        quantity = match ? `-${match[1]}` : '-';
+                      } else {
+                        type = '예약';
+                        const match = remark.match(/\(수량:\s*(\d+)\)/);
+                        quantity = match ? `+${match[1]}` : '+';
+                      }
+                    } else if (netChange > 0) {
                       type = '입고';
                       quantity = `+${netChange}`;
                     } else if (netChange < 0) {
@@ -396,7 +359,14 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                       type = '조정';
                       quantity = '0';
                     }
-                    const date = new Date(history.createdAt).toLocaleString('ko-KR');
+                    
+                    const date = new Date(history.createdAt || history.createAt).toLocaleString('ko-KR', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
                     
                     return React.createElement(TableRow, { key: index },
                       React.createElement(TableCell, null, date),
@@ -404,8 +374,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                         React.createElement(TypeBadge, { type }, type)
                       ),
                       React.createElement(TableCell, null, quantity),
-                      React.createElement(TableCell, null, history.reason || '-'),
-                      React.createElement(TableCell, null, history.remark || '-')
+                      React.createElement(TableCell, null, remark)
                     );
                   })
             )
@@ -416,5 +385,5 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
   );
 }
 
-export default InventoryDetailModal;
+export default FranchiseInventoryDetailModal;
 

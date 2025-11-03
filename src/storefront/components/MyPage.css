@@ -360,11 +360,34 @@
 .purchase-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 15px;
   padding: 15px;
   background: #f8f9fa;
   border-radius: 8px;
   border: 1px solid #eee;
+}
+
+.purchase-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.view-detail-btn {
+  padding: 8px 16px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.view-detail-btn:hover {
+  background: #555;
 }
 
 .purchase-image {
@@ -625,6 +648,108 @@
   }
 }
 
+/* 문의 목록 */
+.inquiries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inquiry-item {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  transition: box-shadow 0.2s;
+}
+
+.inquiry-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.inquiry-header {
+  margin-bottom: 12px;
+}
+
+.inquiry-title-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.inquiry-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.secret-badge {
+  font-size: 12px;
+  color: #666;
+  font-weight: normal;
+}
+
+.inquiry-status {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.inquiry-status.answered {
+  background: #d4edda;
+  color: #155724;
+}
+
+.inquiry-status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.inquiry-status.closed {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+.inquiry-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #666;
+}
+
+.inquiry-type {
+  font-weight: 500;
+}
+
+.inquiry-content {
+  margin-bottom: 12px;
+}
+
+.inquiry-content p {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.inquiry-answers {
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.answer-count {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
 @media (max-width: 480px) {
   .quick-links {
     grid-template-columns: repeat(2, 1fr);
@@ -632,5 +757,24 @@
 
   .purchase-stats {
     grid-template-columns: 1fr;
+  }
+
+  .purchase-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .purchase-actions {
+    width: 100%;
+  }
+
+  .view-detail-btn {
+    width: 100%;
+  }
+
+  .inquiry-title-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 }

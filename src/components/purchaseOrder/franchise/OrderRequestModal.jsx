@@ -42,20 +42,15 @@ const ModalTitle = styled.h2`
 `;
 
 const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  background: #ef4444;
-  color: white;
+  background: none;
   border: none;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 24px;
+  color: #6b7280;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
   
   &:hover {
-    background: #dc2626;
+    color: #374151;
   }
 `;
 
@@ -307,10 +302,22 @@ const OrderRequestButton = styled(Button)`
 
 function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedProducts, setSelectedProducts] = useState({});
+  const [focusedInputs, setFocusedInputs] = useState({}); // 포커스된 입력 필드 추적
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // 검색어 debounce 처리
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // 상품 목록 조회 (가맹점에 등록된 상품 목록만)
   const fetchProducts = async () => {
@@ -349,23 +356,37 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
     }
   };
 
-  // 모달이 열릴 때 상품 목록 조회
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      setCategories(data || []);
+    } catch (error) {
+      console.error('카테고리 목록 조회 실패:', error);
+      setCategories([]);
+    }
+  };
+
+  // 모달이 열릴 때 상품 목록 및 카테고리 목록 조회
   useEffect(() => {
     if (isOpen) {
       fetchProducts();
+      fetchCategories();
       setSelectedProducts({}); // 모달이 열릴 때 선택 상태 초기화
     }
   }, [isOpen]);
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = !searchTerm || 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = !categoryFilter || product.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = !debouncedSearchTerm || 
+        product.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        String(product.id).toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      const matchesCategory = !categoryFilter || product.category === categoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, debouncedSearchTerm, categoryFilter]);
 
   const handleQuantityChange = (productId, quantity) => {
     const numQuantity = parseInt(quantity) || 0;
@@ -375,6 +396,29 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
       ...prev,
       [productId]: numQuantity
     }));
+  };
+  
+  const handleQuantityFocus = (productId) => {
+    setFocusedInputs(prev => ({
+      ...prev,
+      [productId]: true
+    }));
+  };
+  
+  const handleQuantityBlur = (productId) => {
+    // blur 시 포커스 상태 제거 및 빈 값이면 0으로 설정
+    setFocusedInputs(prev => ({
+      ...prev,
+      [productId]: false
+    }));
+    
+    const currentValue = selectedProducts[productId];
+    if (currentValue === '' || currentValue === null || currentValue === undefined) {
+      setSelectedProducts(prev => ({
+        ...prev,
+        [productId]: 0
+      }));
+    }
   };
 
   const handleQuantityIncrease = (productId) => {
@@ -537,6 +581,29 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
         errorMessage = '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
       }
       
+      // 예약재고 확보 실패 메시지 파싱 및 개선
+      const reservationFailedMatch = errorMessage.match(/예약재고 확보 실패: productId=(\d+), 요청수량=(\d+), 최대가능수량=(\d+)/);
+      if (reservationFailedMatch) {
+        const productId = reservationFailedMatch[1];
+        const requestedQty = reservationFailedMatch[2];
+        const availableQty = reservationFailedMatch[3];
+        
+        // 상품명 찾기
+        const product = products.find(p => String(p.productId) === String(productId));
+        const productName = product ? product.name : `상품 ID: ${productId}`;
+        
+        errorMessage = `${productName}의 예약재고 확보에 실패했습니다.\n요청 수량: ${requestedQty}개\n최대 가능 수량: ${availableQty}개\n\n최대 ${availableQty}개까지만 발주 가능합니다.`;
+      } else {
+        // 기존 형식 (productId만 있는 경우) 파싱
+        const oldFormatMatch = errorMessage.match(/예약재고 확보 실패: productId=(\d+)/);
+        if (oldFormatMatch) {
+          const productId = oldFormatMatch[1];
+          const product = products.find(p => String(p.productId) === String(productId));
+          const productName = product ? product.name : `상품 ID: ${productId}`;
+          errorMessage = `${productName}의 예약재고 확보에 실패했습니다.\n재고가 부족합니다.`;
+        }
+      }
+      
       alert(errorMessage);
     } finally {
       setLoading(false);
@@ -547,15 +614,15 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
 
   if (!isOpen) return null;
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '발주 요청'),
         React.createElement(CloseButton, { onClick: onClose }, '×')
       ),
-      React.createElement(ModalBody, null,
-        React.createElement(SearchFilterSection, null,
-          React.createElement(SearchContainer, null,
+      React.createElement(ModalBody, { onClick: (e) => e.stopPropagation() },
+        React.createElement(SearchFilterSection, { onClick: (e) => e.stopPropagation() },
+          React.createElement(SearchContainer, { onClick: (e) => e.stopPropagation() },
             React.createElement(SearchIcon, null,
               React.createElement('img', {
                 src: '/header-search.svg',
@@ -565,18 +632,43 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
             ),
             React.createElement(SearchInput, {
               type: 'text',
-              placeholder: '상품명 또는 SKU로 검색...',
+              autoComplete: 'off',
+              placeholder: '상품명으로 검색',
               value: searchTerm,
-              onChange: (e) => setSearchTerm(e.target.value)
+              onChange: (e) => {
+                e.stopPropagation();
+                setSearchTerm(e.target.value);
+              },
+              onKeyDown: (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              },
+              onClick: (e) => {
+                e.stopPropagation();
+              },
+              onFocus: (e) => {
+                e.stopPropagation();
+              }
             })
           ),
           React.createElement(CategorySelect, {
             value: categoryFilter,
-            onChange: (e) => setCategoryFilter(e.target.value)
+            onChange: (e) => {
+              e.stopPropagation();
+              setCategoryFilter(e.target.value);
+            },
+            onClick: (e) => e.stopPropagation(),
+            onFocus: (e) => e.stopPropagation()
           },
             React.createElement('option', { value: '' }, '전체 카테고리'),
-            React.createElement('option', { value: '원재료' }, '원재료'),
-            React.createElement('option', { value: '포장재' }, '포장재')
+            ...categories.map(category => 
+              React.createElement('option', { 
+                key: category.categoryId || category.id, 
+                value: category.name 
+              }, category.name)
+            )
           )
         ),
         React.createElement(ProductSection, null,
@@ -603,8 +695,22 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
                     }, '-'),
                     React.createElement(QuantityInput, {
                       type: 'number',
-                      value: selectedProducts[product.id] || 0,
-                      onChange: (e) => handleQuantityChange(product.id, e.target.value),
+                      value: focusedInputs[product.id] && (selectedProducts[product.id] === '' || selectedProducts[product.id] === null || selectedProducts[product.id] === undefined) 
+                        ? '' 
+                        : (selectedProducts[product.id] || 0),
+                      onChange: (e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          setSelectedProducts(prev => ({
+                            ...prev,
+                            [product.id]: ''
+                          }));
+                        } else {
+                          handleQuantityChange(product.id, value);
+                        }
+                      },
+                      onFocus: () => handleQuantityFocus(product.id),
+                      onBlur: () => handleQuantityBlur(product.id),
                       min: 0
                     }),
                     React.createElement(QuantityButton, {

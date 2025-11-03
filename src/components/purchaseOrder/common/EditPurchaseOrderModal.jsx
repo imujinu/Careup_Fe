@@ -39,20 +39,15 @@ const ModalTitle = styled.h2`
 `;
 
 const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  background: #ef4444;
-  color: white;
+  background: none;
   border: none;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 20px;
+  color: #6b7280;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
   
   &:hover {
-    background: #dc2626;
+    color: #374151;
   }
 `;
 
@@ -143,7 +138,7 @@ function EditPurchaseOrderModal({ isOpen, onClose, item }) {
     return new Intl.NumberFormat('ko-KR').format(amount || 0);
   };
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, `발주 상세 - ${item.id}`),
@@ -161,7 +156,7 @@ function EditPurchaseOrderModal({ isOpen, onClose, item }) {
             React.createElement(InfoValue, null, item.orderDate)
           ),
           React.createElement(InfoRow, null,
-            React.createElement(InfoLabel, null, '배송예정일'),
+            React.createElement(InfoLabel, null, '배송일자'),
             React.createElement(InfoValue, null, item.deliveryDate || '-')
           ),
           React.createElement(InfoRow, null,

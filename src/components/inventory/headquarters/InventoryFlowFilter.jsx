@@ -137,7 +137,7 @@ function InventoryFlowFilter({ filters, onFiltersChange, branchList = [] }) {
         React.createElement(SearchIcon, null, '🔍'),
         React.createElement(SearchInput, {
           type: 'text',
-          placeholder: '상품명으로 검색...',
+          placeholder: '상품명으로 검색',
           value: filters.searchTerm || '',
           onChange: handleSearchChange
         })

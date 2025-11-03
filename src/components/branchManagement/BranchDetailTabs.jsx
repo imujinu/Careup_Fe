@@ -13,6 +13,7 @@ import EmployeeManagement from "./EmployeeManagement";
 import DocumentManagement from "./DocumentManagement";
 import KPIManagement from "./KPIManagement";
 import BranchDashboard from "./BranchDashboard";
+import LoyalCustomerManagement from "./LoyalCustomerManagement";
 
 function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
   // 지점/가맹점 관리자용 탭 (지점 상세 정보로 변경)
@@ -266,19 +267,7 @@ function KPIContent({ branchId }) {
 }
 
 function CustomerContent({ branchId }) {
-  return (
-    <PlaceholderContent>
-      <PlaceholderIcon>
-        <Icon path={mdiAccount} size={3} />
-      </PlaceholderIcon>
-      <PlaceholderTitle>고객 관리</PlaceholderTitle>
-      <PlaceholderText>
-        지점 {branchId}의 고객 관리 정보가 여기에 표시됩니다.
-        <br />
-        고객 목록, 구매 이력, 문의사항 등을 확인할 수 있습니다.
-      </PlaceholderText>
-    </PlaceholderContent>
-  );
+  return <LoyalCustomerManagement branchId={branchId} />;
 }
 
 export default BranchDetailTabs;

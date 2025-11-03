@@ -20,7 +20,7 @@ const TableHeader = styled.thead`
 
 const TableHeaderCell = styled.th`
   padding: 16px;
-  text-align: left;
+  text-align: center;
   font-size: 14px;
   font-weight: 600;
   color: #374151;
@@ -57,9 +57,11 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
+  text-align: center;
 `;
 
 const StatusBadge = styled.span`
+  display: inline-block;
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 12px;
@@ -72,7 +74,7 @@ const StatusBadge = styled.span`
       case 'rejected': return '#fee2e2';
       case 'partial': return '#fef3c7';
       case 'shipped': return '#e0e7ff';
-      case 'completed': return '#fef3c7';
+      case 'completed': return '#86efac';
       case 'cancelled': return '#fee2e2';
       default: return '#f3f4f6';
     }
@@ -85,7 +87,7 @@ const StatusBadge = styled.span`
       case 'rejected': return '#991b1b';
       case 'partial': return '#d97706';
       case 'shipped': return '#4338ca';
-      case 'completed': return '#92400e';
+      case 'completed': return '#047857';
       case 'cancelled': return '#991b1b';
       default: return '#374151';
     }
@@ -188,6 +190,17 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
     return new Intl.NumberFormat('ko-KR').format(amount);
   };
 
+  const formatDeliveryDate = (dateString) => {
+    if (!dateString || dateString === '-') return '-';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+    } catch (e) {
+      return '-';
+    }
+  };
+
   const getStatusText = (status) => {
     if (!status) return status;
     const upperStatus = status.toUpperCase();
@@ -229,6 +242,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
+          React.createElement(TableHeaderCell, null, '목록번호'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.orderNo)
@@ -249,21 +263,19 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.totalAmount)
           }, '총 금액', getSortIndicator(SORTABLE_COLUMNS.totalAmount)),
-          React.createElement(TableHeaderCell, { 
-            $sortable: true,
-            onClick: () => handleSort(SORTABLE_COLUMNS.status)
-          }, '상태', getSortIndicator(SORTABLE_COLUMNS.status)),
+          React.createElement(TableHeaderCell, null, '상태'), // 정렬 불가
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.deliveryDate)
-          }, '배송예정일', getSortIndicator(SORTABLE_COLUMNS.deliveryDate)),
+          }, '배송일자', getSortIndicator(SORTABLE_COLUMNS.deliveryDate)),
           React.createElement(TableHeaderCell, null, '작업')
         )
       ),
       React.createElement(TableBody, null,
         data.map((item, index) => {
           return React.createElement(TableRow, { key: index },
-            React.createElement(TableCell, null, item.id),
+            React.createElement(TableCell, null, index + 1),
+            React.createElement(TableCell, null, item.displayOrderNo || item.id),
             React.createElement(TableCell, null, item.branch),
             React.createElement(TableCell, null, item.orderDate),
             React.createElement(TableCell, null, `${item.productCount}개`),
@@ -271,7 +283,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
                   React.createElement(TableCell, null,
         React.createElement(StatusBadge, { status: (item.status || item.orderStatus || '').toLowerCase() }, getStatusText(item.status || item.orderStatus))
       ),
-            React.createElement(TableCell, null, item.deliveryDate),
+            React.createElement(TableCell, null, formatDeliveryDate(item.deliveryDate)),
             React.createElement(TableCell, null,
               React.createElement(DetailLink, { onClick: () => onDetail(item) }, '상세보기')
             )

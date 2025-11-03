@@ -104,12 +104,12 @@ export const dashboardService = {
         dashboardService.getSalesStatistics("MONTH"),
       ]);
 
-      // 매출 통계에서 평균 매출 계산
+      // 매출 통계에서 평균 매출 계산 (원 단위로 유지)
       let avgMonthlySales = 0;
       if (salesStats && salesStats.salesData) {
         const totalSales = salesStats.totalSales || 0;
         const branchCount = salesStats.totalBranchCount || branches;
-        avgMonthlySales = Math.floor((totalSales / branchCount) / 10000); // 만원 단위
+        avgMonthlySales = Math.floor(totalSales / branchCount); // 원 단위
       }
 
       // 전월 대비 증가율 계산 (임시로 더미 데이터 사용)
@@ -132,7 +132,7 @@ export const dashboardService = {
       return {
         totalBranches: 324,
         totalEmployees: 1247,
-        avgMonthlySales: 240,
+        avgMonthlySales: 24000000, // 원 단위 (2,400만원)
         branchGrowthRate: 12.5,
         employeeGrowthRate: 8.2,
         salesGrowthRate: 23.1,
