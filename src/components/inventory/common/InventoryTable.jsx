@@ -57,10 +57,16 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
-  max-width: ${props => props.$productName ? '200px' : 'none'};
-  overflow: ${props => props.$productName ? 'hidden' : 'visible'};
-  text-overflow: ${props => props.$productName ? 'ellipsis' : 'clip'};
-  white-space: ${props => props.$productName ? 'nowrap' : 'normal'};
+  max-width: ${props => {
+    if (props.$productName) return '200px';
+    if (props.$category) return '150px';
+    if (props.$branch) return '120px';
+    if (props.$remark) return '200px';
+    return 'none';
+  }};
+  overflow: ${props => (props.$productName || props.$category || props.$branch || props.$remark) ? 'hidden' : 'visible'};
+  text-overflow: ${props => (props.$productName || props.$category || props.$branch || props.$remark) ? 'ellipsis' : 'clip'};
+  white-space: ${props => (props.$productName || props.$category || props.$branch || props.$remark) ? 'nowrap' : 'normal'};
   text-align: ${props => props.$center ? 'center' : 'left'};
 `;
 
@@ -254,8 +260,8 @@ function InventoryTable({
                 React.createElement(ProductName, null, item.product.name)
               )
             ),
-            React.createElement(TableCell, null, item.category || '미분류'),
-            React.createElement(TableCell, { $center: true }, item.branch),
+            React.createElement(TableCell, { $category: true }, item.category || '미분류'),
+            React.createElement(TableCell, { $center: true, $branch: true }, item.branch),
             React.createElement(TableCell, { $center: true }, `${item.currentStock}개`),
             React.createElement(TableCell, { $center: true }, `${item.safetyStock}개`),
             React.createElement(TableCell, { $center: true },

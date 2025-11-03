@@ -56,10 +56,15 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
-  max-width: ${props => props.$productName ? '200px' : 'none'};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: ${props => {
+    if (props.$productName) return '200px';
+    if (props.$branch) return '120px';
+    if (props.$remark) return '200px';
+    return 'none';
+  }};
+  overflow: ${props => (props.$productName || props.$branch || props.$remark) ? 'hidden' : 'visible'};
+  text-overflow: ${props => (props.$productName || props.$branch || props.$remark) ? 'ellipsis' : 'clip'};
+  white-space: ${props => (props.$productName || props.$branch || props.$remark) ? 'nowrap' : 'normal'};
 `;
 
 const StatusBadge = styled.span`
@@ -312,11 +317,11 @@ function InventoryFlowTable({
         data.map((item, index) => 
           React.createElement(TableRow, { key: item.id || index },
             React.createElement(TableCell, { $productName: true }, item.productName || '-'),
-            React.createElement(TableCell, null, getBranchName(item.branchId, item.branchName)),
+            React.createElement(TableCell, { $branch: true }, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
             React.createElement(TableCell, null, formatQuantity(item.inQuantity)),
             React.createElement(TableCell, null, formatQuantity(item.outQuantity)),
-            React.createElement(TableCell, null, item.remark || '-'),
+            React.createElement(TableCell, { $remark: true }, item.remark || '-'),
             React.createElement(TableCell, null, formatDate(item.createdAt)),
             React.createElement(TableCell, null,
               React.createElement(ActionButton, {

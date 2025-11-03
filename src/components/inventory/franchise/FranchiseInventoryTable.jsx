@@ -57,6 +57,14 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
+  max-width: ${props => {
+    if (props.$productName) return '200px';
+    if (props.$category) return '150px';
+    return 'none';
+  }};
+  overflow: ${props => (props.$productName || props.$category) ? 'hidden' : 'visible'};
+  text-overflow: ${props => (props.$productName || props.$category) ? 'ellipsis' : 'clip'};
+  white-space: ${props => (props.$productName || props.$category) ? 'nowrap' : 'normal'};
 `;
 
 const ProductInfo = styled.div`
@@ -242,12 +250,12 @@ function FranchiseInventoryTable({
       React.createElement(TableBody, null,
         data.map((item, index) =>
           React.createElement(TableRow, { key: index },
-            React.createElement(TableCell, null,
+            React.createElement(TableCell, { $productName: true },
               React.createElement(ProductInfo, null,
                 React.createElement(ProductName, null, item.product.name)
               )
             ),
-            React.createElement(TableCell, null, item.category || '미분류'),
+            React.createElement(TableCell, { $category: true }, item.category || '미분류'),
             React.createElement(TableCell, null, `${item.currentStock}개`),
             React.createElement(TableCell, null, `${item.safetyStock}개`),
             React.createElement(TableCell, null,
