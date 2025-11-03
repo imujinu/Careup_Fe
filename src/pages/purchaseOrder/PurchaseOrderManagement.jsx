@@ -96,6 +96,13 @@ function PurchaseOrderManagement() {
   const [productStatistics, setProductStatistics] = useState([]);
   const [branchList, setBranchList] = useState([]);
   const [sort, setSort] = useState(null); // { field, direction }
+  
+  // 정렬 디버깅
+  React.useEffect(() => {
+    if (sort) {
+      console.log('Sort state updated:', sort);
+    }
+  }, [sort]);
 
   // 상태 한글 변환 함수
   const getStatusText = (status) => {
@@ -146,18 +153,45 @@ function PurchaseOrderManagement() {
       ]);
       
       // 데이터 변환
-      const formattedData = data.map(item => ({
-        id: item.purchaseOrderId,
-        branch: item.branchName || `지점-${item.branchId}`,
-        orderDate: item.orderDate || new Date().toISOString().split('T')[0],
-        productCount: item.productCount || 0,
-        totalAmount: item.totalPrice || 0,  // 백엔드에서 totalPrice 필드로 반환됨
-        status: item.orderStatus || item.status || 'pending',
-        orderStatus: item.orderStatus,
-        deliveryDate: item.deliveryDate || '-'
-      }));
+      const formattedData = data.map(item => {
+        const orderDate = item.createdAt ? item.createdAt.split('T')[0] : (item.orderDate || new Date().toISOString().split('T')[0]);
+        const serial = String(item.purchaseOrderId || 0).padStart(6, '0');
+        const yyyymmdd = orderDate.replace(/-/g, '');
+        const displayOrderNo = `PO-${yyyymmdd}-${serial}`;
+        return {
+          id: item.purchaseOrderId,
+          displayOrderNo,
+          branch: item.branchName || `지점-${item.branchId}`,
+          orderDate,
+          productCount: item.productCount || 0,
+          totalAmount: item.totalPrice || 0,  // 백엔드에서 totalPrice 필드로 반환됨
+          status: item.orderStatus || item.status || 'pending',
+          orderStatus: item.orderStatus,
+          // 상태가 COMPLETED이면 updatedAt 사용 (입고완료 시점), 아니면 기본값 '-'
+          deliveryDate: (item.orderStatus === 'COMPLETED' && item.updatedAt)
+            ? item.updatedAt.split('T')[0]
+            : '-' // 입고완료일(배송일자)
+        };
+      });
       
-      setPurchaseOrders(formattedData);
+      // 상세 조회로 상품명 보강 (검색용)
+      try {
+        const detailed = await Promise.all(formattedData.map(async (po) => {
+          try {
+            const detail = await purchaseOrderService.getPurchaseOrder(po.id);
+            const names = Array.isArray(detail.orderDetails)
+              ? detail.orderDetails.map(d => d.productName).filter(Boolean).join(', ')
+              : '';
+            return { ...po, productNames: names, products: detail.orderDetails };
+          } catch (e) {
+            return po;
+          }
+        }));
+        setPurchaseOrders(detailed);
+      } catch (e) {
+        // 상세 조회 실패 시 기본 데이터 사용
+        setPurchaseOrders(formattedData);
+      }
       
       // 지점 목록 설정
       console.log('지점 목록 API 응답:', branches);
@@ -241,7 +275,12 @@ function PurchaseOrderManagement() {
           totalQuantity: stat.totalQuantity || 0,
           totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
         }));
-        setProductStatistics(productChartData);
+        // 정렬 후 상위 10개만 저장 (차트 컴포넌트에서 다시 정렬하지 않도록)
+        const sortedData = productChartData
+          .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0))
+          .slice(0, 10);
+        console.log('상품별 통계 정렬 후:', sortedData);
+        setProductStatistics(sortedData);
       }
       
       if (statistics) {
@@ -317,41 +356,61 @@ function PurchaseOrderManagement() {
   };
 
   const handleSort = (field, direction) => {
-    setSort({ field, direction });
+    console.log('정렬 요청:', { field, direction });
+    const newSort = { field, direction };
+    setSort(newSort);
+    setCurrentPage(1); // 정렬 시 첫 페이지로 리셋
   };
 
   // 필터링된 데이터
   const filteredData = React.useMemo(() => {
     let filtered = purchaseOrders.filter(item => {
+    // 검색 필터
     const matchesSearch = !filters.searchTerm || 
-      String(item.id).toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      item.branch.toLowerCase().includes(filters.searchTerm.toLowerCase());
+      String(item.id || '').toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+      String(item.displayOrderNo || '').toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+      String(item.branch || '').toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+      String(item.productNames || '').toLowerCase().includes(filters.searchTerm.toLowerCase());
     
-    const matchesBranch = !filters.branchFilter || item.branch === filters.branchFilter;
+    // 지점 필터
+    const matchesBranch = !filters.branchFilter || 
+      (item.branch || '').trim() === filters.branchFilter.trim() ||
+      filters.branchFilter === '' ||
+      filters.branchFilter === '전체 지점';
+    
+    // 상태 필터
+    const itemStatus = (item.status || item.orderStatus || '').toUpperCase();
+    const filterStatus = (filters.statusFilter || '').toUpperCase();
     const matchesStatus = !filters.statusFilter || 
-      (item.status || item.orderStatus || '').toUpperCase() === filters.statusFilter.toUpperCase();
+      filters.statusFilter === '' ||
+      filters.statusFilter === '전체 상태' ||
+      itemStatus === filterStatus;
     
     return matchesSearch && matchesBranch && matchesStatus;
     });
 
     // 정렬 적용
-    if (sort && sort.field) {
+    if (sort && sort.field && filtered.length > 0) {
+      console.log('정렬 적용:', sort, '데이터 개수:', filtered.length);
       filtered = [...filtered].sort((a, b) => {
         let aValue, bValue;
 
         switch (sort.field) {
           case 'orderNo':
-            // 발주번호를 숫자로 변환하여 정렬
-            aValue = parseInt(String(a.id || '')) || 0;
-            bValue = parseInt(String(b.id || '')) || 0;
+            // 발주번호를 숫자로 변환하여 정렬 (PO-YYYYMMDD-###### 형식)
+            const aOrderNo = String(a.displayOrderNo || a.id || '').split('-').pop() || '';
+            const bOrderNo = String(b.displayOrderNo || b.id || '').split('-').pop() || '';
+            aValue = parseInt(aOrderNo) || 0;
+            bValue = parseInt(bOrderNo) || 0;
             break;
           case 'branch':
-            aValue = a.branch || '';
-            bValue = b.branch || '';
+            aValue = (a.branch || '').toLowerCase();
+            bValue = (b.branch || '').toLowerCase();
             break;
           case 'orderDate':
-            aValue = new Date(a.orderDate || 0);
-            bValue = new Date(b.orderDate || 0);
+            // 날짜 문자열을 직접 비교 (YYYY-MM-DD 형식)
+            aValue = a.orderDate || '0000-00-00';
+            bValue = b.orderDate || '0000-00-00';
             break;
           case 'productCount':
             aValue = a.productCount || 0;
@@ -362,31 +421,63 @@ function PurchaseOrderManagement() {
             bValue = b.totalAmount || 0;
             break;
           case 'status':
-            aValue = a.status || a.orderStatus || '';
-            bValue = b.status || b.orderStatus || '';
+            // 상태를 한글로 변환 후 정렬
+            const getStatusOrder = (status) => {
+              if (!status) return 999;
+              const upperStatus = status.toUpperCase();
+              switch(upperStatus) {
+                case 'PENDING': return 1;
+                case 'APPROVED': return 2;
+                case 'PARTIAL': return 3;
+                case 'SHIPPED': return 4;
+                case 'COMPLETED': return 5;
+                case 'REJECTED': return 6;
+                case 'CANCELLED': return 7;
+                default: return 999;
+              }
+            };
+            aValue = getStatusOrder(a.status || a.orderStatus);
+            bValue = getStatusOrder(b.status || b.orderStatus);
             break;
           case 'deliveryDate':
-            aValue = a.deliveryDate ? new Date(a.deliveryDate) : new Date(0);
-            bValue = b.deliveryDate ? new Date(b.deliveryDate) : new Date(0);
+            // '-'는 가장 뒤로
+            if (a.deliveryDate === '-' || !a.deliveryDate) aValue = new Date('9999-12-31');
+            else aValue = new Date(a.deliveryDate);
+            if (b.deliveryDate === '-' || !b.deliveryDate) bValue = new Date('9999-12-31');
+            else bValue = new Date(b.deliveryDate);
             break;
           default:
             return 0;
         }
 
-        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
-        return 0;
+        // 비교 로직
+        let result = 0;
+        if (aValue < bValue) {
+          result = -1;
+        } else if (aValue > bValue) {
+          result = 1;
+        }
+        
+        // 방향에 따라 반전
+        return sort.direction === 'asc' ? result : -result;
       });
     }
 
-    return filtered;
+    return filtered || [];
   }, [purchaseOrders, filters, sort]);
 
   // 페이지네이션
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedData = filteredData.slice(startIndex, endIndex);
+  
+  // 현재 페이지가 유효한 범위를 벗어나면 첫 페이지로 조정
+  React.useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,

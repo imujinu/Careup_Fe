@@ -6,8 +6,6 @@ import SearchAndFilter from '../../components/purchaseOrder/franchise/SearchAndF
 import PurchaseOrderTable from '../../components/purchaseOrder/franchise/PurchaseOrderTable';
 import FranchisePurchaseOrderDetailModal from '../../components/purchaseOrder/franchise/FranchisePurchaseOrderDetailModal';
 import OrderRequestModal from '../../components/purchaseOrder/franchise/OrderRequestModal';
-import OrderRecommendationModal from '../../components/purchaseOrder/franchise/OrderRecommendationModal';
-import OrderAutomationModal from '../../components/purchaseOrder/franchise/OrderAutomationModal';
 import { purchaseOrderService } from '../../service/purchaseOrderService';
 import { authService } from '../../service/authService';
 import { getBranchName } from '../../utils/branchUtils';
@@ -109,8 +107,6 @@ function FranchisePurchaseOrderManagement() {
   const [pageSize, setPageSize] = useState(10);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isOrderRequestModalOpen, setIsOrderRequestModalOpen] = useState(false);
-  const [isOrderRecommendationModalOpen, setIsOrderRecommendationModalOpen] = useState(false);
-  const [isOrderAutomationModalOpen, setIsOrderAutomationModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -144,7 +140,10 @@ function FranchisePurchaseOrderManagement() {
           productCount: item.productCount || 0,
           totalAmount: item.totalPrice || 0,
           status: item.orderStatus || 'PENDING',
-          deliveryDate: item.deliveryDate || '-',
+          // 상태가 COMPLETED이면 updatedAt 사용 (입고완료 시점), 아니면 기본값 '-'
+          deliveryDate: (item.orderStatus === 'COMPLETED' && item.updatedAt) 
+            ? item.updatedAt.split('T')[0] 
+            : '-', // 입고완료일(배송일자)
           // 검색용 필드(상세 조회 후 채움)
           productNames: ''
         });
@@ -172,7 +171,19 @@ function FranchisePurchaseOrderManagement() {
             const names = Array.isArray(detail.orderDetails)
               ? detail.orderDetails.map(d => d.productName).filter(Boolean).join(', ')
               : '';
-            return { ...po, productNames: names, products: detail.orderDetails };
+            // 상세 조회에서 배송일자(입고완료일) 업데이트
+            const orderStatus = detail.orderStatus || po.status;
+            let completedDate = '-';
+            
+            // 상태가 COMPLETED인 경우 updatedAt 사용 (입고완료 시점)
+            if (orderStatus === 'COMPLETED' && detail.updatedAt) {
+              completedDate = detail.updatedAt.split('T')[0];
+            } else if (po.deliveryDate && po.deliveryDate !== '-') {
+              // 기존 deliveryDate 유지
+              completedDate = po.deliveryDate;
+            }
+            
+            return { ...po, productNames: names, products: detail.orderDetails, deliveryDate: completedDate, status: orderStatus };
           } catch (e) {
             return po;
           }
@@ -249,30 +260,15 @@ function FranchisePurchaseOrderManagement() {
     handleCloseOrderRequestModal();
   };
 
-  const handleOrderRecommendation = () => {
-    setIsOrderRecommendationModalOpen(true);
-  };
-
-  const handleCloseOrderRecommendationModal = () => {
-    setIsOrderRecommendationModalOpen(false);
-  };
-
-  const handleApplyRecommendation = (recommendedItems) => {
-    console.log('추천 발주 적용:', recommendedItems);
-    // TODO: 추천 발주를 실제 발주로 변환하는 로직 구현
-  };
-
-  const handleOrderAutomation = () => {
-    setIsOrderAutomationModalOpen(true);
-  };
-
-  const handleCloseOrderAutomationModal = () => {
-    setIsOrderAutomationModalOpen(false);
-  };
-
-  const handleSaveAutomationSettings = (settings) => {
-    console.log('자동화 설정 저장:', settings);
-    // TODO: 자동화 설정 저장 로직 구현
+  // 엑셀 다운로드
+  const handleExportExcel = async () => {
+    try {
+      await purchaseOrderService.exportToExcel(branchId);
+      alert('발주 내역 엑셀 다운로드가 완료되었습니다.');
+    } catch (error) {
+      console.error('엑셀 다운로드 실패:', error);
+      alert('엑셀 다운로드에 실패했습니다.');
+    }
   };
 
   const handleSort = (field, direction) => {
@@ -297,7 +293,27 @@ function FranchisePurchaseOrderManagement() {
       return true;
     })();
 
-    const matchStatus = !filters.statusFilter || item.status === filters.statusFilter;
+    // 상태 필터 매칭 (소문자 필터를 대문자 상태와 비교)
+    const matchStatus = !filters.statusFilter || (() => {
+      const filterStatus = filters.statusFilter.toLowerCase();
+      const itemStatus = (item.status || '').toUpperCase();
+      
+      switch(filterStatus) {
+        case 'pending':
+          return itemStatus === 'PENDING';
+        case 'inprogress':
+          // 처리 중 = 승인됨, 부분승인, 배송중
+          return itemStatus === 'APPROVED' || itemStatus === 'PARTIAL' || itemStatus === 'SHIPPED';
+        case 'completed':
+          return itemStatus === 'COMPLETED';
+        case 'rejected':
+          return itemStatus === 'REJECTED';
+        case 'cancelled':
+          return itemStatus === 'CANCELLED';
+        default:
+          return false;
+      }
+    })();
 
     return matchProductName && matchDate && matchStatus;
     });
@@ -361,15 +377,20 @@ function FranchisePurchaseOrderManagement() {
         React.createElement(PageSubtitle, null, '가맹점 발주 내역 조회 및 발주 요청')
       ),
       React.createElement(HeaderRight, null,
-        React.createElement(ExportButton, null, '내보내기'),
-        React.createElement(ExportButton, null, '엑셀 다운로드')
+        React.createElement(ExportButton, { onClick: handleExportExcel },
+          React.createElement('span', null, '📥'),
+          '엑셀 다운로드'
+        )
       )
     ),
     React.createElement(SummaryCards, { summary }),
     productStatistics.length > 0 && React.createElement(ChartCard, null,
       React.createElement(ChartTitle, null, '상품별 발주량 TOP 10'),
       React.createElement(ResponsiveContainer, { width: "100%", height: 300 },
-        React.createElement(BarChart, { data: productStatistics.map(stat => ({
+        React.createElement(BarChart, { data: productStatistics
+          .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0)) // 수량 기준 내림차순 정렬
+          .slice(0, 10) // 상위 10개만 표시
+          .map(stat => ({
           productName: stat.productName,
           totalQuantity: stat.totalQuantity,
           approvedQuantity: stat.approvedQuantity
@@ -387,9 +408,7 @@ function FranchisePurchaseOrderManagement() {
     React.createElement(SearchAndFilter, {
       filters,
       onFiltersChange: handleFiltersChange,
-      onOrderRequest: handleOrderRequest,
-      onOrderRecommendation: handleOrderRecommendation,
-      onOrderAutomation: handleOrderAutomation
+      onOrderRequest: handleOrderRequest
     }),
     React.createElement(PurchaseOrderTable, {
       data: paginatedData,
@@ -405,22 +424,13 @@ function FranchisePurchaseOrderManagement() {
     React.createElement(FranchisePurchaseOrderDetailModal, {
       isOpen: isDetailModalOpen,
       onClose: handleCloseDetailModal,
-      item: selectedItem
+      item: selectedItem,
+      onOrderUpdated: fetchPurchaseOrders
     }),
     React.createElement(OrderRequestModal, {
       isOpen: isOrderRequestModalOpen,
       onClose: handleCloseOrderRequestModal,
       onSubmitOrderRequest: handleSubmitOrderRequest
-    }),
-    React.createElement(OrderRecommendationModal, {
-      isOpen: isOrderRecommendationModalOpen,
-      onClose: handleCloseOrderRecommendationModal,
-      onApplyRecommendation: handleApplyRecommendation
-    }),
-    React.createElement(OrderAutomationModal, {
-      isOpen: isOrderAutomationModalOpen,
-      onClose: handleCloseOrderAutomationModal,
-      onSaveSettings: handleSaveAutomationSettings
     })
   );
 }
