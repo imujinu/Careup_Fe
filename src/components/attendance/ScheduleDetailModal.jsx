@@ -1,4 +1,3 @@
-// src/components/attendance/ScheduleDetailModal.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
@@ -116,23 +115,17 @@ const toIsoLocal = (date, hh, mm, ap) => {
   const M = String(mm || '00').padStart(2, '0');
   return `${date}T${H}:${M}:00`;
 };
-const toMs = (iso) => {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? t : null;
-};
+const getNum = (v) => (v == null ? null : Number(v));
 
-/* ===== 팔레트 ===== */
+/* ===== 팔레트/상태 ===== */
 const tone = {
-  violet: { bg:'#ede9fe', fg:'#4c1d95' }, // 휴가
-  green:  { bg:'#dcfce7', fg:'#166534' }, // 근무중/휴게/완료
-  red:    { bg:'#fee2e2', fg:'#991b1b' }, // 누락/결근
-  amber:  { bg:'#fef3c7', fg:'#92400e' }, // 지각/조퇴/초과
-  gray:   { bg:'#f3f4f6', fg:'#374151' }, // 보조 배지(유형)
-  blue:   { bg:'#dbeafe', fg:'#1e40af' }, // 예정
+  violet: { bg:'#ede9fe', fg:'#4c1d95' },
+  green:  { bg:'#dcfce7', fg:'#166534' },
+  red:    { bg:'#fee2e2', fg:'#991b1b' },
+  amber:  { bg:'#fef3c7', fg:'#92400e' },
+  gray:   { bg:'#f3f4f6', fg:'#374151' },
+  blue:   { bg:'#dbeafe', fg:'#1e40af' },
 };
-
-/* 상태 → 색상/라벨 */
 const STATUS_COLORS = {
   PLANNED:         tone.blue,
   LATE:            tone.amber,
@@ -157,66 +150,50 @@ const STATUS_LABELS_KO = {
   LEAVE:           '휴가',
   ABSENT:          '결근',
 };
-
-/* ===== 서버 필드 우선 선택 ===== */
 const pickStatus = (d) => String(d?.status ?? d?.attendanceStatus ?? '').toUpperCase();
 const pickCategory = (d) => String(d?.category ?? d?.scheduleType ?? '').toUpperCase();
-
-/* ===== 단일 뱃지(상태 + (커스텀명)) ===== */
 function buildSingleBadge(detail) {
   const st = pickStatus(detail);
   const cat = pickCategory(detail);
-
   let color = STATUS_COLORS.PLANNED;
   let label = STATUS_LABELS_KO.PLANNED;
-
-  if (st && STATUS_COLORS[st]) {
-    color = STATUS_COLORS[st];
-    label = STATUS_LABELS_KO[st] || st;
-  } else if (cat === 'LEAVE') {
-    color = STATUS_COLORS.LEAVE;
-    label = STATUS_LABELS_KO.LEAVE;
-  }
-
+  if (st && STATUS_COLORS[st]) { color = STATUS_COLORS[st]; label = STATUS_LABELS_KO[st] || st; }
+  else if (cat === 'LEAVE') { color = STATUS_COLORS.LEAVE; label = STATUS_LABELS_KO.LEAVE; }
   let typeName = null;
   if (cat === 'LEAVE' || st === 'LEAVE') typeName = detail?.leaveTypeName || '휴가';
   else if (detail?.workTypeName) typeName = detail.workTypeName;
-
-  if (typeName && !label.includes(typeName)) {
-    label = `${label} (${typeName})`;
-  }
-
+  if (typeName && !label.includes(typeName)) label = `${label} (${typeName})`;
   return { text: label, bg: color.bg, fg: color.fg };
 }
 
+/* ===== 유효성 유틸 ===== */
+const ok2 = (v) => /^\d{1,2}$/.test(String(v ?? ''));
+const pairValid = (hh, mm) => ok2(hh) && ok2(mm);
+
 /* ===== 컴포넌트 ===== */
-export function ScheduleDetailModal({ open, scheduleId, onClose, onSaved }) {
+export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose, onSaved }) {
   const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState(null);
   const [edit, setEdit] = useState(false);
 
-  // 상태/휴가 여부(서버 필드 우선)
   const statusCode = useMemo(() => pickStatus(detail), [detail]);
   const isLeave = useMemo(() => {
     const cat = pickCategory(detail);
-    return statusCode === 'LEAVE' || cat === 'LEAVE';
+    return statusCode === 'LEAVE' || cat === 'LEAVE' || !!detail?.leaveTypeId;
   }, [statusCode, detail]);
 
-  // 계획(등록 당시)
   const [dDate, setDDate] = useState('');
   const [dSHH, setDSHH] = useState(''); const [dSMM, setDSMM] = useState(''); const [dSAP, setDSAP] = useState('AM');
   const [dB1HH, setDB1HH] = useState(''); const [dB1MM, setDB1MM] = useState(''); const [dB1AP, setDB1AP] = useState('PM');
   const [dB2HH, setDB2HH] = useState(''); const [dB2MM, setDB2MM] = useState(''); const [dB2AP, setDB2AP] = useState('PM');
   const [dEHH, setDEHH] = useState(''); const [dEMM, setDEMM] = useState(''); const [dEAP, setDEAP] = useState('PM');
 
-  // 실제 기록
   const [aSHH, setASHH] = useState(''); const [aSMM, setASMM] = useState(''); const [aSAP, setASAP] = useState('AM');
   const [aB1HH, setAB1HH] = useState(''); const [aB1MM, setAB1MM] = useState(''); const [aB1AP, setAB1AP] = useState('PM');
   const [aB2HH, setAB2HH] = useState(''); const [aB2MM, setAB2MM] = useState(''); const [aB2AP, setAB2AP] = useState('PM');
   const [aEHH, setAEHH] = useState(''); const [aEMM, setAEMM] = useState(''); const [aEAP, setAEAP] = useState('PM');
 
-  // 상세 로드
   useEffect(() => {
     if (!open || !scheduleId) return;
     (async () => {
@@ -224,10 +201,9 @@ export function ScheduleDetailModal({ open, scheduleId, onClose, onSaved }) {
         const d = await getScheduleDetail(scheduleId);
         setDetail(d || null);
 
-        // 날짜
-        setDDate(fmtYMD(d?.registeredDate || d?.date || d?.startAt));
+        const base = fmtYMD(d?.registeredDate || d?.date || d?.startAt);
+        setDDate(base);
 
-        // 계획 → 12h
         const rIn  = to12hParts(d?.registeredClockIn || d?.registeredClockInTime || d?.registeredStartAt || d?.startAt);
         const rB1  = to12hParts(d?.registeredBreakStart || d?.registeredBreakStartTime);
         const rB2  = to12hParts(d?.registeredBreakEnd || d?.registeredBreakEndTime);
@@ -237,7 +213,6 @@ export function ScheduleDetailModal({ open, scheduleId, onClose, onSaved }) {
         setDB2HH(rB2.hh); setDB2MM(rB2.mm); setDB2AP(rB2.ap);
         setDEHH(rOut.hh); setDEMM(rOut.mm); setDEAP(rOut.ap);
 
-        // 실제 → 12h
         const aIn  = d?.actualClockIn  || d?.actualStartAt  ? to12hParts(d.actualClockIn  || d.actualStartAt)  : {hh:'',mm:'',ap:'AM'};
         const aB1  = d?.actualBreakStart || d?.actualBreakStartAt ? to12hParts(d.actualBreakStart || d.actualBreakStartAt) : {hh:'',mm:'',ap:'PM'};
         const aB2  = d?.actualBreakEnd   || d?.actualBreakEndAt   ? to12hParts(d.actualBreakEnd   || d.actualBreakEndAt)   : {hh:'',mm:'',ap:'PM'};
@@ -247,56 +222,145 @@ export function ScheduleDetailModal({ open, scheduleId, onClose, onSaved }) {
         setAB2HH(aB2.hh); setAB2MM(aB2.mm); setAB2AP(aB2.ap);
         setAEHH(aOut.hh); setAEMM(aOut.mm); setAEAP(aOut.ap);
       } catch {
-        addToast('상세 조회에 실패했습니다.', { color: 'error' });
+        setDetail(null);
       }
     })();
-  }, [open, scheduleId, addToast]);
+  }, [open, scheduleId]);
 
   const canSave = useMemo(() => {
     if (!detail) return false;
-    if (isLeave) return true;
-    const okNum = (v) => /^\d{1,2}$/.test(v);
-    const okMin = (v) => /^\d{1,2}$/.test(v);
-    return okNum(dSHH) && okMin(dSMM) && okNum(dEHH) && okMin(dEMM);
-  }, [detail, isLeave, dSHH, dSMM, dEHH, dEMM]);
+    if (!edit) return false;
+    return true;
+  }, [detail, edit]);
+
+  const buildPlanPayload = () => {
+    const d = detail || {};
+    const date = dDate || fmtYMD(d.registeredDate || d.date || d.startAt);
+    const branchId = getNum(d.branchId ?? d.branch?.id);
+
+    const keep = (iso) => (iso ? String(iso) : undefined);
+    const clockInOld  = d.registeredClockIn  || d.registeredStartAt || d.startAt || null;
+    const breakStartOld = d.registeredBreakStart || null;
+    const breakEndOld   = d.registeredBreakEnd   || null;
+    const clockOutOld = d.registeredClockOut || d.registeredEndAt || d.endAt || null;
+
+    const makeOrKeep = (hh, mm, ap, oldIso) => {
+      if (pairValid(hh, mm)) return toIsoLocal(date, hh, mm, ap);
+      return keep(oldIso);
+    };
+
+    const payload = {
+      branchId,
+      registeredDate: date,
+      attendanceTemplateId: getNum(d.attendanceTemplateId) ?? undefined,
+    };
+
+    if (isLeave) {
+      payload.leaveTypeId = getNum(d.leaveTypeId);
+      payload.workTypeId = undefined;
+      payload.registeredClockIn = undefined;
+      payload.registeredBreakStart = undefined;
+      payload.registeredBreakEnd = undefined;
+      payload.registeredClockOut = undefined;
+    } else {
+      payload.workTypeId = getNum(d.workTypeId);
+      payload.leaveTypeId = undefined;
+
+      payload.registeredClockIn   = makeOrKeep(dSHH, dSMM, dSAP, clockInOld);
+      payload.registeredBreakStart= makeOrKeep(dB1HH, dB1MM, dB1AP, breakStartOld);
+      payload.registeredBreakEnd  = makeOrKeep(dB2HH, dB2MM, dB2AP, breakEndOld);
+      payload.registeredClockOut  = makeOrKeep(dEHH, dEMM, dEAP, clockOutOld);
+
+      if (!payload.registeredClockIn || !payload.registeredClockOut) {
+        return { error: '근무 스케줄은 출근·퇴근 시간이 모두 필요합니다. 값을 입력하거나 기존 값 유지 상태로 저장해 주세요.' };
+      }
+    }
+
+    if (!payload.branchId || !payload.registeredDate) {
+      return { error: '지점 또는 날짜 정보가 없습니다.' };
+    }
+
+    const hasWork = !!payload.workTypeId;
+    const hasLeave = !!payload.leaveTypeId;
+    if (hasWork && hasLeave) return { error: 'workTypeId와 leaveTypeId는 동시에 보낼 수 없습니다.' };
+    if (!hasWork && !hasLeave) return { error: '근무 또는 휴가 유형이 존재하지 않습니다.' };
+
+    return { payload };
+  };
+
+  const buildEventPayload = () => {
+    const eventBase = (baseDate && /^\d{4}-\d{2}-\d{2}$/.test(baseDate))
+      ? baseDate
+      : (dDate || fmtYMD(detail?.registeredDate || detail?.date || detail?.startAt));
+
+    const out = { eventDate: eventBase };
+
+    const curIn  = detail?.clockInAt    || detail?.actualClockIn    || null;
+    const curBS  = detail?.breakStartAt || detail?.actualBreakStart || null;
+    const curBE  = detail?.breakEndAt   || detail?.actualBreakEnd   || null;
+    const curOut = detail?.clockOutAt   || detail?.actualClockOut   || null;
+
+    const vIn  = pairValid(aSHH, aSMM)  ? toIsoLocal(eventBase, aSHH, aSMM, aSAP)   : null;
+    const vBS  = pairValid(aB1HH, aB1MM)? toIsoLocal(eventBase, aB1HH, aB1MM, aB1AP): null;
+    const vBE  = pairValid(aB2HH, aB2MM)? toIsoLocal(eventBase, aB2HH, aB2MM, aB2AP): null;
+    const vOut = pairValid(aEHH, aEMM)  ? toIsoLocal(eventBase, aEHH, aEMM, aEAP)   : null;
+
+    let touched = false;
+    let error = null;
+
+    const nextIn  = (vIn  !== null) ? vIn  : curIn;
+    const nextOut = (vOut !== null) ? vOut : curOut;
+
+    if (vIn !== null || vOut !== null) {
+      if (nextIn && nextOut) {
+        out.clockInAt  = nextIn;
+        out.clockOutAt = nextOut;
+        touched = true;
+      } else {
+        error = '출근/퇴근 시간은 둘 다 입력(또는 기존값 유지)해야 합니다.';
+      }
+    }
+
+    if (!error && (vBS !== null || vBE !== null)) {
+      const bsVal = (vBS !== null) ? vBS : curBS;
+      const beVal = (vBE !== null) ? vBE : curBE;
+      if (bsVal && beVal) {
+        out.breakStartAt = bsVal;
+        out.breakEndAt   = beVal;
+        touched = true;
+      } else {
+        error = '휴게 시작/종료는 쌍으로 입력(또는 기존값 유지)해야 합니다.';
+      }
+    }
+
+    const canClearMissed = Boolean(nextIn) && Boolean(nextOut);
+    if (!error && detail?.missedCheckout === true && canClearMissed) {
+      out.clearMissedCheckout = true;
+      touched = true;
+    }
+
+    return { touched, payload: out, error };
+  };
 
   const onSave = async () => {
     if (!detail) return;
+    if (!edit) { addToast('수정 버튼을 먼저 눌러주세요.', { color: 'warning' }); return; }
+
+    const { payload: planPayload, error: planErr } = buildPlanPayload();
+    if (planErr) { addToast(planErr, { color: 'error' }); return; }
+
+    const { touched, payload: eventPayload, error: eventErr } = buildEventPayload();
+    if (eventErr) { addToast(eventErr, { color: 'error' }); return; }
+
     try {
       setSaving(true);
-
-      // 1) 계획(등록) 시간
-      const planPayload = {
-        branchId: Number(detail?.branchId),
-        registeredDate: dDate || detail?.registeredDate,
-        workTypeId: !isLeave ? (detail?.workTypeId || undefined) : undefined,
-        leaveTypeId: isLeave ? (detail?.leaveTypeId || undefined) : undefined,
-        attendanceTemplateId: !isLeave ? (detail?.attendanceTemplateId || undefined) : undefined,
-        registeredClockIn:   !isLeave ? toIsoLocal(dDate, dSHH, dSMM, dSAP) : undefined,
-        registeredBreakStart:(!isLeave && dB1HH) ? toIsoLocal(dDate, dB1HH, dB1MM, dB1AP) : undefined,
-        registeredBreakEnd:  (!isLeave && dB2HH) ? toIsoLocal(dDate, dB2HH, dB2MM, dB2AP) : undefined,
-        registeredClockOut:  !isLeave ? toIsoLocal(dDate, dEHH, dEMM, dEAP) : undefined,
-      };
-
-      // 2) 실제 기록
-      const eventPayload = {
-        eventDate: dDate || detail?.registeredDate,
-        clockInAt:     aSHH ? toIsoLocal(dDate, aSHH, aSMM, aSAP) : undefined,
-        breakStartAt:  aB1HH ? toIsoLocal(dDate, aB1HH, aB1MM, aB1AP) : undefined,
-        breakEndAt:    aB2HH ? toIsoLocal(dDate, aB2HH, aB2MM, aB2AP) : undefined,
-        clockOutAt:    aEHH ? toIsoLocal(dDate, aEHH, aEMM, aEAP) : undefined,
-      };
-
-      const jobs = [];
-      jobs.push(updateSchedule(detail.id, planPayload));
-      if (eventPayload.clockInAt || eventPayload.breakStartAt || eventPayload.breakEndAt || eventPayload.clockOutAt) {
-        jobs.push(upsertAttendanceEvent(detail.id, eventPayload));
+      await updateSchedule(detail.id, planPayload);
+      if (touched) {
+        await upsertAttendanceEvent(detail.id, eventPayload);
       }
-      await Promise.all(jobs);
-
       addToast('스케줄이 저장되었습니다.', { color: 'success' });
-      onSaved?.();
       setEdit(false);
+      onSaved?.();
     } catch (e) {
       const msg = e?.response?.data?.message || '저장 중 오류가 발생했습니다.';
       addToast(msg, { color: 'error' });
@@ -330,7 +394,6 @@ export function ScheduleDetailModal({ open, scheduleId, onClose, onSaved }) {
         </Header>
 
         <Body>
-          {/* 계획(등록 당시) */}
           <Col $split>
             <SectionTitle>계획(등록 당시)</SectionTitle>
 
@@ -416,7 +479,6 @@ export function ScheduleDetailModal({ open, scheduleId, onClose, onSaved }) {
             )}
           </Col>
 
-          {/* 실제 기록 */}
           <Col>
             <SectionTitle>실제 기록</SectionTitle>
             {!isLeave ? (
