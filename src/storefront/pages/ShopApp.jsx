@@ -56,6 +56,7 @@ function ShopLayout() {
     setCurrentPage(0); // 탭 변경 시 첫 페이지로 리셋
   };
   const [page, setPage] = useState("home"); // home | category | products | login | mypage | cart | order | payment | payment-success | order-complete | search
+  const [myPageTab, setMyPageTab] = useState("profile"); // 마이페이지 활성 탭 (profile | purchase | favorites | reviews | inquiries)
   const [activeCategoryPage, setActiveCategoryPage] = useState("의류");
   const [favorites, setFavorites] = useState(new Set());
   const [products, setProducts] = useState([]);
@@ -108,11 +109,12 @@ function ShopLayout() {
             return;
           } catch (error) {
             console.error('결제 완료 정보 파싱 실패:', error);
+            // 파싱 실패 시 localStorage 정리
+            localStorage.removeItem('paymentCompleted');
           }
         } else {
-          setTimeout(() => {
-            window.location.href = `${window.location.origin}/shop`;
-          }, 3000);
+          // paymentCompleted가 없으면 쇼핑몰로 리다이렉트 (타임아웃 없이 즉시)
+          window.location.href = `${window.location.origin}/shop`;
         }
       }
     };
@@ -480,8 +482,6 @@ function ShopLayout() {
         imageUrl: product.image
       }));
 
-      // 장바구니 페이지로 이동
-      setPage("cart");
       alert(`${product.name}이(가) 장바구니에 추가되었습니다.`);
     } catch (error) {
       console.error('장바구니 추가 실패:', error);
@@ -533,6 +533,58 @@ function ShopLayout() {
     setPage("payment");
   };
 
+  // 상품 상세에서 바로 구매 (단일 주문) → OrderPage로 이동
+  const handleBuyNow = (product) => {
+    // 로그인 체크
+    if (!isLoggedIn || !currentUser) {
+      alert('구매하려면 로그인이 필요합니다.');
+      setPage("login");
+      return;
+    }
+
+    // 지점 선택 확인
+    if (!product.selectedBranchId) {
+      alert('구매 지점을 선택해주세요.');
+      return;
+    }
+
+    // 선택된 지점 정보 찾기
+    const selectedBranch = product.availableBranches?.find(
+      (b) => String(b.branchId) === String(product.selectedBranchId)
+    );
+
+    if (!selectedBranch) {
+      alert('선택한 지점 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (!selectedBranch.branchProductId) {
+      alert('지점별 상품 정보가 없습니다.');
+      return;
+    }
+
+    // 단일 상품 정보로 orderData 구성 (주문은 OrderPage에서 생성)
+    const orderData = {
+      isSingleOrder: true, // 단일 주문 플래그
+      product: product,
+      selectedBranch: selectedBranch,
+      items: [{
+        productId: product.productId,
+        branchProductId: selectedBranch.branchProductId,
+        branchId: selectedBranch.branchId,
+        productName: product.name || product.productName,
+        price: selectedBranch.price,
+        quantity: 1,
+        imageUrl: product.image
+      }],
+      branchId: Number(selectedBranch.branchId),
+      totalAmount: selectedBranch.price
+    };
+
+    setOrderData(orderData);
+    setPage("order");
+  };
+
   // 결제 페이지로 이동
   const handleProceedToPayment = (order) => {
     setOrderData(order);
@@ -556,6 +608,8 @@ function ShopLayout() {
   const handleBackToHome = () => {
     setOrderData(null);
     setPaymentData(null);
+    // 주문 완료 정보 삭제 (새로고침 시 주문 완료 페이지가 다시 나타나지 않도록)
+    localStorage.removeItem('paymentCompleted');
     setPage("home");
   };
 
@@ -598,13 +652,17 @@ function ShopLayout() {
           <ProductDetail
             product={detailProduct}
             onBack={() => setDetailProduct(null)}
-            onBuy={() => setCheckoutProduct(detailProduct)}
+            onBuy={handleBuyNow}
             onAddToCart={handleAddToCart}
           />
          ) : page === "login" ? (
            <CustomerLogin />
         ) : page === "mypage" ? (
-          <MyPage onBack={() => setPage("home")} currentUser={currentUser} />
+          <MyPage 
+            onBack={() => setPage("home")} 
+            currentUser={currentUser}
+            initialTab={myPageTab}
+          />
         ) : page === "products" ? (
            <ProductsPage
              favorites={favorites}
@@ -700,6 +758,10 @@ function ShopLayout() {
              orderData={orderData}
              paymentData={paymentData}
              onBackToHome={handleBackToHome}
+             onViewOrders={() => {
+               setMyPageTab("purchase");
+               setPage("mypage");
+             }}
            />
          ) : (
            <>

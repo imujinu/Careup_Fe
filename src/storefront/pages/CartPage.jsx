@@ -33,29 +33,54 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
           const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
           const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
-          // 상품별 지점 재고/가격 조회
-          const response = await shopApi.get(`/inventory/branch-products/search`, {
-            params: { keyword: item.productName }
+          // 상품 상세와 동일한 API 사용: 상품 ID로 지점 정보 조회
+          // 방법 1: 상품 상세 API 직접 호출 (productId로 필터링)
+          const response = await shopApi.get(`/api/public/products/with-branches`, {
+            params: { 
+              page: 0, 
+              size: 100 // 충분히 큰 사이즈로 모든 상품 조회
+            }
           });
 
-          const branchProducts = response?.data?.data || [];
-          const productBranches = branchProducts.filter(bp => bp.productId === item.productId);
+          const responseData = response?.data?.data;
+          const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
+          const products = isPageResponse ? (responseData.content || []) : (responseData || []);
 
-          if (productBranches.length > 0) {
-            branchesData[item.productId] = productBranches.map(bp => ({
-              branchProductId: bp.branchProductId || bp.id,
-              branchId: bp.branchId,
-              branchName: `지점 ${bp.branchId}`,
-              stockQuantity: bp.stockQuantity || 0,
-              price: bp.price || item.price
-            }));
-            // 기본 선택값: 현재 아이템 지점 또는 첫 지점
-            restoredSelections[item.productId] = selectedBranches[item.productId] || item.branchId || productBranches[0].branchId;
+          // 현재 상품 찾기
+          const product = products.find(p => p.productId === item.productId);
+
+          if (product && product.availableBranches && product.availableBranches.length > 0) {
+            // 상품 상세와 동일한 구조로 매핑
+            branchesData[item.productId] = product.availableBranches
+              .filter(bp => bp.stockQuantity > 0) // 재고 있는 지점만
+              .map(bp => ({
+                branchProductId: bp.branchProductId,
+                branchId: bp.branchId,
+                branchName: bp.branchName, // ✅ 실제 지점명 사용
+                stockQuantity: bp.stockQuantity || 0,
+                price: bp.price || item.price
+              }));
+
+            if (branchesData[item.productId].length > 0) {
+              // 기본 선택값: 현재 아이템 지점 또는 첫 지점
+              restoredSelections[item.productId] = selectedBranches[item.productId] || item.branchId || branchesData[item.productId][0].branchId;
+            } else {
+              // 재고 있는 지점이 없으면 기본값만 설정
+              branchesData[item.productId] = [{
+                branchProductId: item.branchProductId,
+                branchId: item.branchId,
+                branchName: item.branchName || `지점 ${item.branchId}`,
+                stockQuantity: 0,
+                price: item.price
+              }];
+              restoredSelections[item.productId] = selectedBranches[item.productId] || item.branchId;
+            }
           } else {
+            // 상품 정보가 없으면 기존 아이템 정보 사용
             branchesData[item.productId] = [{
               branchProductId: item.branchProductId,
               branchId: item.branchId,
-              branchName: `지점 ${item.branchId}`,
+              branchName: item.branchName || `지점 ${item.branchId}`,
               stockQuantity: 0,
               price: item.price
             }];
@@ -66,7 +91,7 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
           branchesData[item.productId] = [{
             branchProductId: item.branchProductId,
             branchId: item.branchId,
-            branchName: `지점 ${item.branchId}`,
+            branchName: item.branchName || `지점 ${item.branchId}`,
             stockQuantity: 0,
             price: item.price
           }];
@@ -268,9 +293,6 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
       <div className="cart-header">
         <h1>장바구니</h1>
         <div className="cart-info">
-          <span className="branch-info">
-            📍 {selectedBranch?.branchName} ({selectedBranch?.address})
-          </span>
           <span className="item-count">
             총 {items.length}개 상품
           </span>
@@ -344,7 +366,12 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
               
               <div className="item-total">
                 <div className="total-price">
-                  {(item.price * item.quantity).toLocaleString()}원
+                  {(() => {
+                    const selectedBranchId = selectedBranches[item.productId];
+                    const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                    const displayPrice = branch?.price || item.price;
+                    return (displayPrice * item.quantity).toLocaleString();
+                  })()}원
                 </div>
                 <button 
                   className="remove-btn"
@@ -365,7 +392,12 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
           <div className="summary-content">
             <div className="summary-row">
               <span>상품 금액</span>
-              <span>{items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}원</span>
+              <span>{items.reduce((sum, item) => {
+                const selectedBranchId = selectedBranches[item.productId];
+                const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                const displayPrice = branch?.price || item.price;
+                return sum + (displayPrice * item.quantity);
+              }, 0).toLocaleString()}원</span>
             </div>
             <div className="summary-row">
               <span>배송비</span>
@@ -373,7 +405,12 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
             </div>
             <div className="summary-row total">
               <span>총 결제 금액</span>
-              <span>{items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}원</span>
+              <span>{items.reduce((sum, item) => {
+                const selectedBranchId = selectedBranches[item.productId];
+                const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                const displayPrice = branch?.price || item.price;
+                return sum + (displayPrice * item.quantity);
+              }, 0).toLocaleString()}원</span>
             </div>
           </div>
           
