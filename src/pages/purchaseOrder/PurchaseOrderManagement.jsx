@@ -154,7 +154,10 @@ function PurchaseOrderManagement() {
         totalAmount: item.totalPrice || 0,  // 백엔드에서 totalPrice 필드로 반환됨
         status: item.orderStatus || item.status || 'pending',
         orderStatus: item.orderStatus,
-        deliveryDate: item.deliveryDate || '-'
+        // 상태가 COMPLETED이면 updatedAt 사용 (입고완료 시점), 아니면 기본값 '-'
+        deliveryDate: (item.orderStatus === 'COMPLETED' && item.updatedAt)
+          ? item.updatedAt.split('T')[0]
+          : '-' // 입고완료일(배송일자)
       }));
       
       setPurchaseOrders(formattedData);

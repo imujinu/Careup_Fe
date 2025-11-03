@@ -510,7 +510,7 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
 
   // 로딩 중이거나 데이터가 없으면 표시
   if (loading || !orderDetail) {
-    return React.createElement(ModalOverlay, { onClick: onClose },
+    return React.createElement(ModalOverlay, null,
       React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
         React.createElement('div', { style: { padding: '40px', textAlign: 'center' } }, '로딩 중...')
       )
@@ -851,7 +851,7 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
         })),
         onApprove: handlePartialApprove
       }),
-      isRejectModalOpen && React.createElement(RejectModalOverlay, { onClick: () => setIsRejectModalOpen(false) },
+      isRejectModalOpen && React.createElement(RejectModalOverlay, null,
         React.createElement(RejectModalContainer, { onClick: (e) => e.stopPropagation() },
           React.createElement(RejectModalTitle, null, '발주 반려'),
           React.createElement(RejectModalTextarea, {

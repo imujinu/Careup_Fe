@@ -225,7 +225,7 @@ function CancelOrderModal({ isOpen, onClose, item, onConfirm }) {
 
   if (!isOpen || !item) return null;
 
-  return React.createElement(ModalOverlay, { onClick: handleClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '발주 취소'),

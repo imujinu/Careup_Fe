@@ -340,12 +340,12 @@ function FranchiseInventoryManagement() {
 
         switch (sort.field) {
           case 'productName':
-            aValue = a.product.name || '';
-            bValue = b.product.name || '';
+            aValue = (a.product.name || '').toLowerCase();
+            bValue = (b.product.name || '').toLowerCase();
             break;
           case 'category':
-            aValue = a.category || '';
-            bValue = b.category || '';
+            aValue = (a.category || '').toLowerCase();
+            bValue = (b.category || '').toLowerCase();
             break;
           case 'currentStock':
             aValue = a.currentStock || 0;

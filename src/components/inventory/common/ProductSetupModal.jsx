@@ -276,7 +276,7 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
 
   if (!isOpen || !product) return null;
 
-  return React.createElement(ModalOverlay, { onClick: handleClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '상품 설정'),

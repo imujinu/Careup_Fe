@@ -369,7 +369,7 @@ const DeliveryAddress = styled.div`
   gap: 8px;
 `;
 
-function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
+function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdated }) {
   const [activeTab, setActiveTab] = useState('products');
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [orderDetail, setOrderDetail] = useState(null);
@@ -400,7 +400,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
 
   // 로딩 중이거나 데이터가 없으면 표시
   if (loading || !orderDetail) {
-    return React.createElement(ModalOverlay, { onClick: onClose },
+    return React.createElement(ModalOverlay, null,
       React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
         React.createElement('div', { style: { padding: '40px', textAlign: 'center' } }, '로딩 중...')
       )
@@ -485,7 +485,12 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
       await purchaseOrderService.completePurchaseOrder(item.id);
       alert('입고가 완료되었습니다.');
       onClose(); // 모달 닫기
-      window.location.reload(); // 목록 새로고침
+      // 부모 컴포넌트에 목록 새로고침 요청
+      if (onOrderUpdated) {
+        onOrderUpdated();
+      } else {
+        window.location.reload(); // fallback
+      }
     } catch (error) {
       console.error('입고 완료 실패:', error);
       alert('입고 완료에 실패했습니다.');
@@ -546,7 +551,19 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item }) {
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '배송예정일:'),
-                React.createElement(InfoValue, null, item.deliveryDate)
+                React.createElement(InfoValue, null, (() => {
+                  const formatDeliveryDate = (dateString) => {
+                    if (!dateString || dateString === '-') return '-';
+                    try {
+                      const date = new Date(dateString);
+                      if (isNaN(date.getTime())) return '-';
+                      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+                    } catch (e) {
+                      return '-';
+                    }
+                  };
+                  return formatDeliveryDate(item.deliveryDate);
+                })())
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '상태:'),

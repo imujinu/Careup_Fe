@@ -42,20 +42,15 @@ const ModalTitle = styled.h2`
 `;
 
 const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  background: #ef4444;
-  color: white;
+  background: none;
   border: none;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 24px;
+  color: #6b7280;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
   
   &:hover {
-    background: #dc2626;
+    color: #374151;
   }
 `;
 
@@ -309,6 +304,7 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedProducts, setSelectedProducts] = useState({});
+  const [focusedInputs, setFocusedInputs] = useState({}); // 포커스된 입력 필드 추적
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -375,6 +371,29 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
       ...prev,
       [productId]: numQuantity
     }));
+  };
+  
+  const handleQuantityFocus = (productId) => {
+    setFocusedInputs(prev => ({
+      ...prev,
+      [productId]: true
+    }));
+  };
+  
+  const handleQuantityBlur = (productId) => {
+    // blur 시 포커스 상태 제거 및 빈 값이면 0으로 설정
+    setFocusedInputs(prev => ({
+      ...prev,
+      [productId]: false
+    }));
+    
+    const currentValue = selectedProducts[productId];
+    if (currentValue === '' || currentValue === null || currentValue === undefined) {
+      setSelectedProducts(prev => ({
+        ...prev,
+        [productId]: 0
+      }));
+    }
   };
 
   const handleQuantityIncrease = (productId) => {
@@ -547,7 +566,7 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
 
   if (!isOpen) return null;
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '발주 요청'),
@@ -603,8 +622,22 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
                     }, '-'),
                     React.createElement(QuantityInput, {
                       type: 'number',
-                      value: selectedProducts[product.id] || 0,
-                      onChange: (e) => handleQuantityChange(product.id, e.target.value),
+                      value: focusedInputs[product.id] && (selectedProducts[product.id] === '' || selectedProducts[product.id] === null || selectedProducts[product.id] === undefined) 
+                        ? '' 
+                        : (selectedProducts[product.id] || 0),
+                      onChange: (e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          setSelectedProducts(prev => ({
+                            ...prev,
+                            [product.id]: ''
+                          }));
+                        } else {
+                          handleQuantityChange(product.id, value);
+                        }
+                      },
+                      onFocus: () => handleQuantityFocus(product.id),
+                      onBlur: () => handleQuantityBlur(product.id),
                       min: 0
                     }),
                     React.createElement(QuantityButton, {
