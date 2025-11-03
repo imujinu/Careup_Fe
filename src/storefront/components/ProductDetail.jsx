@@ -19,16 +19,20 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   };
 
   const handleBuy = () => {
-    // 지점 선택 확인
-    if (!selectedBranchId && product?.availableBranches && product.availableBranches.length > 0) {
+    // 지점이 여러 개인 경우 선택이 없으면 첫 지점을 자동 설정 후 진행
+    let chosenBranchId = selectedBranchId;
+    if (!chosenBranchId && product?.availableBranches && product.availableBranches.length > 0) {
+      chosenBranchId = product.availableBranches[0]?.branchId ?? null;
+    }
+
+    if (product?.availableBranches && product.availableBranches.length > 0 && !chosenBranchId) {
       alert('구매 지점을 선택해주세요.');
       return;
     }
 
-    // 선택된 지점 정보를 product에 추가해서 전달
     const productWithBranch = {
       ...product,
-      selectedBranchId: selectedBranchId
+      selectedBranchId: chosenBranchId
     };
 
     if (onBuy) {

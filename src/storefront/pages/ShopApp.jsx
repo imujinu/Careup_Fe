@@ -706,9 +706,18 @@ function ShopLayout() {
                  로그인하기
                </button>
              </div>
-           ) : (
-             <CartPage onBack={() => setPage("home")} currentUser={currentUser} onProceedToOrder={handleProceedToOrder} />
-           )
+          ) : (
+            <CartPage 
+              onBack={() => {
+                setDetailProduct(null);
+                setCheckoutProduct(null);
+                setActiveTab("전체");
+                setPage("products"); // SHOP으로 이동
+              }} 
+              currentUser={currentUser} 
+              onProceedToOrder={handleProceedToOrder} 
+            />
+          )
          ) : page === "order" ? (
            !isLoggedIn ? (
              <div className="container" style={{ textAlign: "center", padding: "40px 0" }}>

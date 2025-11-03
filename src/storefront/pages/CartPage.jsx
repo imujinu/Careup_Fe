@@ -15,12 +15,7 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const [selectedBranches, setSelectedBranches] = useState({});
   const [availableBranches, setAvailableBranches] = useState({});
 
-  // 장바구니가 비어있으면 홈으로 리다이렉트
-  useEffect(() => {
-    if (items.length === 0 && onBack) {
-      onBack();
-    }
-  }, [items.length, onBack]);
+  // 비어 있어도 진입 가능: 상단 안내와 버튼으로 쇼핑 이동 유도
 
   // 각 상품별로 재고 있는 지점 조회 (선택 기본값 복원)
   useEffect(() => {
@@ -276,12 +271,12 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
       <div className="container cart-page">
         <div className="empty-cart">
           <h2>장바구니가 비어있습니다</h2>
-          <p>상품을 담아보세요!</p>
+          <p>빈 장바구니에 구매할 상품을 넣어주세요.</p>
           <button 
             className="btn-primary"
             onClick={() => onBack && onBack()}
           >
-            쇼핑하러 가기
+            SHOP으로 이동
           </button>
         </div>
       </div>

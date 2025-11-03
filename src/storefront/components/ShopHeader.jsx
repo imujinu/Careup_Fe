@@ -163,6 +163,9 @@ const ShopHeader = ({
               className="icon-btn cart-btn" 
               aria-label="장바구니"
               onClick={() => {
+                // 상세보기 상태가 우선 렌더링을 가로막지 않도록 초기화 후 이동
+                if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                 setPage("cart");
               }}
               style={{ position: 'relative' }}
