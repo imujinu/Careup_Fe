@@ -5,7 +5,7 @@ const AttendanceTab = ({ onTabClick }) => {
     { id: "금일근무현황", label: "📅 금일근무현황" },
     { id: "전체직원조회", label: "👥 전체 직원 조회" },
     { id: "상세직원조회", label: "🔍 상세 직원 조회" },
-    { id: "근태수정", label: "✏️ 근태 수정" },
+    { id: "인건비계산", label: "✏️ 인건비 계산" },
   ];
 
   return (

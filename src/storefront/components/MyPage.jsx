@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from "react";
 import "./MyPage.css";
 import { cartService } from "../../service/cartService";
+import { productInquiryService } from "../../service/productInquiryService";
 import customerAxios from "../../utils/customerAxios";
+import OrderDetailModal from "./OrderDetailModal";
 
-const MyPage = ({ onBack, currentUser }) => {
-  const [activeTab, setActiveTab] = useState("profile");
+const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isOrderDetailModalOpen, setIsOrderDetailModalOpen] = useState(false);
+
+  // initialTab이 변경되면 activeTab 업데이트
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // 마이페이지 정보 로드
   useEffect(() => {
@@ -28,6 +40,15 @@ const MyPage = ({ onBack, currentUser }) => {
         // 주문 내역
         const ordersRes = await cartService.getOrdersByMember(currentUser.memberId);
         setOrders(ordersRes?.data || ordersRes || []);
+        
+        // 문의 목록
+        try {
+          const inquiriesRes = await productInquiryService.getMyInquiries(currentUser.memberId);
+          setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
+        } catch (inquiryErr) {
+          console.error('문의 목록 조회 실패:', inquiryErr);
+          setInquiries([]);
+        }
       } catch (err) {
         console.error('마이페이지 데이터 로드 실패:', err);
         setError('정보를 불러오는데 실패했습니다.');
@@ -38,6 +59,27 @@ const MyPage = ({ onBack, currentUser }) => {
 
     loadMyPageData();
   }, [currentUser]);
+
+  // 탭 변경 시 문의 목록 다시 로드
+  useEffect(() => {
+    if (activeTab === "inquiries" && currentUser?.memberId) {
+      const loadInquiries = async () => {
+        try {
+          const inquiriesRes = await productInquiryService.getMyInquiries(currentUser.memberId);
+          setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
+        } catch (err) {
+          console.error('문의 목록 조회 실패:', err);
+          setInquiries([]);
+        }
+      };
+      loadInquiries();
+    }
+  }, [activeTab, currentUser?.memberId]);
+
+  const handleOrderDetailClick = (order) => {
+    setSelectedOrder(order);
+    setIsOrderDetailModalOpen(true);
+  };
 
   if (loading) {
     return (
@@ -102,6 +144,16 @@ const MyPage = ({ onBack, currentUser }) => {
                       onClick={() => setActiveTab("reviews")}
                     >
                       리뷰 목록
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className={`nav-item ${
+                        activeTab === "inquiries" ? "active" : ""
+                      }`}
+                      onClick={() => setActiveTab("inquiries")}
+                    >
+                      문의 목록
                     </button>
                   </li>
                 </ul>
@@ -196,6 +248,14 @@ const MyPage = ({ onBack, currentUser }) => {
                                order.orderStatus === 'CANCELLED' ? '취소됨' : order.orderStatus || '대기중'}
                             </div>
                           </div>
+                          <div className="purchase-actions">
+                            <button 
+                              className="view-detail-btn"
+                              onClick={() => handleOrderDetailClick(order)}
+                            >
+                              상세보기
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}
@@ -220,10 +280,68 @@ const MyPage = ({ onBack, currentUser }) => {
                   </div>
                 </div>
               )}
+
+              {activeTab === "inquiries" && (
+                <div className="inquiries-content">
+                  <h3>문의 목록</h3>
+                  {inquiries.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                      <p style={{ fontSize: '16px', color: '#666' }}>등록된 문의가 없습니다.</p>
+                    </div>
+                  ) : (
+                    <div className="inquiries-list">
+                      {inquiries.map((inquiry) => (
+                        <div key={inquiry.id} className="inquiry-item">
+                          <div className="inquiry-header">
+                            <div className="inquiry-title-section">
+                              <h4 className="inquiry-title">
+                                {inquiry.title}
+                                {inquiry.isSecret && <span className="secret-badge">🔒 비공개</span>}
+                              </h4>
+                              <span className={`inquiry-status ${inquiry.status?.toLowerCase() || 'pending'}`}>
+                                {inquiry.status === 'ANSWERED' ? '답변완료' : 
+                                 inquiry.status === 'PENDING' ? '답변대기' : 
+                                 inquiry.status === 'CLOSED' ? '종료' : '대기중'}
+                              </span>
+                            </div>
+                            <div className="inquiry-meta">
+                              <span className="inquiry-type">{inquiry.inquiryType || 'PRODUCT'}</span>
+                              <span className="inquiry-date">
+                                {inquiry.createdAt ? new Date(inquiry.createdAt).toLocaleDateString('ko-KR') : '-'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="inquiry-content">
+                            <p>{inquiry.content}</p>
+                          </div>
+                          {inquiry.answerCount > 0 && (
+                            <div className="inquiry-answers">
+                              <span className="answer-count">답변 {inquiry.answerCount}개</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* 주문 상세 모달 */}
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          currentUser={currentUser}
+          isOpen={isOrderDetailModalOpen}
+          onClose={() => {
+            setIsOrderDetailModalOpen(false);
+            setSelectedOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 };

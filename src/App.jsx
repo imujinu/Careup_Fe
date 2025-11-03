@@ -46,6 +46,8 @@ import sharkFavicon from "./assets/logos/shark-favicon.svg";
 
 // ★ 마이페이지: StaffCreate를 재사용(헤더에서 /my로 이동)
 import StaffCreate from "./pages/staff/StaffCreate";
+import { sseService } from "./service/sseService";
+import { fetchNotificationList } from "./stores/slices/alertsSlice";
 
 function ProtectedRoute() {
   const dispatch = useAppDispatch();
@@ -120,10 +122,85 @@ function BrandingManager() {
   return null;
 }
 
+function SSEConnectionManager() {
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const prevAuthenticated = useRef(isAuthenticated);
+
+  useEffect(() => {
+    // 인증된 상태일 때 알림 목록 조회 및 SSE 연결
+    if (isAuthenticated) {
+      // 새로고침마다 기존 연결을 끊고 다시 연결
+      const initializeConnection = async () => {
+        // 1. 기존 SSE 연결 해제
+        await sseService.disconnect();
+        // 2. 알림 목록 조회
+        store.dispatch(fetchNotificationList());
+        // 3. SSE 재연결 (connect 내부에서도 기존 연결을 끊지만 명시적으로 disconnect 후 연결)
+        sseService.connect();
+      };
+
+      // 로그인 성공 시 또는 새로고침 시마다 실행
+      // 새로고침 시 컴포넌트가 재마운트되므로 항상 실행됨
+      initializeConnection();
+    } else if (!isAuthenticated && prevAuthenticated.current) {
+      // 로그아웃 시 SSE 해제
+      sseService.disconnect();
+    }
+    
+    prevAuthenticated.current = isAuthenticated;
+    
+    // 컴포넌트 언마운트 시 cleanup
+    return () => {
+      if (isAuthenticated) {
+        // 언마운트 시에는 disconnect만 (새로고침으로 재마운트될 때 다시 연결됨)
+        sseService.disconnect();
+      }
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    // 페이지를 나갈 때 SSE 해제
+    const handleBeforeUnload = () => {
+      if (isAuthenticated) {
+        // beforeunload에서는 동기 방식으로 요청 전송
+        sseService.disconnectSync();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // 컴포넌트 언마운트 시에도 SSE 해제 (로그아웃 상태일 수도 있지만 안전하게)
+      if (isAuthenticated) {
+        sseService.disconnect();
+      }
+    };
+  }, [isAuthenticated]);
+
+  return null;
+}
+
 export default function App() {
   const dispatch = useAppDispatch();
   const { isAuthenticated, userType } = useAppSelector((state) => state.auth);
   const { isOpen: showChatBot } = useAppSelector((state) => state.chatbot);
+
+  // 챗봇 표시 여부 확인: role이 BRANCH_ADMIN, FRANCHISE_OWNER, STAFF 중 하나일 때만 표시
+  const shouldShowChatbot = () => {
+    try {
+      const userInfoStr = localStorage.getItem("userInfo");
+      if (!userInfoStr) return false;
+
+      const userInfo = JSON.parse(userInfoStr);
+      const allowedRoles = ["BRANCH_ADMIN", "FRANCHISE_OWNER", "STAFF"];
+      return allowedRoles.includes(userInfo.role);
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const showChatbot = shouldShowChatbot();
 
   const getRouteElement = (path) => {
     const hqRoute = headquartersRoutes.find((r) => r.path === path);
@@ -156,6 +233,7 @@ export default function App() {
       <Router>
         <BrandingManager />
         <StaffLogoutWatcher />
+        <SSEConnectionManager />
         <Routes>
           {/* 고객 쇼핑몰: 인증 불필요 */}
           <Route path="/shop/*" element={<ShopApp />} />
@@ -199,22 +277,24 @@ export default function App() {
         </Routes>
 
         {/* 챗봇 */}
-        {showChatBot && <ChatBot onClose={() => dispatch(closeChatbot())} />}
+        {showChatbot && showChatBot && <ChatBot onClose={() => dispatch(closeChatbot())} />}
 
-        <button
-          onClick={() => {
-            const { isOpen: isChatbotOpen } = store.getState().chatbot;
-            if (!isChatbotOpen) {
-              // 챗봇을 열 때 알림창 닫기
-              dispatch(closeAlerts());
-            }
-            dispatch(toggleChatbot());
-          }}
-          className="chatbot-toggle-btn"
-          title="챗봇 열기"
-        >
-          🤖
-        </button>
+        {showChatbot && (
+          <button
+            onClick={() => {
+              const { isOpen: isChatbotOpen } = store.getState().chatbot;
+              if (!isChatbotOpen) {
+                // 챗봇을 열 때 알림창 닫기
+                dispatch(closeAlerts());
+              }
+              dispatch(toggleChatbot());
+            }}
+            className="chatbot-toggle-btn"
+            title="챗봇 열기"
+          >
+            🤖
+          </button>
+        )}
       </Router>
     </ToastProvider>
   );
