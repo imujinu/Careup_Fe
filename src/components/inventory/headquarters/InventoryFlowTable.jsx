@@ -56,6 +56,10 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
+  max-width: ${props => props.$productName ? '200px' : 'none'};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const StatusBadge = styled.span`
@@ -307,7 +311,7 @@ function InventoryFlowTable({
       React.createElement('tbody', null,
         data.map((item, index) => 
           React.createElement(TableRow, { key: item.id || index },
-            React.createElement(TableCell, null, item.productName || '-'),
+            React.createElement(TableCell, { $productName: true }, item.productName || '-'),
             React.createElement(TableCell, null, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
             React.createElement(TableCell, null, formatQuantity(item.inQuantity)),

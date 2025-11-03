@@ -68,6 +68,10 @@ const ProductName = styled.div`
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const ProductSku = styled.div`

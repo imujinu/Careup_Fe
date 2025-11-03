@@ -552,10 +552,10 @@ function InventoryManagement() {
       const userRole = userInfo?.role;
       
       if (userRole === 'HQ_ADMIN') {
-        // 유효성 검사
+        // 유효성 검사 (AddInventoryModal에서도 검증하지만, 이중 체크)
         if (!formData.name || !formData.category) {
           alert('상품명과 카테고리는 필수 입력 항목입니다.');
-          return;
+          throw new Error('필수 입력 항목이 누락되었습니다.');
         }
         
         // 본사 관리자: 상품 마스터 등록
@@ -604,7 +604,7 @@ function InventoryManagement() {
       } else {
         // 지점 관리자: 지점별 상품 추가 (추후 구현)
         alert('지점별 상품 추가 기능은 추후 구현 예정입니다.');
-        return;
+        throw new Error('지점별 상품 추가 기능은 추후 구현 예정입니다.');
       }
       
       // 데이터 새로고침 (이미 위에서 fetchInventoryData 호출됨)

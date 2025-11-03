@@ -123,6 +123,10 @@ const Input = styled.input`
   border-radius: 6px;
   font-size: 14px;
   outline: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   
   &:focus {
     border-color: #6b46c1;
@@ -395,7 +399,18 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
 
   const handleSave = async () => {
     try {
-      // 필수 항목 검증
+      // 필수 항목 검증 - 상품명과 카테고리 먼저 검증
+      if (!formData.name || formData.name.trim() === '') {
+        alert('상품명을 입력해주세요.');
+        return;
+      }
+      
+      if (!formData.category || formData.category === '') {
+        alert('카테고리를 선택해주세요.');
+        return;
+      }
+      
+      // 필수 항목 검증 - 가격 관련
       const minPrice = parseInt(formData.minPrice) || 0;
       const maxPrice = parseInt(formData.maxPrice) || 0;
       const supplyPrice = parseInt(formData.supplyPrice) || 0;
@@ -443,11 +458,11 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
       // onSave가 Promise를 반환하면 결과를 기다림
       await onSave(saveData);
       
-      // 성공 시 초기화
+      // 성공 시에만 초기화
       handleReset();
       // onSave에서 성공 시 모달을 닫아줄 것임
     } catch (error) {
-      // 에러 발생 시 모달은 닫지 않고 그대로 유지
+      // 에러 발생 시 모달은 닫지 않고 그대로 유지 (초기화도 하지 않음)
       console.error('상품 등록 실패:', error);
     }
   };
@@ -516,7 +531,8 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               type: 'text',
               placeholder: '예: 원두, 설탕, 우유 등',
               value: formData.name,
-              onChange: (e) => handleInputChange('name', e.target.value)
+              onChange: (e) => handleInputChange('name', e.target.value),
+              maxLength: 50
             })
           ),
           React.createElement(FormGroup, null,

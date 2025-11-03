@@ -20,7 +20,7 @@ const TableHeader = styled.thead`
 
 const TableHeaderCell = styled.th`
   padding: 16px;
-  text-align: left;
+  text-align: ${props => props.$center ? 'center' : 'left'};
   font-size: 14px;
   font-weight: 600;
   color: #374151;
@@ -57,6 +57,11 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
+  max-width: ${props => props.$productName ? '200px' : 'none'};
+  overflow: ${props => props.$productName ? 'hidden' : 'visible'};
+  text-overflow: ${props => props.$productName ? 'ellipsis' : 'clip'};
+  white-space: ${props => props.$productName ? 'nowrap' : 'normal'};
+  text-align: ${props => props.$center ? 'center' : 'left'};
 `;
 
 const ProductInfo = styled.div`
@@ -68,6 +73,10 @@ const ProductName = styled.div`
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const ProductSku = styled.div`
@@ -76,6 +85,7 @@ const ProductSku = styled.div`
 `;
 
 const StatusBadge = styled.span`
+  display: inline-block;
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 12px;
@@ -87,6 +97,7 @@ const StatusBadge = styled.span`
 const ActionLinks = styled.div`
   display: flex;
   gap: 16px;
+  justify-content: center;
 `;
 
 const ActionLink = styled.button`
@@ -203,30 +214,36 @@ function InventoryTable({
           }, '카테고리', getSortIndicator(SORTABLE_COLUMNS.category)),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
+            $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.branch)
           }, '지점', getSortIndicator(SORTABLE_COLUMNS.branch)),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
+            $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.currentStock)
           }, '현재고', getSortIndicator(SORTABLE_COLUMNS.currentStock)),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
+            $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.safetyStock)
           }, '안전재고', getSortIndicator(SORTABLE_COLUMNS.safetyStock)),
-          React.createElement(TableHeaderCell, null, '상태'),
+          React.createElement(TableHeaderCell, { $center: true }, '상태'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
+            $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.unitPrice)
           }, '공급가', getSortIndicator(SORTABLE_COLUMNS.unitPrice)),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
+            $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.salesPrice)
           }, '판매가', getSortIndicator(SORTABLE_COLUMNS.salesPrice)),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
+            $center: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.totalValue)
           }, '총 가치', getSortIndicator(SORTABLE_COLUMNS.totalValue)),
-          React.createElement(TableHeaderCell, null, '작업')
+          React.createElement(TableHeaderCell, { $center: true }, '작업')
         )
       ),
       React.createElement(TableBody, null,
@@ -238,18 +255,18 @@ function InventoryTable({
               )
             ),
             React.createElement(TableCell, null, item.category || '미분류'),
-            React.createElement(TableCell, null, item.branch),
-            React.createElement(TableCell, null, `${item.currentStock}개`),
-            React.createElement(TableCell, null, `${item.safetyStock}개`),
-            React.createElement(TableCell, null,
+            React.createElement(TableCell, { $center: true }, item.branch),
+            React.createElement(TableCell, { $center: true }, `${item.currentStock}개`),
+            React.createElement(TableCell, { $center: true }, `${item.safetyStock}개`),
+            React.createElement(TableCell, { $center: true },
               React.createElement(StatusBadge, { $status: item.status },
                 item.status === 'normal' ? '정상' : '부족'
               )
             ),
-            React.createElement(TableCell, null, `₩${item.unitPrice.toLocaleString()}`),
-            React.createElement(TableCell, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-'),
-            React.createElement(TableCell, null, `₩${item.totalValue.toLocaleString()}`),
-            React.createElement(TableCell, null,
+            React.createElement(TableCell, { $center: true }, `₩${item.unitPrice.toLocaleString()}`),
+            React.createElement(TableCell, { $center: true }, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-'),
+            React.createElement(TableCell, { $center: true }, `₩${item.totalValue.toLocaleString()}`),
+            React.createElement(TableCell, { $center: true },
               React.createElement(ActionLinks, null,
                 React.createElement(ActionLink, { onClick: () => onModify(item) }, '수정'),
                 React.createElement(ActionLink, { onClick: () => onDetail(item) }, '상세'),
