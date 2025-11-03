@@ -243,7 +243,7 @@ const ProductListPage = () => {
         <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
           <input
             type="text"
-            placeholder="상품명으로 검색..."
+            placeholder="상품명으로 검색"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{

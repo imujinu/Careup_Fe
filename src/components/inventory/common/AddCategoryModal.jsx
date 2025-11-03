@@ -168,7 +168,7 @@ function AddCategoryModal({ isOpen, onClose, onSave }) {
 
   if (!isOpen) return null;
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '카테고리 등록'),

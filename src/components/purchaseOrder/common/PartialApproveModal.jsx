@@ -40,20 +40,15 @@ const ModalTitle = styled.h2`
 `;
 
 const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  background: #ef4444;
-  color: white;
+  background: none;
   border: none;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 20px;
+  color: #6b7280;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
   
   &:hover {
-    background: #dc2626;
+    color: #374151;
   }
 `;
 
@@ -228,7 +223,7 @@ function PartialApproveModal({ isOpen, onClose, products, onApprove }) {
     onApprove({ approvedDetails });
   };
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '부분 승인'),
