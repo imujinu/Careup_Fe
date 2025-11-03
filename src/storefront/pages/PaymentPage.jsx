@@ -14,6 +14,11 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   const [paymentError, setPaymentError] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const hasProcessedPayment = useRef(false);
+  const timeoutTimerRef = useRef(null);
+  const [timeRemaining, setTimeRemaining] = useState(null); // 남은 시간 (초)
+  
+  // 결제 타임아웃 설정 (30분 = 1800000ms)
+  const PAYMENT_TIMEOUT = 30 * 60 * 1000; // 30분
   
   // orderData가 없으면 localStorage에서 복원 시도
   const [actualOrderData, setActualOrderData] = useState(() => {
@@ -44,12 +49,105 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     };
   }, []);
 
+  // 타임아웃 시 주문 취소 처리
+  const handleTimeoutCancel = React.useCallback(async () => {
+    if (!actualOrderData?.orderId) return;
+
+    try {
+      console.log('타임아웃으로 인한 주문 취소 처리 - orderId:', actualOrderData.orderId);
+      await cartService.cancelOrder(actualOrderData.orderId);
+      console.log('타임아웃 주문 취소 완료 - orderId:', actualOrderData.orderId);
+      
+      // 사용자에게 알림
+      alert('결제 시간이 초과되어 주문이 자동으로 취소되었습니다.\n다시 주문해주세요.');
+      
+      // localStorage 정리
+      localStorage.removeItem('currentOrderData');
+      
+      // 이전 페이지로 이동
+      if (onBack) {
+        onBack();
+      } else {
+        window.location.href = '/shop/cart';
+      }
+    } catch (error) {
+      console.error('타임아웃 주문 취소 API 호출 실패:', error);
+      // 에러가 나도 사용자에게는 알림 표시
+      alert('주문이 자동 취소되었습니다.');
+    }
+  }, [actualOrderData?.orderId, onBack]);
+
+  // 결제 페이지 타임아웃 처리 (30분 경과 시 주문 자동 취소)
+  useEffect(() => {
+    if (!actualOrderData?.orderId) return;
+
+    // 주문 생성 시간 확인
+    const orderCreatedTime = actualOrderData.createdAt 
+      ? new Date(actualOrderData.createdAt).getTime() 
+      : Date.now();
+    
+    const elapsedTime = Date.now() - orderCreatedTime;
+    const remainingTime = PAYMENT_TIMEOUT - elapsedTime;
+
+    // 이미 타임아웃이 지났다면 즉시 취소
+    if (remainingTime <= 0) {
+      console.log('주문이 이미 타임아웃되었습니다. 자동 취소 처리...');
+      handleTimeoutCancel();
+      return;
+    }
+
+    // 남은 시간 표시를 위한 타이머
+    setTimeRemaining(Math.floor(remainingTime / 1000));
+
+    const updateTimer = setInterval(() => {
+      const newElapsedTime = Date.now() - orderCreatedTime;
+      const newRemainingTime = PAYMENT_TIMEOUT - newElapsedTime;
+
+      if (newRemainingTime <= 0) {
+        clearInterval(updateTimer);
+        handleTimeoutCancel();
+      } else {
+        setTimeRemaining(Math.floor(newRemainingTime / 1000));
+      }
+    }, 1000);
+
+    // 타임아웃 발생 시 주문 취소
+    timeoutTimerRef.current = setTimeout(() => {
+      console.log('결제 타임아웃 발생. 주문 자동 취소 처리...');
+      handleTimeoutCancel();
+    }, remainingTime);
+
+    // 컴포넌트 언마운트 또는 페이지 이탈 시 타이머 정리
+    return () => {
+      if (timeoutTimerRef.current) {
+        clearTimeout(timeoutTimerRef.current);
+        timeoutTimerRef.current = null;
+      }
+      clearInterval(updateTimer);
+    };
+  }, [actualOrderData?.orderId, actualOrderData?.createdAt, handleTimeoutCancel]);
+
+  // 시간 포맷팅 (분:초)
+  const formatTime = (seconds) => {
+    if (!seconds || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
   // 결제 처리
   const handlePayment = async () => {
     if (!actualOrderData) {
       alert('주문 정보가 없습니다.');
       return;
     }
+
+    // 타임아웃 타이머 취소 (결제 시작 시)
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+    setTimeRemaining(null);
 
     try {
       setLoading(true);
@@ -107,6 +205,18 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     } catch (error) {
       if (error.code === 'USER_CANCEL') {
         console.log('사용자가 결제를 취소했습니다.');
+        
+        // 사용자가 결제를 취소한 경우 주문 취소 처리
+        if (actualOrderData?.orderId) {
+          try {
+            console.log('결제 취소로 인한 주문 취소 처리 - orderId:', actualOrderData.orderId);
+            await cartService.cancelOrder(actualOrderData.orderId);
+            console.log('주문 취소 완료 - orderId:', actualOrderData.orderId);
+          } catch (cancelError) {
+            console.error('주문 취소 API 호출 실패:', cancelError);
+            // 주문 취소 실패해도 사용자에게는 에러 표시하지 않음 (사용자가 취소한 것이므로)
+          }
+        }
       } else {
         console.error('결제 실패:', error);
         setPaymentError(error.message || '결제 처리 중 오류가 발생했습니다.');
@@ -144,6 +254,15 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
         <h1>결제하기</h1>
         <div className="order-info">
           <span>주문번호: {actualOrderData?.orderId}</span>
+          {timeRemaining !== null && timeRemaining > 0 && (
+            <span style={{ 
+              marginLeft: '20px', 
+              color: timeRemaining < 300 ? '#dc3545' : '#666',
+              fontWeight: timeRemaining < 300 ? 'bold' : 'normal'
+            }}>
+              ⏱️ 남은 시간: {formatTime(timeRemaining)}
+            </span>
+          )}
         </div>
       </div>
 
