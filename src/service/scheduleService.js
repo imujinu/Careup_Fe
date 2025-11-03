@@ -96,22 +96,15 @@ export const fetchLeaveTypeOptions = async () => {
   }));
 };
 
-/* ====== 스케줄 작성/수정 API ====== */
+/* ====== 스케줄 작성/수정/상세 API ====== */
 
-/** 단건 생성: POST /schedule/create
- * 서버는 workTypeId 또는 leaveTypeId의 존재 여부로 종류(근무/휴가)를 판정합니다.
- */
+/** 단건 생성: POST /schedule/create */
 export const createSchedule = async (payload) => {
   const res = await axios.post(`${BASE_URL}/schedule/create`, payload);
   return unwrap(res);
 };
 
-/**
- * 대량 생성: POST /schedule/mass-create
- * - 서버가 종류(근무/휴가)를 자동 판정합니다.
- * - 규격: { items: [{ branchId, employeeId, date, workTypeId?|leaveTypeId?, registeredClockInTime?, registeredBreakStartTime?, registeredBreakEndTime?, registeredClockOutTime?, attendanceTemplateId? }...] }
- * - 시간 필드는 "HH:mm" (LocalTime) 형식
- */
+/** 대량 생성: POST /schedule/mass-create */
 export const massCreateSchedules = async (payload) => {
   const res = await axios.post(`${BASE_URL}/schedule/mass-create`, payload);
   return unwrap(res);
@@ -119,9 +112,23 @@ export const massCreateSchedules = async (payload) => {
 
 export const createSchedulesBulk = massCreateSchedules;
 
-/** 단건 수정: PATCH /schedule/update/{id} */
+/** 단건 수정(계획/등록 시간): PATCH /schedule/update/{id} 
+ *  - registeredDate (LocalDate)
+ *  - registeredClockIn/registeredBreakStart/registeredBreakEnd/registeredClockOut (LocalDateTime)
+ *  - branchId, workTypeId/leaveTypeId/attendanceTemplateId
+ */
 export const updateSchedule = async (id, payload) => {
   const res = await axios.patch(`${BASE_URL}/schedule/update/${id}`, payload);
+  return unwrap(res);
+};
+
+/** 실제 기록(근태 이벤트) 보정/저장: PATCH /attendance/event/{scheduleId}
+ *  - eventDate (LocalDate)
+ *  - clockInAt / breakStartAt / breakEndAt / clockOutAt (LocalDateTime)
+ *  - (옵션) clearMissedCheckout: true
+ */
+export const upsertAttendanceEvent = async (scheduleId, payload) => {
+  const res = await axios.patch(`${BASE_URL}/attendance/event/${scheduleId}`, payload);
   return unwrap(res);
 };
 
@@ -132,4 +139,12 @@ export const exportScheduleCalendar = async (params = {}) => {
     responseType: 'blob',
   });
   return res?.data;
+};
+
+/* ====== 스케줄 상세 조회 ======
+ * BE: GET /schedule/detail/{id} → ScheduleDetailDto
+ */
+export const getScheduleDetail = async (id) => {
+  const res = await axios.get(`${BASE_URL}/schedule/detail/${id}`);
+  return unwrap(res) || null;
 };

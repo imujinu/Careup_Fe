@@ -19,8 +19,10 @@ import { fetchBranchOptions } from '../../service/staffService';
 import excelIcon from '../../assets/icons/excel_icon.svg';
 import { decodeToken } from '../../utils/jwt';
 
-// ✅ 분리한 모달
+// ✅ 기존 대량 등록 모달
 import { ScheduleBulkModal } from '../../components/attendance/ScheduleBulkModal';
+// ✅ 신규: 상세/수정 모달
+import { ScheduleDetailModal } from '../../components/attendance/ScheduleDetailModal';
 
 const MAX_VISIBLE_MONTH = 3; // 월간: 날짜칸 내 최대 3건
 const MAX_VISIBLE_WEEK = 10; // 주간: 날짜칸 내 최대 10건
@@ -68,10 +70,10 @@ const SelectWrap = styled.div`
   }
 `;
 const Select = styled.select`
-  height: 36px; padding: 0 34px 0 10px; /* 오른쪽 여백 확대로 화살표가 테두리와 붙지 않게 */
+  height: 36px; padding: 0 34px 0 10px;
   border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 13px;
   outline: 0; width: 100%;
-  appearance: none; /* 기본 화살표 숨기고 커스텀 아이콘 오버레이 */
+  appearance: none;
   transition: box-shadow .15s ease, border-color .15s ease;
   &:focus { border-color: #6d28d9; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15); }
 `;
@@ -140,12 +142,34 @@ const BadgeHolidayCircle = styled.span`
   background: #ef4444; color: #fff; border: 1px solid #dc2626;
 `;
 
-/* 이벤트 */
+/* 이벤트(상태 색상 지원) */
 const Event = styled.div`
   padding: 6px 8px; border-radius: 8px; margin-bottom: 6px; border: 1px solid;
-  background: ${(p) => (p.$leave ? '#f5f3ff' : '#eef2ff')};
-  border-color: ${(p) => (p.$leave ? '#ddd6fe' : '#dbeafe')};
-  color: ${(p) => (p.$leave ? '#6b21a8' : '#1e3a8a')};
+  cursor: pointer;
+  background: ${(p) => (
+    p.$variant === 'green' ? '#ecfdf5' :        // 완료/진행(초록)
+    p.$variant === 'red'   ? '#fef2f2' :        // 결근/퇴근누락(빨강)
+    p.$variant === 'blue'  ? '#eef2ff' :        // 예정(파랑)
+    p.$variant === 'purple'? '#f5f3ff' :        // 휴가(보라)
+    p.$variant === 'orange'? '#fff7ed' :        // 지각/조퇴/초과(주황)
+                             '#eef2ff'
+  )};
+  border-color: ${(p) => (
+    p.$variant === 'green' ? '#d1fae5' :
+    p.$variant === 'red'   ? '#fee2e2' :
+    p.$variant === 'blue'  ? '#dbeafe' :
+    p.$variant === 'purple'? '#ddd6fe' :
+    p.$variant === 'orange'? '#ffedd5' :
+                             '#dbeafe'
+  )};
+  color: ${(p) => (
+    p.$variant === 'green' ? '#065f46' :
+    p.$variant === 'red'   ? '#991b1b' :
+    p.$variant === 'blue'  ? '#1e3a8a' :
+    p.$variant === 'purple'? '#6b21a8' :
+    p.$variant === 'orange'? '#9a3412' :
+                             '#1e3a8a'
+  )};
 `;
 const EventTitle = styled.div`
   font-size: 12px; line-height: 1.28; font-weight: 600; display: flex; align-items: center; gap: 6px;
@@ -196,8 +220,6 @@ const CloseBtn = styled.button`
   &:hover { background: #f9fafb; }
 `;
 const ModalBody = styled.div`padding: 14px 16px; overflow: auto;`;
-const ModalFooter = styled.div`padding: 12px 16px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px;`;
-const HelperError = styled.div`margin-top: 10px; font-size: 12px; color: #dc2626;`;
 
 /* 네비게이션 라벨 */
 const LabelBox = styled.div`margin-left: 8px; font-weight: 700; font-size: 16px;`;
@@ -260,11 +282,82 @@ const fmtRange = (startIso, endIso, allDay) => {
   if (e) return `- ${e}`;
   return '';
 };
+
+// ✅ 휴가 판별 보강: category/scheduleType === 'LEAVE' 최우선
 const isLeaveEvent = (ev) => {
-  const st = String(ev?.status || '').toUpperCase();
-  const ts = String(ev?.timeSource || '').toUpperCase();
-  return st === 'LEAVE' || (ev?.allDay && ts === 'ALL_DAY');
+  const st  = String(ev?.status || ev?.attendanceStatus || '').toUpperCase();
+  const cat = String(ev?.category || ev?.scheduleType || '').toUpperCase();
+  const ts  = String(ev?.timeSource || '').toUpperCase();
+  if (cat === 'LEAVE') return true;
+  return st === 'LEAVE' || (ev?.allDay && ts === 'ALL_DAY') || !!ev?.leaveTypeId || !!ev?.leaveTypeName;
 };
+
+const fmtKDate = (ymd) => {
+  if (!ymd) return '';
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  const DOW = ['일','월','화','수','목','금','토'];
+  return `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${DOW[dt.getDay()]})`;
+};
+const toYearMonth = (ymd) => {
+  const { y, m } = parseYMDParts(ymd);
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+};
+
+/* ===== 상태/색상 판정 (백엔드 AttendanceStatus 우선) =====
+   - PLANNED           → blue (예정)
+   - LEAVE             → purple (휴가/휴무)
+   - CLOCKED_IN/ON_BREAK/CLOCKED_OUT → green (근무중/휴게중/정상 종료)
+   - LATE/EARLY_LEAVE/OVERTIME       → orange (지각/조퇴/초과근무)
+   - MISSED_CHECKOUT/ABSENT          → red (퇴근누락/결근)
+   ▷ 폴백: status가 없을 경우 시간 정보(now/계획/실제)로 안전 추론
+*/
+function getEventVariant(ev, now = new Date()) {
+  const status = String(ev?.status || ev?.attendanceStatus || '').toUpperCase();
+
+  // 휴가 우선
+  if (isLeaveEvent(ev) || status === 'LEAVE') return 'purple';
+
+  // 명시 상태 매핑
+  const missed = ev?.missedCheckout === true || status === 'MISSED_CHECKOUT';
+  if (missed || status === 'ABSENT') return 'red';
+  if (status === 'LATE' || status === 'EARLY_LEAVE' || status === 'OVERTIME') return 'orange';
+  if (status === 'CLOCKED_IN' || status === 'ON_BREAK' || status === 'CLOCKED_OUT') return 'green';
+  if (status === 'PLANNED') return 'blue';
+
+  // ===== 폴백: 시간 기반 안전 추론 =====
+  const plannedStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
+  const plannedEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
+  const actIn  = ev?.actualClockIn || ev?.actualStartAt || null;
+  const actOut = ev?.actualClockOut || ev?.actualEndAt || null;
+
+  // 1) 아직 시작 전 → 예정(파랑)
+  if (plannedStart && now < new Date(plannedStart)) return 'blue';
+
+  // 2) 진행 중 판단
+  if (actIn && !actOut) {
+    // 계획 종료를 넘겨서 계속 근무 중이면 초과근무 성격 → 주황
+    if (plannedEnd && now > new Date(plannedEnd)) return 'orange';
+    // 평소 진행 중/휴게 중은 초록
+    return 'green';
+  }
+
+  // 3) 종료 판단
+  if (actOut) return 'green';
+
+  // 4) 마감 지남 + 퇴근 누락/결근 추정
+  if (plannedEnd && now > new Date(plannedEnd)) {
+    // 출근 찍었는데 퇴근만 누락 → 빨강
+    if (actIn && !actOut) return 'red';
+    // 아무 이벤트도 없으면 결근에 준해 빨강
+    return 'red';
+  }
+
+  // 5) 기타는 기본적으로 예정 취급
+  return 'blue';
+}
+
+/* ===== 라벨 구성 ===== */
 const pickLeaveLabel = (ev, isLeave) => {
   const first = (ev?.leaveTypeName || ev?.leaveTypeCode || '').toString().trim();
   if (first) return first;
@@ -275,31 +368,37 @@ const pickLeaveLabel = (ev, isLeave) => {
   if (b && !/^leave$/i.test(b) && !/^work$/i.test(b)) return b;
   return '';
 };
-const labelParts = (ev) => {
+
+function labelParts(ev, variant) {
   const name = ev?.employeeName || ev?.title || '스케줄';
   const leave = isLeaveEvent(ev);
-  const timeRange = fmtRange(ev?.startAt, ev?.endAt, ev?.allDay);
-  const primary = [name, timeRange].filter(Boolean).join(' | ');
-  const subtitle = ev?.branchName || '';
   const leaveLabel = pickLeaveLabel(ev, leave);
-  return { primary, subtitle, leave, leaveLabel };
-};
-const fmtKDate = (ymd) => {
-  if (!ymd) return '';
-  const [y, m, d] = ymd.split('-').map(Number);
-  const dt = new Date(y, (m || 1) - 1, d || 1);
-  const DOW = ['일','월','화','수','목','금','토'];
-  return `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${DOW[dt.getDay()]})`;
-};
-const daysBetween = (from, to) => {
-  const ms = new Date(to).getTime() - new Date(from).getTime();
-  return Math.floor(ms / (24 * 60 * 60 * 1000));
-};
-const toYearMonth = (ymd) => {
-  const { y, m } = parseYMDParts(ymd);
-  return `${y}-${String(m + 1).padStart(2, '0')}`;
-};
 
+  const planStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
+  const planEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
+  const actStart  = ev?.actualClockIn || ev?.actualStartAt || null;
+  const actEnd    = ev?.actualClockOut || ev?.actualEndAt || null;
+
+  let range = '';
+  if (variant === 'green') {
+    range = fmtRange(actStart || planStart, actEnd || planEnd, ev?.allDay);
+  } else if (variant === 'red') {
+    const s = fmt24(actStart || planStart);
+    range = s ? `${s} -` : '-';
+  } else if (variant === 'blue') {
+    range = fmtRange(planStart, planEnd, ev?.allDay);
+  } else if (variant === 'orange') {
+    range = fmtRange(actStart || planStart, actEnd || planEnd, ev?.allDay);
+  } else {
+    range = fmtRange(planStart, planEnd, ev?.allDay);
+  }
+
+  const primary = [name, range].filter(Boolean).join(' | ');
+  const subtitle = ev?.branchName || '';
+  return { primary, subtitle, leave, leaveLabel };
+}
+
+/* ===== 컴포넌트 ===== */
 export default function AttendanceCalendar() {
   const dispatch = useAppDispatch();
   const { addToast } = useToast();
@@ -345,11 +444,12 @@ export default function AttendanceCalendar() {
   const [viewMode, setViewMode] = useState('month');
   const [weekAnchor, setWeekAnchor] = useState(toYMD(new Date())); // 주 보기 기준 날짜
 
-  // 모달 상태
+  // 모달 상태(더보기)
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreDate, setMoreDate] = useState('');
   const [moreEvents, setMoreEvents] = useState([]);
 
+  // 대량 생성 모달
   const [bulkOpen, setBulkOpen] = useState(false);
 
   // ▶ 월간 라벨 전용 모달
@@ -361,6 +461,10 @@ export default function AttendanceCalendar() {
   const [weekFromInput, setWeekFromInput] = useState('');
   const [weekToInput, setWeekToInput] = useState('');
   const [weekError, setWeekError] = useState('');
+
+  // ▶ 상세/수정 모달
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailScheduleId, setDetailScheduleId] = useState(null);
 
   // 중복 호출 방지 키
   const lastEvtKeyRef = useRef('');
@@ -622,7 +726,7 @@ export default function AttendanceCalendar() {
   const mapByDate = useMemo(() => {
     const map = {};
     (filteredEvents || []).forEach((ev) => {
-      const key = (ev?.date || '').slice(0, 10);
+      const key = (ev?.date || ev?.startAt || '').toString().slice(0, 10);
       if (!key) return;
       if (!map[key]) map[key] = [];
       map[key].push(ev);
@@ -654,21 +758,19 @@ export default function AttendanceCalendar() {
   }, [mapByDate]);
   const closeMore = useCallback(() => setMoreOpen(false), []);
 
-  // RightCluster span 동적 계산 (지점 2 + 직원 4 + 오른쪽 ? = 12)
+  // RightCluster span 동적 계산
   const rightSpan = !isStaff ? (12 - 2 - 4) : (12 - 2);
 
   // 모드별 최대 표시 개수
   const maxVisiblePerCell = viewMode === 'week' ? MAX_VISIBLE_WEEK : MAX_VISIBLE_MONTH;
 
   /* ===== 월 → 주 전환 우선 로직(상위) ===== */
-  // 현재 월(view.viewFrom)의 '첫째 날'이 포함된 주의 시작(일요일)로 weekAnchor 계산
   const firstWeekOfMonthAnchor = useCallback(() => {
     const { y, m } = parseYMDParts(view.viewFrom);
     const first = new Date(y, m, 1);
     return toYMD(startOfWeek(first));
   }, [view.viewFrom]);
 
-  // ‘주’ 버튼 클릭 시: 월간에서 주간으로 전환될 때 먼저 첫째 주로 맞춘 후 주간 보기로 전환
   const onViewWeek = useCallback(() => {
     if (viewMode !== 'week') {
       setWeekAnchor(firstWeekOfMonthAnchor());
@@ -706,7 +808,11 @@ export default function AttendanceCalendar() {
     setWeekModalOpen(true);
   }, [viewMode, weekStart, weekEnd]);
 
-  // 주간 기간 검색(하위): 사용자가 ‘적용’할 때에만 weekAnchor를 명시적으로 덮어씀
+  const daysBetween = (from, to) => {
+    const ms = new Date(to).getTime() - new Date(from).getTime();
+    return Math.floor(ms / (24 * 60 * 60 * 1000));
+  };
+
   const applyRangeToWeek = useCallback(() => {
     const f = String(weekFromInput || '').trim();
     const t = String(weekToInput || '').trim();
@@ -720,13 +826,13 @@ export default function AttendanceCalendar() {
       setWeekError('시작일이 종료일보다 늦을 수 없습니다.');
       return;
     }
-    const diff = daysBetween(f, t); // 일수 차이
+    const diff = daysBetween(f, t);
     if (diff !== 6) {
       setWeekError('기간은 정확히 1주(7일) 단위로만 입력할 수 있습니다. 예: 2025-11-02 ~ 2025-11-08');
       return;
     }
     const anchor = toYMD(startOfWeek(from));
-    setWeekAnchor(anchor);  // ← 하위에서 명시적 덮어쓰기
+    setWeekAnchor(anchor);
     setViewMode('week');
     setWeekModalOpen(false);
     addToast('입력한 기간을 기준으로 주간 보기로 이동했습니다.', { color: 'success' });
@@ -740,6 +846,13 @@ export default function AttendanceCalendar() {
     if (e.key === 'Escape') { e.preventDefault(); setWeekModalOpen(false); }
     if (e.key === 'Enter') { e.preventDefault(); applyRangeToWeek(); }
   };
+
+  // 상세 모달 열기
+  const onOpenDetail = useCallback((scheduleId) => {
+    if (!scheduleId) return;
+    setDetailScheduleId(scheduleId);
+    setDetailOpen(true);
+  }, []);
 
   return (
     <Page>
@@ -765,7 +878,6 @@ export default function AttendanceCalendar() {
             업로드
           </Ghost>
 
-          {/* 🔹 퀵 점프: 작년 / 지난 달 / 오늘 / 다음 달 / 내년 */}
           <SegWrap>
             <Seg onClick={jumpLastYear}>작년</Seg>
             <Seg onClick={jumpLastMonth}>지난 달</Seg>
@@ -774,7 +886,6 @@ export default function AttendanceCalendar() {
             <Seg onClick={jumpNextYear}>내년</Seg>
           </SegWrap>
 
-          {/* 🔹 보기 모드: 주 / 월 */}
           <SegWrap>
             <Seg onClick={onViewWeek} $active={viewMode === 'week'}>주</Seg>
             <Seg onClick={() => setViewMode('month')} $active={viewMode === 'month'}>월</Seg>
@@ -788,7 +899,6 @@ export default function AttendanceCalendar() {
           <Ghost onClick={goPrev}><Icon path={mdiChevronLeft} size={0.9} /></Ghost>
           <Ghost onClick={goNext}><Icon path={mdiChevronRight} size={0.9} /></Ghost>
 
-          {/* ▶ 라벨(월간/주간 각각 별도 모달) */}
           <LabelBox>
             {viewMode === 'week' ? (
               <LabelButton onClick={openWeekLabelModal} title="클릭하여 기간(7일)을 직접 입력">
@@ -907,10 +1017,16 @@ export default function AttendanceCalendar() {
                 </DateHeadRow>
 
                 {visible.map((ev) => {
-                  const { primary, subtitle, leave, leaveLabel } = labelParts(ev);
+                  const variant = getEventVariant(ev, new Date());
+                  const { primary, subtitle, leave, leaveLabel } = labelParts(ev, variant);
                   const tooltip = [primary, leave && leaveLabel ? leaveLabel : '', subtitle].filter(Boolean).join('\n');
                   return (
-                    <Event key={ev.id} $leave={leave} title={tooltip}>
+                    <Event
+                      key={ev.id}
+                      $variant={variant}
+                      title={tooltip}
+                      onClick={() => onOpenDetail(ev.id)}
+                    >
                       <EventTitle>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primary}</span>
                         {leave && !!leaveLabel && <TypeChip>{leaveLabel}</TypeChip>}
@@ -948,10 +1064,17 @@ export default function AttendanceCalendar() {
               </div>
               {moreEvents.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>표시할 스케줄이 없습니다.</div>}
               {moreEvents.map((ev) => {
-                const { primary, subtitle, leave, leaveLabel } = labelParts(ev);
+                const variant = getEventVariant(ev, new Date());
+                const { primary, subtitle, leave, leaveLabel } = labelParts(ev, variant);
                 const tooltip = [primary, leave && leaveLabel ? leaveLabel : '', subtitle].filter(Boolean).join('\n');
                 return (
-                  <Event key={`modal-${ev.id}`} $leave={leave} title={tooltip} style={{ marginBottom: 10 }}>
+                  <Event
+                    key={`modal-${ev.id}`}
+                    $variant={variant}
+                    title={tooltip}
+                    style={{ marginBottom: 10 }}
+                    onClick={() => onOpenDetail(ev.id)}
+                  >
                     <EventTitle>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primary}</span>
                       {leave && !!leaveLabel && <TypeChip>{leaveLabel}</TypeChip>}
@@ -986,7 +1109,7 @@ export default function AttendanceCalendar() {
         </ModalOverlay>
       )}
 
-      {/* ✅ 주간 라벨 모달: 기간(7일) → 주간 보기, 하단에 오류 안내 */}
+      {/* ✅ 주간 라벨 모달: 기간(7일) → 주간 보기 */}
       {weekModalOpen && viewMode === 'week' && (
         <ModalOverlay onClick={() => setWeekModalOpen(false)}>
           <ModalCard onClick={(e) => e.stopPropagation()}>
@@ -1004,7 +1127,7 @@ export default function AttendanceCalendar() {
                 <Input type="date" value={weekToInput} onChange={(e) => { setWeekToInput(e.target.value); setWeekError(''); }} style={{ width: 150 }} />
                 <Primary onClick={applyRangeToWeek}>적용</Primary>
               </div>
-              {weekError && <HelperError>{weekError}</HelperError>}
+              {weekError && <div style={{marginTop:10,fontSize:12,color:'#dc2626'}}>{weekError}</div>}
             </ModalBody>
           </ModalCard>
         </ModalOverlay>
@@ -1018,6 +1141,19 @@ export default function AttendanceCalendar() {
           onClose={() => setBulkOpen(false)}
           onCompleted={() => {
             setBulkOpen(false);
+            dispatch(loadCalendarEvents());
+          }}
+        />
+      )}
+
+      {/* ✅ 상세/수정 모달 */}
+      {detailOpen && detailScheduleId != null && (
+        <ScheduleDetailModal
+          open={detailOpen}
+          scheduleId={detailScheduleId}
+          onClose={() => setDetailOpen(false)}
+          onSaved={() => {
+            setDetailOpen(false);
             dispatch(loadCalendarEvents());
           }}
         />
