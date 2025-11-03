@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import CancelOrderModal from './CancelOrderModal';
 import { purchaseOrderService } from '../../../service/purchaseOrderService';
+import { getBranchDetail } from '../../../service/branchService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -171,12 +172,39 @@ const InfoValue = styled.span`
 `;
 
 const StatusBadge = styled.span`
-  padding: 4px 8px;
-  border-radius: 4px;
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  background: #fef3c7;
-  color: #92400e;
+  background: ${props => {
+    const status = props.status?.toLowerCase();
+    switch(status) {
+      case 'pending': return '#fef3c7';
+      case 'approved': return '#d1fae5';
+      case 'rejected': return '#fee2e2';
+      case 'partial': return '#fef3c7';
+      case 'shipped': return '#e0e7ff';
+      case 'completed': return '#86efac';
+      case 'cancelled': return '#fee2e2';
+      case 'inprogress': return '#dbeafe';
+      default: return '#f3f4f6';
+    }
+  }};
+  color: ${props => {
+    const status = props.status?.toLowerCase();
+    switch(status) {
+      case 'pending': return '#92400e';
+      case 'approved': return '#065f46';
+      case 'rejected': return '#991b1b';
+      case 'partial': return '#d97706';
+      case 'shipped': return '#4338ca';
+      case 'completed': return '#047857';
+      case 'cancelled': return '#991b1b';
+      case 'inprogress': return '#1e40af';
+      default: return '#374151';
+    }
+  }};
 `;
 
 const TabSection = styled.div`
@@ -368,6 +396,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
   const [activeTab, setActiveTab] = useState('products');
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [orderDetail, setOrderDetail] = useState(null);
+  const [branchInfo, setBranchInfo] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // 발주 상세 정보 조회
@@ -383,6 +412,18 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
       const data = await purchaseOrderService.getPurchaseOrder(item.id);
       console.log('발주 상세 정보:', data);
       setOrderDetail(data);
+      
+      // 지점 정보 조회
+      if (data.branchId) {
+        try {
+          const branchData = await getBranchDetail(data.branchId);
+          console.log('지점 상세 정보:', branchData);
+          setBranchInfo(branchData);
+        } catch (branchError) {
+          console.error('지점 정보 조회 실패:', branchError);
+          // 지점 정보 조회 실패해도 계속 진행
+        }
+      }
     } catch (error) {
       console.error('발주 상세 정보 조회 실패:', error);
       alert('발주 상세 정보를 불러오는데 실패했습니다.');
@@ -419,6 +460,17 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
 
   const formatAmount = (amount) => {
     return new Intl.NumberFormat('ko-KR').format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString || dateString === '-') return '-';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+    } catch (e) {
+      return '-';
+    }
   };
 
   const handlePrint = async () => {
@@ -495,7 +547,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
   return React.createElement(ModalOverlay, { onClick: onClose },
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
-        React.createElement(ModalTitle, null, `발주 상세보기 ${item.id}`),
+        React.createElement(ModalTitle, null, '발주 상세보기'),
                           React.createElement(HeaderButtons, null,
             React.createElement(PrintButton, { onClick: handlePrint },
               React.createElement('span', null, '📥'),
@@ -522,15 +574,15 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
             React.createElement(PanelContent, null,
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '지점명:'),
-                React.createElement(InfoValue, null, '강남점')
+                React.createElement(InfoValue, null, branchInfo?.name || branchInfo?.branchName || orderDetail?.branchName || '정보 없음')
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '주소:'),
-                React.createElement(InfoValue, null, '서울시 강남구 테헤란로 123')
+                React.createElement(InfoValue, null, branchInfo?.address || orderDetail?.branchAddress || '정보 없음')
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '연락처:'),
-                React.createElement(InfoValue, null, '02-1234-5678')
+                React.createElement(InfoValue, null, branchInfo?.phone || branchInfo?.phoneNumber || orderDetail?.branchPhone || '정보 없음')
               )
             )
           ),
@@ -542,27 +594,15 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
             React.createElement(PanelContent, null,
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '발주일:'),
-                React.createElement(InfoValue, null, item.orderDate)
+                React.createElement(InfoValue, null, formatDate(item.orderDate))
               ),
               React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '배송예정일:'),
-                React.createElement(InfoValue, null, (() => {
-                  const formatDeliveryDate = (dateString) => {
-                    if (!dateString || dateString === '-') return '-';
-                    try {
-                      const date = new Date(dateString);
-                      if (isNaN(date.getTime())) return '-';
-                      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
-                    } catch (e) {
-                      return '-';
-                    }
-                  };
-                  return formatDeliveryDate(item.deliveryDate);
-                })())
+                React.createElement(InfoLabel, null, '배송일자:'),
+                React.createElement(InfoValue, null, formatDate(item.deliveryDate))
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '상태:'),
-                React.createElement(StatusBadge, null, getStatusText(orderDetail.orderStatus || item.status))
+                React.createElement(StatusBadge, { status: (orderDetail.orderStatus || item.status || '').toLowerCase() }, getStatusText(orderDetail.orderStatus || item.status))
               )
             )
           ),
@@ -686,7 +726,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
                   React.createElement(DeliveryTitle, null, '배송 정보'),
                   React.createElement(DeliveryAddress, null,
                     React.createElement('span', null, '📍'),
-                    '서울시 강남구 테헤란로 123'
+                    branchInfo?.address || orderDetail?.branchAddress || '정보 없음'
                   )
                 )
               );

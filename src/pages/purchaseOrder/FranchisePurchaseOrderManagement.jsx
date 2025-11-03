@@ -367,7 +367,10 @@ function FranchisePurchaseOrderManagement() {
     productStatistics.length > 0 && React.createElement(ChartCard, null,
       React.createElement(ChartTitle, null, '상품별 발주량 TOP 10'),
       React.createElement(ResponsiveContainer, { width: "100%", height: 300 },
-        React.createElement(BarChart, { data: productStatistics.map(stat => ({
+        React.createElement(BarChart, { data: productStatistics
+          .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0)) // 수량 기준 내림차순 정렬
+          .slice(0, 10) // 상위 10개만 표시
+          .map(stat => ({
           productName: stat.productName,
           totalQuantity: stat.totalQuantity,
           approvedQuantity: stat.approvedQuantity

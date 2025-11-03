@@ -88,12 +88,16 @@ function StatisticsChart({ statusData = [], branchData = [], productData = [] })
 
       {/* 지점별 막대 차트 */}
       <ChartCard>
-        <ChartTitle>지점별 발주 통계</ChartTitle>
+        <ChartTitle>지점별 발주 통계{branchData.length > 10 ? ` (상위 10개)` : ''}</ChartTitle>
         {branchData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={branchData}>
+            <BarChart data={branchData.length > 10 
+              ? branchData
+                  .sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0)) // 발주 건수 기준 내림차순 정렬
+                  .slice(0, 10) // 상위 10개만 표시
+              : branchData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="branchName" />
+              <XAxis dataKey="branchName" angle={branchData.length > 5 ? -45 : 0} textAnchor={branchData.length > 5 ? "end" : "middle"} height={branchData.length > 5 ? 100 : 30} />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -110,10 +114,12 @@ function StatisticsChart({ statusData = [], branchData = [], productData = [] })
 
       {/* 상품별 막대 차트 */}
       <ChartCard>
-        <ChartTitle>상품명별 발주 통계</ChartTitle>
+        <ChartTitle>상품명별 발주 통계 (상위 10개)</ChartTitle>
         {productData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={productData}>
+            <BarChart data={productData
+              .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0)) // 수량 기준 내림차순 정렬
+              .slice(0, 10)}> {/* 상위 10개만 표시 */}
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="productName" angle={-45} textAnchor="end" height={100} />
               <YAxis />

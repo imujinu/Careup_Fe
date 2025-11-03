@@ -249,7 +249,7 @@ function CancelOrderModal({ isOpen, onClose, item, onConfirm }) {
             React.createElement(OrderInfoValue, null, `₩${formatAmount(item.totalAmount)}`)
           ),
           React.createElement(OrderInfoRow, null,
-            React.createElement(OrderInfoLabel, null, '배송예정일:'),
+            React.createElement(OrderInfoLabel, null, '배송일자:'),
             React.createElement(OrderInfoValue, null, item.deliveryDate)
           )
         ),

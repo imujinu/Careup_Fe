@@ -156,7 +156,7 @@ function EditPurchaseOrderModal({ isOpen, onClose, item }) {
             React.createElement(InfoValue, null, item.orderDate)
           ),
           React.createElement(InfoRow, null,
-            React.createElement(InfoLabel, null, '배송예정일'),
+            React.createElement(InfoLabel, null, '배송일자'),
             React.createElement(InfoValue, null, item.deliveryDate || '-')
           ),
           React.createElement(InfoRow, null,

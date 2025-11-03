@@ -146,19 +146,26 @@ function PurchaseOrderManagement() {
       ]);
       
       // 데이터 변환
-      const formattedData = data.map(item => ({
-        id: item.purchaseOrderId,
-        branch: item.branchName || `지점-${item.branchId}`,
-        orderDate: item.orderDate || new Date().toISOString().split('T')[0],
-        productCount: item.productCount || 0,
-        totalAmount: item.totalPrice || 0,  // 백엔드에서 totalPrice 필드로 반환됨
-        status: item.orderStatus || item.status || 'pending',
-        orderStatus: item.orderStatus,
-        // 상태가 COMPLETED이면 updatedAt 사용 (입고완료 시점), 아니면 기본값 '-'
-        deliveryDate: (item.orderStatus === 'COMPLETED' && item.updatedAt)
-          ? item.updatedAt.split('T')[0]
-          : '-' // 입고완료일(배송일자)
-      }));
+      const formattedData = data.map(item => {
+        const orderDate = item.createdAt ? item.createdAt.split('T')[0] : (item.orderDate || new Date().toISOString().split('T')[0]);
+        const serial = String(item.purchaseOrderId || 0).padStart(6, '0');
+        const yyyymmdd = orderDate.replace(/-/g, '');
+        const displayOrderNo = `PO-${yyyymmdd}-${serial}`;
+        return {
+          id: item.purchaseOrderId,
+          displayOrderNo,
+          branch: item.branchName || `지점-${item.branchId}`,
+          orderDate,
+          productCount: item.productCount || 0,
+          totalAmount: item.totalPrice || 0,  // 백엔드에서 totalPrice 필드로 반환됨
+          status: item.orderStatus || item.status || 'pending',
+          orderStatus: item.orderStatus,
+          // 상태가 COMPLETED이면 updatedAt 사용 (입고완료 시점), 아니면 기본값 '-'
+          deliveryDate: (item.orderStatus === 'COMPLETED' && item.updatedAt)
+            ? item.updatedAt.split('T')[0]
+            : '-' // 입고완료일(배송일자)
+        };
+      });
       
       setPurchaseOrders(formattedData);
       
@@ -328,6 +335,7 @@ function PurchaseOrderManagement() {
     let filtered = purchaseOrders.filter(item => {
     const matchesSearch = !filters.searchTerm || 
       String(item.id).toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+      (item.displayOrderNo && item.displayOrderNo.toLowerCase().includes(filters.searchTerm.toLowerCase())) ||
       item.branch.toLowerCase().includes(filters.searchTerm.toLowerCase());
     
     const matchesBranch = !filters.branchFilter || item.branch === filters.branchFilter;

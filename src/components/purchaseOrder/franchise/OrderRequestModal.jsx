@@ -302,11 +302,22 @@ const OrderRequestButton = styled(Button)`
 
 function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedProducts, setSelectedProducts] = useState({});
   const [focusedInputs, setFocusedInputs] = useState({}); // 포커스된 입력 필드 추적
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // 검색어 debounce 처리
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // 상품 목록 조회 (가맹점에 등록된 상품 목록만)
   const fetchProducts = async () => {
@@ -345,23 +356,37 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
     }
   };
 
-  // 모달이 열릴 때 상품 목록 조회
+  // 카테고리 목록 조회
+  const fetchCategories = async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      setCategories(data || []);
+    } catch (error) {
+      console.error('카테고리 목록 조회 실패:', error);
+      setCategories([]);
+    }
+  };
+
+  // 모달이 열릴 때 상품 목록 및 카테고리 목록 조회
   useEffect(() => {
     if (isOpen) {
       fetchProducts();
+      fetchCategories();
       setSelectedProducts({}); // 모달이 열릴 때 선택 상태 초기화
     }
   }, [isOpen]);
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = !searchTerm || 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = !categoryFilter || product.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = !debouncedSearchTerm || 
+        product.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        String(product.id).toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      const matchesCategory = !categoryFilter || product.category === categoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, debouncedSearchTerm, categoryFilter]);
 
   const handleQuantityChange = (productId, quantity) => {
     const numQuantity = parseInt(quantity) || 0;
@@ -572,9 +597,9 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
         React.createElement(ModalTitle, null, '발주 요청'),
         React.createElement(CloseButton, { onClick: onClose }, '×')
       ),
-      React.createElement(ModalBody, null,
-        React.createElement(SearchFilterSection, null,
-          React.createElement(SearchContainer, null,
+      React.createElement(ModalBody, { onClick: (e) => e.stopPropagation() },
+        React.createElement(SearchFilterSection, { onClick: (e) => e.stopPropagation() },
+          React.createElement(SearchContainer, { onClick: (e) => e.stopPropagation() },
             React.createElement(SearchIcon, null,
               React.createElement('img', {
                 src: '/header-search.svg',
@@ -584,18 +609,43 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
             ),
             React.createElement(SearchInput, {
               type: 'text',
-              placeholder: '상품명 또는 SKU로 검색...',
+              autoComplete: 'off',
+              placeholder: '상품명으로 검색',
               value: searchTerm,
-              onChange: (e) => setSearchTerm(e.target.value)
+              onChange: (e) => {
+                e.stopPropagation();
+                setSearchTerm(e.target.value);
+              },
+              onKeyDown: (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              },
+              onClick: (e) => {
+                e.stopPropagation();
+              },
+              onFocus: (e) => {
+                e.stopPropagation();
+              }
             })
           ),
           React.createElement(CategorySelect, {
             value: categoryFilter,
-            onChange: (e) => setCategoryFilter(e.target.value)
+            onChange: (e) => {
+              e.stopPropagation();
+              setCategoryFilter(e.target.value);
+            },
+            onClick: (e) => e.stopPropagation(),
+            onFocus: (e) => e.stopPropagation()
           },
             React.createElement('option', { value: '' }, '전체 카테고리'),
-            React.createElement('option', { value: '원재료' }, '원재료'),
-            React.createElement('option', { value: '포장재' }, '포장재')
+            ...categories.map(category => 
+              React.createElement('option', { 
+                key: category.categoryId || category.id, 
+                value: category.name 
+              }, category.name)
+            )
           )
         ),
         React.createElement(ProductSection, null,

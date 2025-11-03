@@ -74,7 +74,7 @@ const StatusBadge = styled.span`
       case 'rejected': return '#fee2e2';
       case 'partial': return '#fef3c7';
       case 'shipped': return '#e0e7ff';
-      case 'completed': return '#fef3c7';
+      case 'completed': return '#86efac';
       case 'cancelled': return '#fee2e2';
       default: return '#f3f4f6';
     }
@@ -87,7 +87,7 @@ const StatusBadge = styled.span`
       case 'rejected': return '#991b1b';
       case 'partial': return '#d97706';
       case 'shipped': return '#4338ca';
-      case 'completed': return '#92400e';
+      case 'completed': return '#047857';
       case 'cancelled': return '#991b1b';
       default: return '#374151';
     }
@@ -242,6 +242,7 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
+          React.createElement(TableHeaderCell, null, '목록번호'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.orderNo)
@@ -276,7 +277,8 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
       React.createElement(TableBody, null,
         data.map((item, index) => {
           return React.createElement(TableRow, { key: index },
-            React.createElement(TableCell, null, item.id),
+            React.createElement(TableCell, null, index + 1),
+            React.createElement(TableCell, null, item.displayOrderNo || item.id),
             React.createElement(TableCell, null, item.branch),
             React.createElement(TableCell, null, item.orderDate),
             React.createElement(TableCell, null, `${item.productCount}개`),

@@ -74,7 +74,7 @@ const StatusBadge = styled.span`
       case 'rejected': return '#fee2e2';
       case 'partial': return '#fef3c7';
       case 'shipped': return '#e0e7ff';
-      case 'completed': return '#fef3c7';
+      case 'completed': return '#86efac';
       case 'cancelled': return '#fee2e2';
       case 'inprogress': return '#dbeafe';
       default: return '#f3f4f6';
@@ -88,7 +88,7 @@ const StatusBadge = styled.span`
       case 'rejected': return '#991b1b';
       case 'partial': return '#d97706';
       case 'shipped': return '#4338ca';
-      case 'completed': return '#92400e';
+      case 'completed': return '#047857';
       case 'cancelled': return '#991b1b';
       case 'inprogress': return '#1e40af';
       default: return '#374151';
