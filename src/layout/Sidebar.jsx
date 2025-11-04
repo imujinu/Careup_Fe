@@ -62,7 +62,6 @@ const AppTitle = styled.h2`font-size: 16px; font-weight: 600; color: #1f2937; ma
 // ▼ 플라이아웃 전용 요소
 const FlyoutWrapper = styled.li`
   position: relative;
-  /* Hover 시에만 패널 표시 */
   &:hover > div[data-flyout="panel"] {
     opacity: 1;
     transform: translateX(0);
@@ -72,15 +71,15 @@ const FlyoutWrapper = styled.li`
 
 const FlyoutPanel = styled.div`
   position: absolute;
-  top: 0; /* 설정 항목의 상단에 맞춰 뜨게 함 */
-  left: calc(100% + 8px); /* 사이드바 오른쪽으로 살짝 띄움 */
+  top: 0;
+  left: calc(100% + 8px);
   min-width: 180px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
   padding: 8px 8px;
-  z-index: 1000; /* 사이드바(999)보다 위 */
+  z-index: 1000;
   opacity: 0;
   transform: translateX(-6px);
   pointer-events: none;
@@ -104,10 +103,11 @@ function Sidebar({ isVisible, userType, branchId }) {
   const branchName = useAppSelector((s) => s.auth.branchName);
   const role = String(rawRole || '').replace(/^ROLE_/, '').toUpperCase();
   const canManageStaff = role === 'BRANCH_ADMIN' || role === 'FRANCHISE_OWNER';
+  const canViewTemplates = ['HQ_ADMIN','BRANCH_ADMIN','FRANCHISE_OWNER'].includes(role);
 
-  // 직급관리 경로: 존재하면 사용, 없으면 폴백
   const JOB_GRADE_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.jobGrade) || '/settings/job-grades';
-  // 플라이아웃 노출 조건: 본사 항상, 가맹점은 관리자급만
+  const ATTENDANCE_TEMPLATES_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.attendanceTemplates) || '/attendance/templates';
+
   const showJobGradeFlyout = userType === 'headquarters' || canManageStaff;
 
   const headquartersMenuItems = [
@@ -173,7 +173,6 @@ function Sidebar({ isVisible, userType, branchId }) {
       <MenuSection>
         <MenuList>
           {menuItems.map((item) => {
-            // 로그아웃 버튼
             if (item.isButton) {
               return (
                 <MenuItem key={item.id}>
@@ -185,7 +184,37 @@ function Sidebar({ isVisible, userType, branchId }) {
               );
             }
 
-            // 설정 항목 + 플라이아웃(직급관리)
+            // ✅ 근태관리 플라이아웃: 템플릿 관리(권한 보유자에게만 노출)
+            if (item.id === 'attendance') {
+              if (canViewTemplates) {
+                return (
+                  <FlyoutWrapper key={item.id}>
+                    <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                      <Mdi path={item.icon} />
+                      {item.label}
+                    </StyledNavLink>
+
+                    <FlyoutPanel data-flyout="panel" aria-label="근태 확장 메뉴">
+                      <FlyoutLink to={ATTENDANCE_TEMPLATES_PATH} className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <Mdi path={mdiClipboardTextOutline} />
+                        템플릿 관리
+                      </FlyoutLink>
+                    </FlyoutPanel>
+                  </FlyoutWrapper>
+                );
+              }
+              // 권한 없으면 플라이아웃 없이 기본 링크만
+              return (
+                <MenuItem key={item.id}>
+                  <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                    <Mdi path={item.icon} />
+                    {item.label}
+                  </StyledNavLink>
+                </MenuItem>
+              );
+            }
+
+            // 설정 플라이아웃(직급관리)
             if (item.id === 'settings' && showJobGradeFlyout) {
               return (
                 <FlyoutWrapper key={item.id}>
@@ -204,7 +233,6 @@ function Sidebar({ isVisible, userType, branchId }) {
               );
             }
 
-            // 기본 항목
             return (
               <MenuItem key={item.id}>
                 <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
