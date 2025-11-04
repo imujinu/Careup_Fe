@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Provider, useSelector, useDispatch } from "react-redux";
 import { store } from "../../store";
 import SharkLogo from "../components/SharkLogo";
@@ -80,7 +80,9 @@ function ShopLayout() {
   const [showBranchSelector, setShowBranchSelector] = useState(false);
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [inquiryProduct, setInquiryProduct] = useState(null);
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
   // URL 체크 및 결제 완료 처리
@@ -188,7 +190,30 @@ function ShopLayout() {
     loadCategories();
   }, []);
 
-  const searchProducts = async (query) => {
+  // 자동 완성 API 호출
+  const fetchAutocomplete = async (keyword) => {
+    if (!keyword || keyword.trim().length < 1) {
+      setAutocompleteSuggestions([]);
+      setShowAutocomplete(false);
+      return;
+    }
+
+    try {
+      const res = await shopApi.get('/products/es-search/autocomplete', {
+        params: { keyword: keyword.trim() }
+      });
+
+      const suggestions = res?.data?.data ?? res?.data ?? [];
+      setAutocompleteSuggestions(Array.isArray(suggestions) ? suggestions : []);
+      setShowAutocomplete(suggestions.length > 0);
+    } catch (e) {
+      console.error('❌ 자동 완성 실패:', e);
+      setAutocompleteSuggestions([]);
+      setShowAutocomplete(false);
+    }
+  };
+
+  const searchProducts = async (query, categoryId = null, minPrice = null, maxPrice = null, page = 0) => {
     if (!query.trim()) {
       setSearchResults([]);
       setSearchError(null);
@@ -199,28 +224,46 @@ function ShopLayout() {
       setIsSearching(true);
       setSearchError(null);
       
-      
-      // 고객용 검색 API 사용
-      const res = await shopApi.get('/api/public/products/search', {
-        params: { 
-          keyword: query,
-          page: 0, 
-          size: 20 
-        }
-      });
+      // 새로운 Elasticsearch 기반 검색 API 사용
+      const params = {
+        keyword: query.trim(),
+        page: page,
+        size: 10
+      };
 
-      const raw = res?.data?.data?.content ?? res?.data?.data ?? res?.data ?? [];
+      if (categoryId) {
+        params.categoryId = categoryId;
+      }
+      if (minPrice !== null) {
+        params.minPrice = minPrice;
+      }
+      if (maxPrice !== null) {
+        params.maxPrice = maxPrice;
+      }
+
+      const res = await shopApi.get('/products/es-search', { params });
+
+      // Page 형식 응답 처리
+      const responseData = res?.data?.data ?? res?.data;
+      const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
+      
+      let raw = [];
+      if (isPageResponse) {
+        raw = responseData.content || [];
+      } else if (Array.isArray(responseData)) {
+        raw = responseData;
+      }
 
       const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
-        id: item.productId ?? Math.random(),
-        productId: item.productId,
-        name: item.name || item.productName || "상품",
-        price: Number(item.minPrice || 0),
-        minPrice: Number(item.minPrice || 0),
-        maxPrice: Number(item.maxPrice || 0),
+        id: item.id ?? Math.random(),
+        productId: item.id,
+        name: item.name || "상품",
+        price: Number(item.price || 0),
+        minPrice: Number(item.price || 0),
+        maxPrice: Number(item.price || 0),
         promotionPrice: null,
         discountRate: null,
-        imageAlt: item.productName || "상품 이미지",
+        imageAlt: item.name || "상품 이미지",
         image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
         category: item.categoryName || "미분류",
         stock: 0,
@@ -240,13 +283,12 @@ function ShopLayout() {
         reviews: [],
         relatedProducts: [],
         availableBranches: [],
-        availableBranchCount: 0
+        availableBranchCount: 0,
+        // 하이라이팅된 상품명 (HTML 태그 포함)
+        highlightedName: item.highlightedName || item.name
       }));
       
-      // 검색 결과는 모든 상품 표시
-      const filteredMapped = mapped;
-
-      setSearchResults(filteredMapped);
+      setSearchResults(mapped);
       
     } catch (e) {
       console.error('❌ 상품 검색 실패:', e);
@@ -257,14 +299,7 @@ function ShopLayout() {
         url: e.config?.url
       });
 
-      // 검색 실패 시 현재 지점의 상품에서 클라이언트 사이드 검색
-      const filteredProducts = products.filter(product => 
-        product.name.toLowerCase().includes(query.toLowerCase()) ||
-        product.category.toLowerCase().includes(query.toLowerCase()) ||
-        product.brand.toLowerCase().includes(query.toLowerCase())
-      );
-      
-      setSearchResults(filteredProducts);
+      setSearchResults([]);
       setSearchError(e?.message || "검색 중 오류가 발생했습니다.");
     } finally {
       setIsSearching(false);
@@ -273,6 +308,7 @@ function ShopLayout() {
 
   const handleSearch = (query) => {
     setSearchQuery(query);
+    setShowAutocomplete(false);
     if (query.trim()) {
       searchProducts(query);
       setShowSearch(false);
@@ -283,11 +319,58 @@ function ShopLayout() {
     }
   };
 
+  // 디바운싱을 위한 ref
+  const autocompleteTimerRef = useRef(null);
+  const searchContainerRef = useRef(null);
+
+  // 외부 클릭 시 자동 완성 숨기기
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowAutocomplete(false);
+      }
+    };
+
+    if (showSearch && showAutocomplete) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showSearch, showAutocomplete]);
+
+  const handleSearchInputChange = (query) => {
+    setSearchQuery(query);
+    
+    // 이전 타이머 취소
+    if (autocompleteTimerRef.current) {
+      clearTimeout(autocompleteTimerRef.current);
+    }
+    
+    // 자동 완성 호출 (디바운싱)
+    if (query.trim().length >= 1) {
+      autocompleteTimerRef.current = setTimeout(() => {
+        fetchAutocomplete(query);
+      }, 300);
+    } else {
+      setAutocompleteSuggestions([]);
+      setShowAutocomplete(false);
+    }
+  };
+
+  const handleAutocompleteSelect = (suggestion) => {
+    setSearchQuery(suggestion.name);
+    setShowAutocomplete(false);
+    handleSearch(suggestion.name);
+  };
+
   const clearSearch = () => {
     setSearchQuery("");
     setSearchResults([]);
     setShowSearch(false);
     setSearchError(null);
+    setAutocompleteSuggestions([]);
+    setShowAutocomplete(false);
   };
 
   const handleOpenInquiry = (product) => {
@@ -582,6 +665,11 @@ function ShopLayout() {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         handleSearch={handleSearch}
+        handleSearchInputChange={handleSearchInputChange}
+        autocompleteSuggestions={autocompleteSuggestions}
+        showAutocomplete={showAutocomplete}
+        handleAutocompleteSelect={handleAutocompleteSelect}
+        searchContainerRef={searchContainerRef}
         setShowBranchSelector={setShowBranchSelector}
         selectedBranch={selectedBranch}
         getCartItemCount={getCartItemCount}
