@@ -1,5 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import Icon from '@mdi/react';
+import { mdiMagnify } from '@mdi/js';
 
 const SearchFilterContainer = styled.div`
   background: #ffffff;
@@ -92,7 +94,9 @@ function SearchAndFilter({ filters, onFiltersChange, branchList = [] }) {
 
   return React.createElement(SearchFilterContainer, null,
     React.createElement(SearchContainer, null,
-      React.createElement(SearchIcon, null, '🔍'),
+      React.createElement(SearchIcon, null,
+        React.createElement(Icon, { path: mdiMagnify, size: 1 })
+      ),
       React.createElement(SearchInput, {
         type: 'text',
         placeholder: '지점명, 상품명, 발주번호로 검색',

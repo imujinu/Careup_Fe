@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import Icon from '@mdi/react';
+import { mdiMagnify } from '@mdi/js';
 import { purchaseOrderService } from '../../../service/purchaseOrderService';
 import { inventoryService } from '../../../service/inventoryService';
 import { authService } from '../../../service/authService';
@@ -624,11 +626,7 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
         React.createElement(SearchFilterSection, { onClick: (e) => e.stopPropagation() },
           React.createElement(SearchContainer, { onClick: (e) => e.stopPropagation() },
             React.createElement(SearchIcon, null,
-              React.createElement('img', {
-                src: '/header-search.svg',
-                alt: '돋보기',
-                style: { width: '16px', height: '16px' }
-              })
+              React.createElement(Icon, { path: mdiMagnify, size: 1 })
             ),
             React.createElement(SearchInput, {
               type: 'text',

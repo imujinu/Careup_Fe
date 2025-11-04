@@ -1,5 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import Icon from '@mdi/react';
+import { mdiMagnify } from '@mdi/js';
 
 const SearchContainer = styled.div`
   background: #ffffff;
@@ -107,7 +109,9 @@ function SearchAndFilter({ filters, onFiltersChange, onAddInventory, onAddProduc
   return React.createElement(SearchContainer, null,
     React.createElement(SearchRow, null,
       React.createElement(SearchInputContainer, null,
-        React.createElement(SearchIcon, null, '🔍'),
+        React.createElement(SearchIcon, null,
+          React.createElement(Icon, { path: mdiMagnify, size: 1 })
+        ),
         React.createElement(SearchInput, {
           type: 'text',
           placeholder: '상품명 검색',
