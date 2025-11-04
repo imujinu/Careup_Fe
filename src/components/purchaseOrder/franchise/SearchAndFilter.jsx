@@ -1,5 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import Icon from '@mdi/react';
+import { mdiMagnify } from '@mdi/js';
 
 const SearchFilterContainer = styled.div`
   background: #ffffff;
@@ -152,11 +154,7 @@ function SearchAndFilter({ filters, onFiltersChange, onOrderRequest }) {
   return React.createElement(SearchFilterContainer, null,
     React.createElement(SearchContainer, null,
       React.createElement(SearchIcon, null,
-        React.createElement('img', {
-          src: '/header-search.svg',
-          alt: '돋보기',
-          style: { width: '16px', height: '16px' }
-        })
+        React.createElement(Icon, { path: mdiMagnify, size: 1 })
       ),
       React.createElement(SearchInput, {
         type: 'text',

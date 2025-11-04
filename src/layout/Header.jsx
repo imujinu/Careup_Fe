@@ -1,6 +1,8 @@
 // src/layout/Header.jsx
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
+import Icon from "@mdi/react";
+import { mdiMagnify } from "@mdi/js";
 import AlertsPanel from "../components/notification/AlertsPanel";
 import { useAppDispatch, useAppSelector } from "../stores/hooks";
 import { closeChatbot } from "../stores/slices/chatbotSlice";
@@ -265,11 +267,7 @@ function Header({ onToggleSidebar, sidebarVisible }) {
         React.createElement(
           SearchIcon,
           null,
-          React.createElement("img", {
-            src: "/header-search.svg",
-            alt: "돋보기",
-            style: { width: "16px", height: "16px" },
-          })
+          React.createElement(Icon, { path: mdiMagnify, size: 1 })
         ),
         React.createElement(SearchInput, { placeholder: "검색..." })
       )
