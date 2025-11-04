@@ -1,5 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import Icon from '@mdi/react';
+import { mdiMagnify } from '@mdi/js';
 
 const FilterContainer = styled.div`
   background: #ffffff;
@@ -134,7 +136,9 @@ function InventoryFlowFilter({ filters, onFiltersChange, branchList = [] }) {
   return React.createElement(FilterContainer, null,
     React.createElement(FilterRow, null,
       React.createElement(SearchInputContainer, null,
-        React.createElement(SearchIcon, null, '🔍'),
+        React.createElement(SearchIcon, null,
+          React.createElement(Icon, { path: mdiMagnify, size: 1 })
+        ),
         React.createElement(SearchInput, {
           type: 'text',
           placeholder: '상품명으로 검색',

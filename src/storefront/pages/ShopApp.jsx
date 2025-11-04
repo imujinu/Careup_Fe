@@ -83,7 +83,7 @@ function ShopLayout() {
   const [inquiryProduct, setInquiryProduct] = useState(null);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
+  const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
   // URL 체크 및 결제 완료 처리
