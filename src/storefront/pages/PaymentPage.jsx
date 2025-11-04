@@ -14,6 +14,9 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   const [paymentError, setPaymentError] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const hasProcessedPayment = useRef(false);
+  const [orderStatus, setOrderStatus] = useState(null); // 주문 상태 확인용
+  const [isOrderCancelled, setIsOrderCancelled] = useState(false);
+  const [orderCreatedAt, setOrderCreatedAt] = useState(null); // 주문 생성 시간
   
   // orderData가 없으면 localStorage에서 복원 시도
   const [actualOrderData, setActualOrderData] = useState(() => {
@@ -44,6 +47,101 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     };
   }, []);
 
+  // 주문 생성 시간 확인 및 저장
+  useEffect(() => {
+    if (actualOrderData?.orderId && !orderCreatedAt) {
+      // 주문 상세 조회하여 생성 시간 확인
+      cartService.getOrderDetail(actualOrderData.orderId)
+        .then(response => {
+          const order = response?.data || response;
+          const createdAt = order.createdAt || order.created_at;
+          if (createdAt) {
+            setOrderCreatedAt(new Date(createdAt).getTime());
+          }
+        })
+        .catch(error => {
+          console.error('주문 생성 시간 조회 실패:', error);
+          // 현재 시간을 기준으로 추정 (백엔드에서 주문 생성 시간을 반환하지 않는 경우)
+          setOrderCreatedAt(Date.now());
+        });
+    }
+  }, [actualOrderData?.orderId, orderCreatedAt]);
+
+  // 프론트엔드에서 타임아웃 체크 (1분 타이머)
+  useEffect(() => {
+    if (!orderCreatedAt || isOrderCancelled) return;
+
+    const timeoutMs = 60 * 1000; // 1분
+    const elapsed = Date.now() - orderCreatedAt;
+    const remaining = timeoutMs - elapsed;
+
+    if (remaining <= 0) {
+      // 이미 타임아웃된 경우
+      setIsOrderCancelled(true);
+      alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
+      localStorage.removeItem('currentOrderData');
+      window.location.href = '/shop?page=cart';
+      return;
+    }
+
+    // 남은 시간 후에 알림 표시
+    const timeoutId = setTimeout(() => {
+      setIsOrderCancelled(true);
+      alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
+      localStorage.removeItem('currentOrderData');
+      window.location.href = '/shop?page=cart';
+    }, remaining);
+
+    return () => clearTimeout(timeoutId);
+  }, [orderCreatedAt, isOrderCancelled]);
+
+  // 주문 상태 주기적 확인 (타임아웃 주문 감지)
+  useEffect(() => {
+    if (!actualOrderData?.orderId || isOrderCancelled) return;
+
+    const checkOrderStatus = async () => {
+      try {
+        const response = await cartService.getOrderDetail(actualOrderData.orderId);
+        const order = response?.data || response;
+        const status = order.orderStatus || order.status;
+        
+        setOrderStatus(status);
+        
+        // 주문 생성 시간 업데이트 (처음 한 번만)
+        if (!orderCreatedAt && order.createdAt) {
+          setOrderCreatedAt(new Date(order.createdAt).getTime());
+        }
+        
+        // 주문이 취소된 경우
+        if (status === 'CANCELLED') {
+          setIsOrderCancelled(true);
+          
+          // 전체 화면 alert로 표시하고 결제 페이지 종료
+          alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
+          
+          // 주문 정보 삭제
+          localStorage.removeItem('currentOrderData');
+          
+          // 장바구니로 이동
+          window.location.href = '/shop?page=cart';
+          
+          return; // 더 이상 확인하지 않음
+        }
+      } catch (error) {
+        console.error('주문 상태 확인 실패:', error);
+        // 에러가 발생해도 결제는 계속 진행 가능하도록 함
+      }
+    };
+
+    // 즉시 한 번 확인
+    checkOrderStatus();
+
+    // 1초마다 주문 상태 확인 (더 빠른 반응을 위해 주기 단축)
+    const interval = setInterval(checkOrderStatus, 1000);
+
+    return () => clearInterval(interval);
+  }, [actualOrderData?.orderId, onBack, isOrderCancelled, orderCreatedAt]);
+
   // 결제 처리
   const handlePayment = async () => {
     if (!actualOrderData) {
@@ -51,9 +149,35 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
       return;
     }
 
+    // 주문이 취소된 경우 결제 불가
+    if (isOrderCancelled || orderStatus === 'CANCELLED') {
+      alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
+      // 주문 정보 삭제
+      localStorage.removeItem('currentOrderData');
+      // 장바구니로 이동
+      window.location.href = '/shop?page=cart';
+      return;
+    }
+
     try {
       setLoading(true);
       setPaymentError(null);
+
+      // 결제 전 마지막으로 주문 상태 한 번 더 확인
+      try {
+        const response = await cartService.getOrderDetail(actualOrderData.orderId);
+        const order = response?.data || response;
+        const status = order.orderStatus || order.status;
+        
+        if (status === 'CANCELLED') {
+          throw new Error('주문이 취소되었습니다. 새로운 주문을 생성해주세요.');
+        }
+      } catch (error) {
+        if (error.message.includes('취소')) {
+          throw error;
+        }
+        // 다른 에러는 무시하고 결제 진행
+      }
 
       // 토스페이먼츠 v2 초기화
       const clientKey = import.meta.env.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
@@ -224,12 +348,20 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
           </div>
           
           <div className="payment-actions">
+            {isOrderCancelled && (
+              <div className="error-message" style={{ marginBottom: '16px', backgroundColor: '#fff3cd', color: '#856404', padding: '12px', borderRadius: '8px' }}>
+                ⚠️ 주문시간이 초과되어 결제가 취소되었습니다. 다시 결제해주세요.
+              </div>
+            )}
             <button 
               className="payment-btn" 
               onClick={handlePayment} 
-              disabled={loading}
+              disabled={loading || isOrderCancelled}
+              style={isOrderCancelled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
             >
-              {loading ? '결제 처리 중...' : `${actualOrderData?.totalAmount ? actualOrderData.totalAmount.toLocaleString() : '0'}원 결제하기`}
+              {loading ? '결제 처리 중...' : 
+               isOrderCancelled ? '주문이 취소되었습니다' :
+               `${actualOrderData?.totalAmount ? actualOrderData.totalAmount.toLocaleString() : '0'}원 결제하기`}
             </button>
             
             <button 
