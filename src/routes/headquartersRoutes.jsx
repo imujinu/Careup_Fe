@@ -14,14 +14,15 @@ import StaffCreate from '../pages/staff/StaffCreate';
 import HeadquartersDashboard from '../pages/admin/HeadquartersDashboard';
 import OrderManagement from '../pages/admin/OrderManagement';
 import StaffDetail from '../pages/staff/StaffDetail';
-
-// 직급관리 페이지가 이미 있다면 경로를 맞춰 import 하세요.
+import AttendanceCalendar from '../pages/attendance/AttendanceCalendar';
 import JobGradeManagement from '../pages/settings/JobGradeManagement';
+import AttendanceTemplateManagement from '../pages/attendance/AttendanceTemplateManagement';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
   { path: 'dashboard', element: <HeadquartersDashboard /> },
 
+  // 지점
   { path: 'branch', element: <HeadquartersBranchList /> },
   { path: 'branch/register', element: <BranchRegistration /> },
   { path: 'branch/edit/:branchId', element: <BranchEdit /> },
@@ -33,9 +34,11 @@ export const headquartersRoutes = [
   { path: 'staff/create', element: <StaffCreate /> },
   { path: 'staff/detail/:id', element: <StaffDetail /> },
 
+  // 기능별 메뉴
   { path: 'client', element: <div>거래처 관리 (준비중)</div> },
   { path: 'task', element: <div>작업 관리 (준비중)</div> },
-  { path: 'attendance', element: <div>근태 관리 (준비중)</div> },
+  { path: 'attendance', element: <AttendanceCalendar /> },                // 근태 캘린더
+  { path: 'attendance/templates', element: <AttendanceTemplateManagement /> }, // 템플릿 관리
   { path: 'inventory', element: <InventoryManagement /> },
   { path: 'purchase-order', element: <PurchaseOrderManagement /> },
   { path: 'order', element: <OrderManagement /> },
@@ -43,7 +46,7 @@ export const headquartersRoutes = [
 
   // 설정
   { path: 'settings', element: <div>설정 (준비중)</div> },
-  { path: 'settings/job-grades', element: <JobGradeManagement /> }, // ← 직급관리 라우트 추가
+  { path: 'settings/job-grades', element: <JobGradeManagement /> },
 ];
 
 export default headquartersRoutes;

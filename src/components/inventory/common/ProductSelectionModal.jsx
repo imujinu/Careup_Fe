@@ -275,7 +275,7 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
         React.createElement(SearchContainer, null,
           React.createElement(SearchInput, {
             type: 'text',
-            placeholder: '상품명으로 검색...',
+            placeholder: '상품명으로 검색',
             value: searchTerm,
             onChange: (e) => setSearchTerm(e.target.value)
           }),

@@ -271,7 +271,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
 
   if (!isOpen || !item) return null;
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '재고 상세보기'),
@@ -309,7 +309,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
               ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '판매가:'),
-                React.createElement(InfoValue, null, `₩${(item.salesPrice || item.price || 0).toLocaleString()}`)
+                React.createElement(InfoValue, null, item.salesPrice ? `₩${item.salesPrice.toLocaleString()}` : '-')
               ),
             )
           ),

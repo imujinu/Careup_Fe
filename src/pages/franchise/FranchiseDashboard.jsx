@@ -86,9 +86,9 @@ function FranchiseDashboard() {
         const fmt = (d) => d.toISOString().slice(0,10);
 
         const [stats, ordersRes, invRes] = await Promise.all([
-          branchId ? salesReportService.getBranchSalesStatistics(branchId, fmt(start), fmt(end), 'DAY') : Promise.resolve(null),
-          branchId ? orderService.getOrdersByBranch(branchId) : Promise.resolve([]),
-          branchId ? inventoryService.getBranchProducts(branchId) : Promise.resolve({ result: [] }),
+          branchId ? salesReportService.getBranchSalesStatistics(branchId, fmt(start), fmt(end), 'DAY').catch(() => null) : Promise.resolve(null),
+          branchId ? orderService.getOrdersByBranch(branchId).catch(() => []) : Promise.resolve([]),
+          branchId ? inventoryService.getBranchProducts(branchId).catch(() => ({ result: [] })) : Promise.resolve({ result: [] }),
         ]);
 
         // 매출 KPI
@@ -224,5 +224,6 @@ function FranchiseDashboard() {
 }
 
 export default FranchiseDashboard;
+
 
 

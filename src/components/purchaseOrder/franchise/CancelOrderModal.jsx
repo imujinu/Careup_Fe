@@ -39,20 +39,15 @@ const ModalTitle = styled.h2`
 `;
 
 const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  background: #ef4444;
-  color: white;
+  background: none;
   border: none;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 20px;
+  color: #6b7280;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
   
   &:hover {
-    background: #dc2626;
+    color: #374151;
   }
 `;
 
@@ -225,7 +220,7 @@ function CancelOrderModal({ isOpen, onClose, item, onConfirm }) {
 
   if (!isOpen || !item) return null;
 
-  return React.createElement(ModalOverlay, { onClick: handleClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '발주 취소'),
@@ -254,7 +249,7 @@ function CancelOrderModal({ isOpen, onClose, item, onConfirm }) {
             React.createElement(OrderInfoValue, null, `₩${formatAmount(item.totalAmount)}`)
           ),
           React.createElement(OrderInfoRow, null,
-            React.createElement(OrderInfoLabel, null, '배송예정일:'),
+            React.createElement(OrderInfoLabel, null, '배송일자:'),
             React.createElement(OrderInfoValue, null, item.deliveryDate)
           )
         ),

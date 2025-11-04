@@ -120,25 +120,7 @@ const OrderRequestButton = styled(Button)`
   }
 `;
 
-const OrderRecommendationButton = styled(Button)`
-  background: #8b5cf6;
-  color: #ffffff;
-  
-  &:hover {
-    background: #7c3aed;
-  }
-`;
-
-const OrderAutomationButton = styled(Button)`
-  background: #10b981;
-  color: #ffffff;
-  
-  &:hover {
-    background: #059669;
-  }
-`;
-
-function SearchAndFilter({ filters, onFiltersChange, onOrderRequest, onOrderRecommendation, onOrderAutomation }) {
+function SearchAndFilter({ filters, onFiltersChange, onOrderRequest }) {
   const handleProductNameChange = (e) => {
     onFiltersChange({
       ...filters,
@@ -178,7 +160,7 @@ function SearchAndFilter({ filters, onFiltersChange, onOrderRequest, onOrderReco
       ),
       React.createElement(SearchInput, {
         type: 'text',
-        placeholder: '상품명으로 검색...',
+        placeholder: '상품명으로 검색',
         value: filters.productName || '',
         onChange: handleProductNameChange
       })
@@ -211,14 +193,6 @@ function SearchAndFilter({ filters, onFiltersChange, onOrderRequest, onOrderReco
       React.createElement(OrderRequestButton, { onClick: onOrderRequest },
         React.createElement('span', null, '+'),
         '발주 요청'
-      ),
-      React.createElement(OrderRecommendationButton, { onClick: onOrderRecommendation },
-        React.createElement('span', null, '💡'),
-        '발주 추천'
-      ),
-      React.createElement(OrderAutomationButton, { onClick: onOrderAutomation },
-        React.createElement('span', null, '🤖'),
-        '발주 자동화'
       )
     )
   );

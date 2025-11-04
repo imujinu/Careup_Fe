@@ -3,7 +3,7 @@ import { createSlice } from "@reduxjs/toolkit";
 const chatbotSlice = createSlice({
   name: "chatbot",
   initialState: {
-    isOpen: true,
+    isOpen: false,
   },
   reducers: {
     toggleChatbot: (state) => {

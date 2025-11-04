@@ -203,7 +203,7 @@ function EditInventoryFlowModal({ isOpen, onClose, item, onSave }) {
 
   if (!isOpen || !item) return null;
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContent, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '입출고 기록 수정'),

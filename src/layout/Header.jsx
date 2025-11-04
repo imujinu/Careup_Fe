@@ -211,7 +211,9 @@ const useUserView = (user) => {
 function Header({ onToggleSidebar, sidebarVisible }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { isOpen: isAlertsOpen, unreadCount } = useAppSelector((s) => s.alerts);
+  const { isOpen: isAlertsOpen } = useAppSelector((s) => s.alerts);
+  const notifications = useAppSelector((s) => s.alerts.notifications);
+  const unreadCount = notifications.length; // 읽지 않은 알림 수 = 전체 알림 수
   const { user: reduxUser } = useAppSelector((s) => s.auth);
 
   // 리덕스 비어있을 시 LocalStorage 폴백 → 초기 깜빡임 방지

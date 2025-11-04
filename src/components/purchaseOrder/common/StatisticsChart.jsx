@@ -86,18 +86,26 @@ function StatisticsChart({ statusData = [], branchData = [], productData = [] })
         </ResponsiveContainer>
       </ChartCard>
 
-      {/* 지점별 막대 차트 */}
+      {/* 지점별 막대 차트 (세로 막대 그래프 - 수평 막대) */}
       <ChartCard>
         <ChartTitle>지점별 발주 통계</ChartTitle>
         {branchData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={branchData}>
+          <ResponsiveContainer width="100%" height={Math.max(300, branchData.length * 40)}>
+            <BarChart 
+              layout="vertical"
+              data={[...branchData]
+                .sort((a, b) => (b.totalAmount || 0) - (a.totalAmount || 0))} // 총 금액 기준 내림차순 정렬, 모든 지점 표시
+              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="branchName" />
-              <YAxis />
+              <XAxis type="number" />
+              <YAxis 
+                type="category" 
+                dataKey="branchName"
+                width={70}
+                tick={{ fontSize: 12 }}
+              />
               <Tooltip />
               <Legend />
-              <Bar dataKey="orderCount" fill="#6b46c1" name="발주 건수" />
               <Bar dataKey="totalAmount" fill="#10b981" name="총 금액 (만원)" />
             </BarChart>
           </ResponsiveContainer>
@@ -110,12 +118,18 @@ function StatisticsChart({ statusData = [], branchData = [], productData = [] })
 
       {/* 상품별 막대 차트 */}
       <ChartCard>
-        <ChartTitle>상품명별 발주 통계</ChartTitle>
+        <ChartTitle>상품명별 발주 통계 (상위 10개)</ChartTitle>
         {productData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={productData}>
+            <BarChart data={productData}> {/* 이미 정렬된 데이터 사용 */}
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="productName" angle={-45} textAnchor="end" height={100} />
+              <XAxis 
+                dataKey="productName" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                interval={0} // 모든 라벨 표시
+              />
               <YAxis />
               <Tooltip />
               <Legend />
