@@ -227,6 +227,12 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
   };
 
   const handleApprove = () => {
+    // 결제 완료 여부 확인
+    if (order.isPaymentCompleted === false) {
+      alert('아직 결제가 완료되지 않은 주문입니다. 결제가 완료된 후 승인할 수 있습니다.');
+      return;
+    }
+
     const orderId = order.orderId || order.id;
     onApprove(orderId);
   };
@@ -313,6 +319,15 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
               React.createElement(InfoLabel, {}, '총 금액'),
               React.createElement(InfoValue, {}, `₩${(order.totalAmount || 0).toLocaleString()}`)
             ),
+            React.createElement(
+              InfoItem,
+              {},
+              React.createElement(InfoLabel, {}, '결제 상태'),
+              React.createElement(InfoValue, {}, 
+                order.paymentStatus === 'COMPLETED' ? '결제 완료' : 
+                order.paymentStatus ? `결제 ${order.paymentStatus}` : '결제 미완료'
+              )
+            ),
             order.approvedBy && React.createElement(
               InfoItem,
               {},
@@ -376,7 +391,12 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
         (order.orderStatus || order.status) === 'PENDING' && canApproveAndReject && React.createElement(
           React.Fragment,
           {},
-          React.createElement(Button, { $primary: true, onClick: handleApprove }, '승인'),
+          React.createElement(Button, { 
+            $primary: true, 
+            onClick: handleApprove,
+            disabled: order.isPaymentCompleted === false,
+            title: order.isPaymentCompleted === false ? '결제가 완료되지 않은 주문입니다' : ''
+          }, '승인'),
           React.createElement(Button, { $danger: true, onClick: handleReject }, '거부')
         )
       )

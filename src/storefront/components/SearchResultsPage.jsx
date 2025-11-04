@@ -4,7 +4,7 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
   return (
     <div className="container search-results-page">
       <div className="search-header">
-        <button className="back-btn" onClick={onBack}>← 돌아가기</button>
+        <button className="back-btn" onClick={onBack}>← 뒤로가기</button>
         <h2 className="search-title">"{searchQuery}" 검색 결과</h2>
         {searchResults.length > 0 && (
           <div className="results-summary">총 {searchResults.length}개의 상품을 찾았습니다.</div>
@@ -22,11 +22,12 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
       ) : searchResults.length === 0 ? (
         <div className="no-results">
           <h3>검색 결과가 없습니다</h3>
-          <p>다른 검색어로 시도해보세요.</p>
+          <p>다른 검색어로 다시 시도해주세요.</p>
         </div>
       ) : (
         <div className="search-results">
-          <div className="grid">
+          <div className="results-summary">총 {searchResults.length}개의 상품을 찾았습니다</div>
+          <div className="products-grid">
             {searchResults.map((product) => (
               <article className="card" key={product.id}>
                 <button
@@ -78,13 +79,17 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                     </div>
                   )}
                 </div>
-                <div className="card-body">
-                  <div className="badge-row">
-                    <span className="badge">{product.category}</span>
-                  </div>
-                  <div className="brand">{product.brand}</div>
-                  <div className="name">{product.name}</div>
-                  <div className="price-section">
+                <div className="product-info">
+                  <div className="product-category">{product.category}</div>
+                  <h3 className="product-name">
+                    {product.highlightedName ? (
+                      <span dangerouslySetInnerHTML={{ __html: product.highlightedName }} />
+                    ) : (
+                      product.name
+                    )}
+                  </h3>
+                  <div className="product-brand">{product.brand}</div>
+                  <div className="product-price">
                     {product.promotionPrice && product.discountRate ? (
                       <>
                         <div className="promotion-price">
@@ -103,18 +108,13 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                       </div>
                     )}
                   </div>
-                  <div className="stock-status">
-                    {product.isOutOfStock ? (
-                      <span className="out-of-stock">품절</span>
-                    ) : product.isLowStock ? (
-                      <span className="low-stock">재고 부족</span>
-                    ) : (
-                      <span className="in-stock">재고 있음</span>
-                    )}
+                  <div className="product-meta">
+                    <span className="likes">관심 {product.likes}</span>
+                    <span className="reviews">리뷰 {product.reviews}</span>
                   </div>
-                  <div className="meta-row">
-                    <span>관심 {product.likes}</span>
-                    <span>리뷰 {product.reviews}</span>
+                  <div className="product-actions">
+                    <button className="detail-btn" onClick={() => onOpenDetail(product)}>상세보기</button>
+                    <button className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`} onClick={() => !product.isOutOfStock && onAddToCart(product)} disabled={product.isOutOfStock}>{product.isOutOfStock ? '품절' : '장바구니 담기'}</button>
                   </div>
                   <button 
                     className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`}

@@ -217,12 +217,35 @@ function OrderManagement() {
     try {
       setLoading(true);
       console.log('주문 목록 조회 시작...');
-      const response = await orderService.getAllOrders();
+      
+      // 본점(branchId=1)인 경우 본점 주문만 조회
+      const userInfo = authService.getCurrentUser();
+      const currentBranchId = userInfo?.branchId;
+      
+      let response;
+      if (currentBranchId === 1) {
+        // 본점인 경우 본점 주문만 조회
+        console.log('본점 주문만 조회 - branchId: 1');
+        response = await orderService.getOrdersByBranch(1);
+      } else {
+        // 본사 관리자나 다른 지점인 경우 전체 주문 조회
+        console.log('전체 주문 조회');
+        response = await orderService.getAllOrders();
+      }
+      
       console.log('주문 목록 조회 응답(normalized):', response);
 
-      const ordersData = Array.isArray(response)
-        ? response
-        : (response?.data || response?.items || []);
+      // 응답 구조 파싱 (지점별 조회와 전체 조회 모두 대응)
+      let ordersData = [];
+      if (Array.isArray(response)) {
+        ordersData = response;
+      } else if (response?.data && Array.isArray(response.data)) {
+        ordersData = response.data;
+      } else if (response?.result && Array.isArray(response.result)) {
+        ordersData = response.result;
+      } else if (response?.items && Array.isArray(response.items)) {
+        ordersData = response.items;
+      }
 
       console.log('파싱된 주문 데이터:', ordersData);
 
@@ -240,6 +263,8 @@ function OrderManagement() {
           status: normalized,
           createdAt: order.createdAt || new Date().toISOString(),
           orderItems: order.orderItems || [],
+          paymentStatus: order.paymentStatus || null,
+          isPaymentCompleted: order.isPaymentCompleted || false
         };
       });
 
@@ -278,7 +303,13 @@ function OrderManagement() {
   };
 
   // 본점 주문만 승인/거부 가능
-  const handleApprove = async (orderId) => {
+  const handleApprove = async (orderId, orderData = null) => {
+    // 결제 완료 여부 확인
+    if (orderData && !orderData.isPaymentCompleted) {
+      alert('아직 결제가 완료되지 않은 주문입니다. 결제가 완료된 후 승인할 수 있습니다.');
+      return;
+    }
+
     if (!window.confirm('이 주문을 승인하시겠습니까?')) return;
 
     try {
@@ -291,7 +322,14 @@ function OrderManagement() {
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'APPROVED' } : o)));
     } catch (error) {
       console.error('주문 승인 실패:', error);
-      alert('주문 승인에 실패했습니다.');
+      const errorMessage = error.response?.data?.status_message || error.message || '주문 승인에 실패했습니다.';
+      
+      // 결제 미완료 에러 메시지 처리
+      if (errorMessage.includes('결제가 완료되지 않은') || errorMessage.includes('결제가 완료되지 않았')) {
+        alert('아직 결제가 완료되지 않은 주문입니다. 결제가 완료된 후 승인할 수 있습니다.');
+      } else {
+        alert(errorMessage);
+      }
     }
   };
 
@@ -342,6 +380,8 @@ function OrderManagement() {
         orderType: detailData.orderType ?? order.orderType,
         createdAt: detailData.createdAt ?? order.createdAt,
         orderItems: detailData.orderItems ?? order.orderItems ?? [],
+        paymentStatus: detailData.paymentStatus ?? order.paymentStatus ?? null,
+        isPaymentCompleted: detailData.isPaymentCompleted ?? order.isPaymentCompleted ?? false
       });
       setIsDetailModalOpen(true);
     } catch (error) {
@@ -443,7 +483,13 @@ function OrderManagement() {
                     <ActionButton onClick={() => handleOpenDetail(order)}>상세</ActionButton>
                     {order.status === 'PENDING' && isBranchOfficeOrder(order) && (
                       <>
-                        <ActionButton onClick={() => handleApprove(order.id)}>승인</ActionButton>
+                        <ActionButton 
+                          onClick={() => handleApprove(order.id, order)}
+                          disabled={order.isPaymentCompleted === false}
+                          title={order.isPaymentCompleted === false ? '결제가 완료되지 않은 주문입니다' : ''}
+                        >
+                          승인
+                        </ActionButton>
                         <ActionButton $danger onClick={() => handleReject(order.id)}>
                           거부
                         </ActionButton>

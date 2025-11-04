@@ -224,7 +224,9 @@ function FranchiseOrderManagement() {
       let ordersData = [];
       
       // ResponseDto 구조에 맞게 데이터 추출
-      if (response.result) {
+      if (response?.data && Array.isArray(response.data)) {
+        ordersData = response.data;
+      } else if (response?.result && Array.isArray(response.result)) {
         ordersData = response.result;
       } else if (Array.isArray(response)) {
         ordersData = response;
@@ -238,7 +240,9 @@ function FranchiseOrderManagement() {
         totalAmount: order.totalAmount || 0,
         status: order.orderStatus || order.status || 'PENDING',
         createdAt: order.createdAt || new Date().toISOString(),
-        orderItems: order.orderItems || []
+        orderItems: order.orderItems || [],
+        paymentStatus: order.paymentStatus || null,
+        isPaymentCompleted: order.isPaymentCompleted || false
       }));
 
       setOrders(formattedOrders);
@@ -273,7 +277,13 @@ function FranchiseOrderManagement() {
   };
 
   // 주문 승인
-  const handleApprove = async (orderId) => {
+  const handleApprove = async (orderId, orderData = null) => {
+    // 결제 완료 여부 확인 (orderData가 있으면 먼저 확인)
+    if (orderData && !orderData.isPaymentCompleted) {
+      alert('아직 결제가 완료되지 않은 주문입니다. 결제가 완료된 후 승인할 수 있습니다.');
+      return;
+    }
+
     if (!window.confirm('이 주문을 승인하시겠습니까?')) return;
 
     try {
@@ -285,7 +295,14 @@ function FranchiseOrderManagement() {
       fetchOrders(); // 목록 새로고침
     } catch (error) {
       console.error('주문 승인 실패:', error);
-      alert('주문 승인에 실패했습니다.');
+      const errorMessage = error.response?.data?.status_message || error.message || '주문 승인에 실패했습니다.';
+      
+      // 결제 미완료 에러 메시지 처리
+      if (errorMessage.includes('결제가 완료되지 않은') || errorMessage.includes('결제가 완료되지 않았')) {
+        alert('아직 결제가 완료되지 않은 주문입니다. 결제가 완료된 후 승인할 수 있습니다.');
+      } else {
+        alert(errorMessage);
+      }
     }
   };
 
@@ -410,7 +427,13 @@ function FranchiseOrderManagement() {
                     <ActionButton onClick={() => handleOpenDetail(order)}>상세</ActionButton>
                     {order.status === 'PENDING' && (
                       <>
-                        <ActionButton onClick={() => handleApprove(order.id)}>승인</ActionButton>
+                        <ActionButton 
+                          onClick={() => handleApprove(order.id, order)}
+                          disabled={order.isPaymentCompleted === false}
+                          title={order.isPaymentCompleted === false ? '결제가 완료되지 않은 주문입니다' : ''}
+                        >
+                          승인
+                        </ActionButton>
                         <ActionButton $danger onClick={() => handleReject(order.id)}>
                           거부
                         </ActionButton>
