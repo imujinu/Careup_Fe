@@ -7,6 +7,8 @@ import axios from 'axios';
 const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const dispatch = useDispatch();
   const { items, branchId, totalAmount } = useSelector(state => state.cart);
+  // 수량 입력 중 임시 값 저장
+  const [quantityInputs, setQuantityInputs] = useState({});
   const selectedBranch = useSelector(state => state.branch.selectedBranch);
   
   const [loading, setLoading] = useState(false);
@@ -167,9 +169,13 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
         };
       });
 
+      // 선택한 지점 ID 사용
+      const selectedBranchId = Number(selectedIds[0]);
+      console.log('📝 주문 생성 요청 - 선택한 지점 ID:', selectedBranchId);
+      
       const orderRequestData = {
         memberId: Number(currentUser?.memberId || 1),
-        branchId: Number(branchId),
+        branchId: selectedBranchId, // 선택한 지점 ID 사용
         orderType: 'ONLINE',
         orderItems,
         couponId: null
@@ -197,7 +203,17 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
       }
     } catch (error) {
       console.error('주문 생성 실패:', error);
-      setOrderError(error.response?.data?.message || error.message || '주문 처리 중 오류가 발생했습니다.');
+      // 백엔드 에러 메시지 추출
+      const errorMessage = error.response?.data?.status_message || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '주문 처리 중 오류가 발생했습니다.';
+      setOrderError(errorMessage);
+      
+      // 재고 부족 에러인 경우 사용자에게 알림
+      if (errorMessage.includes('재고') || errorMessage.includes('소진')) {
+        alert(errorMessage);
+      }
     } finally {
       setOrderLoading(false);
     }
@@ -205,9 +221,74 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
 
   const handleQuantityChange = (branchProductId, newQuantity) => {
     if (newQuantity < 1) {
+      // 수량이 0 이하가 되면 장바구니에서 삭제
+      if (window.confirm('이 상품을 장바구니에서 제거하시겠습니까?')) {
+        dispatch(removeFromCart(branchProductId));
+      }
       return;
     }
     dispatch(updateQuantity({ branchProductId, quantity: newQuantity }));
+  };
+
+  // 수량 직접 입력 핸들러
+  const handleQuantityInput = (branchProductId, inputValue, maxStock) => {
+    // 숫자가 아닌 값 제거
+    const numericValue = inputValue.replace(/[^0-9]/g, '');
+    
+    // 빈 값은 허용
+    if (numericValue === '') {
+      // 입력 중에는 빈 값으로 유지
+      return;
+    }
+    
+    const newQuantity = parseInt(numericValue, 10);
+    
+    // 0이면 빈 값으로 처리 (입력 중)
+    if (newQuantity === 0) {
+      return;
+    }
+    
+    // 최대 재고량 제한
+    if (maxStock && newQuantity > maxStock) {
+      alert(`재고가 부족합니다. 최대 ${maxStock}개까지 주문 가능합니다.`);
+      return;
+    }
+    
+    if (newQuantity < 1) {
+      return;
+    }
+    
+    dispatch(updateQuantity({ branchProductId, quantity: newQuantity }));
+  };
+
+  // 수량 입력 필드 포커스 아웃 시 검증
+  const handleQuantityBlur = (branchProductId, inputValue, maxStock) => {
+    const numericValue = inputValue.replace(/[^0-9]/g, '');
+    
+    if (numericValue === '' || numericValue === '0') {
+      // 빈 값이나 0이면 장바구니에서 삭제
+      if (window.confirm('이 상품을 장바구니에서 제거하시겠습니까?')) {
+        dispatch(removeFromCart(branchProductId));
+      } else {
+        // 취소하면 1개로 복구
+        dispatch(updateQuantity({ branchProductId, quantity: 1 }));
+      }
+    } else {
+      const newQuantity = parseInt(numericValue, 10);
+      
+      // 최대 재고량 제한
+      if (maxStock && newQuantity > maxStock) {
+        alert(`재고가 부족합니다. 최대 ${maxStock}개까지 주문 가능합니다.`);
+        dispatch(updateQuantity({ branchProductId, quantity: maxStock }));
+      } else if (newQuantity < 1) {
+        // 1 미만이면 삭제 확인
+        if (window.confirm('이 상품을 장바구니에서 제거하시겠습니까?')) {
+          dispatch(removeFromCart(branchProductId));
+        } else {
+          dispatch(updateQuantity({ branchProductId, quantity: 1 }));
+        }
+      }
+    }
   };
 
   const handleRemoveItem = (branchProductId) => {
@@ -265,7 +346,17 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
       
     } catch (error) {
       console.error('주문 실패:', error);
-      setOrderError(error.response?.data?.message || error.message || '주문 처리 중 오류가 발생했습니다.');
+      // 백엔드 에러 메시지 추출
+      const errorMessage = error.response?.data?.status_message || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '주문 처리 중 오류가 발생했습니다.';
+      setOrderError(errorMessage);
+      
+      // 재고 부족 에러인 경우 사용자에게 알림
+      if (errorMessage.includes('재고') || errorMessage.includes('소진')) {
+        alert(errorMessage);
+      }
     } finally {
       setOrderLoading(false);
     }
@@ -354,10 +445,68 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
                   >
                     -
                   </button>
-                  <span className="quantity">{item.quantity}</span>
+                  <input
+                    type="text"
+                    className="quantity-input"
+                    value={quantityInputs[item.branchProductId] !== undefined ? quantityInputs[item.branchProductId] : item.quantity}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      setQuantityInputs(prev => ({
+                        ...prev,
+                        [item.branchProductId]: inputValue
+                      }));
+                      
+                      const selectedBranchId = selectedBranches[item.productId];
+                      const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                      const maxStock = branch?.stockQuantity || item.stockQuantity || 9999;
+                      handleQuantityInput(item.branchProductId, inputValue, maxStock);
+                    }}
+                    onFocus={(e) => {
+                      // 포커스 시 현재 값으로 초기화
+                      setQuantityInputs(prev => ({
+                        ...prev,
+                        [item.branchProductId]: e.target.value
+                      }));
+                    }}
+                    onBlur={(e) => {
+                      const selectedBranchId = selectedBranches[item.productId];
+                      const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                      const maxStock = branch?.stockQuantity || item.stockQuantity || 9999;
+                      handleQuantityBlur(item.branchProductId, e.target.value, maxStock);
+                      
+                      // 포커스 아웃 시 임시 값 제거
+                      setQuantityInputs(prev => {
+                        const newInputs = { ...prev };
+                        delete newInputs[item.branchProductId];
+                        return newInputs;
+                      });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.target.blur();
+                      }
+                    }}
+                    style={{
+                      width: '50px',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      padding: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
                   <button 
                     className="quantity-btn"
-                    onClick={() => handleQuantityChange(item.branchProductId, item.quantity + 1)}
+                    onClick={() => {
+                      const selectedBranchId = selectedBranches[item.productId];
+                      const branch = availableBranches[item.productId]?.find(b => b.branchId == selectedBranchId);
+                      const maxStock = branch?.stockQuantity || item.stockQuantity || 9999;
+                      if (item.quantity >= maxStock) {
+                        alert(`재고가 부족합니다. 최대 ${maxStock}개까지 주문 가능합니다.`);
+                        return;
+                      }
+                      handleQuantityChange(item.branchProductId, item.quantity + 1);
+                    }}
                   >
                     +
                   </button>

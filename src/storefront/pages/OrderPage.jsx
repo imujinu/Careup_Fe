@@ -95,7 +95,17 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
       
     } catch (error) {
       console.error('주문 생성 실패:', error);
-      setOrderError(error.response?.data?.message || error.message || '주문 처리 중 오류가 발생했습니다.');
+      // 백엔드 에러 메시지 추출
+      const errorMessage = error.response?.data?.status_message || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '주문 처리 중 오류가 발생했습니다.';
+      setOrderError(errorMessage);
+      
+      // 재고 부족 에러인 경우 사용자에게 알림
+      if (errorMessage.includes('재고') || errorMessage.includes('소진')) {
+        alert(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

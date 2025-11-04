@@ -93,6 +93,16 @@ function ShopLayout() {
     const checkAndNavigate = () => {
       if (processed) return;
 
+      // URL 파라미터 체크 (장바구니로 리다이렉트)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('page') === 'cart') {
+        processed = true;
+        setPage('cart');
+        // URL 파라미터 제거
+        window.history.replaceState({}, '', '/shop');
+        return;
+      }
+
       if (window.location.pathname.includes('/shop/payment-success')) {
         processed = true;
         setPage('payment-success');
