@@ -533,8 +533,8 @@ function ShopLayout() {
     setPage("payment");
   };
 
-  // 상품 상세에서 바로 구매 (단일 주문) → OrderPage로 이동
-  const handleBuyNow = (product) => {
+  // 상품 상세에서 바로 구매 (단일 주문) → 주문 생성 후 결제 페이지로 바로 이동
+  const handleBuyNow = async (product) => {
     // 로그인 체크
     if (!isLoggedIn || !currentUser) {
       alert('구매하려면 로그인이 필요합니다.');
@@ -542,15 +542,19 @@ function ShopLayout() {
       return;
     }
 
-    // 지점 선택 확인
-    if (!product.selectedBranchId) {
+    // 지점 선택 확인 (없으면 첫 지점 자동 선택)
+    let selectedBranchId = product.selectedBranchId;
+    if (!selectedBranchId && product?.availableBranches && product.availableBranches.length > 0) {
+      selectedBranchId = product.availableBranches[0]?.branchId;
+    }
+    if (!selectedBranchId) {
       alert('구매 지점을 선택해주세요.');
       return;
     }
 
     // 선택된 지점 정보 찾기
     const selectedBranch = product.availableBranches?.find(
-      (b) => String(b.branchId) === String(product.selectedBranchId)
+      (b) => String(b.branchId) === String(selectedBranchId)
     );
 
     if (!selectedBranch) {
@@ -563,26 +567,47 @@ function ShopLayout() {
       return;
     }
 
-    // 단일 상품 정보로 orderData 구성 (주문은 OrderPage에서 생성)
-    const orderData = {
-      isSingleOrder: true, // 단일 주문 플래그
-      product: product,
-      selectedBranch: selectedBranch,
-      items: [{
-        productId: product.productId,
-        branchProductId: selectedBranch.branchProductId,
-        branchId: selectedBranch.branchId,
-        productName: product.name || product.productName,
-        price: selectedBranch.price,
-        quantity: 1,
-        imageUrl: product.image
-      }],
-      branchId: Number(selectedBranch.branchId),
-      totalAmount: selectedBranch.price
-    };
+    // 주문을 즉시 생성하고 결제 페이지로 이동
+    try {
+      const orderRequestData = {
+        memberId: Number(currentUser?.memberId || 1),
+        branchId: Number(selectedBranch.branchId),
+        orderType: 'ONLINE',
+        orderItems: [{
+          branchProductId: Number(selectedBranch.branchProductId),
+          quantity: 1
+        }],
+        couponId: null
+      };
 
-    setOrderData(orderData);
-    setPage("order");
+      const response = await cartService.createOrder(orderRequestData);
+      const created = response?.data?.data || response?.data || response;
+      const orderId = created?.orderId;
+      const totalAmount = created?.totalAmount ?? selectedBranch.price;
+
+      const immediateOrderData = {
+        orderId,
+        totalAmount,
+        items: [{
+          productId: product.productId,
+          branchProductId: selectedBranch.branchProductId,
+          branchId: selectedBranch.branchId,
+          productName: product.name || product.productName,
+          price: selectedBranch.price,
+          quantity: 1,
+          imageUrl: product.image
+        }],
+        branchId: Number(selectedBranch.branchId),
+        createdAt: new Date().toISOString()
+      };
+
+      setOrderData(immediateOrderData);
+      localStorage.setItem('currentOrderData', JSON.stringify(immediateOrderData));
+      setPage("payment");
+    } catch (error) {
+      console.error('단일 상품 주문 생성 실패:', error);
+      alert(error.response?.data?.message || error.message || '주문 생성에 실패했습니다.');
+    }
   };
 
   // 결제 페이지로 이동

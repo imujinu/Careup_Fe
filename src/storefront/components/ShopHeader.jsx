@@ -32,6 +32,8 @@ const ShopHeader = ({
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
+                  if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                  if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                   setPage("login");
                 }}
               >
@@ -57,6 +59,8 @@ const ShopHeader = ({
               href="#"
               onClick={(e) => {
                 e.preventDefault();
+                if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                 setPage("mypage");
               }}
             >
@@ -69,6 +73,8 @@ const ShopHeader = ({
               href="#"
               onClick={(e) => {
                 e.preventDefault();
+                if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                 handleLogout();
               }}
             >
