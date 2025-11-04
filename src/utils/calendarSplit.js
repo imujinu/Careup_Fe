@@ -1,6 +1,12 @@
 export function splitForCalendar(ev) {
-  const startIso = ev.registeredClockIn || ev.registeredStartAt || ev.startAt;
-  const endIso   = ev.registeredClockOut || ev.registeredEndAt || ev.endAt;
+  const actStart = ev.actualClockIn || ev.actualStartAt;
+  const actEnd   = ev.actualClockOut || ev.actualEndAt;
+
+  const regStart = ev.registeredClockIn || ev.registeredStartAt || ev.startAt;
+  const regEnd   = ev.registeredClockOut || ev.registeredEndAt || ev.endAt;
+
+  const startIso = (actStart && actEnd) ? actStart : regStart;
+  const endIso   = (actStart && actEnd) ? actEnd   : regEnd;
 
   if (!startIso || !endIso) {
     const day = (startIso || endIso || ev.date || '').slice(0, 10);
@@ -14,7 +20,6 @@ export function splitForCalendar(ev) {
     return [{ ...ev, scheduleId: ev.id, uiKey: `${ev.id}:${dayStart}`, cellDate: dayStart }];
   }
 
-  // 🔴 자정(00:00) 종료면 다음 날(TAIL) 조각을 만들지 않음
   const end = new Date(endIso);
   const isEndAtMidnight =
     end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0;

@@ -1,3 +1,4 @@
+// src/service/scheduleService.js
 import axios from '../utils/axiosConfig';
 
 /**
@@ -16,6 +17,15 @@ const unwrap = (res) => {
   if (data && typeof data === 'object' && 'result' in data) return data.result;
   return data;
 };
+
+/** 안전한 ID 정규화: "123:TAIL" / "123:2025-11-04" → "123" */
+const normalizeId = (val) => {
+  const s = String(val ?? '');
+  return s.includes(':') ? s.split(':')[0] : s;
+};
+
+/** YYYY-MM-DD로 잘라내기 */
+const toYMD = (v) => (v ? String(v).slice(0, 10) : '');
 
 /**
  * 달력 데이터 조회(기간 기반)
@@ -113,15 +123,75 @@ export const createSchedulesBulk = massCreateSchedules;
 
 /** 단건 수정(계획/등록 시간) */
 export const updateSchedule = async (id, payload) => {
-  const res = await axios.patch(`${BASE_URL}/schedule/update/${id}`, payload);
+  const sid = normalizeId(id);
+  const res = await axios.patch(`${BASE_URL}/schedule/update/${encodeURIComponent(sid)}`, payload);
   return unwrap(res);
 };
 
-/** 실제 기록(근태 이벤트) 보정/저장 */
-export const upsertAttendanceEvent = async (scheduleId, payload) => {
-  // ScheduleEventUpdateDto: { eventDate, clockInAt?, breakStartAt?, breakEndAt?, clockOutAt?, clearMissedCheckout? }
-  const res = await axios.patch(`${BASE_URL}/attendance/event/${scheduleId}`, payload);
+/**
+ * 실제 기록(근태 이벤트) 보정/저장 (업서트 의도)
+ * - 서버가 PATCH만 받으면 그대로 사용
+ * - 혹시 405(Method Not Allowed)면 PUT로 재시도
+ */
+export const upsertAttendanceEvent = async (scheduleId, payload = {}) => {
+  const sid = normalizeId(scheduleId);
+
+  // DTO에 맞게 안전 정제 (eventDate는 YYYY-MM-DD만 허용)
+  const body = {
+    eventDate: toYMD(payload.eventDate) || undefined,
+    clockInAt: payload.clockInAt || undefined,
+    breakStartAt: payload.breakStartAt || undefined,
+    breakEndAt: payload.breakEndAt || undefined,
+    clockOutAt: payload.clockOutAt || undefined,
+    clearMissedCheckout: payload.clearMissedCheckout || undefined,
+    part: payload.part || undefined,
+  };
+
+  const url = `${BASE_URL}/attendance/event/${encodeURIComponent(sid)}`;
+
+  try {
+    const res = await axios.patch(url, body);
+    return unwrap(res);
+  } catch (e) {
+    if (e?.response?.status === 405) {
+      const res2 = await axios.put(url, body);
+      return unwrap(res2);
+    }
+    throw e;
+  }
+};
+
+/** 근무 기록(AttendanceEvent) 삭제 */
+export const deleteAttendanceEvent = async (scheduleId) => {
+  const sid = normalizeId(scheduleId);
+  const res = await axios.delete(`${BASE_URL}/attendance/event/${encodeURIComponent(sid)}`);
   return unwrap(res);
+};
+
+/** 스케줄 상세 */
+export const getScheduleDetail = async (id) => {
+  const sid = normalizeId(id);
+  const res = await axios.get(`${BASE_URL}/schedule/detail/${encodeURIComponent(sid)}`);
+  return unwrap(res) || null;
+};
+
+/** 스케줄 계획 삭제
+ *  우선 DELETE /schedule/delete/{id} 사용, 없으면 /schedule/{id}로 폴백
+ */
+export const deleteSchedule = async (id) => {
+  const sid = normalizeId(id);
+  const url1 = `${BASE_URL}/schedule/delete/${encodeURIComponent(sid)}`;
+  try {
+    const res = await axios.delete(url1);
+    return unwrap(res);
+  } catch (e) {
+    if (e?.response?.status && [404, 405].includes(e.response.status)) {
+      const url2 = `${BASE_URL}/schedule/${encodeURIComponent(sid)}`;
+      const res2 = await axios.delete(url2);
+      return unwrap(res2);
+    }
+    throw e;
+  }
 };
 
 /** 캘린더 엑셀 */
@@ -133,8 +203,19 @@ export const exportScheduleCalendar = async (params = {}) => {
   return res?.data;
 };
 
-/** 스케줄 상세 */
-export const getScheduleDetail = async (id) => {
-  const res = await axios.get(`${BASE_URL}/schedule/detail/${id}`);
-  return unwrap(res) || null;
+export default {
+  fetchScheduleCalendar,
+  fetchEmployeeOptions,
+  fetchBranchOptions,
+  fetchWorkTypeOptions,
+  fetchLeaveTypeOptions,
+  createSchedule,
+  massCreateSchedules,
+  createSchedulesBulk,
+  updateSchedule,
+  upsertAttendanceEvent,
+  deleteAttendanceEvent,
+  getScheduleDetail,
+  deleteSchedule,
+  exportScheduleCalendar,
 };
