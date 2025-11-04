@@ -25,7 +25,6 @@ const ShopHeader = ({
     <header className="header">
       <div className="container">
         <div className="header-top">
-          <a href="#">고객센터</a>
           {!isLoggedIn ? (
             <>
               <a
@@ -67,7 +66,6 @@ const ShopHeader = ({
               {currentUser?.nickname || currentUser?.name || '마이페이지'}
             </a>
           )}
-          <a href="#">관심</a>
           {isLoggedIn && (
             <a
               href="#"
@@ -109,6 +107,8 @@ const ShopHeader = ({
                 setDetailProduct(null);
                 setCheckoutProduct(null);
                 setActiveTab("전체");
+                setSearchQuery(""); // 검색어 초기화
+                setShowSearch(false); // 검색창 닫기
                 setPage("home");
               }}
             >
@@ -122,6 +122,8 @@ const ShopHeader = ({
                 setDetailProduct(null);
                 setCheckoutProduct(null);
                 setActiveTab("전체");
+                setSearchQuery(""); // 검색어 초기화
+                setShowSearch(false); // 검색창 닫기
                 setPage("products");
               }}
             >

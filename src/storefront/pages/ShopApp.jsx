@@ -695,7 +695,7 @@ function ShopLayout() {
              onOpenDetail={(p) => setDetailProduct(p)}
              onAddToCart={handleAddToCart}
              products={products}
-             searchQuery={searchQuery}
+             searchQuery="" // shop 페이지에서는 검색어 필터링 안 함
              categories={categories}
              activeTab={activeTab}
              onTabChange={handleTabChange}
