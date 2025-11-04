@@ -345,7 +345,8 @@ img {
 .actions svg {
   fill: #6b7280;
 }
-.icon-btn:hover svg {
+.icon-btn:hover svg,
+.icon-btn:hover svg path {
   fill: #111;
 }
 .icon-btn {
@@ -354,12 +355,18 @@ img {
   border-radius: 8px;
   width: 36px;
   height: 36px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  padding: 0;
 }
 .icon-btn:hover {
   border-color: #cfd3da;
+}
+.icon-btn svg {
+  display: block;
+  margin: 0;
 }
 
 .search {
