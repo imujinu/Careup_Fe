@@ -4,7 +4,7 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
   return (
     <div className="container search-results-page">
       <div className="search-header">
-        <button className="back-btn" onClick={onBack}>← 돌아가기</button>
+        <button className="back-btn" onClick={onBack}>← 뒤로가기</button>
         <h2 className="search-title">"{searchQuery}" 검색 결과</h2>
       </div>
       {isSearching ? (
@@ -17,11 +17,11 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
       ) : searchResults.length === 0 ? (
         <div className="no-results">
           <h3>검색 결과가 없습니다</h3>
-          <p>다른 검색어로 시도해보세요.</p>
+          <p>다른 검색어로 다시 시도해주세요.</p>
         </div>
       ) : (
         <div className="search-results">
-          <div className="results-summary">총 {searchResults.length}개의 상품을 찾았습니다.</div>
+          <div className="results-summary">총 {searchResults.length}개의 상품을 찾았습니다</div>
           <div className="products-grid">
             {searchResults.map((product) => (
               <div key={product.id} className="product-card">
@@ -33,7 +33,13 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                 </div>
                 <div className="product-info">
                   <div className="product-category">{product.category}</div>
-                  <h3 className="product-name">{product.name}</h3>
+                  <h3 className="product-name">
+                    {product.highlightedName ? (
+                      <span dangerouslySetInnerHTML={{ __html: product.highlightedName }} />
+                    ) : (
+                      product.name
+                    )}
+                  </h3>
                   <div className="product-brand">{product.brand}</div>
                   <div className="product-price">
                     {product.promotionPrice && product.discountRate ? (
@@ -47,12 +53,12 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                     )}
                   </div>
                   <div className="product-meta">
-                    <span className="likes">♥ {product.likes}</span>
+                    <span className="likes">관심 {product.likes}</span>
                     <span className="reviews">리뷰 {product.reviews}</span>
                   </div>
                   <div className="product-actions">
                     <button className="detail-btn" onClick={() => onOpenDetail(product)}>상세보기</button>
-                    <button className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`} onClick={() => !product.isOutOfStock && onAddToCart(product)} disabled={product.isOutOfStock}>{product.isOutOfStock ? '품절' : '장바구니'}</button>
+                    <button className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`} onClick={() => !product.isOutOfStock && onAddToCart(product)} disabled={product.isOutOfStock}>{product.isOutOfStock ? '품절' : '장바구니 담기'}</button>
                   </div>
                 </div>
               </div>
