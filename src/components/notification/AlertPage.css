@@ -166,6 +166,42 @@
   background-color: #f9fafb;
 }
 
+.alert-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.alert-action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.alert-action-btn.approve {
+  background: #10b981;
+  color: white;
+}
+
+.alert-action-btn.approve:hover {
+  background: #059669;
+}
+
+.alert-action-btn.reject {
+  background: #ef4444;
+  color: white;
+}
+
+.alert-action-btn.reject:hover {
+  background: #dc2626;
+}
+
 .alert-close-btn {
   position: absolute;
   top: 8px;

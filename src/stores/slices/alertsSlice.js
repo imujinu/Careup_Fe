@@ -7,6 +7,8 @@ const eventTypeToCategory = {
   PURCHASE: "발주",
   ORDER: "주문",
   STOCK: "재고",
+  BRANCH: "지점",
+  BRANCH_UPDATE: "지점",
 };
 
 // API 알림 데이터를 내부 형식으로 변환
@@ -184,6 +186,8 @@ function getDefaultTitle(eventType) {
     PURCHASE: "발주 알림",
     ORDER: "주문 알림",
     STOCK: "재고 알림",
+    BRANCH: "지점 알림",
+    BRANCH_UPDATE: "지점 수정 요청",
   };
   return titles[eventType] || "알림";
 }

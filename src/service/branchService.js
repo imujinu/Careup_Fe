@@ -7,9 +7,16 @@ const BASE_URL =
 
 // 본점 관리자 지점 목록 조회 서비스
 export const branchService = {
-  // GET /branch?page=0&size=10&sort=createdAt,desc
-  async fetchBranches({ page = 0, size = 10, sort = "createdAt,desc" } = {}) {
+  // GET /branch?page=0&size=10&sort=createdAt,desc&keyword=검색어&status=상태
+  async fetchBranches({ page = 0, size = 10, sort = "createdAt,desc", keyword, status } = {}) {
     const params = { page, size, sort };
+    // keyword와 status 파라미터가 있는 경우에만 추가
+    if (keyword && keyword.trim()) {
+      params.keyword = keyword.trim();
+    }
+    if (status) {
+      params.status = status;
+    }
     const url = `${BASE_URL}/branch`;
     const response = await axios.get(url, { params });
 
@@ -130,6 +137,40 @@ export const requestBranchUpdate = async (branchData, profileImage) => {
     },
   });
 
+  return response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 목록 조회
+export const getBranchUpdateRequests = async ({ page = 0, size = 10, status } = {}) => {
+  const params = { page, size, sort: "createdAt,desc" };
+  let url = `${BASE_URL}/branch/update-requests`;
+  
+  if (status) {
+    url = `${BASE_URL}/branch/update-requests/status/${status}`;
+  }
+  
+  const response = await axios.get(url, { params });
+  return response.data?.result || response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 상세 조회
+export const getBranchUpdateRequest = async (requestId) => {
+  const url = `${BASE_URL}/branch/update-requests/${requestId}`;
+  const response = await axios.get(url);
+  return response.data?.result || response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 승인
+export const approveBranchUpdateRequest = async (requestId) => {
+  const url = `${BASE_URL}/branch/update-requests/${requestId}/approve`;
+  const response = await axios.post(url);
+  return response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 거부
+export const rejectBranchUpdateRequest = async (requestId) => {
+  const url = `${BASE_URL}/branch/update-requests/${requestId}/reject`;
+  const response = await axios.post(url);
   return response.data;
 };
 

@@ -20,6 +20,8 @@ import AttendanceTemplateManagement from '../pages/attendance/AttendanceTemplate
 import AttributeTypeManagement from '../pages/settings/AttributeTypeManagement';
 import AttributeValueManagement from '../pages/settings/AttributeValueManagement';
 import CategoryAttributeManagement from '../pages/settings/CategoryAttributeManagement';
+import BranchUpdateRequestList from '../pages/branch/BranchUpdateRequestList';
+import BranchUpdateRequestDetail from '../pages/branch/BranchUpdateRequestDetail';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -31,6 +33,8 @@ export const headquartersRoutes = [
   { path: 'branch/edit/:branchId', element: <BranchEdit /> },
   { path: 'branch/detail/:branchId', element: <BranchDetail /> },
   { path: 'branch/test-register', element: <TestBranchRegistration /> },
+  { path: 'branch/update-requests', element: <BranchUpdateRequestList /> },
+  { path: 'branch/update-requests/:requestId', element: <BranchUpdateRequestDetail /> },
 
   // 직원관리
   { path: 'staff', element: <StaffList /> },

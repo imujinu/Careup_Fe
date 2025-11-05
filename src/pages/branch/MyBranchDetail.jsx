@@ -132,6 +132,7 @@ function MyBranchDetail() {
         onShowDetail={handleShowDetail}
         onEdit={handleShowEditModal}
         showEditButton={true}
+        userType={userType}
       />
 
       <BranchDetailTabs branchId={branchData.id || branchData.branchId} branch={branchData} userType={userType} />

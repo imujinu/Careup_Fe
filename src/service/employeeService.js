@@ -19,10 +19,10 @@ export const fetchEmployeeList = async (params = {}) => {
 
 // 지점별 직원(점주) 목록 조회
 export const fetchEmployeeListByBranch = async (branchId, params = {}) => {
-  const { page = 0, size = 20, sort = "employmentStatus,asc" } = params;
+  const { page = 0, size = 20, sort = "employmentStatus,asc", ...restParams } = params;
   const url = `${BASE_URL}/employees/list/branch/${branchId}`;
   const response = await axios.get(url, {
-    params: { page, size, sort },
+    params: { page, size, sort, ...restParams },
   });
   return response.data?.result || response.data;
 };
