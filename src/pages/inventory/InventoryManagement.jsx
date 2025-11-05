@@ -257,7 +257,11 @@ function InventoryManagement() {
           status: status,
           unitPrice: unitPrice,
           salesPrice: salesPrice,
-          totalValue: currentStock * unitPrice
+          totalValue: currentStock * unitPrice,
+          // 사이즈 정보 추가
+          attributeValueId: item.attributeValueId || null,
+          attributeValueName: item.attributeValueName || null,
+          attributeTypeName: item.attributeTypeName || null
         };
       });
       
@@ -602,6 +606,18 @@ function InventoryManagement() {
             safetyStock: 0,
             price: price
           });
+          
+          // 선택한 속성 값들을 상품에 연결
+          if (formData.attributeValueIds && formData.attributeValueIds.length > 0) {
+            try {
+              await inventoryService.addProductAttributeValues(productId, formData.attributeValueIds);
+              console.log('상품 속성 값 등록 완료');
+            } catch (attrError) {
+              console.error('상품 속성 값 등록 실패:', attrError);
+              // 속성 값 등록 실패해도 상품은 등록됨 (경고만 표시)
+              alert('상품은 등록되었지만 속성 값 등록에 실패했습니다.');
+            }
+          }
         }
         
         alert('상품이 성공적으로 등록되었습니다.');
@@ -685,8 +701,8 @@ function InventoryManagement() {
       const productId = formData.productId || selectedItem?.product?.id;
       const branchProductId = selectedItem?.branchProductId || selectedItem?.id;
       
-      // 상품 정보 수정 (이름, 이미지)
-      if (productId && (formData.productName || formData.imageFile || formData.removeImage)) {
+      // 상품 정보 수정 (이름, 카테고리, 이미지 등)
+      if (productId && (formData.productName || formData.category || formData.imageFile || formData.removeImage || formData.minPrice !== undefined || formData.maxPrice !== undefined || formData.unitPrice !== undefined)) {
         try {
           // 기존 상품 정보 가져오기
           const productResponse = await inventoryService.getProduct(productId);
@@ -700,11 +716,11 @@ function InventoryManagement() {
           await inventoryService.updateProduct(productId, {
             name: formData.productName || existingProduct.name,
             description: existingProduct.description || '',
-            categoryId: existingProduct.categoryId || existingProduct.category?.categoryId,
-            minPrice: existingProduct.minPrice || 0,
-            maxPrice: existingProduct.maxPrice || 0,
-            supplyPrice: existingProduct.supplyPrice || 0,
-            visibility: existingProduct.visibility || 'ALL',
+            categoryId: formData.category || existingProduct.categoryId || existingProduct.category?.categoryId,
+            minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
+            maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),
+            supplyPrice: formData.unitPrice !== undefined ? formData.unitPrice : (existingProduct.supplyPrice || 0),
+            visibility: formData.visibility || existingProduct.visibility || 'ALL',
             imageFile: imageFileToSend,
             imageUrl: imageUrlToSend
           });
@@ -714,6 +730,17 @@ function InventoryManagement() {
           console.error('상품 정보 수정 실패:', err);
           alert('상품 정보 수정에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
           return;
+        }
+      }
+      
+      // 상품 속성 값 업데이트
+      if (productId && formData.attributeValueIds !== undefined) {
+        try {
+          await inventoryService.updateProductAttributeValues(productId, formData.attributeValueIds);
+          console.log('상품 속성 값 업데이트 완료');
+        } catch (attrError) {
+          console.error('상품 속성 값 업데이트 실패:', attrError);
+          alert('상품 속성 값 업데이트에 실패했습니다.');
         }
       }
       
@@ -736,7 +763,7 @@ function InventoryManagement() {
             await inventoryService.updateProduct(productId, {
               name: existingProduct.name,
               description: existingProduct.description || '',
-              categoryId: existingProduct.categoryId || existingProduct.category?.categoryId,
+              categoryId: formData.category || existingProduct.categoryId || existingProduct.category?.categoryId,
               minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
               maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),
               supplyPrice: formData.unitPrice,
@@ -774,17 +801,32 @@ function InventoryManagement() {
   // 입출고 기록 관련 핸들러들
   const handleFlowAdd = async () => {
     try {
-      // inventoryData에서 본점(branchId === 1) 상품만 필터링하고 branchProductId가 있는 항목만 선택
-      const productsWithBranchProduct = inventoryData.filter(item => 
-        item.branchProductId != null && item.branchId === 1
-      );
+      // 본점(branchId === 1)의 재고를 직접 API에서 가져와서 사이즈 정보 포함 확인
+      const userInfo = authService.getCurrentUser();
+      const branchId = 1; // 본점
       
-      // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환
-      const formattedBranchProducts = productsWithBranchProduct.map(item => ({
-        id: item.branchProductId,
-        productName: item.product.name,
-        branchId: item.branchId
-      }));
+      const branchProductsData = await inventoryService.getBranchProducts(branchId);
+      console.log('입출고 기록 등록 - 본점 재고 데이터:', branchProductsData);
+      
+      // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환 (사이즈 정보 포함)
+      const formattedBranchProducts = (branchProductsData.data || branchProductsData || []).map(item => {
+        const sizeInfo = item.attributeValueName 
+          ? ` - ${item.attributeTypeName || ''} ${item.attributeValueName}` 
+          : '';
+        return {
+          id: item.branchProductId,
+          productId: item.productId,
+          product: { id: item.productId },
+          productName: `${item.productName || '알 수 없음'}${sizeInfo}`,
+          branchId: item.branchId || branchId,
+          attributeValueId: item.attributeValueId || null,
+          attributeValueName: item.attributeValueName || null,
+          attributeTypeName: item.attributeTypeName || null,
+          stockQuantity: item.stockQuantity || 0
+        };
+      });
+      
+      console.log('입출고 기록 등록 - 변환된 상품 목록:', formattedBranchProducts);
       
       setBranchProducts(formattedBranchProducts);
       setIsFlowAddModalOpen(true);

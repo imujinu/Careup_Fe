@@ -17,6 +17,9 @@ import StaffDetail from '../pages/staff/StaffDetail';
 import AttendanceCalendar from '../pages/attendance/AttendanceCalendar';
 import JobGradeManagement from '../pages/settings/JobGradeManagement';
 import AttendanceTemplateManagement from '../pages/attendance/AttendanceTemplateManagement';
+import AttributeTypeManagement from '../pages/settings/AttributeTypeManagement';
+import AttributeValueManagement from '../pages/settings/AttributeValueManagement';
+import CategoryAttributeManagement from '../pages/settings/CategoryAttributeManagement';
 import BranchUpdateRequestList from '../pages/branch/BranchUpdateRequestList';
 import BranchUpdateRequestDetail from '../pages/branch/BranchUpdateRequestDetail';
 
@@ -39,8 +42,6 @@ export const headquartersRoutes = [
   { path: 'staff/detail/:id', element: <StaffDetail /> },
 
   // 기능별 메뉴
-  { path: 'client', element: <div>거래처 관리 (준비중)</div> },
-  { path: 'task', element: <div>작업 관리 (준비중)</div> },
   { path: 'attendance', element: <AttendanceCalendar /> },                // 근태 캘린더
   { path: 'attendance/templates', element: <AttendanceTemplateManagement /> }, // 템플릿 관리
   { path: 'inventory', element: <InventoryManagement /> },
@@ -51,6 +52,9 @@ export const headquartersRoutes = [
   // 설정
   { path: 'settings', element: <div>설정 (준비중)</div> },
   { path: 'settings/job-grades', element: <JobGradeManagement /> },
+  { path: 'settings/attribute-types', element: <AttributeTypeManagement /> },
+  { path: 'settings/attribute-types/:typeId/values', element: <AttributeValueManagement /> },
+  { path: 'settings/category-attributes', element: <CategoryAttributeManagement /> },
 ];
 
 export default headquartersRoutes;
