@@ -12,7 +12,7 @@ const ChatBot = ({ onClose }) => {
       id: 1,
       type: "bot",
       content:
-        "안녕하세요!\n케어업 챗봇 환이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 환이에게 물어보세요.",
+        "안녕하세요!\n케어업 챗봇 케이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
       timestamp: new Date(),
     },
   ]);
@@ -28,7 +28,35 @@ const ChatBot = ({ onClose }) => {
   const [inventoryData, setInventoryData] = useState(null);
   const [isInventoryEditMode, setIsInventoryEditMode] = useState(false);
   const [orderQuantities, setOrderQuantities] = useState({});
+  const [inventoryReasons, setInventoryReasons] = useState({});
   const [showOrderConfirm, setShowOrderConfirm] = useState(false);
+  const [turnoverData, setTurnoverData] = useState(null);
+  const [showTurnoverOrderConfirm, setShowTurnoverOrderConfirm] =
+    useState(false);
+  const [showOrderRecommendConfirm, setShowOrderRecommendConfirm] =
+    useState(false);
+  const [showManualOrderConfirm, setShowManualOrderConfirm] = useState(false);
+
+  const calculateManualOrderTotalPrice = (items) => {
+    if (!items) return 0;
+    return items.reduce((sum, i) => {
+      const qty = Number(orderQuantities[i.id] || 0);
+      const unit = Number(i.unitPrice || i.price || 0);
+      return sum + qty * unit;
+    }, 0);
+  };
+  // 근태 수정용 캐시 및 상태
+  const [attendanceEmployees, setAttendanceEmployees] = useState(null);
+  const [attendanceMeta, setAttendanceMeta] = useState(null); // { leaveTypes, templates, workTypes }
+  const [isAttendanceEditMode, setIsAttendanceEditMode] = useState(false);
+  const [attendanceEditSelection, setAttendanceEditSelection] = useState({
+    employeeId: "",
+    scheduleId: "",
+    date: "",
+    templateId: "",
+    workTypeId: "",
+    leaveTypeId: "",
+  });
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -39,7 +67,7 @@ const ChatBot = ({ onClose }) => {
   const updateOrderQuantity = (itemId, quantity) => {
     setOrderQuantities((prev) => ({
       ...prev,
-      [itemId]: Math.max(0, quantity),
+      [itemId]: quantity,
     }));
   };
 
@@ -51,6 +79,14 @@ const ChatBot = ({ onClose }) => {
   const decrementQuantity = (itemId) => {
     const currentQuantity = orderQuantities[itemId] || 0;
     updateOrderQuantity(itemId, currentQuantity - 1);
+  };
+
+  // 사유 선택 업데이트
+  const updateInventoryReason = (itemId, reason) => {
+    setInventoryReasons((prev) => ({
+      ...prev,
+      [itemId]: reason,
+    }));
   };
 
   // 최종 가격 계산
@@ -65,18 +101,39 @@ const ChatBot = ({ onClose }) => {
 
   // 발주 요청 처리
   const handleOrderRequest = () => {
+    // 수량이 입력된 항목들에 대해 사유 검증
+    const itemsWithQuantity = inventoryData.filter(
+      (item) => (orderQuantities[item.id] || 0) !== 0
+    );
+    const itemsWithoutReason = itemsWithQuantity.filter(
+      (item) => !inventoryReasons[item.id]
+    );
+
+    if (itemsWithoutReason.length > 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content:
+            "사유 선택은 필수입니다. 모든 수정 항목에 대해 사유를 선택해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
     setShowOrderConfirm(true);
   };
 
   const confirmOrderRequest = async () => {
     const orderItems = inventoryData
-      .filter((item) => (orderQuantities[item.id] || 0) > 0)
+      .filter((item) => (orderQuantities[item.id] || 0) !== 0)
       .map((item) => ({
         id: item.id,
         productName: item.productName,
         quantity: orderQuantities[item.id],
-        price: item.price,
-        totalPrice: item.price * orderQuantities[item.id],
+        reason: inventoryReasons[item.id] || "",
       }));
 
     if (orderItems.length === 0) {
@@ -85,7 +142,7 @@ const ChatBot = ({ onClose }) => {
         {
           id: Date.now(),
           type: "bot",
-          content: "발주할 상품을 선택해주세요.",
+          content: "수정할 상품을 선택해주세요.",
           timestamp: new Date(),
         },
       ]);
@@ -93,8 +150,144 @@ const ChatBot = ({ onClose }) => {
       return;
     }
 
+    const inventoryUpdateMessage = `재고 수정: ${JSON.stringify(orderItems)}`;
+
     const result = await sendChatbotRequest(
-      `발주 요청: ${JSON.stringify(orderItems)}`,
+      inventoryUpdateMessage,
+      "재고 수정을 처리하고 있습니다..."
+    );
+
+    const botMessage = {
+      id: Date.now(),
+      type: "bot",
+      content: result?.data?.result?.body
+        ? `재고 수정이 완료되었습니다!\n\n${JSON.stringify(result.data.result.body, null, 2)}`
+        : "재고 수정이 완료되었습니다!",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, botMessage]);
+    setShowOrderConfirm(false);
+    setIsInventoryEditMode(false);
+    setOrderQuantities({});
+    setInventoryReasons({});
+    // 재고 최신화 표시
+    const invResult = await sendChatbotRequest(
+      "재고 전체 조회",
+      "재고 정보를 새로고침하고 있습니다..."
+    );
+    if (
+      invResult?.result?.body ||
+      invResult?.data?.result?.body ||
+      invResult?.body
+    ) {
+      let stocks = [];
+      const body =
+        invResult?.data?.result?.body ||
+        invResult?.result?.body ||
+        invResult?.body;
+      if (Array.isArray(body)) stocks = body;
+      else if (body.stocks && Array.isArray(body.stocks)) stocks = body.stocks;
+      else if (body.branchProductId) stocks = [body];
+      if (stocks.length > 0) {
+        const processedData = stocks.map((item) => ({
+          id: item.branchProductId,
+          productName: item.productName,
+          stockQuantity: item.stockQuantity,
+          safetyStock: item.safetyStock,
+          price: item.price,
+        }));
+        setInventoryData(processedData);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            content: { type: "inventory_table", data: processedData },
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    }
+  };
+
+  // 발주추천(회전율 기반) 합계 계산
+  const calculateOrderRecommendTotalPrice = (data) => {
+    if (!data || !data.products) return 0;
+    return data.products.reduce((sum, p) => {
+      const qty = Number(p.recommendedOrderQuantity) || 0;
+      const unit = Number(p.supplyPrice) || 0;
+      return sum + qty * unit;
+    }, 0);
+  };
+
+  const calculateOrderRecommendTotalQty = (data) => {
+    if (!data || !data.products) return 0;
+    return data.products.reduce(
+      (sum, p) => sum + (Number(p.recommendedOrderQuantity) || 0),
+      0
+    );
+  };
+
+  // 회전율 기반 발주 요청 처리
+  const handleTurnoverOrderRequest = () => {
+    if (!turnoverData || !turnoverData.products) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "회전율 데이터가 없습니다.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    // recommendedOrderQuantity가 0보다 큰 상품들만 필터링
+    const orderItems = turnoverData.products
+      .filter((product) => product.recommendedOrderQuantity > 0)
+      .map((product) => ({
+        productId: product.productId,
+        quantity: product.recommendedOrderQuantity,
+      }));
+
+    if (orderItems.length === 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "발주가 필요한 상품이 없습니다.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    setShowTurnoverOrderConfirm(true);
+  };
+
+  const confirmTurnoverOrderRequest = async () => {
+    if (!turnoverData || !turnoverData.products) return;
+
+    const orderItems = turnoverData.products
+      .filter((product) => product.recommendedOrderQuantity > 0)
+      .map((product) => ({
+        productId: product.productId,
+        quantity: product.recommendedOrderQuantity,
+      }));
+
+    if (orderItems.length === 0) {
+      setShowTurnoverOrderConfirm(false);
+      return;
+    }
+
+    // 발주 요청 메시지 생성
+    const orderRequestMessage = `발주 요청: ${JSON.stringify(orderItems)}`;
+
+    const result = await sendChatbotRequest(
+      orderRequestMessage,
       "발주 요청을 처리하고 있습니다..."
     );
 
@@ -108,9 +301,298 @@ const ChatBot = ({ onClose }) => {
     };
 
     setMessages((prev) => [...prev, botMessage]);
-    setShowOrderConfirm(false);
-    setIsInventoryEditMode(false);
-    setOrderQuantities({});
+    setShowTurnoverOrderConfirm(false);
+    // 발주 현황 재조회
+    const ordRes = await sendChatbotRequest(
+      "발주 전체 조회",
+      "발주 정보를 새로고침하고 있습니다..."
+    );
+    let orderData = null;
+    if (ordRes?.data?.result?.body) orderData = ordRes.data.result.body;
+    else if (ordRes?.result?.body) orderData = ordRes.result.body;
+    else if (ordRes?.body) orderData = ordRes.body;
+    if (orderData) {
+      const parsed = parseOrderData(orderData);
+      if (parsed) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            content: formatOrderTable(parsed),
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    }
+  };
+
+  // 수동 발주 확인 처리
+  const confirmManualOrderRequest = async () => {
+    if (!inventoryData || inventoryData.length === 0) {
+      setShowManualOrderConfirm(false);
+      return;
+    }
+
+    const orderItems = inventoryData
+      .filter((i) => (orderQuantities[i.id] || 0) > 0)
+      .map((i) => ({
+        productId: i.id,
+        quantity: Number(orderQuantities[i.id] || 0),
+      }));
+
+    if (orderItems.length === 0) {
+      setShowManualOrderConfirm(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "발주 수량을 입력해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    const orderRequestMessage = `발주 요청: ${JSON.stringify(orderItems)}`;
+    const result = await sendChatbotRequest(
+      orderRequestMessage,
+      "발주 요청을 처리하고 있습니다..."
+    );
+
+    const botMessage = {
+      id: Date.now(),
+      type: "bot",
+      content: result?.data?.result?.body
+        ? `발주 요청이 완료되었습니다!\n\n${JSON.stringify(result.data.result.body, null, 2)}`
+        : "발주 요청이 완료되었습니다!",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, botMessage]);
+    setShowManualOrderConfirm(false);
+    // 발주 현황 재조회
+    const ordRes2 = await sendChatbotRequest(
+      "발주 전체 조회",
+      "발주 정보를 새로고침하고 있습니다..."
+    );
+    let orderData2 = null;
+    if (ordRes2?.data?.result?.body) orderData2 = ordRes2.data.result.body;
+    else if (ordRes2?.result?.body) orderData2 = ordRes2.result.body;
+    else if (ordRes2?.body) orderData2 = ordRes2.body;
+    if (orderData2) {
+      const parsed2 = parseOrderData(orderData2);
+      if (parsed2) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            content: formatOrderTable(parsed2),
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    }
+  };
+
+  // 근태 수정 입력 변경
+  const handleAttendanceEditChange = (field, value) => {
+    setAttendanceEditSelection((prev) => {
+      const next = { ...prev, [field]: value };
+      // 상호 배타 제어: leaveType 선택 시 template/workType 초기화
+      if (field === "leaveTypeId" && value) {
+        next.templateId = "";
+        next.workTypeId = "";
+      }
+      // template 또는 workType 선택 시 leaveType 초기화
+      if ((field === "templateId" || field === "workTypeId") && value) {
+        next.leaveTypeId = "";
+      }
+      return next;
+    });
+  };
+
+  const getSelectedEmployee = () => {
+    if (!attendanceEmployees || !attendanceEditSelection.employeeId)
+      return null;
+    return attendanceEmployees.find(
+      (e) => String(e.employeeId) === String(attendanceEditSelection.employeeId)
+    );
+  };
+
+  const getScheduleOptions = () => {
+    const emp = getSelectedEmployee();
+    if (!emp) return [];
+    // employees[*].details 배열(날짜 기반 일정) 우선 사용, 없으면 기존 필드 사용
+    const details = Array.isArray(emp.details) ? emp.details : [];
+    if (details.length > 0) {
+      return details.map((d, idx) => ({
+        scheduleId: d.scheduleId ?? `detail-${idx}`,
+        date: d.date,
+        templateName: d.templateName,
+        workTypeName: d.workType,
+      }));
+    }
+    const schedules = emp.schedules || emp.nextSchedules || [];
+    return Array.isArray(schedules) ? schedules : [];
+  };
+
+  const submitAttendanceEdit = async () => {
+    const {
+      employeeId,
+      scheduleId,
+      date,
+      templateId,
+      workTypeId,
+      leaveTypeId,
+    } = attendanceEditSelection;
+
+    // 필수값 검증
+    if (!employeeId) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "직원을 선택해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    if (!date) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "등록 날짜를 선택해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    if (!scheduleId) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "스케줄을 선택해주세요.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    // 상호배타 검증
+    const choseLeave = !!leaveTypeId;
+    const choseTemplateOrWork = !!templateId || !!workTypeId;
+    if (choseLeave && choseTemplateOrWork) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content:
+            "휴가 타입을 선택한 경우 템플릿/워크타입을 선택할 수 없습니다.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    if (!choseLeave && !choseTemplateOrWork) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "bot",
+          content: "템플릿 또는 워크타입, 혹은 휴가 타입 중 하나는 필수입니다.",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+
+    const payload = {
+      employeeId: Number(employeeId),
+      scheduleId: isNaN(Number(scheduleId)) ? null : Number(scheduleId),
+      date,
+      templateId: templateId ? Number(templateId) : null,
+      workTypeId: workTypeId ? Number(workTypeId) : null,
+      leaveTypeId: leaveTypeId ? Number(leaveTypeId) : null,
+    };
+
+    const result = await sendChatbotRequest(
+      `근태 수정 요청: ${JSON.stringify(payload)}`,
+      "근태 수정 요청을 처리하고 있습니다..."
+    );
+
+    const ok = result && (result.result?.body || result.data?.result?.body);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        type: "bot",
+        content: ok
+          ? "근태 수정이 완료되었습니다."
+          : "근태 수정 처리에 실패했습니다.",
+        timestamp: new Date(),
+      },
+    ]);
+
+    if (ok) {
+      setIsAttendanceEditMode(false);
+      setAttendanceEditSelection({
+        employeeId: "",
+        scheduleId: "",
+        date: "",
+        templateId: "",
+        workTypeId: "",
+        leaveTypeId: "",
+      });
+      // 근태 요약 재표시
+      const res2 = await sendChatbotRequest(
+        "전체 직원 근태 조회",
+        "근태 정보를 새로고침하고 있습니다..."
+      );
+      let employees = null;
+      if (res2?.data?.result?.body)
+        employees = (res2.data.result.body.attendance || res2.data.result.body)
+          ?.employees;
+      else if (res2?.result?.body)
+        employees = (res2.result.body.attendance || res2.result.body)
+          ?.employees;
+      else if (res2?.body)
+        employees = (res2.body.attendance || res2.body)?.employees;
+      if (Array.isArray(employees)) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            content: {
+              type: "attendance_table",
+              data: employees.map((emp) => ({
+                employeeName: emp.employeeName,
+                totalDays: emp.summary?.totalDays ?? 0,
+                workDays: emp.summary?.workDays ?? 0,
+                absentDays: emp.summary?.absentDays ?? 0,
+                leaveDays: emp.summary?.leaveDays ?? 0,
+                totalWorkMinutes: emp.summary?.totalWorkMinutes ?? 0,
+                averageWorkMinutes: emp.summary?.averageWorkMinutes ?? 0,
+              })),
+            },
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    }
   };
 
   useEffect(() => {
@@ -272,6 +754,90 @@ const ChatBot = ({ onClose }) => {
     return {
       type: "attendance_table",
       data: Object.values(employeeStats),
+    };
+  };
+
+  // 회전율 데이터 파싱 함수
+  const parseTurnoverData = (data) => {
+    console.log("parseTurnoverData - 입력 데이터:", data);
+
+    if (!data || !data.products || !Array.isArray(data.products)) {
+      console.log("parseTurnoverData - 데이터가 없거나 products 배열이 아님");
+      return null;
+    }
+
+    console.log(
+      "parseTurnoverData - products 배열 길이:",
+      data.products.length
+    );
+
+    const parsedData = data.products.map((product) => {
+      const {
+        productId,
+        productName,
+        currentStock,
+        avgWeeklySales,
+        turnoverRate,
+        recommendedOrderQuantity,
+        status,
+        message,
+        unitPrice,
+        price,
+        supplyPrice,
+        orderStatus,
+        turnoverStatus,
+      } = product;
+
+      const orderUnitPrice =
+        typeof supplyPrice === "number"
+          ? supplyPrice
+          : typeof unitPrice === "number"
+            ? unitPrice
+            : typeof price === "number"
+              ? price
+              : 0;
+
+      return {
+        productId,
+        productName,
+        currentStock,
+        avgWeeklySales,
+        turnoverRate:
+          typeof turnoverRate === "number"
+            ? turnoverRate.toFixed(1)
+            : turnoverRate,
+        recommendedOrderQuantity,
+        status,
+        message,
+        unitPrice: orderUnitPrice,
+        supplyPrice:
+          typeof supplyPrice === "number" ? supplyPrice : orderUnitPrice,
+        orderStatus,
+        turnoverStatus: turnoverStatus || status || null,
+      };
+    });
+
+    console.log("parseTurnoverData - 파싱된 결과:", parsedData);
+    return {
+      branchId: data.branchId,
+      products: parsedData,
+      summary: data.summary || null,
+    };
+  };
+
+  // 회전율 정보를 표 형태로 표시하는 함수
+  const formatTurnoverTable = (turnoverData) => {
+    if (
+      !turnoverData ||
+      !turnoverData.products ||
+      turnoverData.products.length === 0
+    ) {
+      return "관련 정보가 존재하지 않습니다.\n다른 항목을 입력하시거나 다른 날짜를 입력해주세요.";
+    }
+
+    return {
+      type: "turnover_table",
+      data: turnoverData,
     };
   };
 
@@ -455,8 +1021,13 @@ const ChatBot = ({ onClose }) => {
         "근태 정보를 조회하고 있습니다..."
       );
 
+
+
       // 여러 가능한 데이터 경로 확인
       let employees = null;
+      let leaveTypes = null;
+      let templates = null;
+      let workTypes = null;
 
       console.log("전체직원조회 - API 응답:", result);
 
@@ -466,13 +1037,26 @@ const ChatBot = ({ onClose }) => {
         result.data.result &&
         result.data.result.body
       ) {
-        employees = result.data.result.body.employees;
+        const body =
+          result.data.result.body.attendance || result.data.result.body;
+        employees = body.employees;
+        leaveTypes = result.data.result.body.leaveTypes;
+        templates = result.data.result.body.templates;
+        workTypes = result.data.result.body.workTypes;
         console.log("전체직원조회 - 경로1에서 찾음:", employees);
       } else if (result && result.result && result.result.body) {
-        employees = result.result.body.employees;
+        const body = result.result.body.attendance || result.result.body;
+        employees = body.employees;
+        leaveTypes = result.result.body.leaveTypes;
+        templates = result.result.body.templates;
+        workTypes = result.result.body.workTypes;
         console.log("전체직원조회 - 경로2에서 찾음:", employees);
       } else if (result && result.body) {
-        employees = result.body.employees;
+        const body = result.body.attendance || result.body;
+        employees = body.employees;
+        leaveTypes = result.body.leaveTypes;
+        templates = result.body.templates;
+        workTypes = result.body.workTypes;
         console.log("전체직원조회 - 경로3에서 찾음:", employees);
       } else if (result && result.employees) {
         employees = result.employees;
@@ -480,6 +1064,15 @@ const ChatBot = ({ onClose }) => {
       }
 
       if (employees && Array.isArray(employees)) {
+        // 캐시 저장
+        setAttendanceEmployees(employees);
+        if (leaveTypes || templates || workTypes) {
+          setAttendanceMeta({
+            leaveTypes: leaveTypes || [],
+            templates: templates || [],
+            workTypes: workTypes || [],
+          });
+        }
         const botMessage = {
           id: Date.now() + 1,
           type: "bot",
@@ -510,6 +1103,91 @@ const ChatBot = ({ onClose }) => {
         setMessages((prev) => [...prev, botMessage]);
       }
 
+      return;
+    }
+
+    // 근태 수정 진입
+    if (tabType === "근태수정") {
+      // 캐시가 없으면 먼저 전체 직원 조회를 호출하여 메타/직원 캐시 확보
+      let employees = attendanceEmployees;
+      let leaveTypes = attendanceMeta?.leaveTypes;
+      let templates = attendanceMeta?.templates;
+      let workTypes = attendanceMeta?.workTypes;
+
+      if (!employees || !leaveTypes || !templates || !workTypes) {
+        const result = await sendChatbotRequest(
+          "전체 직원 근태 조회",
+          "근태 정보를 조회하고 있습니다..."
+        );
+
+        if (result?.data?.result?.body) {
+          const body = result.data.result.body;
+          const att = body.attendance || body;
+          employees = att.employees;
+          leaveTypes = body.leaveTypes;
+          templates = body.templates;
+          workTypes = body.workTypes;
+        } else if (result?.result?.body) {
+          const body = result.result.body;
+          const att = body.attendance || body;
+          employees = att.employees;
+          leaveTypes = body.leaveTypes;
+          templates = body.templates;
+          workTypes = body.workTypes;
+        } else if (result?.body) {
+          const body = result.body;
+          const att = body.attendance || body;
+          employees = att.employees;
+          leaveTypes = body.leaveTypes;
+          templates = body.templates;
+          workTypes = body.workTypes;
+        }
+
+        if (employees && leaveTypes && templates && workTypes) {
+          setAttendanceEmployees(employees);
+          setAttendanceMeta({ leaveTypes, templates, workTypes });
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              type: "bot",
+              content: "근태 수정에 필요한 데이터 로드에 실패했습니다.",
+              timestamp: new Date(),
+            },
+          ]);
+          return;
+        }
+      }
+
+      setIsAttendanceEditMode(true);
+      setAttendanceEditSelection({
+        employeeId: "",
+        scheduleId: "",
+        date: "",
+        templateId: "",
+        workTypeId: "",
+        leaveTypeId: "",
+      });
+
+      // 상태 비동기 반영 전이라도 즉시 표시하도록 로컬 데이터 사용
+      const botMessage = {
+        id: Date.now(),
+        type: "bot",
+        content: {
+          type: "attendance_edit",
+          data: {
+            employees: employees || [],
+            meta: {
+              leaveTypes: leaveTypes || [],
+              templates: templates || [],
+              workTypes: workTypes || [],
+            },
+          },
+        },
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
       return;
     }
 
@@ -626,7 +1304,7 @@ const ChatBot = ({ onClose }) => {
     // 채팅 내용 유지 - 초기화하지 않음
     setActiveTab(null);
 
-    if (tabType === "전체조회") {
+    if (tabType === "전체조회" || tabType === "발주조회") {
       // 저장된 재고 데이터가 있으면 그대로 표시 (API 호출 없음)
       console.log("전체조회 클릭 - inventoryData:", inventoryData);
       if (inventoryData && inventoryData.length > 0) {
@@ -724,6 +1402,7 @@ const ChatBot = ({ onClose }) => {
 
       setIsInventoryEditMode(true);
       setOrderQuantities({});
+      setInventoryReasons({});
 
       const botMessage = {
         id: Date.now(),
@@ -742,17 +1421,41 @@ const ChatBot = ({ onClose }) => {
         "재고 회전율 조회",
         "회전율 정보를 조회하고 있습니다..."
       );
-      setMessages((prev) => [
-        ...prev,
-        {
+
+      console.log("회전율 조회 - API 응답:", result);
+
+      // 여러 가능한 데이터 경로 확인
+      let turnoverData = null;
+
+      if (result?.data?.result?.body) {
+        turnoverData = parseTurnoverData(result.data.result.body);
+        console.log("회전율 조회 - 경로1에서 찾음:", turnoverData);
+      } else if (result?.result?.body) {
+        turnoverData = parseTurnoverData(result.result.body);
+        console.log("회전율 조회 - 경로2에서 찾음:", turnoverData);
+      } else if (result?.body) {
+        turnoverData = parseTurnoverData(result.body);
+        console.log("회전율 조회 - 경로3에서 찾음:", turnoverData);
+      }
+
+      if (turnoverData) {
+        setTurnoverData(turnoverData);
+        const botMessage = {
           id: Date.now(),
           type: "bot",
-          content: result?.data?.result?.body
-            ? JSON.stringify(result.data.result.body, null, 2)
-            : "회전율 데이터를 불러오지 못했습니다.",
+          content: formatTurnoverTable(turnoverData),
           timestamp: new Date(),
-        },
-      ]);
+        };
+        setMessages((prev) => [...prev, botMessage]);
+      } else {
+        const botMessage = {
+          id: Date.now(),
+          type: "bot",
+          content: "회전율 데이터를 불러오지 못했습니다.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+      }
     }
   };
 
@@ -771,6 +1474,42 @@ const ChatBot = ({ onClose }) => {
     setMessages((prev) => [...prev, userMessage]);
 
     // 발주 관련 API 요청
+    if (tabType === "발주추천") {
+      // 캐시 사용, 없으면 회전율과 동일 요청
+      let dataToUse = turnoverData;
+      if (!dataToUse) {
+        const result = await sendChatbotRequest(
+          "재고 회전율 조회",
+          "발주 추천 데이터를 조회하고 있습니다..."
+        );
+        if (result?.data?.result?.body)
+          dataToUse = parseTurnoverData(result.data.result.body);
+        else if (result?.result?.body)
+          dataToUse = parseTurnoverData(result.result.body);
+        else if (result?.body) dataToUse = parseTurnoverData(result.body);
+        if (dataToUse) setTurnoverData(dataToUse);
+      }
+
+      if (!dataToUse) {
+        const botMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content: "발주 추천 데이터를 불러오지 못했습니다.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+        return;
+      }
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: { type: "order_recommendation_table", data: dataToUse },
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
     if (tabType === "전체조회") {
       const result = await sendChatbotRequest(
         "발주 전체 조회",
@@ -832,6 +1571,38 @@ const ChatBot = ({ onClose }) => {
       return;
     }
 
+    // 발주 요청 화면 (상품명/현재재고/안전재고/수량/발주단가 + 총액)
+    if (tabType === "발주요청") {
+      // 재고 데이터 필요
+      if (!inventoryData || inventoryData.length === 0) {
+        const botMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content: "먼저 재고 전체 조회를 진행해주세요.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+        return;
+      }
+
+      const formatted = inventoryData.map((i) => ({
+        id: i.id,
+        productName: i.productName,
+        stockQuantity: i.stockQuantity,
+        safetyStock: i.safetyStock,
+        unitPrice: i.price,
+      }));
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: { type: "order_request_table", data: formatted },
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
     // 발주 등록 처리
     if (tabType === "발주등록") {
       setIsOrderRegistering(true);
@@ -890,15 +1661,118 @@ const ChatBot = ({ onClose }) => {
         "매출 정보를 조회하고 있습니다..."
       );
 
+      // 다양한 경로에서 statistics 추출
+      let stats = null;
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+      if (body?.statistics && Array.isArray(body.statistics))
+        stats = body.statistics;
+
       const botMessage = {
         id: Date.now() + 1,
         type: "bot",
-        content: result?.data?.result?.body
-          ? JSON.stringify(result.data.result.body, null, 2)
-          : "매출 데이터를 불러오지 못했습니다.",
+        content:
+          stats && stats.length
+            ? { type: "sales_daily_table", data: stats }
+            : "매출 데이터를 불러오지 못했습니다.",
         timestamp: new Date(),
       };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
 
+    if (tabType === "인건비율") {
+      const result = await sendChatbotRequest(
+        "인건비율 조회",
+        "인건비율 정보를 조회하고 있습니다..."
+      );
+
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+      const summary = body?.summary;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: summary
+          ? { type: "labor_cost_table", data: summary }
+          : "인건비율 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    if (tabType === "인건비 분석") {
+      const result = await sendChatbotRequest(
+        "인건비 분석 조회",
+        "인건비 분석 정보를 조회하고 있습니다..."
+      );
+
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+      const summary = body?.summary;
+      const hourlyDetails = body?.hourlyDetails;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: summary
+          ? {
+              type: "labor_cost_analysis_table",
+              data: { summary, hourlyDetails: hourlyDetails || [] },
+            }
+          : "인건비 분석 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    if (tabType === "상품별매출") {
+      const result = await sendChatbotRequest(
+        "상품별 매출 조회",
+        "상품별 매출 정보를 조회하고 있습니다..."
+      );
+
+      // 다양한 경로에서 products 추출
+      let products = null;
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+      if (body?.products && Array.isArray(body.products))
+        products = body.products;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content:
+          products && products.length
+            ? { type: "sales_product_table", data: products }
+            : "매출 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    if (tabType === "매출분석") {
+      const result = await sendChatbotRequest(
+        "매출 분석 조회",
+        "매출 분석 정보를 조회하고 있습니다..."
+      );
+
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+      const summary = body?.summary;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: summary
+          ? { type: "sales_analysis_table", data: summary }
+          : "매출 분석 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
       setMessages((prev) => [...prev, botMessage]);
       return;
     }
@@ -933,7 +1807,7 @@ const ChatBot = ({ onClose }) => {
         id: 1,
         type: "bot",
         content:
-          "안녕하세요!\n신한카드 챗봇 레이에요!\n\n카드 이용 관련 궁금한 점이 생기면,\n언제든지 레이에게 물어보세요.",
+          "안녕하세요!\nCare Up 챗봇 케이에요!\n\n카드 이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
         timestamp: new Date(),
       },
     ]);
@@ -975,63 +1849,75 @@ const ChatBot = ({ onClose }) => {
       return;
     }
 
-    // 직원 이름으로 근태 조회하는 경우
-    if (messageContent.trim()) {
-      const requestMessage = isComparing
-        ? `${messageContent} 직원 상세 근태 조회`
-        : `${messageContent} 근태 조회`;
-
+    // 근태 상세 직원 조회 입력 처리
+    if (isComparing) {
       const result = await sendChatbotRequest(
-        requestMessage,
-        "근태 정보를 조회하고 있습니다..."
+        `근태 상세 조회 ${messageContent}`,
+        "직원 근태 상세를 조회하고 있습니다..."
+      );
+
+      // 가능한 경로에서 데이터 추출
+      let summary = null;
+      let details = null;
+      let body = null;
+      if (result?.data?.result?.body) body = result.data.result.body;
+      else if (result?.result?.body) body = result.result.body;
+      else if (result?.body) body = result.body;
+
+      if (body) {
+        const att = body.attendance || body;
+        // 요약과 상세 형태 유연 파싱
+        if (att.summary) summary = att.summary;
+        if (att.details && Array.isArray(att.details)) details = att.details;
+        // 일부 응답은 employees[0]에 담길 수 있음
+        if (!summary && Array.isArray(att.employees) && att.employees.length) {
+          const emp0 = att.employees[0];
+          summary = {
+            employeeName: emp0.employeeName,
+            workDays: emp0.summary?.workDays ?? 0,
+            absentDays: emp0.summary?.absentDays ?? 0,
+            leaveDays: emp0.summary?.leaveDays ?? 0,
+            averageWorkMinutes: emp0.summary?.averageWorkMinutes ?? 0,
+          };
+          details = Array.isArray(emp0.details) ? emp0.details : [];
+        }
+      }
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content:
+          summary || (details && details.length)
+            ? {
+                type: "detail_table",
+                summary: summary || {},
+                details: details || [],
+              }
+            : "관련 정보가 존재하지 않습니다. 다른 이름으로 시도해주세요.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      setIsComparing(false);
+      return;
+    }
+
+    // 일반 메시지 처리 - 사용자가 입력한 메시지를 그대로 전송
+    if (messageContent.trim()) {
+      const result = await sendChatbotRequest(
+        messageContent,
+        "정보를 조회하고 있습니다..."
       );
 
       let botContent = "";
 
       if (result.error) {
         botContent = `오류가 발생했습니다: ${result.error}`;
-      } else if (isComparing) {
-        // ✅ 상세 직원 조회 처리
-        const employeeData =
-          result.result?.body?.employee || result.result?.body?.employees?.[0];
-
-        if (employeeData) {
-          botContent = {
-            type: "detail_table",
-            summary: employeeData.summary,
-            details: employeeData.details || [],
-          };
-        } else {
-          botContent = "해당 직원의 근태 정보를 찾을 수 없습니다.";
-        }
       } else {
-        let attendanceData = null;
-        if (Array.isArray(result)) {
-          attendanceData = result;
-        } else if (result.employees && Array.isArray(result.employees)) {
-          attendanceData = result.employees;
-        } else if (result.data && Array.isArray(result.data)) {
-          attendanceData = result.data;
-        } else if (
-          result.attendanceData &&
-          Array.isArray(result.attendanceData)
-        ) {
-          attendanceData = result.attendanceData;
-        } else if (
-          result.result?.body?.employees &&
-          Array.isArray(result.result.body.employees)
-        ) {
-          attendanceData = result.result.body.employees;
-        }
-
-        if (attendanceData && attendanceData.length > 0) {
-          const employeeStats = parseAttendanceData(attendanceData);
-          const tableContent = formatAttendanceTable(employeeStats);
-          botContent = tableContent;
-        } else {
-          botContent =
-            "관련 정보가 존재하지 않습니다.\n다른 항목을 입력하시거나 다른 날짜를 입력해주세요.";
-        }
+        // API 응답을 그대로 표시
+        botContent =
+          result?.data?.result?.body ||
+          result?.result?.body ||
+          JSON.stringify(result, null, 2);
       }
 
       const botMessage = {
@@ -1061,7 +1947,7 @@ const ChatBot = ({ onClose }) => {
               <div className="avatar-icon">🤖</div>
             </div>
             <div className="chatbot-title">
-              <div className="chatbot-name">레이</div>
+              <div className="chatbot-name">케이</div>
               <div className="chatbot-subtitle">궁금한 사항을 물어보세요!</div>
             </div>
           </div>
@@ -1087,19 +1973,47 @@ const ChatBot = ({ onClose }) => {
                 <div className="message-bubble">
                   {message.content &&
                   typeof message.content === "object" &&
-                  (message.content.type === "attendance_table" ||
+                  (message.content.type === "order_request_table" ||
+                    message.content.type === "attendance_table" ||
                     message.content.type === "today_attendance_table" ||
                     message.content.type === "detail_table" ||
+                    message.content.type === "attendance_edit" ||
                     message.content.type === "inventory_table" ||
                     message.content.type === "inventory_edit" ||
-                    message.content.type === "order_table") ? (
+                    message.content.type === "order_table" ||
+                    message.content.type === "turnover_table" ||
+                    message.content.type === "order_recommendation_table" ||
+                    message.content.type === "sales_daily_table" ||
+                    message.content.type === "sales_product_table" ||
+                    message.content.type === "labor_cost_table" ||
+                    message.content.type === "labor_cost_analysis_table" ||
+                    message.content.type === "sales_analysis_table") ? (
                     <div className="attendance-table-container">
                       <div className="attendance-title">
                         {message.content.type === "today_attendance_table"
                           ? "📅 금일 근무 현황"
                           : message.content.type === "order_table"
                             ? "📋 발주 현황"
-                            : "📊 근태 현황"}
+                            : message.content.type === "turnover_table"
+                              ? "📊 재고 회전율"
+                              : message.content.type ===
+                                  "order_recommendation_table"
+                                ? "🛒 발주 추천"
+                                : message.content.type === "sales_daily_table"
+                                  ? "💰 일일 매출"
+                                  : message.content.type ===
+                                      "sales_product_table"
+                                    ? "🛍️ 상품별 매출"
+                                    : message.content.type ===
+                                        "labor_cost_table"
+                                      ? "👥 인건비율"
+                                      : message.content.type ===
+                                          "labor_cost_analysis_table"
+                                        ? "📈 인건비 분석"
+                                        : message.content.type ===
+                                            "sales_analysis_table"
+                                          ? "📋 매출 분석"
+                                          : "📊 근태 현황"}
                       </div>
                       <div className="attendance-table">
                         {message.content.type === "today_attendance_table" ? (
@@ -1313,10 +2227,10 @@ const ChatBot = ({ onClose }) => {
                                   상품명
                                 </div>
                                 <div className="inventory-edit-cell header">
-                                  발주수량
+                                  수량
                                 </div>
                                 <div className="inventory-edit-cell header">
-                                  단가
+                                  사유
                                 </div>
                               </div>
                               {message.content.data.map((item, index) => (
@@ -1325,43 +2239,71 @@ const ChatBot = ({ onClose }) => {
                                     {item.productName}
                                   </div>
                                   <div className="inventory-edit-cell quantity-control">
-                                    <button
-                                      className="quantity-btn minus"
-                                      onClick={() => decrementQuantity(item.id)}
-                                    >
-                                      -
-                                    </button>
-                                    <input
-                                      type="number"
-                                      value={orderQuantities[item.id] || 0}
+                                    <div className="quantity-control-wrapper">
+                                      <input
+                                        type="number"
+                                        value={orderQuantities[item.id] || 0}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          if (value === "" || value === "-") {
+                                            updateOrderQuantity(item.id, 0);
+                                          } else {
+                                            const numValue = parseInt(value);
+                                            updateOrderQuantity(
+                                              item.id,
+                                              isNaN(numValue) ? 0 : numValue
+                                            );
+                                          }
+                                        }}
+                                        className="quantity-input"
+                                        min="-999"
+                                        max="999"
+                                      />
+                                      <div className="quantity-arrows">
+                                        <button
+                                          className="quantity-arrow-btn increase-btn"
+                                          onClick={() =>
+                                            incrementQuantity(item.id)
+                                          }
+                                          type="button"
+                                        >
+                                          ▲
+                                        </button>
+                                        <button
+                                          className="quantity-arrow-btn decrease-btn"
+                                          onClick={() =>
+                                            decrementQuantity(item.id)
+                                          }
+                                          type="button"
+                                        >
+                                          ▼
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="inventory-edit-cell reason-select">
+                                    <select
+                                      value={inventoryReasons[item.id] || ""}
                                       onChange={(e) =>
-                                        updateOrderQuantity(
+                                        updateInventoryReason(
                                           item.id,
-                                          parseInt(e.target.value) || 0
+                                          e.target.value
                                         )
                                       }
-                                      className="quantity-input"
-                                      min="0"
-                                    />
-                                    <button
-                                      className="quantity-btn plus"
-                                      onClick={() => incrementQuantity(item.id)}
+                                      className="reason-select-box"
                                     >
-                                      +
-                                    </button>
-                                  </div>
-                                  <div className="inventory-edit-cell price">
-                                    {item.price.toLocaleString()}원
+                                      <option value="">사유</option>
+                                      <option value="입고">입고</option>
+                                      <option value="판매">판매</option>
+                                      <option value="주문취소">주문취소</option>
+                                      <option value="환불">환불</option>
+                                      <option value="폐기">폐기</option>
+                                      <option value="상품불량">상품불량</option>
+                                    </select>
                                   </div>
                                 </div>
                               ))}
                               <div className="order-summary">
-                                <div className="total-price">
-                                  최종 가격:{" "}
-                                  <span className="price-amount">
-                                    {calculateTotalPrice().toLocaleString()}원
-                                  </span>
-                                </div>
                                 <button
                                   className="order-request-btn"
                                   onClick={handleOrderRequest}
@@ -1369,6 +2311,757 @@ const ChatBot = ({ onClose }) => {
                                   재고 수정
                                 </button>
                               </div>
+                            </div>
+                          </>
+                        ) : message.content.type === "order_table" ? (
+                          // ✅ 발주 현황 테이블 (발주번호 / 발주단가 / 발주 상태)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                발주번호
+                              </div>
+                              <div className="attendance-cell header">
+                                지점명
+                              </div>
+                              <div className="attendance-cell header">
+                                상품수
+                              </div>
+                              <div className="attendance-cell header">
+                                총금액
+                              </div>
+                              <div className="attendance-cell header">상태</div>
+                            </div>
+                            {message.content.data.map((order, index) => (
+                              <div key={index} className="attendance-row">
+                                <div className="attendance-cell">
+                                  #{order.purchaseOrderId}
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.branchName}
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.productCount}개
+                                </div>
+                                <div className="attendance-cell">
+                                  {order.totalPrice}원
+                                </div>
+                                <div className="attendance-cell">
+                                  <span
+                                    className={`status-badge status-${order.status.toLowerCase()}`}
+                                  >
+                                    {order.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : message.content.type === "attendance_edit" ? (
+                          // ✅ 근태 수정 UI
+                          <>
+                            <div className="attendance-title">✏️ 근태 수정</div>
+                            <div className="attendance-edit-form">
+                              <div className="form-row">
+                                <label>직원</label>
+                                <select
+                                  value={attendanceEditSelection.employeeId}
+                                  onChange={(e) =>
+                                    handleAttendanceEditChange(
+                                      "employeeId",
+                                      e.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="">선택하세요</option>
+                                  {(message.content.data.employees || []).map(
+                                    (e) => (
+                                      <option
+                                        key={e.employeeId}
+                                        value={e.employeeId}
+                                      >
+                                        {e.employeeName}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              </div>
+                              <div className="form-row">
+                                <label>스케줄</label>
+                                <select
+                                  value={attendanceEditSelection.id}
+                                  onChange={(e) =>
+                                    handleAttendanceEditChange(
+                                      "scheduleId",
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={!attendanceEditSelection.employeeId}
+                                >
+                                  <option value="">선택하세요</option>
+                                  {getScheduleOptions().map((s) => (
+                                    <option
+                                      key={s.scheduleId}
+                                      value={s.scheduleId}
+                                    >
+                                      {s.date}{" "}
+                                      {s.templateName || s.workTypeName || ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-row">
+                                <label>등록 날짜</label>
+                                <input
+                                  type="date"
+                                  value={attendanceEditSelection.date}
+                                  onChange={(e) =>
+                                    handleAttendanceEditChange(
+                                      "date",
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </div>
+                              <div className="form-row">
+                                <label>스케줄 템플릿</label>
+                                <select
+                                  value={attendanceEditSelection.templateId}
+                                  onChange={(e) =>
+                                    handleAttendanceEditChange(
+                                      "templateId",
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={
+                                    !!attendanceEditSelection.leaveTypeId
+                                  }
+                                >
+                                  <option value="">선택 안함</option>
+                                  {(
+                                    message.content.data.meta.templates || []
+                                  ).map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              {attendanceEditSelection.templateId && (
+                                <div className="form-row">
+                                  <label>기본 출퇴근시간</label>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    {(() => {
+                                      const tmpl = (
+                                        message.content.data.meta.templates ||
+                                        []
+                                      ).find(
+                                        (t) =>
+                                          String(t.id) ===
+                                          String(
+                                            attendanceEditSelection.templateId
+                                          )
+                                      );
+                                      const clockIn =
+                                        tmpl?.defaultClockIn || "-";
+                                      const clockOut =
+                                        tmpl?.defaultClockOut || "-";
+                                      return (
+                                        <>
+                                          <input
+                                            type="text"
+                                            value={`출근 ${clockIn}`}
+                                            readOnly
+                                          />
+                                          <input
+                                            type="text"
+                                            value={`퇴근 ${clockOut}`}
+                                            readOnly
+                                          />
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              )}
+                              <div className="form-row">
+                                <label>워크 타입</label>
+                                <select
+                                  value={attendanceEditSelection.workTypeId}
+                                  onChange={(e) =>
+                                    handleAttendanceEditChange(
+                                      "workTypeId",
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={
+                                    !!attendanceEditSelection.leaveTypeId
+                                  }
+                                >
+                                  <option value="">선택 안함</option>
+                                  {(
+                                    message.content.data.meta.workTypes || []
+                                  ).map((w) => (
+                                    <option key={w.id} value={w.id}>
+                                      {w.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-row">
+                                <label>휴가 타입</label>
+                                <select
+                                  value={attendanceEditSelection.leaveTypeId}
+                                  onChange={(e) =>
+                                    handleAttendanceEditChange(
+                                      "leaveTypeId",
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={
+                                    !!attendanceEditSelection.templateId ||
+                                    !!attendanceEditSelection.workTypeId
+                                  }
+                                >
+                                  <option value="">선택 안함</option>
+                                  {(
+                                    message.content.data.meta.leaveTypes || []
+                                  ).map((l) => (
+                                    <option key={l.id} value={l.id}>
+                                      {l.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-row">
+                                <button
+                                  className="order-request-btn"
+                                  onClick={submitAttendanceEdit}
+                                >
+                                  저장
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        ) : message.content.type === "turnover_table" ? (
+                          // ✅ 회전율 테이블 (avgWeeklySales 표시, 권장발주/버튼 제거)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                상품명
+                              </div>
+                              <div className="attendance-cell header">
+                                현재재고
+                              </div>
+                              <div className="attendance-cell header">
+                                평균주간판매량
+                              </div>
+                              <div className="attendance-cell header">
+                                회전율
+                              </div>
+                              <div className="attendance-cell header">상태</div>
+                            </div>
+                            {message.content.data.products.map(
+                              (product, index) => (
+                                <div key={index} className="attendance-row">
+                                  <div className="attendance-cell">
+                                    {product.productName}
+                                  </div>
+                                  <div className="attendance-cell">
+                                    {product.currentStock}
+                                  </div>
+                                  <div className="attendance-cell">
+                                    {product.avgWeeklySales ?? "-"}
+                                  </div>
+                                  <div className="attendance-cell">
+                                    {product.turnoverRate}%
+                                  </div>
+                                  <div className="attendance-cell">
+                                    <span
+                                      className={`status-badge status-${String(product.status || "").toLowerCase()}`}
+                                    >
+                                      {product.turnoverStatus || "-"}
+                                    </span>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                            {message.content?.data?.summary
+                              ?.turnoverMessage && (
+                              <div className="summary-note">
+                                {message.content.data.summary.turnoverMessage}
+                              </div>
+                            )}
+                          </>
+                        ) : message.content.type === "order_request_table" ? (
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                상품명
+                              </div>
+                              <div className="attendance-cell header">
+                                현재재고
+                              </div>
+                              <div className="attendance-cell header">
+                                안전재고
+                              </div>
+                              <div className="attendance-cell header">수량</div>
+                              <div className="attendance-cell header">
+                                발주단가
+                              </div>
+                            </div>
+                            {message.content.data.map((item, index) => (
+                              <div key={index} className="attendance-row">
+                                <div className="attendance-cell">
+                                  {item.productName}
+                                </div>
+                                <div className="attendance-cell">
+                                  {item.stockQuantity}
+                                </div>
+                                <div className="attendance-cell">
+                                  {item.safetyStock}
+                                </div>
+                                <div className="attendance-cell">
+                                  <div className="quantity-control">
+                                    <div className="quantity-control-wrapper">
+                                      <input
+                                        type="number"
+                                        value={orderQuantities[item.id] || 0}
+                                        onChange={(e) => {
+                                          const v = parseInt(e.target.value);
+                                          updateOrderQuantity(
+                                            item.id,
+                                            isNaN(v) ? 0 : v
+                                          );
+                                        }}
+                                        className="quantity-input"
+                                        min="0"
+                                        max="9999"
+                                      />
+                                      <div className="quantity-arrows">
+                                        <button
+                                          className="quantity-arrow-btn increase-btn"
+                                          onClick={() =>
+                                            incrementQuantity(item.id)
+                                          }
+                                          type="button"
+                                        >
+                                          ▲
+                                        </button>
+                                        <button
+                                          className="quantity-arrow-btn decrease-btn"
+                                          onClick={() =>
+                                            decrementQuantity(item.id)
+                                          }
+                                          type="button"
+                                        >
+                                          ▼
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="attendance-cell">
+                                  {Number(item.unitPrice || 0).toLocaleString()}
+                                  원
+                                </div>
+                              </div>
+                            ))}
+                            {(() => {
+                              const total = calculateManualOrderTotalPrice(
+                                message.content.data
+                              );
+                              const anyPositiveUnit = (
+                                message.content.data || []
+                              ).some((i) => Number(i.unitPrice || 0) > 0);
+                              return (
+                                <div className="order-summary">
+                                  <div className="total-price">
+                                    총 발주단가:{" "}
+                                    <span className="price-amount">
+                                      {total.toLocaleString()}원
+                                    </span>
+                                  </div>
+                                  <button
+                                    className="order-request-btn"
+                                    disabled={!anyPositiveUnit || total <= 0}
+                                    onClick={() =>
+                                      setShowManualOrderConfirm(true)
+                                    }
+                                  >
+                                    발주 요청하기
+                                  </button>
+                                </div>
+                              );
+                            })()}
+                          </>
+                        ) : message.content.type ===
+                          "order_recommendation_table" ? (
+                          // ✅ 발주 추천 테이블 (권장발주 기반, 총 발주단가 및 확인)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                상품명
+                              </div>
+                              <div className="attendance-cell header">
+                                현재재고
+                              </div>
+                              <div className="attendance-cell header">
+                                권장발주량
+                              </div>
+                              <div className="attendance-cell header">
+                                발주단가
+                              </div>
+                              <div className="attendance-cell header">상태</div>
+                            </div>
+                            {message.content.data.products.map(
+                              (product, index) => (
+                                <div key={index} className="attendance-row">
+                                  <div className="attendance-cell">
+                                    {product.productName}
+                                  </div>
+                                  <div className="attendance-cell">
+                                    {product.currentStock}
+                                  </div>
+                                  <div className="attendance-cell">
+                                    {product.recommendedOrderQuantity || 0}
+                                  </div>
+                                  <div className="attendance-cell">
+                                    {(
+                                      Number(product.supplyPrice) || 0
+                                    ).toLocaleString()}
+                                    원
+                                  </div>
+                                  <div className="attendance-cell">
+                                    <span
+                                      className={`status-badge order-status-${String(product.orderStatus || "").toLowerCase()}`}
+                                    >
+                                      {product.orderStatus || "-"}
+                                    </span>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                            {message.content?.data?.summary?.orderMessage && (
+                              <div className="summary-note">
+                                {message.content.data.summary.orderMessage}
+                              </div>
+                            )}
+                            {calculateOrderRecommendTotalPrice(
+                              message.content.data
+                            ) > 0 && (
+                              <div className="order-summary">
+                                <div className="total-price">
+                                  총 발주단가:{" "}
+                                  <span className="price-amount">
+                                    {calculateOrderRecommendTotalPrice(
+                                      message.content.data
+                                    ).toLocaleString()}
+                                    원
+                                  </span>
+                                </div>
+                                <button
+                                  className="order-request-btn"
+                                  onClick={() =>
+                                    setShowOrderRecommendConfirm(true)
+                                  }
+                                >
+                                  발주하시겠습니까?
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        ) : message.content.type === "sales_daily_table" ? (
+                          // ✅ 일일 매출 테이블 (시간/평균 주문금액/총 주문수/총 주문금액)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">시간</div>
+                              <div className="attendance-cell header">
+                                평균 주문금액
+                              </div>
+                              <div className="attendance-cell header">
+                                총 주문수
+                              </div>
+                              <div className="attendance-cell header">
+                                총 주문금액
+                              </div>
+                            </div>
+                            {(message.content.data || []).map((row, idx) => (
+                              <div key={idx} className="attendance-row">
+                                <div className="attendance-cell">
+                                  {row.hour ?? "-"}
+                                </div>
+                                <div className="attendance-cell">
+                                  {Number(
+                                    row.averageOrderAmount || 0
+                                  ).toLocaleString()}
+                                  원
+                                </div>
+                                <div className="attendance-cell">
+                                  {row.totalOrders ?? 0}건
+                                </div>
+                                <div className="attendance-cell">
+                                  {Number(row.totalSales || 0).toLocaleString()}
+                                  원
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : message.content.type === "sales_product_table" ? (
+                          // ✅ 상품별 매출 테이블 (상품명/판매수량/판매금액/공급가/마진율)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">
+                                상품명
+                              </div>
+                              <div className="attendance-cell header">
+                                판매수량
+                              </div>
+                              <div className="attendance-cell header">
+                                판매금액
+                              </div>
+                              <div className="attendance-cell header">
+                                공급가
+                              </div>
+                              <div className="attendance-cell header">
+                                마진율
+                              </div>
+                            </div>
+                            {(message.content.data || []).map((p, idx) => (
+                              <div key={idx} className="attendance-row">
+                                <div className="attendance-cell">
+                                  {p.productName}
+                                </div>
+                                <div className="attendance-cell">
+                                  {Number(
+                                    p.totalQuantity || 0
+                                  ).toLocaleString()}
+                                </div>
+                                <div className="attendance-cell">
+                                  {Number(p.totalSales || 0).toLocaleString()}원
+                                </div>
+                                <div className="attendance-cell">
+                                  {Number(p.supplyPrice || 0).toLocaleString()}
+                                  원
+                                </div>
+                                <div className="attendance-cell">
+                                  {typeof p.marginRate === "number"
+                                    ? `${p.marginRate.toFixed(1)}%`
+                                    : `${Number(p.marginRate || 0).toFixed(1)}%`}
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : message.content.type === "labor_cost_table" ? (
+                          // ✅ 인건비율 (시간 : 인건비율 / 평균 인건비율 / 메시지)
+                          <>
+                            <div className="attendance-header">
+                              <div className="attendance-cell header">시간</div>
+                              <div className="attendance-cell header">
+                                인건비율
+                              </div>
+                            </div>
+                            <div className="attendance-row">
+                              <div className="attendance-cell">
+                                최고{" "}
+                                {message.content.data.highestCostHour ?? "-"}시
+                              </div>
+                              <div className="attendance-cell">
+                                {Number(
+                                  message.content.data.highestCostRatio || 0
+                                ).toFixed(1)}
+                                %
+                              </div>
+                            </div>
+                            <div className="attendance-row">
+                              <div className="attendance-cell">
+                                최저{" "}
+                                {message.content.data.lowestCostHour ?? "-"}시
+                              </div>
+                              <div className="attendance-cell">
+                                {Number(
+                                  message.content.data.lowestCostRatio || 0
+                                ).toFixed(1)}
+                                %
+                              </div>
+                            </div>
+                            <div
+                              className="summary-note"
+                              style={{ marginTop: 10 }}
+                            >
+                              평균 인건비율:{" "}
+                              {Number(
+                                message.content.data.avgCostRatioChange || 0
+                              ).toFixed(1)}
+                              %
+                            </div>
+                            {message.content.data.message && (
+                              <div
+                                className="summary-note"
+                                style={{ marginTop: 6 }}
+                              >
+                                {message.content.data.message}
+                              </div>
+                            )}
+                          </>
+                        ) : message.content.type ===
+                          "labor_cost_analysis_table" ? (
+                          // ✅ 인건비 분석 (시간대별 테이블 + 요약 + 메시지)
+                          <>
+                            {/* 시간대별 인건비 테이블 */}
+                            {message.content.data.hourlyDetails &&
+                            message.content.data.hourlyDetails.length > 0 ? (
+                              <>
+                                <div className="attendance-header">
+                                  <div className="attendance-cell header">
+                                    시간대
+                                  </div>
+                                  <div className="attendance-cell header">
+                                    평균 매출
+                                  </div>
+                                  <div className="attendance-cell header">
+                                    평균 인건비
+                                  </div>
+                                  <div className="attendance-cell header">
+                                    평균 인건비율
+                                  </div>
+                                </div>
+                                {message.content.data.hourlyDetails.map(
+                                  (detail, idx) => {
+                                    const periodLabel =
+                                      detail.period === "morning"
+                                        ? "오전"
+                                        : detail.period === "lunch"
+                                          ? "점심"
+                                          : detail.period === "evening"
+                                            ? "저녁"
+                                            : (detail.period ?? "-");
+                                    return (
+                                      <div key={idx} className="attendance-row">
+                                        <div className="attendance-cell">
+                                          {periodLabel}
+                                        </div>
+                                        <div className="attendance-cell">
+                                          {Number(
+                                            detail.avgSales || 0
+                                          ).toLocaleString()}
+                                          원
+                                        </div>
+                                        <div className="attendance-cell">
+                                          {Number(
+                                            detail.avgLaborCost || 0
+                                          ).toLocaleString()}
+                                          원
+                                        </div>
+                                        <div className="attendance-cell">
+                                          {Number(detail.avgRatio || 0).toFixed(
+                                            1
+                                          )}
+                                          %
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                )}
+                              </>
+                            ) : null}
+                            {/* 요약 정보 */}
+                            <div
+                              className="summary-note"
+                              style={{ marginTop: 10 }}
+                            >
+                              <div>
+                                가장 높은 인건비율 시간대:{" "}
+                                {message.content.data.summary.highestCostHour ??
+                                  "-"}
+                                시 (
+                                {Number(
+                                  message.content.data.summary
+                                    .highestCostRatio || 0
+                                ).toFixed(1)}
+                                %)
+                              </div>
+                              <div style={{ marginTop: 6 }}>
+                                가장 낮은 인건비율 시간대:{" "}
+                                {message.content.data.summary.lowestCostHour ??
+                                  "-"}
+                                시 (
+                                {Number(
+                                  message.content.data.summary
+                                    .lowestCostRatio || 0
+                                ).toFixed(1)}
+                                %)
+                              </div>
+                            </div>
+                            {/* 메시지 */}
+                            {message.content.data.summary.message && (
+                              <div
+                                className="summary-note"
+                                style={{ marginTop: 6 }}
+                              >
+                                {message.content.data.summary.message}
+                              </div>
+                            )}
+                          </>
+                        ) : message.content.type === "sales_analysis_table" ? (
+                          // ✅ 매출 분석 (요약 정보 표시)
+                          <>
+                            <div
+                              className="summary-note"
+                              style={{ marginTop: 0 }}
+                            >
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>주요 시간대:</strong>{" "}
+                                {Array.isArray(message.content.data.topHours)
+                                  ? message.content.data.topHours.join(", ")
+                                  : (message.content.data.topHours ?? "-")}
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>주간 변화:</strong>{" "}
+                                {message.content.data.weekChange ?? "-"}
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>월간 변화:</strong>{" "}
+                                {message.content.data.monthChange ?? "-"}
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>최고 마진 상품:</strong>{" "}
+                                {message.content.data.topMarginProduct ?? "-"}
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>최저 마진 상품:</strong>{" "}
+                                {message.content.data.lowMarginProduct ?? "-"}
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>평균 인건비율:</strong>{" "}
+                                {message.content.data.avgLaborRatio ?? "-"}
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>다음 주 예측:</strong>{" "}
+                                {message.content.data.nextWeekForecast ===
+                                "increase"
+                                  ? "증가 예상"
+                                  : message.content.data.nextWeekForecast ===
+                                      "decrease"
+                                    ? "감소 예상"
+                                    : (message.content.data.nextWeekForecast ??
+                                      "-")}
+                              </div>
+                              {message.content.data.message && (
+                                <div
+                                  style={{
+                                    marginTop: 12,
+                                    paddingTop: 12,
+                                    borderTop: "1px solid #e0e0e0",
+                                  }}
+                                >
+                                  {message.content.data.message}
+                                </div>
+                              )}
                             </div>
                           </>
                         ) : message.content.type === "order_table" ? (
@@ -1546,6 +3239,54 @@ const ChatBot = ({ onClose }) => {
                 <button
                   className="reset-confirm-btn"
                   onClick={confirmOrderRequest}
+                >
+                  예
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 발주 추천 확인 모달 */}
+        {showOrderRecommendConfirm && (
+          <div className="reset-modal">
+            <div className="reset-modal-content">
+              <div className="reset-modal-title">발주 요청</div>
+              <div className="reset-modal-message">발주하시겠습니까?</div>
+              <div className="reset-modal-buttons">
+                <button
+                  className="reset-cancel-btn"
+                  onClick={() => setShowOrderRecommendConfirm(false)}
+                >
+                  아니오
+                </button>
+                <button
+                  className="reset-confirm-btn"
+                  onClick={confirmTurnoverOrderRequest}
+                >
+                  예
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 수동 발주 확인 모달 */}
+        {showManualOrderConfirm && (
+          <div className="reset-modal">
+            <div className="reset-modal-content">
+              <div className="reset-modal-title">발주 요청</div>
+              <div className="reset-modal-message">발주하시겠습니까?</div>
+              <div className="reset-modal-buttons">
+                <button
+                  className="reset-cancel-btn"
+                  onClick={() => setShowManualOrderConfirm(false)}
+                >
+                  아니오
+                </button>
+                <button
+                  className="reset-confirm-btn"
+                  onClick={confirmManualOrderRequest}
                 >
                   예
                 </button>
