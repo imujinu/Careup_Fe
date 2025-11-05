@@ -411,6 +411,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
       setLoading(true);
       const data = await purchaseOrderService.getPurchaseOrder(item.id);
       console.log('발주 상세 정보:', data);
+      
       setOrderDetail(data);
       
       // 지점 정보 조회
@@ -452,7 +453,9 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
     approvedQuantity: detail.approvedQuantity,
     unit: '개',
     unitPrice: detail.unitPrice,
-    amount: detail.subtotalPrice
+    amount: detail.subtotalPrice,
+    // 속성 정보 (백엔드에서 전달됨)
+    attributes: detail.attributes || []
   })) || [];
 
   const totalAmount = orderDetail.totalPrice || productData.reduce((sum, product) => sum + product.amount, 0);
@@ -651,6 +654,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
                   React.createElement('tr', null,
                     React.createElement(ProductTableHeaderCell, null, '상품명'),
                     React.createElement(ProductTableHeaderCell, null, '카테고리'),
+                    React.createElement(ProductTableHeaderCell, null, '속성'),
                     React.createElement(ProductTableHeaderCell, null, '신청 수량'),
                     React.createElement(ProductTableHeaderCell, null, '승인 수량'),
                     React.createElement(ProductTableHeaderCell, null, '단가'),
@@ -665,8 +669,15 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
                         product.name
                       ),
                       React.createElement(ProductTableCell, null, product.category),
+                      React.createElement(ProductTableCell, null, 
+                        product.attributes && product.attributes.length > 0
+                          ? product.attributes.map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`).join('  ·  ')
+                          : '-'
+                      ),
                       React.createElement(ProductTableCell, null, `${product.quantity}${product.unit}`),
-                      React.createElement(ProductTableCell, null, `${product.approvedQuantity || product.quantity}${product.unit}`),
+                      React.createElement(ProductTableCell, null, 
+                        (orderDetail.orderStatus === 'PENDING') ? '0개' : `${product.approvedQuantity || 0}${product.unit}`
+                      ),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.unitPrice)}`),
                       React.createElement(ProductTableCell, null, `₩${formatAmount(product.amount)}`)
                     )

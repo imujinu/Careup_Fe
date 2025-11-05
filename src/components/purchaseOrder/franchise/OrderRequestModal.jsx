@@ -197,6 +197,20 @@ const ProductCategory = styled.span`
   border-radius: 12px;
 `;
 
+const ProductInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+`;
+
+const ProductAttributes = styled.div`
+  font-size: 12px;
+  color: #1f2937;
+  line-height: 1.4;
+`;
+
 const ProductPrice = styled.div`
   font-size: 14px;
   color: #1f2937;
@@ -332,14 +346,101 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
       // 가맹점에 등록된 상품 목록만 조회
       const data = await inventoryService.getBranchProducts(branchId);
       
-      const formattedProducts = data.map(item => ({
-        id: item.branchProductId,
-        productId: item.productId, // 실제 productId 저장
-        name: item.productName || '상품명 없음',
-        category: item.categoryName || '미분류',
-        unit: '개', // 기본 단위
-        unitPrice: item.price && item.price > 0 ? item.price : 0
-      }));
+      // 상품별 속성 정보를 가져오기 위한 Map (캐싱)
+      const productAttributesMap = new Map();
+      
+      // 모든 고유한 상품 ID 수집
+      const uniqueProductIds = [...new Set(data.map(bp => bp.productId).filter(Boolean))];
+      
+      // 모든 상품의 속성 정보를 배치로 가져오기
+      const batchSize = 10;
+      for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+        const batch = uniqueProductIds.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (productId) => {
+          if (!productAttributesMap.has(productId)) {
+            try {
+              const productAttributes = await inventoryService.getProductAttributeValues(productId);
+              // 속성 타입별로 그룹화
+              const attributeMap = new Map();
+              (productAttributes || []).forEach(attr => {
+                const typeId = String(attr.attributeTypeId || attr.attributeType?.id || '');
+                const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
+                const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
+                const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName || '';
+                const displayOrder = attr.attributeType?.displayOrder || attr.displayOrder || 0;
+                
+                const key = typeId || typeName;
+                if (!key) return;
+                
+                if (!attributeMap.has(key)) {
+                  attributeMap.set(key, {
+                    attributeTypeId: typeId,
+                    attributeTypeName: typeName,
+                    displayOrder: displayOrder,
+                    values: []
+                  });
+                }
+                
+                if (valueId && valueName) {
+                  attributeMap.get(key).values.push({
+                    attributeValueId: valueId,
+                    attributeValueName: valueName
+                  });
+                }
+              });
+              
+              // 속성 타입별로 정렬하고 최대 2개까지만 선택
+              const sortedAttributes = Array.from(attributeMap.values())
+                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+              
+              const attributes = sortedAttributes
+                .slice(0, 2)
+                .map(attr => ({
+                  attributeTypeId: attr.attributeTypeId,
+                  attributeTypeName: attr.attributeTypeName,
+                  attributeValueId: attr.values[0]?.attributeValueId || null,
+                  attributeValueName: attr.values[0]?.attributeValueName || null
+                }));
+              
+              productAttributesMap.set(productId, attributes);
+            } catch (err) {
+              productAttributesMap.set(productId, []);
+            }
+          }
+        }));
+      }
+      
+      const formattedProducts = data.map(item => {
+        // 상품에 등록된 모든 속성 정보 가져오기 (캐시 사용)
+        let attributes = productAttributesMap.get(item.productId) || [];
+        
+        if (attributes.length > 0) {
+          attributes = attributes.map(attr => ({
+            attributeTypeId: attr.attributeTypeId,
+            attributeTypeName: attr.attributeTypeName,
+            attributeValueId: attr.attributeValueId,
+            attributeValueName: attr.attributeValueName
+          }));
+        } else {
+          // 속성 정보가 없으면 BranchProduct에서 가져오기
+          if (item.attributeTypeName && item.attributeValueName) {
+            attributes = [{
+              attributeTypeName: item.attributeTypeName,
+              attributeValueName: item.attributeValueName
+            }];
+          }
+        }
+        
+        return {
+          id: item.branchProductId,
+          productId: item.productId, // 실제 productId 저장
+          name: item.productName || '상품명 없음',
+          category: item.categoryName || '미분류',
+          unit: '개', // 기본 단위
+          unitPrice: item.price && item.price > 0 ? item.price : 0,
+          attributes: attributes  // 속성 정보 (최대 2개)
+        };
+      });
       
       
       setProducts(formattedProducts);
@@ -464,7 +565,11 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
           quantity,
           unit: product.unit,
           unitPrice: safeUnitPrice,
-          totalPrice: quantity * safeUnitPrice
+          totalPrice: quantity * safeUnitPrice,
+          // 속성 정보 포함 (첫 번째 속성의 attributeValueId 사용)
+          attributeValueId: product.attributes && product.attributes.length > 0 
+            ? product.attributes[0].attributeValueId 
+            : null
         };
       })
       .filter(item => item !== null); // null 제거
@@ -523,7 +628,8 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
           return {
             productId: productId,
             quantity: quantity,
-            supplyPrice: supplyPrice
+            supplyPrice: supplyPrice,
+            attributeValueId: item.attributeValueId || null  // 속성 값 ID 포함
           };
         })
       };
@@ -681,7 +787,12 @@ function OrderRequestModal({ isOpen, onClose, onSubmitOrderRequest }) {
               React.createElement(ProductCard, { key: product.id },
                 React.createElement(ProductHeader, null,
                   React.createElement(ProductName, null, product.name),
-                  React.createElement(ProductCategory, null, product.category)
+                  React.createElement(ProductInfo, null,
+                    React.createElement(ProductCategory, null, product.category),
+                    product.attributes && product.attributes.length > 0 && React.createElement(ProductAttributes, null,
+                      product.attributes.map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`).join('  ·  ')
+                    )
+                  )
                 ),
                 React.createElement(ProductPrice, null, `₩${product.unitPrice.toLocaleString()}/${product.unit}`),
                 React.createElement(QuantitySection, null,
