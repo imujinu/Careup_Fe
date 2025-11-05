@@ -8,7 +8,9 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
         <h2 className="search-title">"{searchQuery}" 검색 결과</h2>
       </div>
       {isSearching ? (
-        <div className="search-loading"><div className="loading-spinner">검색 중...</div></div>
+        <div className="search-loading">
+          <div className="loading-spinner">검색 중...</div>
+        </div>
       ) : searchError ? (
         <div className="search-error">
           <p>검색 중 오류가 발생했습니다: {searchError}</p>
@@ -22,46 +24,102 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
       ) : (
         <div className="search-results">
           <div className="results-summary">총 {searchResults.length}개의 상품을 찾았습니다</div>
-          <div className="products-grid">
+          <div className="grid">
             {searchResults.map((product) => (
-              <div key={product.id} className="product-card">
-                <div className="product-image-container">
-                  <img src={product.image} alt={product.imageAlt || product.name} className="product-image" />
-                  {product.isOutOfStock && <div className="out-of-stock-overlay"><span>품절</span></div>}
-                  {product.isLowStock && !product.isOutOfStock && <div className="low-stock-overlay"><span>재고부족</span></div>}
-                  <button className={`favorite-btn ${favorites.has(product.id) ? 'active' : ''}`} onClick={() => onToggleFavorite(product.id)}>♥</button>
+              <article className="card" key={product.id} onClick={() => onOpenDetail(product)} style={{ cursor: "pointer" }}>
+                <button
+                  className={`fav-btn${favorites.has(product.id) ? " active" : ""}`}
+                  aria-pressed={favorites.has(product.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(product.id);
+                  }}
+                  title="관심 상품"
+                >
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 21s-6.716-4.21-9.193-7.44C.502 10.781 2.117 7 5.6 7c2.098 0 3.342 1.27 4.4 2.6C11.058 8.27 12.302 7 14.4 7c3.483 0 5.098 3.781 2.793 6.56C18.716 16.79 12 21 12 21z"
+                      fill={favorites.has(product.id) ? "#ef4444" : "rgba(0,0,0,0.0)"}
+                      stroke={favorites.has(product.id) ? "#ef4444" : "rgba(0,0,0,0.35)"}
+                      strokeWidth="1.6"
+                    />
+                  </svg>
+                </button>
+                <div className="card-img">
+                  <img
+                    src={product.image || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"}
+                    alt={product.imageAlt || product.name}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                    }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                  {product.isOutOfStock && (
+                    <div className="out-of-stock-overlay">
+                      <span>품절</span>
+                    </div>
+                  )}
+                  {product.isLowStock && !product.isOutOfStock && (
+                    <div className="low-stock-overlay">
+                      <span>재고부족</span>
+                    </div>
+                  )}
                 </div>
-                <div className="product-info">
-                  <div className="product-category">{product.category}</div>
-                  <h3 className="product-name">
+                <div className="card-body">
+                  <div className="badge-row">
+                    <span className="badge">{product.category}</span>
+                  </div>
+                  <div className="brand">{product.brand}</div>
+                  <div className="name">
                     {product.highlightedName ? (
                       <span dangerouslySetInnerHTML={{ __html: product.highlightedName }} />
                     ) : (
                       product.name
                     )}
-                  </h3>
-                  <div className="product-brand">{product.brand}</div>
-                  <div className="product-price">
+                  </div>
+                  <div className="price-section">
                     {product.promotionPrice && product.discountRate ? (
                       <>
-                        <span className="promotion-price">{product.promotionPrice.toLocaleString()}원</span>
-                        <span className="original-price">{product.price.toLocaleString()}원</span>
-                        <span className="discount-badge">{product.discountRate}% 할인</span>
+                        <div className="promotion-price">
+                          {product.promotionPrice.toLocaleString()}원
+                        </div>
+                        <div className="original-price">
+                          {product.price.toLocaleString()}원
+                        </div>
+                        <div className="discount-badge">
+                          {product.discountRate}% 할인
+                        </div>
                       </>
                     ) : (
-                      <span className="price">{product.price.toLocaleString()}원</span>
+                      <div className="price">
+                        {product.price.toLocaleString()}원
+                      </div>
                     )}
                   </div>
-                  <div className="product-meta">
-                    <span className="likes">관심 {product.likes}</span>
-                    <span className="reviews">리뷰 {product.reviews}</span>
-                  </div>
-                  <div className="product-actions">
-                    <button className="detail-btn" onClick={() => onOpenDetail(product)}>상세보기</button>
-                    <button className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`} onClick={() => !product.isOutOfStock && onAddToCart(product)} disabled={product.isOutOfStock}>{product.isOutOfStock ? '품절' : '장바구니 담기'}</button>
-                  </div>
+                  <button 
+                    className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!product.isOutOfStock) {
+                        onAddToCart(product);
+                      }
+                    }}
+                    disabled={product.isOutOfStock}
+                  >
+                    {product.isOutOfStock ? '품절' : '장바구니 담기'}
+                  </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         </div>

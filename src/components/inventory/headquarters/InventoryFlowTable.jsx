@@ -292,6 +292,7 @@ function InventoryFlowTable({
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.productName)
           }, '상품명', getSortIndicator(SORTABLE_COLUMNS.productName)),
+          React.createElement(TableHeaderCell, null, '속성'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.branch)
@@ -317,6 +318,11 @@ function InventoryFlowTable({
         data.map((item, index) => 
           React.createElement(TableRow, { key: item.id || index },
             React.createElement(TableCell, { $productName: true }, item.productName || '-'),
+            React.createElement(TableCell, null, 
+              item.attributeValueName 
+                ? `${item.attributeTypeName || ''} ${item.attributeValueName}` 
+                : '-'
+            ),
             React.createElement(TableCell, { $branch: true }, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
             React.createElement(TableCell, null, formatQuantity(item.inQuantity)),

@@ -17,6 +17,7 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   const [orderStatus, setOrderStatus] = useState(null); // 주문 상태 확인용
   const [isOrderCancelled, setIsOrderCancelled] = useState(false);
   const [orderCreatedAt, setOrderCreatedAt] = useState(null); // 주문 생성 시간
+  const [timeRemaining, setTimeRemaining] = useState(null); // 남은 시간 (초 단위)
   
   // orderData가 없으면 localStorage에서 복원 시도
   const [actualOrderData, setActualOrderData] = useState(() => {
@@ -67,33 +68,46 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     }
   }, [actualOrderData?.orderId, orderCreatedAt]);
 
-  // 프론트엔드에서 타임아웃 체크 (1분 타이머)
+  // 남은 시간 계산 및 표시
   useEffect(() => {
-    if (!orderCreatedAt || isOrderCancelled) return;
-
-    const timeoutMs = 60 * 1000; // 1분
-    const elapsed = Date.now() - orderCreatedAt;
-    const remaining = timeoutMs - elapsed;
-
-    if (remaining <= 0) {
-      // 이미 타임아웃된 경우
-      setIsOrderCancelled(true);
-      alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
-      localStorage.removeItem('currentOrderData');
-      window.location.href = '/shop?page=cart';
+    if (!orderCreatedAt || isOrderCancelled) {
+      setTimeRemaining(null);
       return;
     }
 
-    // 남은 시간 후에 알림 표시
-    const timeoutId = setTimeout(() => {
-      setIsOrderCancelled(true);
-      alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
-      localStorage.removeItem('currentOrderData');
-      window.location.href = '/shop?page=cart';
-    }, remaining);
+    const timeoutMs = 60 * 1000; // 1분
+    const updateTimeRemaining = () => {
+      const elapsed = Date.now() - orderCreatedAt;
+      const remaining = timeoutMs - elapsed;
 
-    return () => clearTimeout(timeoutId);
+      if (remaining <= 0) {
+        setTimeRemaining(0);
+        setIsOrderCancelled(true);
+        alert('주문시간이 초과되어 결제가 취소되었습니다.\n\n장바구니로 돌아갑니다.');
+        localStorage.removeItem('currentOrderData');
+        window.location.href = '/shop?page=cart';
+        return;
+      }
+
+      setTimeRemaining(Math.floor(remaining / 1000)); // 초 단위로 변환
+    };
+
+    // 즉시 한 번 실행
+    updateTimeRemaining();
+
+    // 1초마다 업데이트
+    const intervalId = setInterval(updateTimeRemaining, 1000);
+
+    return () => clearInterval(intervalId);
   }, [orderCreatedAt, isOrderCancelled]);
+
+  // 시간 포맷 함수 (초를 MM:SS 형식으로 변환)
+  const formatTime = (seconds) => {
+    if (seconds === null || seconds === undefined || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // 주문 상태 주기적 확인 (타임아웃 주문 감지)
   useEffect(() => {
@@ -231,6 +245,18 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     } catch (error) {
       if (error.code === 'USER_CANCEL') {
         console.log('사용자가 결제를 취소했습니다.');
+        
+        // 사용자가 결제를 취소한 경우 주문 취소 처리
+        if (actualOrderData?.orderId) {
+          try {
+            console.log('결제 취소로 인한 주문 취소 처리 - orderId:', actualOrderData.orderId);
+            await cartService.cancelOrder(actualOrderData.orderId);
+            console.log('주문 취소 완료 - orderId:', actualOrderData.orderId);
+          } catch (cancelError) {
+            console.error('주문 취소 API 호출 실패:', cancelError);
+            // 주문 취소 실패해도 사용자에게는 에러 표시하지 않음 (사용자가 취소한 것이므로)
+          }
+        }
       } else {
         console.error('결제 실패:', error);
         setPaymentError(error.message || '결제 처리 중 오류가 발생했습니다.');
@@ -268,6 +294,15 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
         <h1>결제하기</h1>
         <div className="order-info">
           <span>주문번호: {actualOrderData?.orderId}</span>
+          {timeRemaining !== null && timeRemaining > 0 && (
+            <span style={{ 
+              marginLeft: '20px', 
+              color: timeRemaining < 10 ? '#dc3545' : '#666',
+              fontWeight: timeRemaining < 10 ? 'bold' : 'normal'
+            }}>
+              ⏱️ 남은 시간: {formatTime(timeRemaining)}
+            </span>
+          )}
         </div>
       </div>
 

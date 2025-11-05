@@ -1,8 +1,6 @@
 // src/layout/Header.jsx
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import Icon from "@mdi/react";
-import { mdiMagnify } from "@mdi/js";
 import AlertsPanel from "../components/notification/AlertsPanel";
 import { useAppDispatch, useAppSelector } from "../stores/hooks";
 import { closeChatbot } from "../stores/slices/chatbotSlice";
@@ -42,45 +40,6 @@ const SidebarToggle = styled.button`
   &:hover { background: #f3f4f6; }
 
   img { width: 16px; height: 16px; object-fit: contain; }
-`;
-
-const SearchSection = styled.div`
-  flex: 1;
-  max-width: 300px;
-  margin: 0 8px 0 8px;
-`;
-
-const SearchContainer = styled.div`
-  position: relative;
-  display: flex;
-  align-items: center;
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  height: 44px;
-  padding: 0 16px 0 48px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 14px;
-  background: #ffffff;
-  outline: none;
-
-  &::placeholder { color: #9ca3af; }
-  &:focus { border-color: #6b46c1; }
-`;
-
-const SearchIcon = styled.div`
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  img { width: 16px; height: 16px; opacity: 0.6; }
 `;
 
 const NotificationSection = styled.div`
@@ -257,20 +216,6 @@ function Header({ onToggleSidebar, sidebarVisible }) {
         alt: "메뉴",
         style: { width: "16px", height: "16px" },
       })
-    ),
-    React.createElement(
-      SearchSection,
-      null,
-      React.createElement(
-        SearchContainer,
-        null,
-        React.createElement(
-          SearchIcon,
-          null,
-          React.createElement(Icon, { path: mdiMagnify, size: 1 })
-        ),
-        React.createElement(SearchInput, { placeholder: "검색..." })
-      )
     ),
     React.createElement(
       NotificationSection,

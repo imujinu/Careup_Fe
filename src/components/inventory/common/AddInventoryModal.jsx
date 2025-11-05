@@ -280,6 +280,172 @@ const UploadText = styled.span`
   text-align: center;
 `;
 
+const AttributeSection = styled.div`
+  margin-top: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+`;
+
+const AttributeTypeTitle = styled.div`
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  
+  .required {
+    color: #ef4444;
+    margin-left: 4px;
+  }
+`;
+
+const AttributeValueList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+`;
+
+const CheckboxWrapper = styled.label`
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  transition: all 0.2s;
+  
+  &:hover {
+    border-color: #6b46c1;
+    background: #f3f4f6;
+  }
+  
+  input[type="checkbox"]:checked + & {
+    border-color: #6b46c1;
+    background: #ede9fe;
+  }
+  
+  input[type="checkbox"] {
+    margin-right: 6px;
+  }
+`;
+
+const AttributeInfo = styled.div`
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+`;
+
+const AddValueButton = styled.button`
+  padding: 6px 12px;
+  border: 1px dashed #6b46c1;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #6b46c1;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+
+  &:hover {
+    background: #ede9fe;
+    border-color: #553c9a;
+  }
+`;
+
+const ValueModalOverlay = styled(ModalOverlay)`
+  z-index: 10001;
+`;
+
+const ValueModal = styled.div`
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90vw;
+`;
+
+const ValueModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+`;
+
+const ValueModalTitle = styled.h3`
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+`;
+
+const ValueFormGroup = styled.div`
+  margin-bottom: 16px;
+`;
+
+const ValueLabel = styled.label`
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+
+  .required {
+    color: #ef4444;
+  }
+`;
+
+const ValueInput = styled.input`
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+
+  &:focus {
+    border-color: #6b46c1;
+  }
+`;
+
+const ValueModalActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+`;
+
+const ValueButton = styled.button`
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &.cancel {
+    background: #f3f4f6;
+    color: #374151;
+
+    &:hover {
+      background: #e5e7eb;
+    }
+  }
+
+  &.save {
+    background: #6b46c1;
+    color: white;
+
+    &:hover {
+      background: #553c9a;
+    }
+  }
+`;
+
 function AddInventoryModal({ isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -296,12 +462,51 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [categories, setCategories] = useState([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  
+  // 속성 관련 상태
+  const [categoryAttributes, setCategoryAttributes] = useState([]); // 카테고리에 연결된 속성 타입들
+  const [selectedAttributeValues, setSelectedAttributeValues] = useState([]); // 선택한 속성 값 ID들
+  const [loadingAttributes, setLoadingAttributes] = useState(false);
+  
+  // 속성 값 추가 모달 상태
+  const [valueModalOpen, setValueModalOpen] = useState(false);
+  const [selectedAttributeType, setSelectedAttributeType] = useState(null);
+  const [valueForm, setValueForm] = useState({
+    value: '',
+    displayName: '',
+    displayOrder: 0
+  });
+  
+  // 속성 타입 추가 모달 상태
+  const [typeModalOpen, setTypeModalOpen] = useState(false);
+  const [typeForm, setTypeForm] = useState({
+    name: '',
+    description: '',
+    isRequired: false,
+    displayOrder: 0
+  });
+  const [availableAttributeTypes, setAvailableAttributeTypes] = useState([]);
+  const [useExistingType, setUseExistingType] = useState(false);
+  const [selectedExistingTypeId, setSelectedExistingTypeId] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
+      // 모달 열릴 때 상태 초기화
+      setSelectedAttributeValues([]);
+      setCategoryAttributes([]);
     }
   }, [isOpen]);
+
+  // 카테고리 선택 시 해당 카테고리의 속성 타입 조회
+  useEffect(() => {
+    if (formData.category && isOpen) {
+      fetchCategoryAttributes(formData.category);
+    } else {
+      setCategoryAttributes([]);
+      setSelectedAttributeValues([]);
+    }
+  }, [formData.category, isOpen]);
 
   const fetchCategories = async () => {
     try {
@@ -332,6 +537,237 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
         { categoryId: 2, name: '디저트' },
         { categoryId: 3, name: '빵' }
       ]);
+    }
+  };
+
+  // 카테고리별 속성 조회
+  const fetchCategoryAttributes = async (categoryId) => {
+    try {
+      setLoadingAttributes(true);
+      console.log('카테고리 속성 조회 시작:', categoryId);
+      const data = await inventoryService.getCategoryAttributes(categoryId); // with-values 엔드포인트 사용
+      console.log('카테고리 속성 API 응답:', data);
+      console.log('첫 번째 속성 타입:', data?.[0]);
+      console.log('첫 번째 속성 타입의 availableValues:', data?.[0]?.availableValues);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        setCategoryAttributes(data);
+      } else {
+        setCategoryAttributes([]);
+      }
+    } catch (error) {
+      console.error('카테고리 속성 조회 실패:', error);
+      console.error('에러 상세:', error.response?.data);
+      setCategoryAttributes([]);
+    } finally {
+      setLoadingAttributes(false);
+    }
+  };
+
+  // 속성 값 선택/해제 핸들러
+  const handleAttributeValueToggle = (attributeValueId) => {
+    setSelectedAttributeValues(prev => {
+      if (prev.includes(attributeValueId)) {
+        // 이미 선택된 경우 제거
+        return prev.filter(id => id !== attributeValueId);
+      } else {
+        // 선택되지 않은 경우 추가
+        return [...prev, attributeValueId];
+      }
+    });
+  };
+
+  // 속성 값 추가 모달 열기
+  const openAddValueModal = (categoryAttr) => {
+    setSelectedAttributeType(categoryAttr);
+    setValueForm({
+      value: '',
+      displayName: '',
+      displayOrder: categoryAttr.availableValues?.length || 0
+    });
+    setValueModalOpen(true);
+  };
+
+  // 속성 값 추가 모달 닫기
+  const closeAddValueModal = () => {
+    setValueModalOpen(false);
+    setSelectedAttributeType(null);
+    setValueForm({
+      value: '',
+      displayName: '',
+      displayOrder: 0
+    });
+  };
+
+  // 속성 타입 추가 모달 열기
+  const openAddTypeModal = async () => {
+    if (!formData.category) {
+      alert('먼저 카테고리를 선택해주세요.');
+      return;
+    }
+    
+    // 사용 가능한 속성 타입 목록 조회
+    try {
+      const allTypes = await inventoryService.getAttributeTypes();
+      // 이미 연결된 속성 타입 ID 목록
+      const connectedIds = categoryAttributes.map(ca => 
+        ca.attributeTypeId || ca.attributeType?.id
+      ).filter(Boolean);
+      // 연결되지 않은 속성 타입만 필터링
+      const available = allTypes.filter(at => !connectedIds.includes(at.id));
+      setAvailableAttributeTypes(available || []);
+    } catch (error) {
+      console.error('속성 타입 조회 실패:', error);
+      setAvailableAttributeTypes([]);
+    }
+    
+    setTypeForm({
+      name: '',
+      description: '',
+      isRequired: false,
+      displayOrder: categoryAttributes.length
+    });
+    setUseExistingType(false);
+    setSelectedExistingTypeId('');
+    setTypeModalOpen(true);
+  };
+
+  // 속성 타입 추가 모달 닫기
+  const closeAddTypeModal = () => {
+    setTypeModalOpen(false);
+    setTypeForm({
+      name: '',
+      description: '',
+      isRequired: false,
+      displayOrder: 0
+    });
+    setUseExistingType(false);
+    setSelectedExistingTypeId('');
+    setAvailableAttributeTypes([]);
+  };
+
+  // 속성 타입 추가 핸들러
+  const handleAddAttributeType = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.category) {
+      alert('카테고리를 선택해주세요.');
+      return;
+    }
+
+    try {
+      let attributeTypeId;
+      
+      if (useExistingType) {
+        // 기존 속성 타입 사용
+        if (!selectedExistingTypeId) {
+          alert('속성 타입을 선택해주세요.');
+          return;
+        }
+        attributeTypeId = selectedExistingTypeId;
+      } else {
+        // 새 속성 타입 생성
+        if (!typeForm.name || typeForm.name.trim() === '') {
+          alert('속성 타입명을 입력해주세요.');
+          return;
+        }
+
+        const newAttributeType = await inventoryService.createAttributeType({
+          name: typeForm.name.trim(),
+          description: typeForm.description.trim() || '',
+          isRequired: typeForm.isRequired,
+          displayOrder: typeForm.displayOrder || 0
+        });
+
+        console.log('속성 타입 생성 성공:', newAttributeType);
+        attributeTypeId = newAttributeType.id || newAttributeType.attributeTypeId;
+        
+        if (!attributeTypeId) {
+          alert('속성 타입 ID를 찾을 수 없습니다.');
+          return;
+        }
+      }
+
+      // 카테고리와 속성 타입 연결
+      await inventoryService.addCategoryAttribute({
+        categoryId: formData.category,
+        attributeTypeId: attributeTypeId,
+        isRequired: typeForm.isRequired,
+        displayOrder: typeForm.displayOrder || 0
+      });
+
+      console.log('카테고리-속성 연결 성공');
+
+      // 속성 목록 다시 로드
+      setTimeout(async () => {
+        await fetchCategoryAttributes(formData.category);
+      }, 300);
+      
+      // 성공 메시지
+      const typeName = useExistingType 
+        ? availableAttributeTypes.find(t => t.id === selectedExistingTypeId)?.name || '속성 타입'
+        : typeForm.name;
+      alert(`'${typeName}' 속성 타입이 추가되었습니다.\n\n목록에 자동으로 반영됩니다.`);
+      
+      closeAddTypeModal();
+    } catch (error) {
+      console.error('속성 타입 추가 실패:', error);
+      alert(error.response?.data?.status_message || '속성 타입 추가에 실패했습니다.');
+    }
+  };
+
+  // 속성 값 추가 핸들러
+  const handleAddAttributeValue = async (e) => {
+    e.preventDefault();
+    
+    if (!valueForm.value || valueForm.value.trim() === '') {
+      alert('값을 입력해주세요.');
+      return;
+    }
+
+    if (!valueForm.displayName || valueForm.displayName.trim() === '') {
+      alert('표시명을 입력해주세요.');
+      return;
+    }
+
+    if (!selectedAttributeType) return;
+
+    try {
+      const attributeTypeId = selectedAttributeType.attributeTypeId || selectedAttributeType.attributeType?.id;
+      if (!attributeTypeId) {
+        alert('속성 타입 ID를 찾을 수 없습니다.');
+        return;
+      }
+
+      const newValue = await inventoryService.createAttributeValue({
+        attributeTypeId: attributeTypeId,
+        value: valueForm.value.trim(),
+        displayName: valueForm.displayName.trim(),
+        displayOrder: valueForm.displayOrder || 0,
+        isActive: true
+      });
+
+      console.log('속성 값 추가 성공:', newValue);
+
+      // 새로 추가된 속성 값을 선택 목록에 추가
+      const newValueId = newValue.id || newValue.attributeValueId;
+      if (newValueId) {
+        setSelectedAttributeValues(prev => [...prev, newValueId]);
+      }
+
+      // 속성 목록 다시 로드 (with-values로 다시 조회)
+      // 약간의 지연을 두어 서버에 반영되도록 함
+      setTimeout(async () => {
+        await fetchCategoryAttributes(formData.category);
+      }, 300);
+      
+      // 성공 메시지
+      alert(`'${valueForm.displayName}' 속성 값이 추가되었습니다.\n\n목록에 자동으로 반영됩니다.`);
+      
+      closeAddValueModal();
+    } catch (error) {
+      console.error('속성 값 추가 실패:', error);
+      alert(error.response?.data?.status_message || '속성 값 추가에 실패했습니다.');
     }
   };
 
@@ -391,6 +827,8 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     });
     setImageFile(null);
     setImagePreview(null);
+    setSelectedAttributeValues([]);
+    setCategoryAttributes([]);
     const fileInput = document.getElementById('productImage');
     if (fileInput) {
       fileInput.value = '';
@@ -448,11 +886,27 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
         return;
       }
       
+      // 필수 속성 검증
+      for (const categoryAttr of categoryAttributes) {
+        if (categoryAttr.isRequired) {
+          const activeValues = categoryAttr.availableValues?.filter(av => av.isActive !== false) || [];
+          const hasSelectedValue = selectedAttributeValues.some(id => 
+            activeValues.some(av => (av.id || av.attributeValueId) === id)
+          );
+          
+          if (!hasSelectedValue) {
+            alert(`'${categoryAttr.attributeTypeName || categoryAttr.attributeType?.name}' 속성은 필수입니다. 최소 1개를 선택해주세요.`);
+            return;
+          }
+        }
+      }
+      
       // 이미지 파일 업로드 (선택사항)
       const saveData = {
         ...formData,
         categoryId: formData.category,
-        imageFile: imageFile || null
+        imageFile: imageFile || null,
+        attributeValueIds: selectedAttributeValues.length > 0 ? selectedAttributeValues : [] // 선택한 속성 값 ID들 (없어도 됨)
       };
       
       // onSave가 Promise를 반환하면 결과를 기다림
@@ -575,6 +1029,75 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               value: formData.description,
               onChange: (e) => handleInputChange('description', e.target.value)
             })
+          ),
+          // 속성 선택 섹션
+          React.createElement(FormGroup, null,
+            React.createElement(Label, null, '상품 속성'),
+            formData.category ? (
+              React.createElement(React.Fragment, null,
+                categoryAttributes.length > 0 ? categoryAttributes.map(categoryAttr => {
+              const activeValues = categoryAttr.availableValues?.filter(av => av.isActive !== false) || [];
+              const hasSelectedValue = selectedAttributeValues.some(id => 
+                activeValues.some(av => (av.id || av.attributeValueId) === id)
+              );
+              
+              return React.createElement(AttributeSection, { key: categoryAttr.id || categoryAttr.categoryAttributeId },
+                React.createElement(AttributeTypeTitle, null,
+                  categoryAttr.attributeTypeName || categoryAttr.attributeType?.name,
+                  categoryAttr.isRequired && React.createElement('span', { className: 'required' }, '*')
+                ),
+                loadingAttributes ? React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '속성 로딩 중...') :
+                React.createElement(React.Fragment, null,
+                  activeValues.length > 0 ? React.createElement(AttributeValueList, null,
+                    activeValues.map(attrValue => 
+                      React.createElement(CheckboxWrapper, {
+                        key: attrValue.id || attrValue.attributeValueId,
+                        style: {
+                          borderColor: selectedAttributeValues.includes(attrValue.id || attrValue.attributeValueId) ? '#6b46c1' : '#d1d5db',
+                          background: selectedAttributeValues.includes(attrValue.id || attrValue.attributeValueId) ? '#ede9fe' : '#ffffff'
+                        }
+                      },
+                        React.createElement('input', {
+                          type: 'checkbox',
+                          checked: selectedAttributeValues.includes(attrValue.id || attrValue.attributeValueId),
+                          onChange: () => handleAttributeValueToggle(attrValue.id || attrValue.attributeValueId)
+                        }),
+                        React.createElement('span', null, attrValue.displayName || attrValue.value)
+                      )
+                    )
+                  ) : React.createElement(AttributeInfo, null, '등록된 속성 값이 없습니다. 아래 버튼을 클릭하여 추가하세요.'),
+                  React.createElement(AddValueButton, {
+                    type: 'button',
+                    onClick: () => openAddValueModal(categoryAttr)
+                  },
+                    React.createElement('span', null, '+'),
+                    React.createElement('span', null, '속성 값 추가')
+                  ),
+                  categoryAttr.isRequired && !hasSelectedValue && 
+                  React.createElement(AttributeInfo, null, '필수 속성입니다. 최소 1개를 선택해주세요.')
+                )
+              );
+            }) : (
+              loadingAttributes ? React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '속성 로딩 중...') :
+              React.createElement(AttributeInfo, null, '등록된 속성이 없습니다. 아래 버튼을 클릭하여 속성 타입을 추가하세요.')
+            ),
+            // 속성 타입 추가 버튼 (항상 표시 - 속성 타입이 있어도 추가 가능)
+            !loadingAttributes && React.createElement(AddValueButton, {
+              type: 'button',
+              onClick: openAddTypeModal,
+              style: { 
+                marginTop: '12px', 
+                backgroundColor: '#6b46c1',
+                color: 'white',
+                border: 'none',
+                width: '100%'
+              }
+            },
+              React.createElement('span', null, '+'),
+              React.createElement('span', null, '속성 타입 추가')
+            )
+              )
+            ) : React.createElement(AttributeInfo, null, '카테고리를 선택하면 속성을 추가할 수 있습니다.')
           ),
           React.createElement(FormGroup, null,
             React.createElement(Label, null, '상품 이미지'),
@@ -753,7 +1276,190 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
         isOpen: isCategoryModalOpen,
         onClose: () => setIsCategoryModalOpen(false),
         onSave: handleCategorySave
-      })
+      }),
+      // 속성 값 추가 모달
+      valueModalOpen && React.createElement(ValueModalOverlay, { onClick: closeAddValueModal },
+        React.createElement(ValueModal, { onClick: (e) => e.stopPropagation() },
+          React.createElement(ValueModalHeader, null,
+            React.createElement(ValueModalTitle, null,
+              '속성 값 추가',
+              selectedAttributeType && ` - ${selectedAttributeType.attributeTypeName || selectedAttributeType.attributeType?.name}`
+            ),
+            React.createElement(CloseButton, { onClick: closeAddValueModal }, '×')
+          ),
+          React.createElement('form', { onSubmit: handleAddAttributeValue },
+            React.createElement(ValueFormGroup, null,
+              React.createElement(ValueLabel, null,
+                '값 ',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
+              React.createElement(ValueInput, {
+                type: 'text',
+                value: valueForm.value,
+                onChange: (e) => setValueForm({ ...valueForm, value: e.target.value }),
+                placeholder: '예: red, small, cotton',
+                required: true
+              }),
+              React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
+                '시스템에서 사용하는 실제 값 (영문 권장)'
+              )
+            ),
+            React.createElement(ValueFormGroup, null,
+              React.createElement(ValueLabel, null,
+                '표시명 ',
+                React.createElement('span', { className: 'required' }, '*')
+              ),
+              React.createElement(ValueInput, {
+                type: 'text',
+                value: valueForm.displayName,
+                onChange: (e) => setValueForm({ ...valueForm, displayName: e.target.value }),
+                placeholder: '예: 빨강, S, 면',
+                required: true
+              }),
+              React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
+                '사용자에게 표시되는 이름'
+              )
+            ),
+            React.createElement(ValueFormGroup, null,
+              React.createElement(ValueLabel, null, '표시 순서'),
+              React.createElement(ValueInput, {
+                type: 'number',
+                value: valueForm.displayOrder,
+                onChange: (e) => setValueForm({ ...valueForm, displayOrder: parseInt(e.target.value) || 0 }),
+                min: '0'
+              })
+            ),
+            React.createElement(ValueModalActions, null,
+              React.createElement(ValueButton, {
+                type: 'button',
+                className: 'cancel',
+                onClick: closeAddValueModal
+              }, '취소'),
+              React.createElement(ValueButton, {
+                type: 'submit',
+                className: 'save'
+              }, '추가')
+            )
+          )
+        )
+      ),
+      // 속성 타입 추가 모달
+      typeModalOpen && React.createElement(ValueModalOverlay, { onClick: closeAddTypeModal },
+        React.createElement(ValueModal, { onClick: (e) => e.stopPropagation() },
+          React.createElement(ValueModalHeader, null,
+            React.createElement(ValueModalTitle, null, '속성 타입 추가'),
+            React.createElement(CloseButton, { onClick: closeAddTypeModal }, '×')
+          ),
+          React.createElement('form', { onSubmit: handleAddAttributeType },
+            // 기존 속성 타입 사용 / 새로 만들기 선택
+            React.createElement(ValueFormGroup, null,
+              React.createElement(ValueLabel, null,
+                React.createElement('input', {
+                  type: 'radio',
+                  name: 'typeOption',
+                  checked: !useExistingType,
+                  onChange: () => setUseExistingType(false),
+                  style: { marginRight: '8px' }
+                }),
+                '새 속성 타입 만들기'
+              ),
+              React.createElement(ValueLabel, { style: { marginTop: '8px' } },
+                React.createElement('input', {
+                  type: 'radio',
+                  name: 'typeOption',
+                  checked: useExistingType,
+                  onChange: () => setUseExistingType(true),
+                  style: { marginRight: '8px' }
+                }),
+                '기존 속성 타입 사용'
+              )
+            ),
+            useExistingType ? (
+              // 기존 속성 타입 선택
+              React.createElement(ValueFormGroup, null,
+                React.createElement(ValueLabel, null,
+                  '속성 타입 선택 ',
+                  React.createElement('span', { className: 'required' }, '*')
+                ),
+                availableAttributeTypes.length > 0 ? React.createElement(Select, {
+                  value: selectedExistingTypeId,
+                  onChange: (e) => setSelectedExistingTypeId(e.target.value),
+                  required: true,
+                  style: { width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }
+                },
+                  React.createElement('option', { value: '' }, '속성 타입을 선택하세요'),
+                  availableAttributeTypes.map(type => 
+                    React.createElement('option', { key: type.id, value: type.id }, type.name)
+                  )
+                ) : React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '사용 가능한 속성 타입이 없습니다. 새로 만들어주세요.')
+              )
+            ) : (
+              // 새 속성 타입 생성 폼
+              React.createElement(React.Fragment, null,
+                React.createElement(ValueFormGroup, null,
+                  React.createElement(ValueLabel, null,
+                    '속성 타입명 ',
+                    React.createElement('span', { className: 'required' }, '*')
+                  ),
+                  React.createElement(ValueInput, {
+                    type: 'text',
+                    value: typeForm.name,
+                    onChange: (e) => setTypeForm({ ...typeForm, name: e.target.value }),
+                    placeholder: '예: 색상, 사이즈, 재질',
+                    required: true
+                  }),
+                  React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
+                    '속성의 이름 (예: 색상, 사이즈)'
+                  )
+                ),
+                React.createElement(ValueFormGroup, null,
+                  React.createElement(ValueLabel, null, '설명'),
+                  React.createElement(ValueInput, {
+                    type: 'text',
+                    value: typeForm.description,
+                    onChange: (e) => setTypeForm({ ...typeForm, description: e.target.value }),
+                    placeholder: '속성에 대한 설명 (선택사항)'
+                  })
+                )
+              )
+            ),
+            React.createElement(ValueFormGroup, null,
+              React.createElement(ValueLabel, null,
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: typeForm.isRequired,
+                  onChange: (e) => setTypeForm({ ...typeForm, isRequired: e.target.checked }),
+                  style: { marginRight: '8px' }
+                }),
+                '필수 속성'
+              ),
+              React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
+                '체크 시 상품 등록 시 이 속성 값 선택이 필수입니다.'
+              )
+            ),
+            React.createElement(ValueFormGroup, null,
+              React.createElement(ValueLabel, null, '표시 순서'),
+              React.createElement(ValueInput, {
+                type: 'number',
+                value: typeForm.displayOrder,
+                onChange: (e) => setTypeForm({ ...typeForm, displayOrder: parseInt(e.target.value) || 0 }),
+                min: '0'
+              })
+            ),
+            React.createElement(ValueModalActions, null,
+              React.createElement(ValueButton, {
+                type: 'button',
+                className: 'cancel',
+                onClick: closeAddTypeModal
+              }, '취소'),
+              React.createElement(ValueButton, {
+                type: 'submit',
+                className: 'save'
+              }, '추가')
+            )
+          )
+        )
+      )
     )
   );
 }

@@ -194,6 +194,159 @@ export const inventoryService = {
     const response = await inventoryApi.get(`${API_BASE_URL}/inventory/adjustment-history?${params.toString()}`);
     return response.data;
   },
+
+  // ========== 속성 관리 API ==========
+  
+  // 카테고리별 속성 조회 (값 포함)
+  getCategoryAttributes: async (categoryId) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/category-attributes/category/${categoryId}/with-values`);
+    return response.data.data || response.data || [];
+  },
+
+  // 상품 속성 값 일괄 추가
+  addProductAttributeValues: async (productId, attributeValueIds) => {
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/product-attribute-values/bulk`, {
+      productId,
+      attributes: attributeValueIds.map(id => ({ attributeValueId: id }))
+    });
+    return response.data.data || response.data || [];
+  },
+
+  // 상품 속성 값 조회
+  getProductAttributeValues: async (productId) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/product-attribute-values/product/${productId}`);
+    return response.data.data || response.data || [];
+  },
+
+  // 상품 속성 값 일괄 삭제 및 재등록
+  updateProductAttributeValues: async (productId, attributeValueIds) => {
+    // 기존 속성 값 삭제 (자동으로 처리됨 - bulk API가 전체 교체)
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/product-attribute-values/bulk`, {
+      productId,
+      attributes: attributeValueIds.map(id => ({ attributeValueId: id }))
+    });
+    return response.data.data || response.data || [];
+  },
+
+  // ========== 속성 타입 관리 API ==========
+  
+  // 속성 타입 목록 조회
+  getAttributeTypes: async () => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/attribute-types`);
+    return response.data.data || response.data || [];
+  },
+
+  // 속성 타입 목록 조회 (값 포함)
+  getAttributeTypesWithValues: async () => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/attribute-types/with-values`);
+    return response.data.data || response.data || [];
+  },
+
+  // 속성 타입 단건 조회
+  getAttributeType: async (id) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/attribute-types/${id}`);
+    return response.data.data || response.data;
+  },
+
+  // 속성 타입 생성
+  createAttributeType: async (data) => {
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/attribute-types`, data);
+    return response.data.data || response.data;
+  },
+
+  // 속성 타입 수정
+  updateAttributeType: async (id, data) => {
+    const response = await inventoryApi.put(`${API_BASE_URL}/api/attribute-types/${id}`, data);
+    return response.data.data || response.data;
+  },
+
+  // 속성 타입 삭제
+  deleteAttributeType: async (id) => {
+    const response = await inventoryApi.delete(`${API_BASE_URL}/api/attribute-types/${id}`);
+    return response.data;
+  },
+
+  // ========== 속성 값 관리 API ==========
+  
+  // 속성 타입별 속성 값 조회
+  getAttributeValuesByType: async (attributeTypeId) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/attribute-values/by-type/${attributeTypeId}`);
+    return response.data.data || response.data || [];
+  },
+
+  // 속성 타입별 활성 속성 값 조회
+  getActiveAttributeValuesByType: async (attributeTypeId) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/attribute-values/by-type/${attributeTypeId}/active`);
+    return response.data.data || response.data || [];
+  },
+
+  // 속성 값 단건 조회
+  getAttributeValue: async (id) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/attribute-values/${id}`);
+    return response.data.data || response.data;
+  },
+
+  // 속성 값 생성 (단건)
+  createAttributeValue: async (data) => {
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/attribute-values`, data);
+    return response.data.data || response.data;
+  },
+
+  // 속성 값 일괄 생성
+  createAttributeValuesBulk: async (data) => {
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/attribute-values/bulk`, data);
+    return response.data.data || response.data || [];
+  },
+
+  // 속성 값 수정
+  updateAttributeValue: async (id, data) => {
+    const response = await inventoryApi.put(`${API_BASE_URL}/api/attribute-values/${id}`, data);
+    return response.data.data || response.data;
+  },
+
+  // 속성 값 삭제
+  deleteAttributeValue: async (id) => {
+    const response = await inventoryApi.delete(`${API_BASE_URL}/api/attribute-values/${id}`);
+    return response.data;
+  },
+
+  // 속성 값 활성화/비활성화 토글
+  toggleAttributeValue: async (id) => {
+    const response = await inventoryApi.patch(`${API_BASE_URL}/api/attribute-values/${id}/toggle`);
+    return response.data.data || response.data;
+  },
+
+  // ========== 카테고리 속성 연결 관리 API ==========
+  
+  // 카테고리별 속성 목록 조회 (값 제외) - 관리 페이지용
+  getCategoryAttributesWithoutValues: async (categoryId) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/category-attributes/category/${categoryId}`);
+    return response.data.data || response.data || [];
+  },
+
+  // 카테고리 속성 단건 조회
+  getCategoryAttribute: async (id) => {
+    const response = await inventoryApi.get(`${API_BASE_URL}/api/category-attributes/${id}`);
+    return response.data.data || response.data;
+  },
+
+  // 카테고리에 속성 타입 추가
+  addCategoryAttribute: async (data) => {
+    const response = await inventoryApi.post(`${API_BASE_URL}/api/category-attributes`, data);
+    return response.data.data || response.data;
+  },
+
+  // 카테고리 속성 수정
+  updateCategoryAttribute: async (id, data) => {
+    const response = await inventoryApi.put(`${API_BASE_URL}/api/category-attributes/${id}`, data);
+    return response.data.data || response.data;
+  },
+
+  // 카테고리 속성 삭제
+  deleteCategoryAttribute: async (id) => {
+    const response = await inventoryApi.delete(`${API_BASE_URL}/api/category-attributes/${id}`);
+    return response.data;
+  },
 };
 
 

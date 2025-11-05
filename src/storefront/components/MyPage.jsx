@@ -129,26 +129,6 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                   <li>
                     <button
                       className={`nav-item ${
-                        activeTab === "favorites" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveTab("favorites")}
-                    >
-                      관심
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className={`nav-item ${
-                        activeTab === "reviews" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveTab("reviews")}
-                    >
-                      리뷰 목록
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className={`nav-item ${
                         activeTab === "inquiries" ? "active" : ""
                       }`}
                       onClick={() => setActiveTab("inquiries")}
@@ -173,21 +153,6 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                   <div className="username">{profile?.nickname || profile?.name || currentUser?.nickname || currentUser?.name || '사용자'}</div>
                   <div className="email">{profile?.email || currentUser?.email || '이메일 없음'}</div>
                 </div>
-              </div>
-              <div className="quick-link-item">
-                <div className="quick-icon coupons">
-                  🎫
-                  <span className="notification-dot">19</span>
-                </div>
-                <div className="quick-label">쿠폰 19</div>
-              </div>
-              <div className="quick-link-item">
-                <div className="quick-icon reviews">💬</div>
-                <div className="quick-label">리뷰</div>
-              </div>
-              <div className="quick-link-item">
-                <div className="quick-icon favorites">♡</div>
-                <div className="quick-label">관심 0</div>
               </div>
               <div className="profile-actions">
                 <button className="action-btn">프로필 관리</button>
@@ -259,24 +224,6 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                         </div>
                       ))
                     )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "favorites" && (
-                <div className="favorites-content">
-                  <h3>관심 상품</h3>
-                  <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                    <p style={{ fontSize: '16px', color: '#666' }}>이 기능은 추후 추가 예정입니다.</p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "reviews" && (
-                <div className="reviews-content">
-                  <h3>리뷰 목록</h3>
-                  <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                    <p style={{ fontSize: '16px', color: '#666' }}>이 기능은 추후 추가 예정입니다.</p>
                   </div>
                 </div>
               )}

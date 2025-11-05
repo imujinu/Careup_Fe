@@ -177,10 +177,6 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
               <div className="brand">{p.brand}</div>
               <div className="name">{p.name}</div>
               <div className="price">{p.price.toLocaleString()}원</div>
-              <div className="meta-row">
-                <span>관심 {p.likes}</span>
-                <span>리뷰 {p.reviews}</span>
-              </div>
               <button 
                 className="add-to-cart-btn"
                 onClick={(e) => {

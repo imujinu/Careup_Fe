@@ -120,13 +120,14 @@ const ShopHeader = ({
     <header className="header">
       <div className="container">
         <div className="header-top">
-          <a href="#">고객센터</a>
           {!isLoggedIn ? (
             <>
               <a
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
+                  if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                  if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                   setPage("login");
                 }}
               >
@@ -152,6 +153,8 @@ const ShopHeader = ({
               href="#"
               onClick={(e) => {
                 e.preventDefault();
+                if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                 setPage("mypage");
               }}
             >
@@ -164,6 +167,8 @@ const ShopHeader = ({
               href="#"
               onClick={(e) => {
                 e.preventDefault();
+                if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                 handleLogout();
               }}
             >
@@ -198,6 +203,8 @@ const ShopHeader = ({
                 setDetailProduct(null);
                 setCheckoutProduct(null);
                 setActiveTab("전체");
+                setSearchQuery(""); // 검색어 초기화
+                setShowSearch(false); // 검색창 닫기
                 setPage("home");
               }}
             >
@@ -211,6 +218,8 @@ const ShopHeader = ({
                 setDetailProduct(null);
                 setCheckoutProduct(null);
                 setActiveTab("전체");
+                setSearchQuery(""); // 검색어 초기화
+                setShowSearch(false); // 검색창 닫기
                 setPage("products");
               }}
             >
@@ -321,6 +330,9 @@ const ShopHeader = ({
               className="icon-btn cart-btn"
               aria-label="장바구니"
               onClick={() => {
+                // 상세보기 상태가 우선 렌더링을 가로막지 않도록 초기화 후 이동
+                if (typeof setDetailProduct === 'function') setDetailProduct(null);
+                if (typeof setCheckoutProduct === 'function') setCheckoutProduct(null);
                 setPage("cart");
               }}
               style={{ position: 'relative' }}
