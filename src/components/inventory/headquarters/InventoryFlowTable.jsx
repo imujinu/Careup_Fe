@@ -27,7 +27,7 @@ const TableRow = styled.tr`
 
 const TableHeaderCell = styled.th`
   padding: 12px 16px;
-  text-align: left;
+  text-align: ${props => props.$center ? 'center' : 'left'};
   font-weight: 600;
   font-size: 14px;
   color: #374151;
@@ -56,6 +56,7 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
+  text-align: ${props => props.$center ? 'center' : 'left'};
   max-width: ${props => {
     if (props.$productName) return '200px';
     if (props.$branch) return '120px';
@@ -238,7 +239,6 @@ function InventoryFlowTable({
     }
     
     // 찾지 못한 경우 fallback
-    console.warn(`지점명을 찾을 수 없습니다. branchId: ${branchId}, branchList:`, branchList);
     return `지점-${branchId}`;
   };
   const getStatusBadge = (item) => {
@@ -292,7 +292,10 @@ function InventoryFlowTable({
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.productName)
           }, '상품명', getSortIndicator(SORTABLE_COLUMNS.productName)),
-          React.createElement(TableHeaderCell, null, '속성'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션2'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명2'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.branch)
@@ -306,7 +309,7 @@ function InventoryFlowTable({
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.outQuantity)
           }, '출고수량', getSortIndicator(SORTABLE_COLUMNS.outQuantity)),
-          React.createElement(TableHeaderCell, null, '비고'),
+          React.createElement(TableCell, null, '비고'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.createdAt)
@@ -315,14 +318,31 @@ function InventoryFlowTable({
         )
       ),
       React.createElement('tbody', null,
-        data.map((item, index) => 
-          React.createElement(TableRow, { key: item.id || index },
+        data.map((item, index) => {
+          // 속성 정보 배열로 변환 (최대 2개)
+          const attributes = [];
+          
+          // item.attributes가 배열인 경우
+          if (Array.isArray(item.attributes)) {
+            attributes.push(...item.attributes.slice(0, 2));
+          } 
+          // 단일 속성 정보가 있는 경우
+          else if (item.attributeTypeName && item.attributeValueName) {
+            attributes.push({
+              attributeTypeName: item.attributeTypeName,
+              attributeValueName: item.attributeValueName
+            });
+          }
+          
+          const option1 = attributes[0];
+          const option2 = attributes[1];
+          
+          return React.createElement(TableRow, { key: item.id || index },
             React.createElement(TableCell, { $productName: true }, item.productName || '-'),
-            React.createElement(TableCell, null, 
-              item.attributeValueName 
-                ? `${item.attributeTypeName || ''} ${item.attributeValueName}` 
-                : '-'
-            ),
+            React.createElement(TableCell, { $center: true }, option1?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true }, option1?.attributeValueName || '-'),
+            React.createElement(TableCell, { $center: true }, option2?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true }, option2?.attributeValueName || '-'),
             React.createElement(TableCell, { $branch: true }, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
             React.createElement(TableCell, null, formatQuantity(item.inQuantity)),
@@ -343,8 +363,8 @@ function InventoryFlowTable({
                 }
               }, '삭제')
             )
-          )
-        )
+          );
+        })
       )
     ),
     totalPages > 1 && React.createElement(PaginationContainer, null,
