@@ -1057,10 +1057,6 @@ function ShopLayout() {
                             <span className="in-stock">재고 있음</span>
                           )}
                         </div>
-                        <div className="meta-row">
-                          <span>관심 {p.likes}</span>
-                          <span>리뷰 {p.reviews}</span>
-                        </div>
                         <button 
                           className={`add-to-cart-btn ${p.isOutOfStock ? 'disabled' : ''}`}
                            onClick={(e) => {
