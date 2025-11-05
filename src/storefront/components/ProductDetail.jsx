@@ -19,16 +19,20 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   };
 
   const handleBuy = () => {
-    // 지점 선택 확인
-    if (!selectedBranchId && product?.availableBranches && product.availableBranches.length > 0) {
+    // 지점이 여러 개인 경우 선택이 없으면 첫 지점을 자동 설정 후 진행
+    let chosenBranchId = selectedBranchId;
+    if (!chosenBranchId && product?.availableBranches && product.availableBranches.length > 0) {
+      chosenBranchId = product.availableBranches[0]?.branchId ?? null;
+    }
+
+    if (product?.availableBranches && product.availableBranches.length > 0 && !chosenBranchId) {
       alert('구매 지점을 선택해주세요.');
       return;
     }
 
-    // 선택된 지점 정보를 product에 추가해서 전달
     const productWithBranch = {
       ...product,
-      selectedBranchId: selectedBranchId
+      selectedBranchId: chosenBranchId
     };
 
     if (onBuy) {
@@ -161,13 +165,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               </p>
             </div>
 
-            <div className="rating-section">
-              <div className="rating">
-                <span className="stars">★4.8</span>
-                <span className="review-count">리뷰 {product?.reviewCount || 0}</span>
-              </div>
-            </div>
-
             {/* 구매 가능한 지점 선택 */}
             {product?.availableBranches && product.availableBranches.length > 0 && (
               <div className="option-section">
@@ -255,14 +252,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   {isInCart ? "장바구니 담김" : "장바구니"}
                 </div>
               </button>
-            </div>
-
-            {/* 관심상품 */}
-            <div className="interest-section">
-              <div className="interest-item">
-                <span className="interest-icon">♡</span>
-                <span className="interest-text">관심상품 2.6만</span>
-              </div>
             </div>
 
             {/* 추가 혜택 */}
