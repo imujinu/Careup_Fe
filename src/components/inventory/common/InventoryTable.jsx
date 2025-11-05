@@ -263,7 +263,10 @@ function InventoryTable({
           React.createElement(TableRow, { key: index },
             React.createElement(TableCell, null,
               React.createElement(ProductInfo, null,
-                React.createElement(ProductName, null, item.product.name)
+                React.createElement(ProductName, null, item.product.name),
+                item.attributeValueName && React.createElement(ProductSku, null, 
+                  `${item.attributeTypeName || ''} ${item.attributeValueName}`
+                )
               )
             ),
             React.createElement(TableCell, { $category: true }, item.category || '미분류'),

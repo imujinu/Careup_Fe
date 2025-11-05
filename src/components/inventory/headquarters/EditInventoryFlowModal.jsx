@@ -213,8 +213,12 @@ function EditInventoryFlowModal({ isOpen, onClose, item, onSave }) {
         React.createElement(ReadOnlyInfo, null,
           React.createElement(ReadOnlyLabel, null, '상품명'),
           React.createElement(ReadOnlyValue, null, item.productName || '-'),
+          item.attributeValueName && React.createElement(React.Fragment, null,
+            React.createElement(ReadOnlyLabel, { style: { marginTop: '8px' } }, '속성'),
+            React.createElement(ReadOnlyValue, null, `${item.attributeTypeName || ''} ${item.attributeValueName}`)
+          ),
           React.createElement(ReadOnlyLabel, { style: { marginTop: '8px' } }, '지점'),
-          React.createElement(ReadOnlyValue, null, item.branchId === 1 ? '본사' : `지점-${item.branchId}`)
+          React.createElement(ReadOnlyValue, null, item.branchId === 1 ? '본점' : `지점-${item.branchId}`)
         ),
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '입고수량'),

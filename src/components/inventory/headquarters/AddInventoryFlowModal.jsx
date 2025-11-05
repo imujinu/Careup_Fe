@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
+import { inventoryService } from '../../../service/inventoryService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -19,7 +20,7 @@ const ModalContent = styled.div`
   border-radius: 8px;
   padding: 24px;
   width: 90%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 80vh;
   overflow-y: auto;
 `;
@@ -51,7 +52,7 @@ const CloseButton = styled.button`
 `;
 
 const FormGroup = styled.div`
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 `;
 
 const Label = styled.label`
@@ -75,6 +76,11 @@ const Select = styled.select`
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  &:disabled {
+    background: #f3f4f6;
+    cursor: not-allowed;
   }
 `;
 
@@ -156,6 +162,26 @@ const HelpText = styled.div`
   margin-top: 4px;
 `;
 
+const SelectedProductInfo = styled.div`
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #0369a1;
+`;
+
+const ErrorMessage = styled.div`
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #dc2626;
+`;
+
 function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] }) {
   const [formData, setFormData] = useState({
     branchProductId: '',
@@ -164,23 +190,232 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     remark: ''
   });
   const [loading, setLoading] = useState(false);
+  
+  // 속성 선택을 위한 상태
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
+  const [selectedAttributeValues, setSelectedAttributeValues] = useState({}); // { attributeTypeId: attributeValueId }
+  const [selectedBranchProduct, setSelectedBranchProduct] = useState(null);
 
+  // 상품 목록 (중복 제거)
+  const uniqueProducts = useMemo(() => {
+    const productMap = new Map();
+    branchProducts.forEach(bp => {
+      const productId = bp.productId || bp.product?.id;
+      if (productId && !productMap.has(String(productId))) {
+        // productName에서 속성 정보 제거 (예: "사이다 - 사이즈 S" -> "사이다")
+        let productName = bp.productName || '알 수 없음';
+        // " - " 패턴으로 속성 정보가 포함되어 있으면 제거
+        if (productName.includes(' - ')) {
+          productName = productName.split(' - ')[0];
+        }
+        
+        productMap.set(String(productId), {
+          productId: String(productId),
+          productName: productName.trim()
+        });
+      }
+    });
+    return Array.from(productMap.values());
+  }, [branchProducts]);
+
+  // 선택한 상품의 속성별 BranchProduct 그룹화
+  const attributeGroups = useMemo(() => {
+    if (!selectedProductId || !categoryAttributes.length) {
+      console.log('속성 그룹 없음 - selectedProductId:', selectedProductId, 'categoryAttributes:', categoryAttributes.length);
+      return [];
+    }
+
+    const sortedAttributes = [...categoryAttributes].sort((a, b) => 
+      (a.displayOrder || 0) - (b.displayOrder || 0)
+    );
+
+    console.log('속성 그룹 생성:', sortedAttributes);
+
+    return sortedAttributes.map(attr => ({
+      attributeType: attr,
+      availableValues: attr.availableValues || []
+    }));
+  }, [selectedProductId, categoryAttributes]);
+
+  // 선택한 속성 조합에 해당하는 BranchProduct 찾기
   useEffect(() => {
-    if (isOpen) {
+    if (!selectedProductId || !branchProducts.length) {
+      setSelectedBranchProduct(null);
+      setFormData(prev => ({ ...prev, branchProductId: '' }));
+      return;
+    }
+
+    const productBranchProducts = branchProducts.filter(bp => {
+      const bpProductId = bp.productId || bp.product?.id;
+      return String(bpProductId) === String(selectedProductId);
+    });
+
+    // 속성이 없는 경우
+    if (!categoryAttributes.length) {
+      const bp = productBranchProducts[0];
+      if (bp) {
+        setSelectedBranchProduct(bp);
+        setFormData(prev => ({ ...prev, branchProductId: bp.id }));
+      } else {
+        setSelectedBranchProduct(null);
+        setFormData(prev => ({ ...prev, branchProductId: '' }));
+      }
+      return;
+    }
+
+    // 선택한 속성 값들과 일치하는 BranchProduct 찾기
+    const selectedValues = Object.values(selectedAttributeValues);
+    if (selectedValues.length === 0) {
+      setSelectedBranchProduct(null);
+      setFormData(prev => ({ ...prev, branchProductId: '' }));
+      return;
+    }
+
+    // 모든 속성 타입이 선택되었는지 확인
+    const sortedAttributes = [...categoryAttributes].sort((a, b) => 
+      (a.displayOrder || 0) - (b.displayOrder || 0)
+    );
+    
+    const allSelected = sortedAttributes.every(attr => {
+      return selectedAttributeValues[String(attr.attributeTypeId)];
+    });
+
+    if (!allSelected) {
+      setSelectedBranchProduct(null);
+      setFormData(prev => ({ ...prev, branchProductId: '' }));
+      return;
+    }
+
+    // 선택한 속성 값들과 일치하는 BranchProduct 찾기
+    // 여러 속성이 있을 때는 정확히 매칭되는 것을 찾아야 함
+    const matchingBP = productBranchProducts.find(bp => {
+      // 속성이 하나인 경우
+      if (sortedAttributes.length === 1) {
+        return String(bp.attributeValueId) === String(selectedValues[0]);
+      }
+      
+      // 여러 속성이 있는 경우 - 실제로는 각 BranchProduct가 하나의 속성 값만 가지므로
+      // 선택한 속성 값 중 하나와 일치하면 됨
+      // 하지만 정확한 매칭을 위해서는 모든 속성 값을 확인해야 함
+      // 현재 구조에서는 BranchProduct가 하나의 attributeValueId만 가지므로
+      // 마지막으로 선택한 속성 값과 일치하는 것을 찾음
+      return String(bp.attributeValueId) === String(selectedValues[selectedValues.length - 1]);
+    });
+
+    console.log('매칭된 BranchProduct:', matchingBP);
+    console.log('선택한 속성 값들:', selectedValues);
+
+    if (matchingBP) {
+      setSelectedBranchProduct(matchingBP);
+      setFormData(prev => ({ ...prev, branchProductId: matchingBP.id }));
+    } else {
+      setSelectedBranchProduct(null);
+      setFormData(prev => ({ ...prev, branchProductId: '' }));
+    }
+  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes]);
+
+  // 상품 선택 시 카테고리 속성 조회
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const resetForm = () => {
       setFormData({
         branchProductId: '',
         inQuantity: '',
         outQuantity: '',
         remark: ''
       });
-    }
+      setSelectedProductId('');
+      setSelectedProduct(null);
+      setCategoryAttributes([]);
+      setSelectedAttributeValues({});
+      setSelectedBranchProduct(null);
+    };
+
+    resetForm();
   }, [isOpen]);
+
+  const handleProductSelect = async (productId) => {
+    if (!productId) {
+      setSelectedProductId('');
+      setSelectedProduct(null);
+      setCategoryAttributes([]);
+      setSelectedAttributeValues({});
+      return;
+    }
+
+    console.log('상품 선택:', productId);
+    setSelectedProductId(String(productId));
+    setSelectedAttributeValues({});
+    
+    // 선택한 상품 정보 찾기
+    const product = uniqueProducts.find(p => String(p.productId) === String(productId));
+    setSelectedProduct(product);
+
+    // 해당 상품의 BranchProduct에서 속성 정보 가져오기
+    const productBPs = branchProducts.filter(bp => {
+      const bpProductId = bp.productId || bp.product?.id;
+      return String(bpProductId) === String(productId);
+    });
+
+    console.log('선택한 상품의 BranchProduct:', productBPs);
+
+    if (productBPs.length === 0) {
+      setCategoryAttributes([]);
+      return;
+    }
+
+    // 상품 정보를 통해 카테고리 ID 가져오기
+    try {
+      const productDetail = await inventoryService.getProduct(productId);
+      const productData = productDetail.data?.data || productDetail.data;
+      
+      console.log('상품 상세 정보:', productData);
+      
+      if (productData?.category?.id) {
+        const attributes = await inventoryService.getCategoryAttributes(productData.category.id);
+        console.log('카테고리 속성:', attributes);
+        setCategoryAttributes(attributes || []);
+      } else {
+        console.log('카테고리 정보 없음');
+        setCategoryAttributes([]);
+      }
+    } catch (error) {
+      console.error('카테고리 속성 조회 실패:', error);
+      setCategoryAttributes([]);
+    }
+  };
+
+  const handleAttributeValueSelect = (attributeTypeId, attributeValueId) => {
+    console.log('속성 값 선택:', attributeTypeId, attributeValueId);
+    setSelectedAttributeValues(prev => {
+      const newValues = { ...prev };
+      const typeIdStr = String(attributeTypeId);
+      if (attributeValueId) {
+        newValues[typeIdStr] = String(attributeValueId);
+      } else {
+        delete newValues[typeIdStr];
+        // 이후 속성 선택도 초기화
+        const sortedAttributes = [...categoryAttributes].sort((a, b) => 
+          (a.displayOrder || 0) - (b.displayOrder || 0)
+        );
+        const currentIndex = sortedAttributes.findIndex(a => String(a.attributeTypeId) === typeIdStr);
+        sortedAttributes.slice(currentIndex + 1).forEach(attr => {
+          delete newValues[String(attr.attributeTypeId)];
+        });
+      }
+      console.log('새로운 속성 값들:', newValues);
+      return newValues;
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.branchProductId) {
-      alert('상품을 선택해주세요.');
+      alert('상품과 속성을 모두 선택해주세요.');
       return;
     }
     
@@ -211,6 +446,33 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     }));
   };
 
+  // 속성 타입별로 사용 가능한 속성 값 필터링
+  const getAvailableValues = (attributeType) => {
+    if (!selectedProductId) return [];
+
+    const productBPs = branchProducts.filter(bp => {
+      const bpProductId = bp.productId || bp.product?.id;
+      return String(bpProductId) === String(selectedProductId);
+    });
+
+    // 해당 속성 타입의 값을 가진 BranchProduct들에서 속성 값 추출
+    const availableValueIds = new Set(
+      productBPs
+        .filter(bp => {
+          // 해당 속성 타입의 속성 값을 가진 BranchProduct만 필터링
+          // categoryAttributes에서 해당 속성 타입의 availableValues에 포함된 값인지 확인
+          const attrValues = attributeType.availableValues || [];
+          return attrValues.some(av => av.id === bp.attributeValueId);
+        })
+        .map(bp => bp.attributeValueId)
+        .filter(Boolean)
+    );
+
+    return (attributeType.availableValues || []).filter(value => 
+      availableValueIds.has(value.id)
+    );
+  };
+
   if (!isOpen) return null;
 
   return React.createElement(ModalOverlay, null,
@@ -223,19 +485,70 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '상품 *'),
           React.createElement(Select, {
-            value: formData.branchProductId,
-            onChange: (e) => handleChange('branchProductId', e.target.value),
+            value: selectedProductId,
+            onChange: (e) => handleProductSelect(e.target.value),
             required: true
           },
             React.createElement('option', { value: '' }, '상품을 선택하세요'),
-            branchProducts.map(product => 
+            uniqueProducts.map(product => 
               React.createElement('option', { 
-                key: product.id, 
-                value: product.id 
-              }, `${product.productName} (본점)`)
+                key: product.productId, 
+                value: product.productId 
+              }, product.productName)
+            )
+          ),
+          selectedProduct && React.createElement(SelectedProductInfo, null,
+            `선택한 상품: ${selectedProduct.productName}`
+          )
+        ),
+        
+        // 속성 선택 (속성이 있는 경우)
+        attributeGroups.length > 0 && attributeGroups.map((group, index) => {
+          const attributeType = group.attributeType;
+          const availableValues = getAvailableValues(attributeType);
+          const prevAttributeType = index > 0 ? attributeGroups[index - 1].attributeType : null;
+          const isDisabled = prevAttributeType && !selectedAttributeValues[String(prevAttributeType.attributeTypeId)];
+          
+          return React.createElement(FormGroup, { key: attributeType.attributeTypeId },
+            React.createElement(Label, null, `${attributeType.attributeTypeName || '속성'} *`),
+            React.createElement(Select, {
+              value: selectedAttributeValues[String(attributeType.attributeTypeId)] || '',
+              onChange: (e) => handleAttributeValueSelect(attributeType.attributeTypeId, e.target.value),
+              disabled: isDisabled,
+              required: true
+            },
+              React.createElement('option', { value: '' }, 
+                isDisabled ? '이전 속성을 먼저 선택하세요' : `${attributeType.attributeTypeName || '속성'} 선택`
+              ),
+              availableValues.map(value => 
+                React.createElement('option', { 
+                  key: value.id, 
+                  value: value.id 
+                }, value.name)
+              )
+            ),
+            availableValues.length === 0 && selectedProductId && React.createElement(ErrorMessage, null,
+              `해당 상품에 ${attributeType.attributeTypeName} 속성이 없습니다.`
+            )
+          );
+        }),
+
+        // 선택한 BranchProduct 정보 표시
+        selectedBranchProduct && React.createElement(FormGroup, null,
+          React.createElement(SelectedProductInfo, null,
+            React.createElement('div', { style: { marginBottom: '4px' } },
+              `선택한 상품: ${selectedProduct?.productName || ''}`
+            ),
+            selectedBranchProduct.attributeTypeName && selectedBranchProduct.attributeValueName && 
+              React.createElement('div', null,
+                `속성: ${selectedBranchProduct.attributeTypeName} ${selectedBranchProduct.attributeValueName}`
+              ),
+            React.createElement('div', { style: { marginTop: '4px', fontSize: '12px', opacity: 0.8 } },
+              `현재 재고: ${selectedBranchProduct.stockQuantity || 0}개`
             )
           )
         ),
+
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '입고수량'),
           React.createElement(Input, {
@@ -275,7 +588,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
           React.createElement(Button, {
             type: 'submit',
             className: 'save',
-            disabled: loading
+            disabled: loading || !formData.branchProductId
           }, loading ? '저장 중...' : '저장')
         )
       )
