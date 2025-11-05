@@ -36,6 +36,10 @@ import PasswordReset from "./pages/auth/PasswordReset";
 import EmployeePasswordResetRequest from "./pages/auth/EmployeePasswordResetRequest";
 import EmployeePasswordReset from "./pages/auth/EmployeePasswordReset";
 
+// 직원 근태용 모바일 로그인
+import MobileLogin from "./pages/auth/MobileLogin";
+import MobileStaffHome from "./pages/mobile/MobileStaffHome";
+
 // 고객 아이디 찾기
 import FindCustomerId from "./pages/auth/FindCustomerId";
 // ★ 직원 아이디 찾기 (공개 라우트)
@@ -274,6 +278,10 @@ export default function App() {
           {/* 루트/기타 → 쇼핑 홈 */}
           <Route path="/" element={<Navigate to="/shop" replace />} />
           <Route path="*" element={<Navigate to="/shop" replace />} />
+
+          {/* 직원 근태용 모바일 로그인 */}
+          <Route path="/m/login" element={<MobileLogin />} />
+          <Route path="/m" element={<MobileStaffHome />} />
         </Routes>
 
         {/* 챗봇 */}
