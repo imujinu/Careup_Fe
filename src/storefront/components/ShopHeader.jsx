@@ -161,7 +161,6 @@ const ShopHeader = ({
               {currentUser?.nickname || currentUser?.name || '마이페이지'}   
             </a>
           )}
-          <a href="#">주문조회</a>
           {isLoggedIn && (
             <a
               href="#"
