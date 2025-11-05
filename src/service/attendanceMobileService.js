@@ -1,10 +1,6 @@
 // src/service/attendanceMobileService.js
 import axios from '../utils/axiosConfig';
-import {
-  fetchScheduleCalendar,
-  upsertAttendanceEvent,
-  getScheduleDetail,
-} from './scheduleService';
+import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
 
@@ -60,6 +56,13 @@ const fmtAMPM = (isoLike) => {
   return `${String(h).padStart(2, '0')}:${m}${ampm}`;
 };
 
+/** LocalDateTime 안전 전송용(오프셋/밀리초 제거) */
+const localIsoNoZ = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 19); // yyyy-MM-ddTHH:mm:ss
+};
+
 /* ===== 이벤트별 시각 추출 ===== */
 const pickTimesForPiece = (ev) => {
   const s = ev.actualClockIn || ev.clockInAt || ev.actualStartAt || ev.registeredClockIn || ev.registeredStartAt || ev.startAt || null;
@@ -76,7 +79,6 @@ const pickPlanTimes = (ev) => {
   const pe = ev.registeredClockOut || ev.registeredEndAt || ev.endAt || null;
   return { ps, pe };
 };
-
 const isLeavePiece = (p) => {
   const st = String(p?.status || p?.attendanceStatus || '').toUpperCase();
   const cat = String(p?.category || p?.scheduleType || '').toUpperCase();
@@ -129,18 +131,15 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
         return keySource && toYMD(keySource) === ymd;
       });
 
-    // 표시 텍스트
     let dispMinS = null, dispMaxE = null;
     let planStart = null, planEnd = null;
 
     let anyIn = false, anyOut = false, anyOvernightHead = false, anyOvernightTail = false;
     let leaveTypeName = '';
 
-    // 대표 스케줄
     let primaryPiece = null;
     let primaryStartTs = NaN;
 
-    // (표시용) minutes 기본 0 — 실제 합산은 추후 보강
     let minutes = 0;
 
     for (const ev of pieces) {
@@ -159,7 +158,6 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
       if (ev.isOvernight && ev.part === 'HEAD') anyOvernightHead = true;
       if (ev.isOvernight && ev.part === 'TAIL') anyOvernightTail = true;
 
-      // 경계 표시 보정
       if (ev.isOvernight && ev.part === 'HEAD' && !e0) {
         const nextMid = dayNextStart(ymd);
         if (!dispMaxE || toTime(nextMid) > toTime(dispMaxE)) dispMaxE = nextMid;
@@ -169,8 +167,7 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
         if (!dispMinS || toTime(thisMid) < toTime(dispMinS)) dispMinS = thisMid;
       }
 
-      // 대표 스케줄 선정
-      const candidateStart = as || s0 || ps || null;
+      const candidateStart = (ev.actualClockIn || ev.clockInAt || ev.actualStartAt || ev.registeredClockIn || ev.registeredStartAt || ev.startAt || null);
       const cts = toTime(candidateStart);
       if (candidateStart && (Number.isNaN(primaryStartTs) || cts < primaryStartTs)) {
         primaryStartTs = cts;
@@ -182,7 +179,6 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
     const isFuture = ymd > todayYMD;
     const isPast = ymd < todayYMD;
 
-    // 상태 추론
     let status = '';
     let category = '';
     if (pieces.some(isLeavePiece)) {
@@ -222,12 +218,12 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
 
     return {
       ymd,
-      name: i === 0 ? '일' : DOW_KR[i],
+      name: DOW_KR[i],
       in: dispMinS ? fmtHM(dispMinS) : '',
       out: dispMaxE ? fmtHM(dispMaxE) : '',
       today: isToday,
       off: pieces.length === 0,
-      minutes, // ✅ 실제 합산은 아래 fetchWeekSummary에서 디테일 기반으로 보강
+      minutes,
       status,
       attendanceStatus: status,
       category,
@@ -252,15 +248,12 @@ export const fetchWeekSummary = async (baseDate = new Date()) => {
   const from = toYMD(s);
   const to = toYMD(addDays(s, 6));
 
-  // 원본 이벤트
   const list = await fetchScheduleCalendar({ from, to, employeeId });
   const events = Array.isArray(list) ? list : [];
 
-  // 1) 표시/상태 요약
   const summary = summarizeWeekFromEvents(events, baseDate);
   let days = summary.days;
 
-  // 2) 실제 합산(상세 기반) — 주차 내 모든 스케줄 ID 대상으로 분배
   const pieces = events.flatMap(splitForCalendar);
   const sidSet = new Set(pieces.map(pickScheduleId).filter(Boolean));
   if (sidSet.size > 0) {
@@ -276,14 +269,27 @@ export const fetchWeekSummary = async (baseDate = new Date()) => {
     );
     const detailMap = new Map(detailEntries);
 
-    // 날짜별 분(min) 누적 버킷
     const bucket = new Map(days.map(d => [d.ymd, 0]));
+    const now = new Date();
 
-    // 각 상세의 실제 근무시간을 주간 7일에 분배(겹침만)
-    for (const [sid, det] of detailMap.entries()) {
+    for (const [, det] of detailMap.entries()) {
       if (!det) continue;
+
       const as = det.actualClockIn || det.clockInAt || det.actualStartAt || null;
-      const ae = det.actualClockOut || det.clockOutAt || det.actualEndAt || null;
+      const ae0 = det.actualClockOut || det.clockOutAt || det.actualEndAt || null;
+      const ps = det.registeredClockIn || det.registeredStartAt || det.startAt || null;
+      const pe = det.registeredClockOut || det.registeredEndAt || det.endAt || null;
+
+      let ae = ae0;
+      if (!ae && as) {
+        const asDay = toYMD(as);
+        if (asDay < toYMD(now)) {
+          ae = pe || null;
+        } else if (asDay === toYMD(now)) {
+          ae = pe ? new Date(Math.min(toTime(pe), now.getTime())) : now;
+        }
+      }
+
       if (!as || !ae) continue;
 
       for (const d of days) {
@@ -292,7 +298,6 @@ export const fetchWeekSummary = async (baseDate = new Date()) => {
       }
     }
 
-    // 기존 minutes(표시용)보다 상세 기반이 크면 교체
     days = days.map(d => ({ ...d, minutes: Math.max(d.minutes || 0, bucket.get(d.ymd) || 0) }));
   }
 
@@ -305,16 +310,13 @@ export const fetchWeekMetrics = async (baseDate = new Date()) => {
   const summary = await fetchWeekSummary(baseDate);
   const totalMinutes = Number(summary?.totalMinutes || 0);
 
-  // 주간 총합
   const totalHours = Math.floor(totalMinutes / 60);
   const totalRemainMinutes = totalMinutes % 60;
 
-  // 일 평균(분)
   const avgPerDayMinutes = totalMinutes / 7;
   const avgPerDayHours = Math.floor(avgPerDayMinutes / 60);
   const avgPerDayRemainMinutes = Math.round(avgPerDayMinutes % 60);
 
-  // 게이지 기준
   const targets = {
     weekTargetHours: 52,
     weekMarkerHours: 40,
@@ -332,31 +334,6 @@ export const fetchWeekMetrics = async (baseDate = new Date()) => {
     avgPerDayRemainMinutes,
     targets,
   };
-};
-
-/** 버튼 활성화 기준 */
-const allowClockIn = (obj) => {
-  if (!obj) return false;
-  const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
-  const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
-  if (leave || obj.off) return false;
-  if (obj.canClockIn != null) return !!obj.canClockIn;
-  const anyIn = hasIn(obj);
-  if (!anyIn && (st === 'PLANNED' || st === 'LATE' || !st)) return true;
-  return false;
-};
-const allowClockOut = (obj) => {
-  if (!obj) return false;
-  const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
-  const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
-  if (leave || obj.off) return false;
-  if (obj.canClockOut != null) return !!obj.canClockOut;
-  const anyIn = hasIn(obj);
-  const anyOut = hasOut(obj);
-  if (st === 'CLOCKED_IN' || st === 'ON_BREAK') return true;
-  if (anyIn && !anyOut) return true;
-  if (st === 'MISSED_CHECKOUT') return true;
-  return false;
 };
 
 /** 오늘 카드 데이터 */
@@ -412,11 +389,13 @@ export const fetchTodayStatus = async () => {
   };
   let inText = '';
   let outText = '';
+  let scheduleId = null;
 
   if (primary) {
     ({ inText, outText } = timesFor(primary));
+    scheduleId = pickScheduleId(primary) || null;
 
-    const sid = pickScheduleId(primary);
+    const sid = scheduleId;
     if (sid) {
       try {
         const detail = await getScheduleDetail(sid);
@@ -522,6 +501,7 @@ export const fetchTodayStatus = async () => {
     category,
     leaveTypeName,
     missedCheckout,
+    scheduleId,
   };
 
   todayObj.canClockIn = allowClockIn(todayObj);
@@ -530,39 +510,102 @@ export const fetchTodayStatus = async () => {
   return todayObj;
 };
 
-/** (호환) 평균 주간 시간 추출 */
-export const fetchAvgWeekHours = async () => {
-  const metrics = await fetchWeekMetrics(new Date());
-  return {
-    hours: metrics.totalHours,
-    minutes: metrics.totalRemainMinutes,
-    targetHours: metrics?.targets?.weekTargetHours ?? 52,
-  };
+/** 버튼 활성화 기준 */
+const allowClockIn = (obj) => {
+  if (!obj) return false;
+  const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
+  const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
+  if (leave || obj.off) return false;
+  if (obj.canClockIn != null) return !!obj.canClockIn;
+  const anyIn = hasIn(obj);
+  if (!anyIn && (st === 'PLANNED' || st === 'LATE' || !st)) return true;
+  return false;
+};
+const allowClockOut = (obj) => {
+  if (!obj) return false;
+  const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
+  const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
+  if (leave || obj.off) return false;
+  if (obj.canClockOut != null) return !!obj.canClockOut;
+  const anyIn = hasIn(obj);
+  const anyOut = hasOut(obj);
+  if (st === 'CLOCKED_IN' || st === 'ON_BREAK') return true;
+  if (anyIn && !anyOut) return true;
+  if (st === 'MISSED_CHECKOUT') return true;
+  return false;
 };
 
-export const clockIn = async () => {
-  try {
-    const res = await axios.post(`${BASE_URL}/attendance/clock-in`, {});
-    return res?.data;
-  } catch {
-    const now = new Date();
-    return upsertAttendanceEvent('me', {
-      eventDate: toYMD(now),
-      clockInAt: now.toISOString(),
-    });
-  }
+/* ===== 출근/퇴근: 표준 페이로드 + 폴백 경로 ===== */
+const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const postJson = (url, data = {}) =>
+  axios.post(url, data, {
+    headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemp() },
+  }).then(r => r?.data);
+
+// 콜론 등 접미사가 딸려온 scheduleId를 경로에서는 숫자부만 사용
+const normalizeId = (v) => String(v ?? '').split(':')[0];
+
+// 레거시 폴백 시도 여부
+const shouldTryNext = (status) => [400, 404, 405, 415].includes(Number(status));
+
+/** ✅ 서버 DTO(AttendanceActionRequest)에 맞춘 페이로드 */
+const buildActionPayload = (_scheduleId, geo) => {
+  const lat = Number.isFinite(geo?.lat) ? geo.lat : undefined;
+  const lng = Number.isFinite(geo?.lng) ? geo.lng
+           : Number.isFinite(geo?.lon) ? geo.lon : undefined; // lon이 들어와도 lng로 맞춰 전송
+  const at  = (typeof geo?.at === 'string' && geo.at) ? geo.at : undefined;
+  const accuracyMeters = Number.isFinite(geo?.accuracyMeters) ? geo.accuracyMeters : undefined;
+
+  const payload = { lat, lng, at, accuracyMeters };
+  return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
 };
 
-export const clockOut = async () => {
-  try {
-    const res = await axios.post(`${BASE_URL}/attendance/clock-out`, {});
-    return res?.data;
-  } catch {
-    const now = new Date();
-    return upsertAttendanceEvent('me', {
-      eventDate: toYMD(now),
-      clockOutAt: now.toISOString(),
-      clearMissedCheckout: true,
-    });
+/** ✅ 출근 (신규 경로 우선, 레거시 폴백 지원) */
+export const clockIn = async (scheduleId, geo) => {
+  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+  if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
+  const id = normalizeId(id0);
+  const body = buildActionPayload(id, geo ?? { at: localIsoNoZ() });
+
+  const candidates = [
+    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-in`,       // 신규
+    `${BASE_URL}/attendance/clock-in?scheduleId=${encodeURIComponent(id)}`, // 레거시(qs)
+    `${BASE_URL}/attendance/clock-in`,                                      // 레거시(body)
+  ];
+
+  let lastErr;
+  for (const url of candidates) {
+    try { return await postJson(url, body); }
+    catch (e) {
+      lastErr = e;
+      const st = e?.response?.status;
+      if (!shouldTryNext(st)) break;
+    }
   }
+  throw lastErr || new Error('출근 처리 실패');
+};
+
+/** ✅ 퇴근 (신규 경로 우선, 레거시 폴백 지원) */
+export const clockOut = async (scheduleId, geo) => {
+  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+  if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
+  const id = normalizeId(id0);
+  const body = buildActionPayload(id, geo ?? { at: localIsoNoZ() });
+
+  const candidates = [
+    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-out`,      // 신규
+    `${BASE_URL}/attendance/clock-out?scheduleId=${encodeURIComponent(id)}`, // 레거시(qs)
+    `${BASE_URL}/attendance/clock-out`,                                     // 레거시(body)
+  ];
+
+  let lastErr;
+  for (const url of candidates) {
+    try { return await postJson(url, body); }
+    catch (e) {
+      lastErr = e;
+      const st = e?.response?.status;
+      if (!shouldTryNext(st)) break;
+    }
+  }
+  throw lastErr || new Error('퇴근 처리 실패');
 };

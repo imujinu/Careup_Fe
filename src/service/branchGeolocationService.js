@@ -20,26 +20,126 @@ const unwrap = (res) => {
 
 /** 숫자 파싱(유효하지 않으면 null) */
 const toNum = (v) => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'string') {
+    const trimmed = v.trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
 
+/** 객체에서 첫 유효 숫자 필드 선택 */
+const pickNumber = (obj, keys = []) => {
+  if (!obj) return null;
+  for (const k of keys) {
+    if (k in obj) {
+      const n = toNum(obj[k]);
+      if (n !== null) return n;
+    }
+  }
+  return null;
+};
+
+/** 중첩 후보 경로에서 lat/lng/radius 검색 */
+const nestedCandidates = (dto) => {
+  const candidates = [];
+  if (!dto || typeof dto !== 'object') return candidates;
+  const containerKeys = [
+    'geofence',
+    'geoFence',
+    'geo',
+    'location',
+    'branchGeofence',
+    'branchLocation',
+    'coordinates',
+    'center',       // 추가 후보
+  ];
+  for (const key of containerKeys) {
+    if (dto[key] && typeof dto[key] === 'object') candidates.push(dto[key]);
+  }
+  return candidates;
+};
+
 /** DTO → 지오펜스 표준형으로 매핑 */
 const mapBranchGeo = (dto = {}) => {
-  const lat = toNum(dto.latitude ?? dto.lat ?? dto.branchLat);
-  const lng = toNum(
-    dto.longitude ?? dto.lng ?? dto.lon ?? dto.long ?? dto.branchLng ?? dto.branchLong
-  );
-  const radius = toNum(dto.geofenceRadius ?? dto.geofenceRadiusMeters ?? dto.branchRadiusMeters);
+  // 1) 최상위에서 먼저 시도
+  let lat = pickNumber(dto, ['latitude', 'lat', 'branchLat', 'centerLatitude', 'centerLat']);
+  let lng = pickNumber(dto, ['longitude', 'lng', 'lon', 'long', 'branchLng', 'branchLong', 'centerLongitude', 'centerLng']);
+  let radius = pickNumber(dto, [
+    'geofenceRadius',
+    'geofenceRadiusMeters',
+    'branchRadiusMeters',
+    'radiusMeters',
+    'radius',
+    'r',
+  ]);
+
+  // 2) 실패 시 중첩 객체들에서 재시도
+  if (lat === null || lng === null || radius === null) {
+    for (const nest of nestedCandidates(dto)) {
+      if (lat === null) {
+        lat = pickNumber(nest, ['latitude', 'lat', 'branchLat', 'centerLatitude', 'centerLat']);
+      }
+      if (lng === null) {
+        lng = pickNumber(nest, ['longitude', 'lng', 'lon', 'long', 'branchLng', 'branchLong', 'centerLongitude', 'centerLng']);
+      }
+      if (radius === null) {
+        radius = pickNumber(nest, [
+          'geofenceRadius',
+          'geofenceRadiusMeters',
+          'branchRadiusMeters',
+          'radiusMeters',
+          'radius',
+          'r',
+        ]);
+      }
+      if (lat !== null && lng !== null && radius !== null) break;
+    }
+  }
+
+  // 주소도 상위 → 중첩 순서로 시도
+  let address = dto.address ?? dto.branchAddress ?? dto.addr ?? '';
+  let addressDetail = dto.addressDetail ?? dto.addrDetail ?? dto.detailAddress ?? '';
+  if (!address || !addressDetail) {
+    for (const nest of nestedCandidates(dto)) {
+      if (!address) {
+        address = nest.address ?? nest.branchAddress ?? nest.addr ?? address;
+      }
+      if (!addressDetail) {
+        addressDetail = nest.addressDetail ?? nest.addrDetail ?? nest.detailAddress ?? addressDetail;
+      }
+      if (address && addressDetail) break;
+    }
+  }
+
+  // id/name도 흔한 키들 지원
+  let branchId = dto.id ?? dto.branchId ?? dto.seq ?? dto.branchSeq ?? null;
+  let name = dto.name ?? dto.branchName ?? dto.title ?? '';
+
+  // 중첩에서 보완
+  if (branchId === null || !name) {
+    for (const nest of nestedCandidates(dto)) {
+      if (branchId === null) {
+        branchId = nest.id ?? nest.branchId ?? nest.seq ?? nest.branchSeq ?? branchId;
+      }
+      if (!name) {
+        name = nest.name ?? nest.branchName ?? nest.title ?? name;
+      }
+      if (branchId !== null && name) break;
+    }
+  }
 
   return {
-    branchId: dto.id ?? dto.branchId ?? null,
-    name: dto.name ?? dto.branchName ?? '',
+    branchId,
+    name,
     lat,
     lng,
     radius,
-    address: dto.address ?? '',
-    addressDetail: dto.addressDetail ?? '',
+    address,
+    addressDetail,
   };
 };
 
@@ -60,7 +160,7 @@ export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   if ([lat1, lon1, lat2, lon2].some((v) => typeof v !== 'number' || !Number.isFinite(v))) {
     return NaN;
   }
-  const R = 6371000; // meters
+  const R = 6371000;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =

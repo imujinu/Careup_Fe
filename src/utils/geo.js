@@ -1,7 +1,14 @@
 // src/utils/geo.js
+
+/** 지오로케이션 지원 여부 */
+export function supportsGeolocation() {
+  return typeof navigator !== 'undefined' && 'geolocation' in navigator;
+}
+
+/** 권한 상태 조회: 'granted' | 'denied' | 'prompt' */
 export async function requestGeoPermission() {
   try {
-    if (!('geolocation' in navigator)) return 'denied';
+    if (!supportsGeolocation()) return 'denied';
     if (!('permissions' in navigator)) return 'prompt';
     const p = await navigator.permissions.query({ name: 'geolocation' });
     return p.state; // 'granted' | 'denied' | 'prompt'
@@ -10,9 +17,10 @@ export async function requestGeoPermission() {
   }
 }
 
+/** 현재 좌표 1회 조회 (Promise) */
 export function getCurrentCoords(options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }) {
   return new Promise((resolve, reject) => {
-    if (!('geolocation' in navigator)) return reject(new Error('not-supported'));
+    if (!supportsGeolocation()) return reject(new Error('not-supported'));
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         resolve({
@@ -27,8 +35,9 @@ export function getCurrentCoords(options = { enableHighAccuracy: true, timeout: 
   });
 }
 
+/** 위치 변경 감시 시작 → 해제 함수 반환 */
 export function startWatchPosition(onUpdate, onError, options = { enableHighAccuracy: true, maximumAge: 5000 }) {
-  if (!('geolocation' in navigator)) return () => {};
+  if (!supportsGeolocation()) return () => {};
   const id = navigator.geolocation.watchPosition(
     (pos) => {
       onUpdate?.({
@@ -47,8 +56,12 @@ export function startWatchPosition(onUpdate, onError, options = { enableHighAccu
   };
 }
 
+export function toRad(d) {
+  return (d * Math.PI) / 180;
+}
+
+/** 하버사인 거리(m) */
 export function haversineMeters(aLat, aLng, bLat, bLng) {
-  const toRad = (d) => (d * Math.PI) / 180;
   const R = 6371000;
   const dLat = toRad(bLat - aLat);
   const dLng = toRad(bLng - aLng);
@@ -60,6 +73,7 @@ export function haversineMeters(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/** 거리 포맷 */
 export function formatMeters(m) {
   if (m == null || Number.isNaN(m)) return '-';
   if (m < 1000) return `${Math.round(m)}m`;
@@ -77,9 +91,7 @@ export function isInsideFence(user, center, radius, { inflateByAccuracy = true }
   return d <= effectiveRadius;
 }
 
-/**
- * 거리와 inside를 함께 계산
- */
+/** 거리와 inside를 함께 계산 */
 export function computeFenceState(user, center, radius, { inflateByAccuracy = true } = {}) {
   if (!user?.lat || !user?.lng || !center?.lat || !center?.lng || !radius) {
     return { distance: null, inside: false };

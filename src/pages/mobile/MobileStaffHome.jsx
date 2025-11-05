@@ -24,8 +24,9 @@ import { useToast } from '../../components/common/Toast';
 import { useAppSelector } from '../../stores/hooks';
 import { tokenStorage, authService } from '../../service/authService';
 import { MobileScheduleDetailModal } from '../../components/mobile/MobileScheduleDetailModal';
+import { fetchMyBranchGeofence, isBranchGeofenceConfigured } from '../../service/branchGeolocationService';
 
-// ✅ 지오펜스 훅/유틸 (분리 파일)
+// ✅ 지오펜스 훅/유틸
 import { useGeofence } from '../../hooks/useGeofence';
 import { formatMeters } from '../../utils/geo';
 
@@ -105,7 +106,7 @@ const TitleRow = styled.div`
 `;
 const WeekViewport = styled.div`
   overflow-x: auto; overflow-y: hidden;
-  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch; overscroll-beavior-x: contain;
   padding-bottom: 2px; scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
@@ -454,6 +455,7 @@ export default function MobileStaffHome() {
 
   const [openDetail, setOpenDetail] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
+  const [branchGeoApi, setBranchGeoApi] = useState(null); // ✅ 서버 지점 지오펜스
 
   /** 주간 days를 서버 상세로 하이드레이트(상태/시각 보정) */
   const hydrateWeekDaysWithServer = useCallback(async (days) => {
@@ -524,9 +526,10 @@ export default function MobileStaffHome() {
   const loadAll = useCallback(async (anchorDate) => {
     setLoading(true);
     try {
-      const [t, met] = await Promise.all([
+      const [t, met, geo] = await Promise.all([
         fetchTodayStatus(),
         fetchWeekMetrics(anchorDate), // ✅ 기준일 주차로 총합/평균/타깃/마커 취득(실제 기록 기반 보강)
+        fetchMyBranchGeofence().catch(() => null), // ✅ 내 지점 지오펜스(API 우선)
       ]);
 
       // days 하이드레이트
@@ -535,11 +538,13 @@ export default function MobileStaffHome() {
       setToday(t || null);
       setWeekDays(hydratedDays);
       setMetrics(met || null);
+      setBranchGeoApi(geo || null);
     } catch {
       addToast('근무 데이터를 불러오지 못했습니다.', { color: 'error' });
       setToday(null);
       setWeekDays([]);
       setMetrics(null);
+      setBranchGeoApi(null);
     } finally {
       setLoading(false);
     }
@@ -560,39 +565,65 @@ export default function MobileStaffHome() {
   const todayIn = getInText(safeToday);
   const todayOut = getOutText(safeToday);
 
-  // ✅ 지점 지오펜스 정보 추론 (서버 필드가 어디에 있든 폭넓게 대응)
+  // ✅ 지점 지오펜스 정보 (API 우선 → today → authUser)
   const branchGeo = useMemo(() => {
-    const lat =
-      Number(pick(safeToday, ['branchLat', 'branchLatitude', 'latitude'])) ||
-      Number(pick(authUserSafe, ['branchLat', 'branchLatitude', 'latitude'])) ||
-      null;
-    const lng =
-      Number(pick(safeToday, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon'])) ||
-      Number(pick(authUserSafe, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon'])) ||
-      null;
-    const radius =
-      Number(pick(safeToday, ['geofenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters'])) ||
-      Number(pick(authUserSafe, ['geofenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters'])) ||
-      null;
+    const apiLat = Number(branchGeoApi?.lat);
+    const apiLng = Number(branchGeoApi?.lng);
+    const apiRad = Number(branchGeoApi?.radius);
+
+    const tLat = Number(pick(safeToday, ['branchLat', 'branchLatitude', 'latitude']));
+    const tLng = Number(pick(safeToday, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon']));
+    const tRad = Number(pick(safeToday, ['geofenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters']));
+
+    const uLat = Number(pick(authUserSafe, ['branchLat', 'branchLatitude', 'latitude']));
+    const uLng = Number(pick(authUserSafe, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon']));
+    const uRad = Number(pick(authUserSafe, ['geofenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters']));
+
+    const lat = Number.isFinite(apiLat) ? apiLat : (Number.isFinite(tLat) ? tLat : (Number.isFinite(uLat) ? uLat : null));
+    const lng = Number.isFinite(apiLng) ? apiLng : (Number.isFinite(tLng) ? tLng : (Number.isFinite(uLng) ? uLng : null));
+    const radius = Number.isFinite(apiRad) ? apiRad : (Number.isFinite(tRad) ? tRad : (Number.isFinite(uRad) ? uRad : null));
+
     return { lat, lng, radius };
-  }, [safeToday, authUserSafe]);
+  }, [branchGeoApi, safeToday, authUserSafe]);
 
-  // ✅ 지오펜스 훅
-  const { permission, coords, distance, inside, loading: geoLoading, refresh } =
-    useGeofence(branchGeo, { autoStart: true, inflateByAccuracy: true });
+  // ✅ 지오펜스 훅 (타임아웃 허용 정책)
+  const { permission, coords, distance, inside, loading: geoLoading, refresh, timedOut } =
+    useGeofence(branchGeo, {
+      autoStart: true,
+      inflateByAccuracy: true,
+      timeoutMs: 15000,
+      acceptStaleMs: 180000,
+    });
 
-  const branchReady = !!(branchGeo.lat && branchGeo.lng && branchGeo.radius);
+  const branchReady = isBranchGeofenceConfigured(branchGeo);
   const geoReady = !!(coords?.lat && coords?.lng);
   const geoBlocked = permission === 'denied';
-  const geoDisabled = !branchReady || !geoReady || !inside || geoBlocked;
+  const geoTimedOut = !!timedOut && !geoBlocked;
+
+  // ❗변경: 지점 지오펜스가 미구성(!branchReady)이라면 버튼을 막지 않습니다.
+  // 권한 거부만 무조건 막고, 지오펜스가 구성된 경우에만 inside/timeout을 적용합니다.
+  const geoDisabled =
+    geoBlocked ||
+    (branchReady && (!geoTimedOut && (!geoReady || !inside)));
 
   // 액션 버튼(출근/퇴근) 결정 + 지오펜스 조건 병합
   const next = decideAction(safeToday, loading);
   const finalDisabled = next.disabled || geoDisabled;
 
+  // ✅ scheduleId + 좌표를 반드시 전달
   const actionOnClick = next.onClickName === 'out'
-    ? async () => { try { await clockOut(); addToast('퇴근 처리되었습니다.', { color:'success' }); loadAll(weekAnchor); } catch { addToast('퇴근 처리에 실패했습니다.', { color:'error' }); } }
-    : async () => { try { await clockIn();  addToast('출근 처리되었습니다.', { color:'success' }); loadAll(weekAnchor); } catch { addToast('출근 처리에 실패했습니다.', { color:'error' }); } };
+    ? async () => {
+        const sid = safeToday?.scheduleId;
+        if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+        try { await clockOut(sid, coords); addToast('퇴근 처리되었습니다.', { color:'success' }); loadAll(weekAnchor); }
+        catch (e) { addToast(e?.response?.data?.message || '퇴근 처리에 실패했습니다.', { color:'error' }); }
+      }
+    : async () => {
+        const sid = safeToday?.scheduleId;
+        if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+        try { await clockIn(sid, coords);  addToast('출근 처리되었습니다.', { color:'success' }); loadAll(weekAnchor); }
+        catch (e) { addToast(e?.response?.data?.message || '출근 처리에 실패했습니다.', { color:'error' }); }
+      };
 
   // 주간 게이지 값
   const totalMinutes = Number(metrics?.totalMinutes || 0);
@@ -632,13 +663,16 @@ export default function MobileStaffHome() {
   const geoMsg = useMemo(() => {
     if (!branchReady) return '지점 위치 정보 없음';
     if (geoBlocked) return '위치 권한이 거부되었습니다';
+    if (geoTimedOut) return '위치 확인이 지연됩니다(타임아웃) · 새로고침 또는 위치 서비스 확인';
     if (!geoReady) return '현재 위치 확인중…';
     return inside
       ? `현재 지점까지 ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`
       : `반경 밖입니다: ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`;
-  }, [branchReady, geoBlocked, geoReady, inside, distance, branchGeo]);
+  }, [branchReady, geoBlocked, geoTimedOut, geoReady, inside, distance, branchGeo]);
 
-  const geoOk = branchReady && geoReady && inside && !geoBlocked;
+  const geoOk = branchReady
+    ? ((geoReady && inside && !geoBlocked) || geoTimedOut)
+    : true; // ❗미구성 시 OK 취급(버튼 활성 목적)
 
   return (
     <Screen>
