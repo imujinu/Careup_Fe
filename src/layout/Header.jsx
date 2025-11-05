@@ -7,7 +7,8 @@ import { closeChatbot } from "../stores/slices/chatbotSlice";
 import { toggleAlerts, closeAlerts } from "../stores/slices/alertsSlice";
 import { tokenStorage } from "../service/authService";
 import { useNavigate } from "react-router-dom";
-// 상환바보
+
+//상환바보
 const HeaderContainer = styled.header`
   position: fixed;
   top: 0;
