@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { Icon } from '@mdi/react';
 import { 
   mdiEmail, 
@@ -88,9 +88,40 @@ function EmployeeTable({
   if (loading) {
     return (
       <TableContainer>
-        <LoadingContainer>
-          <LoadingSpinner>로딩 중...</LoadingSpinner>
-        </LoadingContainer>
+        <EmployeeGrid>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <EmployeeCard key={i}>
+              <CardHeader>
+                <ProfileSection>
+                  <SkeletonCircle />
+                  <ProfileInfo>
+                    <SkeletonText width="100px" height="16px" />
+                    <SkeletonText width="80px" height="12px" style={{ marginTop: '4px' }} />
+                  </ProfileInfo>
+                </ProfileSection>
+              </CardHeader>
+              <CardBody>
+                <InfoRow>
+                  <SkeletonText width="100%" height="14px" />
+                  <SkeletonText width="80%" height="14px" style={{ marginTop: '8px' }} />
+                </InfoRow>
+                <InfoRow>
+                  <SkeletonText width="90%" height="14px" />
+                </InfoRow>
+                <InfoRow>
+                  <SkeletonText width="70%" height="14px" />
+                </InfoRow>
+                <StatusSection>
+                  <SkeletonText width="60px" height="20px" />
+                </StatusSection>
+                <DateSection>
+                  <SkeletonText width="120px" height="12px" />
+                  <SkeletonText width="120px" height="12px" style={{ marginTop: '4px' }} />
+                </DateSection>
+              </CardBody>
+            </EmployeeCard>
+          ))}
+        </EmployeeGrid>
       </TableContainer>
     );
   }
@@ -501,4 +532,41 @@ const ContextMenuItem = styled.div.withConfig({
   svg {
     color: ${props => props.danger ? '#dc2626' : '#6b7280'};
   }
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+`;
+
+const SkeletonBase = styled.div`
+  background: #e5e7eb;
+  background-image: linear-gradient(
+    to right,
+    #e5e7eb 0%,
+    #f3f4f6 20%,
+    #e5e7eb 40%,
+    #e5e7eb 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 4px;
+`;
+
+const SkeletonCircle = styled(SkeletonBase)`
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+`;
+
+const SkeletonText = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'height',
+})`
+  height: ${props => props.height || '16px'};
+  width: ${props => props.width || '100%'};
 `;

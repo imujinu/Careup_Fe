@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { loyalCustomerService } from '../../service/loyalCustomerService';
 import { Icon } from '@mdi/react';
 import { mdiAccountStar, mdiPlus, mdiPencil, mdiDelete, mdiFilter } from '@mdi/js';
@@ -111,7 +111,50 @@ function LoyalCustomerManagement({ branchId }) {
   if (loading) {
     return (
       <Container>
-        <LoadingText>로딩 중...</LoadingText>
+        <Header>
+          <Title>
+            <Icon path={mdiAccountStar} size={1.5} />
+            단골고객 관리
+          </Title>
+          <Actions>
+            <FilterWrapper>
+              <Icon path={mdiFilter} size={1} />
+              <SkeletonText width="120px" height="32px" />
+            </FilterWrapper>
+            <SkeletonText width="140px" height="40px" />
+          </Actions>
+        </Header>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeader>고객명</TableHeader>
+              <TableHeader>이메일</TableHeader>
+              <TableHeader>누적 금액</TableHeader>
+              <TableHeader>주문 횟수</TableHeader>
+              <TableHeader>등급</TableHeader>
+              <TableHeader>등록일</TableHeader>
+              <TableHeader>액션</TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <TableRow key={i}>
+                <TableCell><SkeletonText width="80px" height="14px" /></TableCell>
+                <TableCell><SkeletonText width="150px" height="14px" /></TableCell>
+                <TableCell><SkeletonText width="100px" height="14px" /></TableCell>
+                <TableCell><SkeletonText width="60px" height="14px" /></TableCell>
+                <TableCell><SkeletonText width="60px" height="24px" style={{ borderRadius: '12px' }} /></TableCell>
+                <TableCell><SkeletonText width="90px" height="14px" /></TableCell>
+                <TableCell>
+                  <ActionButtons>
+                    <SkeletonCircle size="32px" />
+                    <SkeletonCircle size="32px" />
+                  </ActionButtons>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </Container>
     );
   }
@@ -1211,5 +1254,44 @@ const MemberCardDetail = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+`;
+
+const SkeletonBase = styled.div`
+  background: #e5e7eb;
+  background-image: linear-gradient(
+    to right,
+    #e5e7eb 0%,
+    #f3f4f6 20%,
+    #e5e7eb 40%,
+    #e5e7eb 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 4px;
+`;
+
+const SkeletonCircle = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'size',
+})`
+  width: ${props => props.size || '32px'};
+  height: ${props => props.size || '32px'};
+  border-radius: 50%;
+`;
+
+const SkeletonText = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'height',
+})`
+  height: ${props => props.height || '16px'};
+  width: ${props => props.width || '100%'};
 `;
 

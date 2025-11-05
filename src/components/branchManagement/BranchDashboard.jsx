@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import styled, { keyframes } from "styled-components";
+import GridLayout from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 import {
   LineChart,
   Line,
@@ -112,7 +115,45 @@ function BranchDashboard({ branchId }) {
   }, [dashboard]);
 
   if (loading) {
-    return <Centered>로딩 중...</Centered>;
+    return (
+      <Wrapper>
+        <Hero>
+          <HeroLeft>
+            <HeroTitle>대시보드</HeroTitle>
+            <HeroSub>카드를 드래그하여 레이아웃을 조정할 수 있습니다</HeroSub>
+          </HeroLeft>
+          <HeroRight>
+            <HeroActions>
+              <SmallBtn $primary={false}>
+                주간
+              </SmallBtn>
+              <SmallBtn $primary={true}>
+                월간
+              </SmallBtn>
+              <SmallBtn $primary={false}>
+                연간
+              </SmallBtn>
+            </HeroActions>
+          </HeroRight>
+        </Hero>
+        <GridLayoutContainer>
+          <DashboardSkeletonGrid>
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <DashboardSkeletonCard key={i}>
+                <SkeletonHeader>
+                  <SkeletonText width="120px" height="20px" />
+                </SkeletonHeader>
+                <SkeletonBody>
+                  <SkeletonText width="80px" height="28px" />
+                  <SkeletonText width="60px" height="14px" />
+                  <SkeletonChart height="120px" />
+                </SkeletonBody>
+              </DashboardSkeletonCard>
+            ))}
+          </DashboardSkeletonGrid>
+        </GridLayoutContainer>
+      </Wrapper>
+    );
   }
 
   if (error) {
@@ -485,6 +526,80 @@ const FooterStat = styled.div`
   margin-top: 12px;
   font-size: 14px;
   color: #374151;
+`;
+
+const DashboardSkeletonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+  padding: 24px;
+`;
+
+const DashboardSkeletonCard = styled.div`
+  grid-column: span 4;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  border: 1px solid #e5e7eb;
+`;
+
+const SkeletonHeader = styled.div`
+  margin-bottom: 12px;
+`;
+
+const SkeletonBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+`;
+
+const SkeletonText = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'height',
+})`
+  background: #e5e7eb;
+  background-image: linear-gradient(
+    to right,
+    #e5e7eb 0%,
+    #f3f4f6 20%,
+    #e5e7eb 40%,
+    #e5e7eb 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 4px;
+  height: ${props => props.height || '16px'};
+  width: ${props => props.width || '100%'};
+`;
+
+const SkeletonChart = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'height',
+})`
+  background: #e5e7eb;
+  background-image: linear-gradient(
+    to right,
+    #e5e7eb 0%,
+    #f3f4f6 20%,
+    #e5e7eb 40%,
+    #e5e7eb 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 4px;
+  height: ${props => props.height || '120px'};
+  width: 100%;
+  margin-top: 8px;
 `;
 
 
