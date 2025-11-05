@@ -378,11 +378,14 @@ const AutoOrderSettings = () => {
             productAttributes.forEach(attr => {
               const typeId = String(attr.attributeTypeId || attr.attributeType?.id || '');
               const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
-              const valueName = attr.displayName || attr.value || '';
+              const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
+              const valueName = attr.displayName || attr.attributeValue?.name || attr.value || '';
               
               if (typeId && typeName && !attributeMap.has(typeId)) {
                 attributeMap.set(typeId, {
+                  attributeTypeId: typeId,
                   attributeTypeName: typeName,
+                  attributeValueId: valueId,
                   attributeValueName: valueName
                 });
               }
@@ -724,12 +727,10 @@ const AutoOrderSettings = () => {
                     paginatedData.map(product => (
                       <TableRow key={product.id}>
                         <TableCell>
-                          <div style={{ fontWeight: '500' }}>{product.name}</div>
+                          <div style={{ fontWeight: '600', color: '#1f2937' }}>{product.name}</div>
                         </TableCell>
                         <TableCell>
-                          <div style={{ fontWeight: '500' }}>
-                            {product.attributeDisplay || '-'}
-                          </div>
+                          {product.attributeDisplay || '-'}
                         </TableCell>
                         <TableCell>
                           <Badge count={product.currentStock}>
@@ -818,20 +819,6 @@ const AutoOrderSettings = () => {
             </TableContainer>
           </>
         )}
-      </Card>
-
-      {/* 자동 발주 히스토리 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>자동 발주 히스토리</CardTitle>
-          <Button onClick={() => alert('자동 발주 히스토리 조회 기능은 개발 중입니다')}>
-            📋 히스토리 조회
-          </Button>
-        </CardHeader>
-        
-        <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-          자동 발주 히스토리가 여기에 표시됩니다.
-        </div>
       </Card>
     </PageContainer>
   );
