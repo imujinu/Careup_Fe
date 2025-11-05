@@ -15,8 +15,6 @@ export const PATHS = {
 export const HEADQUARTERS_PATHS = {
   BRANCH: '/branch',
   BRANCH_DETAIL: '/branch/detail',
-  CLIENT: '/client',
-  TASK: '/task',
   ATTENDANCE: '/attendance',
   INVENTORY: '/inventory',
   PURCHASE_ORDER: '/purchase-order',
@@ -45,8 +43,6 @@ export const MENU_PATH_MAP = {
   dashboard: '/dashboard',
   branch: '/branch',
   myBranch: '/my-branch',
-  client: '/client',
-  task: '/task',
   attendance: '/attendance',
   inventory: '/inventory',
   purchaseOrder: '/purchase-order',

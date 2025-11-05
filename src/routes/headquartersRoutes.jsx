@@ -38,8 +38,6 @@ export const headquartersRoutes = [
   { path: 'staff/detail/:id', element: <StaffDetail /> },
 
   // 기능별 메뉴
-  { path: 'client', element: <div>거래처 관리 (준비중)</div> },
-  { path: 'task', element: <div>작업 관리 (준비중)</div> },
   { path: 'attendance', element: <AttendanceCalendar /> },                // 근태 캘린더
   { path: 'attendance/templates', element: <AttendanceTemplateManagement /> }, // 템플릿 관리
   { path: 'inventory', element: <InventoryManagement /> },

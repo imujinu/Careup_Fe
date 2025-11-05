@@ -19,10 +19,6 @@ export const franchiseRoutes = [
 
   { path: 'dashboard', element: <FranchiseDashboard /> },
 
-  // 가맹점에서 미사용 메뉴는 대시보드로 폴백
-  { path: 'client', element: <Navigate to="/dashboard" replace /> },
-  { path: 'task', element: <Navigate to="/dashboard" replace /> },
-
   // 기능별 메뉴
   { path: 'inventory', element: <FranchiseInventoryManagement /> },
   { path: 'purchase-order', element: <FranchisePurchaseOrderManagement /> },
