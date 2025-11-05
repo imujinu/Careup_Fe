@@ -132,6 +132,7 @@ const initialState = {
   summary: {
     totalEmployees: 0,
     activeEmployees: 0,
+    terminatedEmployees: 0,
     recentlyAdded: 0,
   },
 };
@@ -180,16 +181,30 @@ const employeeSlice = createSlice({
         // 요약 정보 업데이트
         const employees = payload.content || [];
         const activeEmployees = employees.filter(emp => emp.employmentStatus === 'ACTIVE');
+        const terminatedEmployees = employees.filter(emp => emp.employmentStatus === 'TERMINATED');
         const recentlyAdded = employees.filter(emp => {
-          const createdDate = new Date(emp.createdAt);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return createdDate >= thirtyDaysAgo;
+          // 배치 정보가 있고 assignedFrom이 있는 경우
+          if (emp.dispatches && emp.dispatches.length > 0) {
+            // 가장 최근 배치 시작일 찾기 (assignedFrom이 가장 최근인 것)
+            const sortedDispatches = emp.dispatches
+              .filter(d => d.assignedFrom)
+              .sort((a, b) => new Date(b.assignedFrom) - new Date(a.assignedFrom));
+            
+            if (sortedDispatches.length > 0) {
+              const mostRecentAssignedFrom = new Date(sortedDispatches[0].assignedFrom);
+              const fourteenDaysAgo = new Date();
+              fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+              return mostRecentAssignedFrom >= fourteenDaysAgo;
+            }
+          }
+          // 배치 정보가 없으면 false 반환
+          return false;
         });
         
         state.summary = {
           totalEmployees: payload.totalElements ?? 0,
           activeEmployees: activeEmployees.length,
+          terminatedEmployees: terminatedEmployees.length,
           recentlyAdded: recentlyAdded.length,
         };
       })
@@ -206,6 +221,8 @@ const employeeSlice = createSlice({
       .addCase(fetchEmployeeListByBranchAction.fulfilled, (state, action) => {
         state.loading = false;
         const payload = action.payload || {};
+        const params = action.meta.arg.params || {};
+        
         state.list = payload.content || [];
         state.pagination = {
           page: payload.page ?? 0,
@@ -217,16 +234,41 @@ const employeeSlice = createSlice({
         // 요약 정보 업데이트
         const employees = payload.content || [];
         const activeEmployees = employees.filter(emp => emp.employmentStatus === 'ACTIVE');
+        const terminatedEmployees = employees.filter(emp => emp.employmentStatus === 'TERMINATED');
         const recentlyAdded = employees.filter(emp => {
-          const createdDate = new Date(emp.createdAt);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return createdDate >= thirtyDaysAgo;
+          // 배치 정보가 있고 assignedFrom이 있는 경우
+          if (emp.dispatches && emp.dispatches.length > 0) {
+            // 가장 최근 배치 시작일 찾기 (assignedFrom이 가장 최근인 것)
+            const sortedDispatches = emp.dispatches
+              .filter(d => d.assignedFrom)
+              .sort((a, b) => new Date(b.assignedFrom) - new Date(a.assignedFrom));
+            
+            if (sortedDispatches.length > 0) {
+              const mostRecentAssignedFrom = new Date(sortedDispatches[0].assignedFrom);
+              const fourteenDaysAgo = new Date();
+              fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+              return mostRecentAssignedFrom >= fourteenDaysAgo;
+            }
+          }
+          // 배치 정보가 없으면 false 반환
+          return false;
         });
         
+        // 검색어나 필터가 없는 경우에만 총 직원 수 업데이트 (실제 전체 총 직원 수)
+        const hasSearch = params.search && params.search.trim() !== '';
+        const hasFilters = Object.entries(params).some(([key, value]) => 
+          key !== 'page' && key !== 'size' && key !== 'sort' && key !== 'search' && value !== '' && value !== null && value !== undefined
+        );
+        
+        // 검색/필터가 없으면 총 직원 수 업데이트, 있으면 기존 값 유지
+        const totalEmployees = (!hasSearch && !hasFilters) 
+          ? (payload.totalElements ?? 0)
+          : (state.summary.totalEmployees || 0);
+        
         state.summary = {
-          totalEmployees: payload.totalElements ?? 0,
+          totalEmployees,
           activeEmployees: activeEmployees.length,
+          terminatedEmployees: terminatedEmployees.length,
           recentlyAdded: recentlyAdded.length,
         };
       })
@@ -309,8 +351,9 @@ const employeeSlice = createSlice({
           state.detail.employmentStatus = 'TERMINATED';
           state.detail.enabled = false;
         }
-        // 활성 직원 수 감소
+        // 활성 직원 수 감소, 퇴사 직원 수 증가
         state.summary.activeEmployees = Math.max(0, state.summary.activeEmployees - 1);
+        state.summary.terminatedEmployees += 1;
       })
       .addCase(deactivateEmployeeAction.rejected, (state, action) => {
         state.deactivateLoading = false;
@@ -333,9 +376,10 @@ const employeeSlice = createSlice({
         if (state.detail && state.detail.id === action.payload.id) {
           state.detail = action.payload;
         }
-        // 활성 직원 수 증가
+        // 재입사 시: 활성 직원 수 증가, 퇴사 직원 수 감소
         if (action.payload.employmentStatus === 'ACTIVE') {
           state.summary.activeEmployees += 1;
+          state.summary.terminatedEmployees = Math.max(0, state.summary.terminatedEmployees - 1);
         }
       })
       .addCase(rehireEmployeeAction.rejected, (state, action) => {

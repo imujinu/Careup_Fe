@@ -17,6 +17,8 @@ import StaffDetail from '../pages/staff/StaffDetail';
 import AttendanceCalendar from '../pages/attendance/AttendanceCalendar';
 import JobGradeManagement from '../pages/settings/JobGradeManagement';
 import AttendanceTemplateManagement from '../pages/attendance/AttendanceTemplateManagement';
+import BranchUpdateRequestList from '../pages/branch/BranchUpdateRequestList';
+import BranchUpdateRequestDetail from '../pages/branch/BranchUpdateRequestDetail';
 
 export const headquartersRoutes = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -28,6 +30,8 @@ export const headquartersRoutes = [
   { path: 'branch/edit/:branchId', element: <BranchEdit /> },
   { path: 'branch/detail/:branchId', element: <BranchDetail /> },
   { path: 'branch/test-register', element: <TestBranchRegistration /> },
+  { path: 'branch/update-requests', element: <BranchUpdateRequestList /> },
+  { path: 'branch/update-requests/:requestId', element: <BranchUpdateRequestDetail /> },
 
   // 직원관리
   { path: 'staff', element: <StaffList /> },

@@ -19,6 +19,7 @@ function BranchDetailHeader({
   onEdit,
   onDelete,
   showEditButton = false,
+  userType = null,
 }) {
   if (!branch) return null;
 
@@ -127,35 +128,37 @@ function BranchDetailHeader({
                 )}
               </ManagerDetails>
             </ManagerInfo>
+          </ManagerCard>
 
-            <ActionButtons>
-              {showEditButton && onEdit && (
-                <EditButton onClick={onEdit}>
-                  <Icon path={mdiPencil} size={0.8} />
-                  수정 요청
-                </EditButton>
-              )}
-              {!showEditButton && (
-                <>
-                  {onEdit && (
-                    <EditButton onClick={onEdit}>
-                      <Icon path={mdiPencil} size={0.8} />
-                      수정
-                    </EditButton>
-                  )}
-                  {onDelete && (
-                    <DeleteButton onClick={onDelete}>
-                      <Icon path={mdiDelete} size={0.8} />
-                      삭제
-                    </DeleteButton>
-                  )}
+          <ActionButtons>
+            {showEditButton && onEdit && (
+              <EditButton onClick={onEdit}>
+                <Icon path={mdiPencil} size={0.8} />
+                수정 요청
+              </EditButton>
+            )}
+            {!showEditButton && (
+              <>
+                {onEdit && (
+                  <EditButton onClick={onEdit}>
+                    <Icon path={mdiPencil} size={0.8} />
+                    수정
+                  </EditButton>
+                )}
+                {onDelete && (
+                  <DeleteButton onClick={onDelete}>
+                    <Icon path={mdiDelete} size={0.8} />
+                    삭제
+                  </DeleteButton>
+                )}
+                {userType !== "headquarters" && (
                   <MoreButton>
                     <Icon path={mdiDotsVertical} size={1} />
                   </MoreButton>
-                </>
-              )}
-            </ActionButtons>
-          </ManagerCard>
+                )}
+              </>
+            )}
+          </ActionButtons>
         </RightSection>
       </HeaderContent>
 
@@ -267,7 +270,6 @@ const ManagerTitle = styled.h3`
 `;
 
 const ManagerInfo = styled.div`
-  margin-bottom: 20px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -307,6 +309,8 @@ const ActionButtons = styled.div`
   display: flex;
   gap: 8px;
   align-items: center;
+  margin-top: 16px;
+  justify-content: flex-end;
 `;
 
 const EditButton = styled.button`

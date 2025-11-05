@@ -133,4 +133,38 @@ export const requestBranchUpdate = async (branchData, profileImage) => {
   return response.data;
 };
 
+// 본사 관리자용 지점 수정 요청 목록 조회
+export const getBranchUpdateRequests = async ({ page = 0, size = 10, status } = {}) => {
+  const params = { page, size, sort: "createdAt,desc" };
+  let url = `${BASE_URL}/branch/update-requests`;
+  
+  if (status) {
+    url = `${BASE_URL}/branch/update-requests/status/${status}`;
+  }
+  
+  const response = await axios.get(url, { params });
+  return response.data?.result || response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 상세 조회
+export const getBranchUpdateRequest = async (requestId) => {
+  const url = `${BASE_URL}/branch/update-requests/${requestId}`;
+  const response = await axios.get(url);
+  return response.data?.result || response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 승인
+export const approveBranchUpdateRequest = async (requestId) => {
+  const url = `${BASE_URL}/branch/update-requests/${requestId}/approve`;
+  const response = await axios.post(url);
+  return response.data;
+};
+
+// 본사 관리자용 지점 수정 요청 거부
+export const rejectBranchUpdateRequest = async (requestId) => {
+  const url = `${BASE_URL}/branch/update-requests/${requestId}/reject`;
+  const response = await axios.post(url);
+  return response.data;
+};
+
 export default branchService;
