@@ -9,6 +9,9 @@ import {
   mdiCalendarWeek,
   mdiChevronRight,
   mdiChevronLeft,
+  mdiMapMarker,
+  mdiCrosshairsGps,
+  mdiAlertCircle,
 } from '@mdi/js';
 import {
   fetchTodayStatus,
@@ -21,6 +24,10 @@ import { useToast } from '../../components/common/Toast';
 import { useAppSelector } from '../../stores/hooks';
 import { tokenStorage, authService } from '../../service/authService';
 import { MobileScheduleDetailModal } from '../../components/mobile/MobileScheduleDetailModal';
+
+// ✅ 지오펜스 훅/유틸 (분리 파일)
+import { useGeofence } from '../../hooks/useGeofence';
+import { formatMeters } from '../../utils/geo';
 
 /* ===== 상수 ===== */
 const LATE_THRESHOLD_MIN = 1;
@@ -96,19 +103,17 @@ const CardTitle = styled.h2`
 const TitleRow = styled.div`
   display: grid; grid-template-columns: 1fr auto; align-items: center;
 `;
-/* ‘이번 주 근무’와 카드 사이 좀 더 여유 */
 const WeekViewport = styled.div`
   overflow-x: auto; overflow-y: hidden;
   -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
   padding-bottom: 2px; scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
-  margin-top: 12px; /* ✅ 간격 확대 */
+  margin-top: 12px;
 `;
 const WeekNav = styled.div`
   display: inline-flex; align-items: center; gap: 2px;
 `;
-/* ✅ 둥근 사각 배경 제거: 완전 투명 아이콘 버튼 */
 const WeekNavBtn = styled.button`
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0;
@@ -165,7 +170,7 @@ const WeekStrip = styled.div`
 const DayBox = styled.button`
   border-radius: 12px;
   padding: 12px 12px;
-  min-height: 128px; /* 섹션 여유 */
+  min-height: 128px;
   text-align: center;
   border:1px solid ${(p)=>p.$bd}; background:${(p)=>p.$bg};
   small { display:block; color: #6b7280; font-size: 11px; }
@@ -204,6 +209,21 @@ const MarkerLabel = styled.div`
   transform: translate(-50%, 4px);
 `;
 const BarMeta = styled.div`display:flex; justify-content: space-between; font-size: 12px; color:#374151; margin-top: 18px;`;
+
+/* ===== 지오펜스 표시 ===== */
+const GeoRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+`;
+const GeoPill = styled.div`
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 10px; font-size: 12px; font-weight: 700;
+  border: 1px solid ${(p)=>p.$ok ? '#a7f3d0' : '#fed7aa'};
+  color:  ${(p)=>p.$ok ? '#065f46' : '#9a3412'};
+  background: ${(p)=>p.$ok ? '#ecfdf5' : '#fff7ed'};
+`;
 
 /* ===== 색상 팔레트 ===== */
 const stylesByVariant = {
@@ -527,13 +547,49 @@ export default function MobileStaffHome() {
 
   useEffect(() => { loadAll(weekAnchor); }, [loadAll, weekAnchor]);
 
-  // 오늘 표시
+  // 오늘/사용자 표시
+  const authUserSafe = authUser || {};
+  const name = authUserSafe?.name || '직원';
+  const title = authUserSafe?.title || '';
+  const branch = authUserSafe?.branchName || '';
+  const photo = authUserSafe?.profileImageUrl || '';
+
   const safeToday = today || {};
   const todayVariant = colorVariant(safeToday, new Date());
   const todayStyle = stylesByVariant[todayVariant] || stylesByVariant.blue;
   const todayIn = getInText(safeToday);
   const todayOut = getOutText(safeToday);
+
+  // ✅ 지점 지오펜스 정보 추론 (서버 필드가 어디에 있든 폭넓게 대응)
+  const branchGeo = useMemo(() => {
+    const lat =
+      Number(pick(safeToday, ['branchLat', 'branchLatitude', 'latitude'])) ||
+      Number(pick(authUserSafe, ['branchLat', 'branchLatitude', 'latitude'])) ||
+      null;
+    const lng =
+      Number(pick(safeToday, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon'])) ||
+      Number(pick(authUserSafe, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon'])) ||
+      null;
+    const radius =
+      Number(pick(safeToday, ['geofenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters'])) ||
+      Number(pick(authUserSafe, ['geofenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters'])) ||
+      null;
+    return { lat, lng, radius };
+  }, [safeToday, authUserSafe]);
+
+  // ✅ 지오펜스 훅
+  const { permission, coords, distance, inside, loading: geoLoading, refresh } =
+    useGeofence(branchGeo, { autoStart: true, inflateByAccuracy: true });
+
+  const branchReady = !!(branchGeo.lat && branchGeo.lng && branchGeo.radius);
+  const geoReady = !!(coords?.lat && coords?.lng);
+  const geoBlocked = permission === 'denied';
+  const geoDisabled = !branchReady || !geoReady || !inside || geoBlocked;
+
+  // 액션 버튼(출근/퇴근) 결정 + 지오펜스 조건 병합
   const next = decideAction(safeToday, loading);
+  const finalDisabled = next.disabled || geoDisabled;
+
   const actionOnClick = next.onClickName === 'out'
     ? async () => { try { await clockOut(); addToast('퇴근 처리되었습니다.', { color:'success' }); loadAll(weekAnchor); } catch { addToast('퇴근 처리에 실패했습니다.', { color:'error' }); } }
     : async () => { try { await clockIn();  addToast('출근 처리되었습니다.', { color:'success' }); loadAll(weekAnchor); } catch { addToast('출근 처리에 실패했습니다.', { color:'error' }); } };
@@ -557,12 +613,6 @@ export default function MobileStaffHome() {
   const totalHoursText = `${Math.floor(totalMinutes / 60)}시간 ${totalMinutes % 60}분`;
   const avgHoursText = `${Math.floor(avgPerDayMinutes / 60)}시간 ${String(Math.round(avgPerDayMinutes % 60)).padStart(2,'0')}분`;
 
-  const authUserSafe = authUser || {};
-  const name = authUserSafe?.name || '직원';
-  const title = authUserSafe?.title || '';
-  const branch = authUserSafe?.branchName || '';
-  const photo = authUserSafe?.profileImageUrl || '';
-
   const days = Array.isArray(weekDays) ? weekDays.filter(Boolean) : [];
 
   const onLogout = async () => {
@@ -577,6 +627,18 @@ export default function MobileStaffHome() {
     const moved = new Date(base.getFullYear(), base.getMonth(), base.getDate() + deltaWeeks * 7);
     setWeekAnchor(moved);
   };
+
+  // 지오 메시지
+  const geoMsg = useMemo(() => {
+    if (!branchReady) return '지점 위치 정보 없음';
+    if (geoBlocked) return '위치 권한이 거부되었습니다';
+    if (!geoReady) return '현재 위치 확인중…';
+    return inside
+      ? `현재 지점까지 ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`
+      : `반경 밖입니다: ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`;
+  }, [branchReady, geoBlocked, geoReady, inside, distance, branchGeo]);
+
+  const geoOk = branchReady && geoReady && inside && !geoBlocked;
 
   return (
     <Screen>
@@ -633,12 +695,34 @@ export default function MobileStaffHome() {
                 </StatusBadge>
               </ScheduleLine>
 
+              {/* ✅ 지오펜스 상태 */}
+              <GeoRow>
+                <GeoPill $ok={geoOk}>
+                  <Icon path={geoOk ? mdiMapMarker : mdiAlertCircle} size={0.82} />
+                  {geoMsg}
+                </GeoPill>
+                <button
+                  onClick={refresh}
+                  disabled={geoLoading}
+                  style={{
+                    height: 36, padding: '0 10px', borderRadius: 10, border: '1px solid #e5e7eb',
+                    background: '#f9fafb', color: '#374151', fontWeight: 800, fontSize: 12, display: 'inline-flex',
+                    alignItems: 'center', gap: 6, cursor: geoLoading ? 'default' : 'pointer'
+                  }}
+                  aria-label="위치 새로고침"
+                  title="위치 새로고침"
+                >
+                  <Icon path={mdiCrosshairsGps} size={0.82} />
+                  {geoLoading ? '갱신중…' : '새로고침'}
+                </button>
+              </GeoRow>
+
               <SingleBtnRow>
                 <ActionBtn
                   $variant={next.variant}
                   onClick={actionOnClick}
-                  disabled={next.disabled}
-                  aria-disabled={next.disabled}
+                  disabled={finalDisabled}
+                  aria-disabled={finalDisabled}
                 >
                   {next.label} <Icon path={next.icon} size={0.8} />
                 </ActionBtn>
@@ -653,7 +737,6 @@ export default function MobileStaffHome() {
                 <Icon path={mdiCalendarWeek} size={0.9} />
                 이번 주 근무
               </CardTitle>
-              {/* ✅ 투명 아이콘 버튼 */}
               <WeekNav aria-label="주간 이동">
                 <WeekNavBtn onClick={() => moveWeek(-1)} aria-label="이전 주">
                   <Icon path={mdiChevronLeft} size={0.9} />
