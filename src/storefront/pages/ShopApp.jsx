@@ -20,6 +20,7 @@ import SearchResultsPage from "../components/SearchResultsPage";
 import ProductInquiryModal from "../components/ProductInquiryModal";
 import ShopHeader from "../components/ShopHeader";
 import ShopFooter from "../components/ShopFooter";
+import ProductRanking from "../components/ProductRanking";
 import "../styles/shop.css";
 import axios from "axios";
 import { authService } from "../../service/authService";
@@ -27,6 +28,7 @@ import { addToCart, clearCart } from "../../store/slices/cartSlice";
 import { setSelectedBranch } from "../../store/slices/branchSlice";
 import { cartService } from "../../service/cartService";
 import { customerAuthService } from "../../service/customerAuthService";
+import { customerProductService } from "../../service/customerProductService";
 
 function ShopApp() {
   return (
@@ -522,6 +524,17 @@ function ShopLayout() {
     });
   };
 
+  // 상품 클릭 시 조회 기록 POST 요청 (전역 서비스 사용)
+  const handleProductClick = async (product) => {
+    // 상품 조회 기록 POST 요청
+    const productId = product.productId || product.id;
+    if (productId) {
+      await customerProductService.recordProductView(productId);
+    }
+    
+    setDetailProduct(product);
+  };
+
   const handleAddToCart = async (product) => {
     // 로그인 체크
     if (!isLoggedIn || !currentUser) {
@@ -790,7 +803,7 @@ function ShopLayout() {
            <ProductsPage
              favorites={favorites}
              onToggleFavorite={toggleFavorite}
-             onOpenDetail={(p) => setDetailProduct(p)}
+             onOpenDetail={handleProductClick}
              onAddToCart={handleAddToCart}
              products={products}
              searchQuery="" // shop 페이지에서는 검색어 필터링 안 함
@@ -809,7 +822,7 @@ function ShopLayout() {
              searchError={searchError}
              favorites={favorites}
              onToggleFavorite={toggleFavorite}
-             onOpenDetail={(p) => setDetailProduct(p)}
+             onOpenDetail={handleProductClick}
              onAddToCart={handleAddToCart}
              onBack={() => {
                clearSearch();
@@ -974,7 +987,7 @@ function ShopLayout() {
                     </div>
                   )}
                   {!loadingProducts && !productsError && filteredProducts.map((p) => (
-                    <article className="card" key={p.id} onClick={() => setDetailProduct(p)} style={{ cursor: "pointer" }}>
+                    <article className="card" key={p.id} onClick={() => handleProductClick(p)} style={{ cursor: "pointer" }}>
                       <button
                         className={`fav-btn${
                           favorites.has(p.id) ? " active" : ""
@@ -1079,19 +1092,15 @@ function ShopLayout() {
             <section className="section">
               <div className="container">
                 <div className="section-title">🏆 실시간 인기 랭킹</div>
-                <Ranking />
+                <ProductRanking 
+                  memberId={currentUser?.memberId}
+                  onAddToCart={handleAddToCart}
+                  onOpenDetail={handleProductClick}
+                />
               </div>
             </section>
 
-            <section className="section pre-footer-gap">
-              <div className="container">
-                <div className="section-title">선물특가</div>
-                <Deals />
-                <div style={{ textAlign: "center", marginTop: 16 }}>
-                  <button className="tab">전체보기 ▸</button>
-                </div>
-              </div>
-            </section>
+       
           </>
         )}
       </main>
@@ -1130,115 +1139,5 @@ function ShopLayout() {
   );
 }
 
-function Deals() {
-  const end = new Date(Date.now() + 1000 * 60 * 60 * 13 + 1000 * 60 * 41);
-  const [now, setNow] = useState(Date.now());
-  const remain = Math.max(0, end.getTime() - now);
-  const hh = String(Math.floor(remain / 3600000)).padStart(2, "0");
-  const mm = String(Math.floor((remain % 3600000) / 60000)).padStart(2, "0");
-  const ss = String(Math.floor((remain % 60000) / 1000)).padStart(2, "0");
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div className="deals">
-      <div className="deals-aside">
-        <div className="deals-title">🎁 선물특가</div>
-        <div className="deals-timer">
-          {hh}:{mm}:{ss}
-        </div>
-        <div className="deals-sub">망설이면 늦어요!</div>
-      </div>
-      <div className="deals-card">
-        <img
-          src="https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?auto=format&fit=crop&w=900&q=80"
-          alt="스포츠웨어 특가"
-        />
-        <button className="deal-cta">🛒 담기</button>
-        <div className="deal-meta">
-          <div className="deal-name">[선물특가] 런닝/트레이닝 웨어 세트</div>
-          <div className="deal-price">
-            <b>30%</b> 39,900원 <span className="strike">57,000원</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Ranking() {
-  const items = rankingItems;
-  return (
-    <>
-      <div className="grid ranking-grid">
-        {items.slice(0, 5).map((it, i) => (
-          <article className="rank-card" key={i}>
-            <div className="rank-badge">{i + 1}</div>
-            <div className="rank-img">
-              <img src={it.image} alt={it.name} />
-              {it.sticker && <span className="rank-sticker">{it.sticker}</span>}
-            </div>
-            <button className="deal-cta">🛒 담기</button>
-            <div className="card-body">
-              <div className="name">{it.name}</div>
-              <div className="price">
-                <b>{it.sale}%</b> {it.price.toLocaleString()}원
-                <span className="strike"> {it.origin.toLocaleString()}원</span>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-      <div style={{ textAlign: "center", marginTop: 16 }}>
-        <button className="tab">전체보기 ▸</button>
-      </div>
-    </>
-  );
-}
-
-const rankingItems = [
-  {
-    name: "러닝화 경량 모델",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
-    sale: 20,
-    price: 89000,
-    origin: 112000,
-    sticker: "FESTA DEAL",
-  },
-  {
-    name: "트레이닝 조거 팬츠",
-    image: "https://images.unsplash.com/photo-1545912452-8aea7e25a3d3?auto=format&fit=crop&w=900&q=80",
-    sale: 18,
-    price: 36000,
-    origin: 44000,
-    sticker: "멤버특가",
-  },
-  {
-    name: "퍼포먼스 드라이 티셔츠",
-    image: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
-    sale: 15,
-    price: 18900,
-    origin: 22900,
-    sticker: "+10% 쿠폰",
-  },
-  {
-    name: "아웃도어 트레일 자켓",
-    image: "https://images.unsplash.com/photo-1549576490-b0b4831ef60a?auto=format&fit=crop&w=900&q=80",
-    sale: 22,
-    price: 129000,
-    origin: 165000,
-    sticker: "HOT",
-  },
-  {
-    name: "컴프레션 레깅스",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
-    sale: 28,
-    price: 24900,
-    origin: 34900,
-    sticker: "쿠폰",
-  },
-];
 
 export default ShopApp;
