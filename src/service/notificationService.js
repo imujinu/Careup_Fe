@@ -50,5 +50,33 @@ export const notificationService = {
       return false;
     }
   },
+
+  /**
+   * 특정 알림 삭제
+   */
+  deleteNotification: async (notificationId) => {
+    try {
+      await axios.patch(`${BRANCH_API_BASE}/noti/delete/${notificationId}`);
+      console.log('알림 삭제 완료:', notificationId);
+      return true;
+    } catch (error) {
+      console.error('알림 삭제 실패:', error);
+      return false;
+    }
+  },
+
+  /**
+   * 전체 알림 삭제
+   */
+  deleteAllNotifications: async (notificationIds) => {
+    try {
+      await axios.patch(`${BRANCH_API_BASE}/noti/deleteAll`, notificationIds);
+      console.log('전체 알림 삭제 완료:', notificationIds);
+      return true;
+    } catch (error) {
+      console.error('전체 알림 삭제 실패:', error);
+      return false;
+    }
+  },
 };
 
