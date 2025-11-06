@@ -305,51 +305,24 @@ export const dashboardService = {
   // 우수 지점 조회
   getTopBranch: async () => {
     try {
-      // 1) 지점 목록 조회 (간단한 정보)
-      const branches = await dashboardService.getAllBranches();
-      if (!Array.isArray(branches) || branches.length === 0) return null;
-
-      // 2) 최근 1개월 기간 설정
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setMonth(endDate.getMonth() - 1);
-
-      // 3) 가맹점 간 매출 비교 조회
-      const branchIds = branches
-        .map((b) => b.branchId || b.id)
-        .filter((id) => id != null);
-
-      if (branchIds.length === 0) return null;
-
-      const params = new URLSearchParams({
-        branchIds: branchIds.join(','),
-        startDate: formatDate(startDate),
-        endDate: formatDate(endDate),
-        periodType: 'DAY',
-      });
-
       const response = await axios.get(
-        `${ORDERING_API_BASE_URL}/hq/sales/comparison?${params.toString()}`
+        `${ORDERING_API_BASE_URL}/hq/sales/top-branch`
       );
+      
+      const result = response.data?.result || null;
+      if (!result) return null;
 
-      const result = response.data?.result?.content || response.data?.result || [];
-      if (!Array.isArray(result) || result.length === 0) return null;
-
-      // 4) 총매출이 가장 높은 지점 선택
-      let top = null;
-      for (const item of result) {
-        const totalSales = Number(item?.totalSales ?? item?.sales ?? 0);
-        if (top == null || totalSales > top.totalSales) {
-          top = {
-            branchId: item?.branchId,
-            branchName: item?.branchName || item?.name || '',
-            ownerName: item?.ownerName || item?.managerName || '',
-            totalSales,
-          };
-        }
-      }
-
-      return top;
+      // 지점 상세 정보 조회 (ownerName 등)
+      const branches = await dashboardService.getAllBranches();
+      const branch = branches.find((b) => (b.branchId || b.id) === result.branchId);
+      
+      return {
+        branchId: result.branchId,
+        branchName: result.branchName,
+        ownerName: branch?.ownerName || branch?.managerName || "-",
+        totalSales: result.totalSales || 0,
+        totalOrders: result.totalOrders || 0,
+      };
     } catch (error) {
       console.error("Failed to get top branch:", error);
       return null;
@@ -370,8 +343,24 @@ export const dashboardService = {
   // 저조 지점 조회
   getLowSalesBranch: async () => {
     try {
-      // TODO: 저조 지점 API 엔드포인트 확인 및 구현
-      return null;
+      const response = await axios.get(
+        `${ORDERING_API_BASE_URL}/hq/sales/low-branch`
+      );
+      
+      const result = response.data?.result || null;
+      if (!result) return null;
+
+      // 지점 상세 정보 조회 (ownerName 등)
+      const branches = await dashboardService.getAllBranches();
+      const branch = branches.find((b) => (b.branchId || b.id) === result.branchId);
+      
+      return {
+        branchId: result.branchId,
+        branchName: result.branchName,
+        ownerName: branch?.ownerName || branch?.managerName || "-",
+        totalSales: result.totalSales || 0,
+        totalOrders: result.totalOrders || 0,
+      };
     } catch (error) {
       console.error("Failed to get low sales branch:", error);
       return null;
@@ -379,12 +368,51 @@ export const dashboardService = {
   },
 
   // 카테고리별 매출 비중 조회
-  getSalesByCategory: async () => {
+  getSalesByCategory: async (period = "MONTH") => {
     try {
-      // TODO: 카테고리별 매출 API 엔드포인트 확인 및 구현
-      return null;
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      if (period === "WEEK") {
+        startDate.setDate(endDate.getDate() - 7);
+      } else if (period === "MONTH") {
+        startDate.setMonth(endDate.getMonth() - 1);
+      } else if (period === "YEAR") {
+        startDate.setFullYear(endDate.getFullYear() - 1);
+      }
+
+      const response = await axios.get(
+        `${ORDERING_API_BASE_URL}/hq/sales/categories?startDate=${formatDate(startDate)}&endDate=${formatDate(endDate)}&periodType=${period}`
+      );
+      
+      return response.data?.result || null;
     } catch (error) {
       console.error("Failed to get sales by category:", error);
+      return null;
+    }
+  },
+
+  // 지점별 매출 집계 조회 (지점간 비교용)
+  getBranchSalesSummary: async (period = "MONTH") => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      if (period === "WEEK") {
+        startDate.setDate(endDate.getDate() - 7);
+      } else if (period === "MONTH") {
+        startDate.setMonth(endDate.getMonth() - 1);
+      } else if (period === "YEAR") {
+        startDate.setFullYear(endDate.getFullYear() - 1);
+      }
+
+      const response = await axios.get(
+        `${ORDERING_API_BASE_URL}/hq/sales/branches-summary?startDate=${formatDate(startDate)}&endDate=${formatDate(endDate)}&periodType=${period}`
+      );
+      
+      return response.data?.result || null;
+    } catch (error) {
+      console.error("Failed to get branch sales summary:", error);
       return null;
     }
   },

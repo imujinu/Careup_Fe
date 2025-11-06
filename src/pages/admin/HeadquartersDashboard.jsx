@@ -336,6 +336,9 @@ const HeadquartersDashboard = () => {
   const [popularProduct, setPopularProduct] = useState(null);
   const [unpopularProduct, setUnpopularProduct] = useState(null);
   const [topBranch, setTopBranch] = useState(null);
+  const [lowBranch, setLowBranch] = useState(null);
+  const [categorySales, setCategorySales] = useState(null);
+  const [branchSalesSummary, setBranchSalesSummary] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -369,6 +372,21 @@ const HeadquartersDashboard = () => {
       const top = await dashboardService.getTopBranch();
       console.log("Top Branch:", top);
       setTopBranch(top);
+
+      // 저조 지점 조회
+      const low = await dashboardService.getLowSalesBranch();
+      console.log("Low Branch:", low);
+      setLowBranch(low);
+
+      // 카테고리별 매출 비중 조회
+      const categories = await dashboardService.getSalesByCategory(categoryPeriod);
+      console.log("Category Sales:", categories);
+      setCategorySales(categories);
+
+      // 지점별 매출 집계 조회
+      const branchSummary = await dashboardService.getBranchSalesSummary(salesPeriod);
+      console.log("Branch Sales Summary:", branchSummary);
+      setBranchSalesSummary(branchSummary);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -382,6 +400,9 @@ const HeadquartersDashboard = () => {
         try {
           const sales = await dashboardService.getSalesStatistics(salesPeriod);
           setSalesData(sales);
+
+          const branchSummary = await dashboardService.getBranchSalesSummary(salesPeriod);
+          setBranchSalesSummary(branchSummary);
         } catch (error) {
           console.error("Failed to load sales data:", error);
         }
@@ -389,6 +410,20 @@ const HeadquartersDashboard = () => {
       loadSalesData();
     }
   }, [salesPeriod]);
+
+  useEffect(() => {
+    if (categoryPeriod) {
+      const loadCategorySales = async () => {
+        try {
+          const categories = await dashboardService.getSalesByCategory(categoryPeriod);
+          setCategorySales(categories);
+        } catch (error) {
+          console.error("Failed to load category sales:", error);
+        }
+      };
+      loadCategorySales();
+    }
+  }, [categoryPeriod]);
 
   // 원 → 만원 → 억 자동 변환 포맷팅 함수
   const formatCurrency = (value) => {
@@ -427,21 +462,34 @@ const HeadquartersDashboard = () => {
     return value;
   };
 
-  // 매출 데이터를 차트 형식으로 변환
+  // 매출 데이터를 차트 형식으로 변환 (지점별 매출 비교용)
   const getChartData = () => {
-    if (!salesData || !salesData.statistics) {
-      return WeeklyData;
+    if (!branchSalesSummary || !branchSalesSummary.branches) {
+      return [];
     }
 
-    return salesData.statistics.map((item) => {
-      const date = item.period || item.date;
-      const day = date ? new Date(date).toLocaleDateString('ko-KR', { weekday: 'short' }).replace('.', '') : '';
-      return {
-        day: day || date,
-        actual: item.totalSales ? item.totalSales / 1000 : 0,
-        target: 3.0, // 목표 매출은 하드코딩
-      };
-    });
+    // 상위 10개 지점만 표시 (너무 많으면 차트가 복잡해짐)
+    const topBranches = branchSalesSummary.branches.slice(0, 10);
+    
+    return topBranches.map((branch) => ({
+      name: branch.branchName?.length > 6 ? branch.branchName.substring(0, 6) + '...' : branch.branchName,
+      매출: branch.totalSales ? Math.round(branch.totalSales / 1000) : 0, // 천원 단위
+    }));
+  };
+
+  // 카테고리별 매출 데이터 변환
+  const getCategoryChartData = () => {
+    if (!categorySales || !categorySales.categories) {
+      return CategoryData;
+    }
+
+    const colors = ["#3b82f6", "#f97316", "#eab308", "#10b981", "#8b5cf6", "#06b6d4", "#ef4444", "#059669"];
+    
+    return categorySales.categories.map((item, index) => ({
+      name: item.categoryName,
+      value: Number(item.percentage.toFixed(1)),
+      color: colors[index % colors.length],
+    }));
   };
 
   if (loading) {
@@ -453,12 +501,12 @@ const HeadquartersDashboard = () => {
   }
 
   const chartData = getChartData();
+  const categoryChartData = getCategoryChartData();
 
   return (
     <DashboardContainer>
       <DashboardHeader>
         <Title>한솥도시락 대시보드에 오신 것을 환영합니다.</Title>
-        <EditButton>편집</EditButton>
       </DashboardHeader>
 
       {/* KPI Cards */}
@@ -548,9 +596,11 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiAlertCircle} size={1.5} color="#ef4444" />
           </KPIIcon>
           <KPILabel>매출 저조 지점</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>고양삼송점</KPIValue>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {lowBranch?.branchName || "-"}
+          </KPIValue>
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            임성후
+            {lowBranch?.ownerName || "-"}
           </KPILabel>
         </HighlightCard>
       </HighlightsGrid>
@@ -560,10 +610,9 @@ const HeadquartersDashboard = () => {
         <ChartCard>
           <ChartHeader>
             <div>
-              <ChartTitle>매출 현황</ChartTitle>
+              <ChartTitle>지점별 매출 비교</ChartTitle>
               <ChartSubtitle>전국 지점</ChartSubtitle>
             </div>
-            <MoreLink>더보기</MoreLink>
           </ChartHeader>
 
           <TabContainer>
@@ -581,30 +630,33 @@ const HeadquartersDashboard = () => {
             </Tab>
           </TabContainer>
 
+          <div style={{ marginBottom: "10px", fontSize: "12px", color: "#6b7280" }}>
+            {(() => {
+              const endDate = new Date();
+              const startDate = new Date();
+              if (salesPeriod === "WEEK") {
+                startDate.setDate(endDate.getDate() - 7);
+              } else if (salesPeriod === "MONTH") {
+                startDate.setMonth(endDate.getMonth() - 1);
+              } else if (salesPeriod === "YEAR") {
+                startDate.setFullYear(endDate.getFullYear() - 1);
+              }
+              return `${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`;
+            })()}
+          </div>
+
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
+              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
               <YAxis />
-              <Tooltip />
+              <Tooltip 
+                formatter={(value) => `${value.toLocaleString()}천원`}
+                labelFormatter={(label) => `지점: ${label}`}
+              />
               <Legend />
-              <Line
-                type="monotone"
-                dataKey="actual"
-                stroke="#10b981"
-                strokeWidth={2}
-                name="실제 매출"
-                unit="k"
-              />
-              <Line
-                type="monotone"
-                dataKey="target"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                name="목표 매출"
-                unit="k"
-              />
-            </LineChart>
+              <Bar dataKey="매출" fill="#10b981" />
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
@@ -614,7 +666,6 @@ const HeadquartersDashboard = () => {
               <ChartTitle>카테고리별 매출 비중</ChartTitle>
               <ChartSubtitle>전국 지점</ChartSubtitle>
             </div>
-            <MoreLink>더보기</MoreLink>
           </ChartHeader>
 
           <TabContainer>
@@ -639,13 +690,24 @@ const HeadquartersDashboard = () => {
           </TabContainer>
 
           <div style={{ marginBottom: "10px", fontSize: "12px", color: "#6b7280" }}>
-            2025.09.22 ~ 2025.09.22
+            {(() => {
+              const endDate = new Date();
+              const startDate = new Date();
+              if (categoryPeriod === "WEEK") {
+                startDate.setDate(endDate.getDate() - 7);
+              } else if (categoryPeriod === "MONTH") {
+                startDate.setMonth(endDate.getMonth() - 1);
+              } else if (categoryPeriod === "YEAR") {
+                startDate.setFullYear(endDate.getFullYear() - 1);
+              }
+              return `${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`;
+            })()}
           </div>
 
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={CategoryData}
+                data={categoryChartData}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -655,11 +717,11 @@ const HeadquartersDashboard = () => {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {CategoryData.map((entry, index) => (
+                {categoryChartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(value) => `${value}%`} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -673,7 +735,6 @@ const HeadquartersDashboard = () => {
             <ChartTitle>재고 부족 현황</ChartTitle>
             <ChartSubtitle>전국 지점</ChartSubtitle>
           </div>
-          <MoreLink>더보기</MoreLink>
         </ChartHeader>
 
         <ResponsiveContainer width="100%" height={400}>
