@@ -225,7 +225,6 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   // item이 변경될 때 formData 초기화 및 상품 정보 조회
   useEffect(() => {
     if (item && isOpen) {
-      console.log('EditInventoryModal에서 받은 item:', item); // 디버깅용
       setFormData({
         currentStock: item.currentStock || item.stockQuantity || 0,
         safetyStock: item.safetyStock || 0,
@@ -309,13 +308,11 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               React.createElement(InfoLabel, null, '카테고리:'),
               React.createElement(InfoValue, null, item.category || item.categoryName || '미분류')
             ),
-            React.createElement(InfoRow, null,
-              React.createElement(InfoLabel, null, '현재 재고:'),
-              React.createElement(InfoValue, null, `${item.currentStock || 0}개`)
-            ),
-            React.createElement(InfoRow, null,
-              React.createElement(InfoLabel, null, '안전 재고:'),
-              React.createElement(InfoValue, null, `${item.safetyStock || 0}개`)
+            item.attributes && item.attributes.length > 0 && React.createElement(InfoRow, null,
+              React.createElement(InfoLabel, null, '옵션:'),
+              React.createElement(InfoValue, null, 
+                item.attributes.map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`).join(', ')
+              )
             )
           )
         ),

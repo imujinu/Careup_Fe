@@ -268,6 +268,12 @@ function FranchiseInventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(InfoLabel, null, '카테고리:'),
                 React.createElement(InfoValue, null, item.category || '미분류')
               ),
+              item.attributes && item.attributes.length > 0 && React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '속성:'),
+                React.createElement(InfoValue, null, 
+                  item.attributes.map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`).join(', ')
+                )
+              ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '공급가:'),
                 React.createElement(InfoValue, null, `₩${(item.unitPrice || 0).toLocaleString()}`)

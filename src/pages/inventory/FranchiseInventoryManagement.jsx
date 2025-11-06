@@ -45,7 +45,8 @@ function FranchiseInventoryManagement() {
 
   const [filters, setFilters] = useState({
     searchTerm: '',
-    categoryFilter: ''
+    categoryFilter: '',
+    statusFilter: ''
   });
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,11 +90,95 @@ function FranchiseInventoryManagement() {
         productMap.set(product.productId, product);
       });
       
+      // 상품별 속성 정보를 가져오기 위한 Map (캐싱)
+      const productAttributesMap = new Map();
+      
+      // 모든 고유한 상품 ID 수집
+      const uniqueProductIds = [...new Set(data.map(bp => bp.productId).filter(Boolean))];
+      
+      // 모든 상품의 속성 정보를 배치로 가져오기
+      const batchSize = 10;
+      for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+        const batch = uniqueProductIds.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (productId) => {
+          if (!productAttributesMap.has(productId)) {
+            try {
+              const productAttributes = await inventoryService.getProductAttributeValues(productId);
+              // 속성 타입별로 그룹화
+              const attributeMap = new Map();
+              (productAttributes || []).forEach(attr => {
+                const typeId = String(attr.attributeTypeId || attr.attributeType?.id || '');
+                const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
+                const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
+                const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName || '';
+                const displayOrder = attr.attributeType?.displayOrder || attr.displayOrder || 0;
+                
+                const key = typeId || typeName;
+                if (!key) return;
+                
+                if (!attributeMap.has(key)) {
+                  attributeMap.set(key, {
+                    attributeTypeId: typeId,
+                    attributeTypeName: typeName,
+                    displayOrder: displayOrder,
+                    values: []
+                  });
+                }
+                
+                if (valueId && valueName) {
+                  attributeMap.get(key).values.push({
+                    attributeValueId: valueId,
+                    attributeValueName: valueName
+                  });
+                }
+              });
+              
+              // 속성 타입별로 정렬하고 최대 2개까지만 선택
+              const sortedAttributes = Array.from(attributeMap.values())
+                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+              
+              const attributes = sortedAttributes
+                .slice(0, 2)
+                .map(attr => ({
+                  attributeTypeId: attr.attributeTypeId,
+                  attributeTypeName: attr.attributeTypeName,
+                  attributeValueId: attr.values[0]?.attributeValueId || null,
+                  attributeValueName: attr.values[0]?.attributeValueName || null
+                }));
+              
+              productAttributesMap.set(productId, attributes);
+            } catch (err) {
+              productAttributesMap.set(productId, []);
+            }
+          }
+        }));
+      }
+      
       // 데이터 변환
       const formattedData = data.map(item => {
         const product = productMap.get(item.productId);
         const unitPrice = product?.supplyPrice || 0;  // 공급가는 Product.supplyPrice
         const salesPrice = item.price || null;  // 판매가는 BranchProduct.price
+        
+        // 상품에 등록된 모든 속성 정보 가져오기 (캐시 사용)
+        let attributes = productAttributesMap.get(item.productId) || [];
+        
+        if (attributes.length > 0) {
+          attributes = attributes.map(attr => ({
+            attributeTypeId: attr.attributeTypeId,
+            attributeTypeName: attr.attributeTypeName,
+            attributeValueId: attr.attributeValueId,
+            attributeValueName: attr.attributeValueName
+          }));
+        } else {
+          // 속성 정보가 없으면 BranchProduct에서 가져오기
+          if (item.attributeTypeName && item.attributeValueName) {
+            attributes = [{
+              attributeTypeName: item.attributeTypeName,
+              attributeValueName: item.attributeValueName
+            }];
+          }
+        }
         
         return {
           id: item.branchProductId,
@@ -109,13 +194,30 @@ function FranchiseInventoryManagement() {
           status: (item.stockQuantity || 0) < (item.safetyStock || 0) ? 'low' : 'normal',
           unitPrice: unitPrice,
           salesPrice: salesPrice,
-          totalValue: (item.stockQuantity || 0) * unitPrice
+          totalValue: (item.stockQuantity || 0) * unitPrice,
+          attributes: attributes  // 속성 정보 (최대 2개)
         };
       });
       
-      // 중복 데이터 제거
+      // 중복 데이터 제거 (같은 productId와 같은 속성 조합을 가진 항목 제거)
       const uniqueData = formattedData.reduce((acc, current) => {
-        const existingIndex = acc.findIndex(item => item.product.id === current.product.id);
+        // 속성 조합을 문자열로 변환하여 비교
+        const currentAttributesKey = (current.attributes || [])
+          .map(attr => `${attr.attributeTypeId || ''}_${attr.attributeValueId || ''}`)
+          .sort()
+          .join('|');
+        
+        const existingIndex = acc.findIndex(item => {
+          if (item.product.id !== current.product.id) return false;
+          
+          const itemAttributesKey = (item.attributes || [])
+            .map(attr => `${attr.attributeTypeId || ''}_${attr.attributeValueId || ''}`)
+            .sort()
+            .join('|');
+          
+          return itemAttributesKey === currentAttributesKey;
+        });
+        
         if (existingIndex === -1) {
           acc.push(current);
         } else {
@@ -185,13 +287,11 @@ function FranchiseInventoryManagement() {
   };
 
   const handleModify = (item) => {
-    console.log('수정할 상품 데이터:', item); // 디버깅용
     setSelectedItem(item);
     setIsEditModalOpen(true);
   };
 
   const handleViewDetail = (item) => {
-    console.log('상세보기 상품 데이터:', item);
     setSelectedItem(item);
     setIsDetailModalOpen(true);
   };
@@ -274,7 +374,8 @@ function FranchiseInventoryManagement() {
         serialNumber: setupData.serialNumber || `${currentProduct.productId}-${Date.now()}`,
         stockQuantity: setupData.stockQuantity || 0,
         safetyStock: setupData.safetyStock,
-        price: setupData.sellingPrice || setupData.price || 0  // 판매가를 price로 매핑
+        price: setupData.sellingPrice || 0,  // 판매가를 price로 매핑 (sellingPrice 우선)
+        attributeValueId: setupData.attributeValueId || null  // 속성 값 ID 포함
       });
       
       alert('상품이 등록되었습니다.');
@@ -298,8 +399,6 @@ function FranchiseInventoryManagement() {
 
   const handleSaveEdit = async (formData) => {
     try {
-      console.log('Saving inventory data:', formData);
-      
       // 안전재고와 판매가 업데이트 (공급가는 수정 불가)
       if (selectedItem?.id) {
         await inventoryService.updateInventoryInfo(
@@ -330,7 +429,9 @@ function FranchiseInventoryManagement() {
       
       const matchesCategory = !filters.categoryFilter || item.category === filters.categoryFilter;
       
-      return matchesSearch && matchesCategory;
+      const matchesStatus = !filters.statusFilter || item.status === filters.statusFilter;
+      
+      return matchesSearch && matchesCategory && matchesStatus;
     });
 
     // 정렬 적용

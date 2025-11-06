@@ -234,7 +234,12 @@ function PartialApproveModal({ isOpen, onClose, products, onApprove }) {
         React.createElement(ProductList, null,
           products.map(product =>
             React.createElement(ProductItem, { key: product.id },
-              React.createElement(ProductName, null, product.name),
+              React.createElement(ProductName, null,
+                React.createElement('div', null, product.name),
+                product.attributes && product.attributes.length > 0 && React.createElement('div', { 
+                  style: { fontSize: '12px', color: '#6b7280', marginTop: '4px', fontWeight: '400' } 
+                }, product.attributes.map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`).join('  ·  '))
+              ),
               React.createElement(QuantityInputGroup, null,
                 React.createElement(QuantityLabel, null, '승인 수량:'),
                 React.createElement(QuantityInput, {

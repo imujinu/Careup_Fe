@@ -202,7 +202,130 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
     try {
       // 본사 상품 목록 조회 (모든 상품)
       const response = await inventoryService.getBranchProducts(1); // 본사 branchId = 1
-      setProducts(response || []);
+      const branchProducts = response || [];
+      
+      // 같은 상품(productId)을 그룹화하고, 각 그룹 내에서 속성 정보를 수집
+      const productMap = new Map();
+      
+      for (const bp of branchProducts) {
+        const productId = bp.productId;
+        
+        if (!productMap.has(productId)) {
+          // 상품의 모든 속성 값 조회
+          try {
+            const attributes = await inventoryService.getProductAttributeValues(productId);
+            productMap.set(productId, {
+              productId: productId,
+              productName: bp.productName,
+              productDescription: bp.productDescription,
+              categoryName: bp.categoryName,
+              categoryId: bp.categoryId,
+              allAttributes: attributes || [],
+              branchProducts: []
+            });
+          } catch (err) {
+            console.error(`상품 ${productId} 속성 조회 실패:`, err);
+            productMap.set(productId, {
+              productId: productId,
+              productName: bp.productName,
+              productDescription: bp.productDescription,
+              categoryName: bp.categoryName,
+              categoryId: bp.categoryId,
+              allAttributes: [],
+              branchProducts: []
+            });
+          }
+        }
+        
+        productMap.get(productId).branchProducts.push(bp);
+      }
+      
+      // 각 상품에 대해 속성 정보를 표시 형식으로 변환
+      const productsWithAttributes = [];
+      
+      for (const [productId, productData] of productMap.entries()) {
+        // 각 BranchProduct별로 속성 정보 생성
+        for (const bp of productData.branchProducts) {
+          // 이 BranchProduct의 속성 정보
+          const currentAttributeType = bp.attributeTypeName;
+          const currentAttributeValue = bp.attributeValueName;
+          
+          // 상품의 모든 속성 중에서 이 BranchProduct와 관련된 속성들을 찾아서 표시
+          const attributeGroups = {};
+          
+          // 현재 BranchProduct의 속성 ID 찾기
+          let currentAttributeValueId = bp.attributeValueId || null;
+          
+          // 상품 마스터의 속성에서 현재 속성 값과 일치하는 ID 찾기
+          if (currentAttributeType && currentAttributeValue && productData.allAttributes) {
+            const matchedAttr = productData.allAttributes.find(attr => {
+              const typeName = attr.attributeTypeName || attr.attributeType?.name;
+              const valueName = attr.displayName || attr.value || '';
+              return typeName === currentAttributeType && valueName === currentAttributeValue;
+            });
+            if (matchedAttr && !currentAttributeValueId) {
+              currentAttributeValueId = matchedAttr.attributeValueId || matchedAttr.id || null;
+            }
+          }
+          
+          // 현재 BranchProduct의 속성 추가
+          if (currentAttributeType && currentAttributeValue) {
+            attributeGroups[currentAttributeType] = {
+              typeName: currentAttributeType,
+              values: [currentAttributeValue]
+            };
+          }
+          
+          // 상품 마스터의 다른 속성들도 추가 (같은 속성 타입의 다른 값들)
+          if (productData.allAttributes && productData.allAttributes.length > 0) {
+            productData.allAttributes.forEach(attr => {
+              const typeId = attr.attributeTypeId || attr.attributeType?.id;
+              const typeName = attr.attributeTypeName || attr.attributeType?.name;
+              const valueName = attr.displayName || attr.value || '-';
+              
+              if (typeName && typeName === currentAttributeType) {
+                // 같은 속성 타입이면 기존 그룹에 추가
+                if (!attributeGroups[typeName]) {
+                  attributeGroups[typeName] = {
+                    typeName: typeName,
+                    values: []
+                  };
+                }
+                if (!attributeGroups[typeName].values.includes(valueName)) {
+                  attributeGroups[typeName].values.push(valueName);
+                }
+              } else if (typeName && typeName !== currentAttributeType) {
+                // 다른 속성 타입도 추가 (상품에 등록된 모든 속성 표시)
+                if (!attributeGroups[typeName]) {
+                  attributeGroups[typeName] = {
+                    typeName: typeName,
+                    values: []
+                  };
+                }
+                if (!attributeGroups[typeName].values.includes(valueName)) {
+                  attributeGroups[typeName].values.push(valueName);
+                }
+              }
+            });
+          }
+          
+          // 속성 표시 문자열 생성 (예: "사이즈: L, 색상: 브라운")
+          const attributeDisplayParts = Object.values(attributeGroups).map(group => {
+            return `${group.typeName}: ${group.values.join(', ')}`;
+          });
+          const attributeDisplay = attributeDisplayParts.length > 0 
+            ? attributeDisplayParts.join(', ')
+            : null;
+          
+          productsWithAttributes.push({
+            ...bp,
+            attributeDisplay: attributeDisplay,
+            attributeValueId: currentAttributeValueId  // 속성 값 ID 명시적으로 포함
+          });
+        }
+      }
+      
+      setProducts(productsWithAttributes);
     } catch (error) {
       console.error('상품 목록 조회 실패:', error);
       setProducts([]);
@@ -311,16 +434,21 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
               React.createElement('div', { style: { fontSize: '14px' } }, '모든 상품이 이미 등록되었거나 검색 조건에 맞는 상품이 없습니다.')
             ) :
             React.createElement(ProductGrid, null,
-              filteredProducts.map((product) => {
+              filteredProducts.map((product, index) => {
+                // 속성 정보 표시
+                const attributeDisplay = product.attributeDisplay;
+                
                 return React.createElement(ProductCard, {
-                  key: product.productId,
+                  key: `${product.branchProductId || product.productId}-${index}`,
                   $selected: false,
                   onClick: () => handleProductSelect(product)
                 },
                   React.createElement(ProductName, null, product.productName || '알 수 없음'),
                   React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
-                  React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`),
-                  React.createElement(ProductPrice, null, `공급가: ₩${product.price?.toLocaleString() || 0}`)
+                  attributeDisplay && React.createElement(ProductInfo, { 
+                    style: { color: '#6b46c1', fontWeight: '500', marginTop: '4px' } 
+                  }, attributeDisplay),
+                  React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`)
                 );
               })
             ),
