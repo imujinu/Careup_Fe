@@ -26,13 +26,13 @@ const BranchDashboard = ({ branchId }) => {
   // 상단 4개 카드: 높이 대폭 증가 (h: 8로 설정하여 잘림 완전 방지)
   // 차트: 크기 고정
   const [layout, setLayout] = useState([
-    { i: 'sales', x: 0, y: 0, w: 3, h: 6, minW: 3, maxW: 3, minH: 8, maxH: 8 },
-    { i: 'inventory', x: 3, y: 0, w: 3, h: 6, minW: 3, maxW: 3, minH: 8, maxH: 8 },
-    { i: 'employee', x: 6, y: 0, w: 3, h: 6, minW: 3, maxW: 3, minH: 8, maxH: 8 },
-    { i: 'order', x: 9, y: 0, w: 3, h: 6, minW: 3, maxW: 3, minH: 8, maxH: 8 },
-    { i: 'revenue', x: 0, y: 8, w: 6, h: 7, minW: 6, maxW: 6, minH: 7, maxH: 7 },
-    { i: 'category', x: 6, y: 8, w: 6, h: 7, minW: 6, maxW: 6, minH: 7, maxH: 7 },
-    { i: 'attendance', x: 0, y: 15, w: 12, h: 4, minW: 12, maxW: 12, minH: 4, maxH: 4 },
+    { i: 'sales', x: 0, y: 0, w: 3, h: 10, minW: 3, maxW: 3, minH: 10, maxH: 10 },
+    { i: 'inventory', x: 3, y: 0, w: 3, h: 10, minW: 3, maxW: 3, minH: 10, maxH: 10 },
+    { i: 'employee', x: 6, y: 0, w: 3, h: 10, minW: 3, maxW: 3, minH: 10, maxH: 10 },
+    { i: 'order', x: 9, y: 0, w: 3, h: 10, minW: 3, maxW: 3, minH: 10, maxH: 10 },
+    { i: 'revenue', x: 0, y: 10, w: 6, h: 7, minW: 6, maxW: 6, minH: 7, maxH: 7 },
+    { i: 'category', x: 6, y: 10, w: 6, h: 7, minW: 6, maxW: 6, minH: 7, maxH: 7 },
+    { i: 'attendance', x: 0, y: 17, w: 12, h: 4, minW: 12, maxW: 12, minH: 4, maxH: 4 },
   ]);
 
   // 그리드 너비 동적 조정 (정확한 계산)
