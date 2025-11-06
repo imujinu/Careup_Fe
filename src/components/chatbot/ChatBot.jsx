@@ -1215,6 +1215,27 @@ const ChatBot = ({ onClose }) => {
       return;
     }
 
+    // 인건비 계산 처리
+    if (tabType === "인건비계산") {
+      const result = await sendChatbotRequest(
+        "인건비 계산",
+        "인건비를 계산하고 있습니다..."
+      );
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: result?.error 
+          ? `오류가 발생했습니다: ${result.error}`
+          : result?.data?.result?.body || result?.result?.body || result?.body
+            ? "인건비 계산이 완료되었습니다."
+            : "인건비 계산 결과를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
     // API 요청 메시지 설정
     let message = "";
     switch (tabType) {
@@ -2868,11 +2889,11 @@ const ChatBot = ({ onClose }) => {
                             <div className="attendance-row">
                               <div className="attendance-cell">
                                 최고{" "}
-                                {message.content.data.highestCostHour ?? "-"}시
+                                {message.content.data.summary.highestCostHour ?? "-"}시
                               </div>
                               <div className="attendance-cell">
                                 {Number(
-                                  message.content.data.highestCostRatio || 0
+                                  message.content.data.summary.highestCostRatio || 0
                                 ).toFixed(1)}
                                 %
                               </div>
@@ -2880,11 +2901,11 @@ const ChatBot = ({ onClose }) => {
                             <div className="attendance-row">
                               <div className="attendance-cell">
                                 최저{" "}
-                                {message.content.data.lowestCostHour ?? "-"}시
+                                {message.content.data.summary.lowestCostHour ?? "-"}시
                               </div>
                               <div className="attendance-cell">
                                 {Number(
-                                  message.content.data.lowestCostRatio || 0
+                                  message.content.data.summary.lowestCostRatio || 0
                                 ).toFixed(1)}
                                 %
                               </div>
@@ -2895,16 +2916,16 @@ const ChatBot = ({ onClose }) => {
                             >
                               평균 인건비율:{" "}
                               {Number(
-                                message.content.data.avgCostRatioChange || 0
+                                message.content.data.summary.avgCostRatioChange || 0
                               ).toFixed(1)}
                               %
                             </div>
-                            {message.content.data.message && (
+                            {message.content.data.summary.message && (
                               <div
                                 className="summary-note"
                                 style={{ marginTop: 6 }}
                               >
-                                {message.content.data.message}
+                                {message.content.data.summary.message}
                               </div>
                             )}
                           </>
