@@ -4,6 +4,50 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
 const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
+// 상품명 기준으로 그룹화하는 함수 (검색 결과용)
+function groupSearchResultsByName(products) {
+  const groupedMap = {};
+  
+  products.forEach(product => {
+    // 상품명 정규화 (공백 제거)
+    const normalizedName = (product.name || '').trim();
+    
+    if (!normalizedName) return;
+    
+    if (!groupedMap[normalizedName]) {
+      // 첫 번째 상품을 기준으로 그룹 생성
+      groupedMap[normalizedName] = {
+        ...product,
+        id: product.id,
+        productId: product.productId,
+        name: normalizedName,
+        variants: [product],
+        productIds: [product.productId]
+      };
+    } else {
+      // 기존 그룹에 추가
+      const group = groupedMap[normalizedName];
+      group.variants.push(product);
+      group.productIds.push(product.productId);
+      
+      // 가격 범위 업데이트
+      const allMinPrices = group.variants.map(v => v.minPrice || 0).filter(p => p > 0);
+      const allMaxPrices = group.variants.map(v => v.maxPrice || 0).filter(p => p > 0);
+      
+      if (allMinPrices.length > 0) {
+        group.minPrice = Math.min(...allMinPrices);
+      }
+      if (allMaxPrices.length > 0) {
+        group.maxPrice = Math.max(...allMaxPrices);
+        group.price = group.maxPrice;
+      }
+    }
+  });
+  
+  // 그룹화된 상품들을 배열로 변환
+  return Object.values(groupedMap);
+}
+
 export function useShopSearch() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -128,8 +172,11 @@ export function useShopSearch() {
       })
       .filter((item) => item != null); // null 항목 제거 (productId가 없는 경우)
       
-      console.log('✅ 매핑된 검색 결과:', { mappedLength: mapped.length, mapped });
-      setSearchResults(mapped);
+      // 상품명 기준으로 그룹화
+      const groupedResults = groupSearchResultsByName(mapped);
+      
+      console.log('✅ 매핑된 검색 결과:', { mappedLength: mapped.length, groupedLength: groupedResults.length, groupedResults });
+      setSearchResults(groupedResults);
       
     } catch (e) {
       console.error('❌ 상품 검색 실패:', e);

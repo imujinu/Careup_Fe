@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./ProductDetail.css";
 
 const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
@@ -7,11 +7,43 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedAttributeValueId, setSelectedAttributeValueId] = useState(null);
+  const [currentProductImage, setCurrentProductImage] = useState(product?.image || null);
+
+  // product가 변경될 때 기본 이미지 설정
+  useEffect(() => {
+    if (product?.image && !selectedAttributeValueId) {
+      setCurrentProductImage(product.image);
+    }
+  }, [product?.image]);
+
+  // 선택된 속성에 해당하는 이미지 가져오기
+  useEffect(() => {
+    if (selectedAttributeValueId && product?.attributeGroups) {
+      // 모든 속성 그룹에서 선택된 속성 값 찾기
+      for (const attrGroup of product.attributeGroups) {
+        if (attrGroup.values) {
+          const selectedValue = attrGroup.values.find(
+            v => v.attributeValueId === selectedAttributeValueId
+          );
+          if (selectedValue && selectedValue.imageUrl) {
+            setCurrentProductImage(selectedValue.imageUrl);
+            return;
+          }
+        }
+      }
+    }
+    // 속성이 선택되지 않았거나 이미지를 찾을 수 없으면 기본 이미지 사용
+    if (!selectedAttributeValueId) {
+      setCurrentProductImage(product?.image || null);
+    }
+  }, [selectedAttributeValueId, product?.attributeGroups, product?.image]);
 
   // 이미지 배열 처리 - images 배열이 있으면 사용, 없으면 image를 배열로 변환
-  const productImages = product?.images && product.images.length > 0 
-    ? product.images 
-    : (product?.image ? [product.image] : []);
+  const productImages = currentProductImage 
+    ? [currentProductImage]
+    : (product?.images && product.images.length > 0 
+      ? product.images 
+      : (product?.image ? [product.image] : []));
 
   const currentImage = productImages[selectedImageIndex] || productImages[0] || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
 
@@ -183,6 +215,11 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                               // 속성 선택 시 해당 속성의 첫 번째 지점을 기본 선택
                               if (firstBranch && firstBranch.branchId) {
                                 setSelectedBranchId(firstBranch.branchId);
+                              }
+                              // 속성 선택 시 해당 상품의 이미지로 변경
+                              if (valueGroup.imageUrl) {
+                                setCurrentProductImage(valueGroup.imageUrl);
+                                setSelectedImageIndex(0); // 이미지 인덱스 초기화
                               }
                             }}
                             style={{

@@ -5,6 +5,105 @@ import { customerProductService } from '../../service/customerProductService';
 const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
 const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
+// 상품명 기준으로 그룹화하는 함수
+function groupProductsByName(products) {
+  const groupedMap = {};
+  
+  products.forEach(product => {
+    // 상품명 정규화 (공백 제거, 대소문자 통일)
+    const normalizedName = (product.name || product.productName || '').trim();
+    
+    if (!normalizedName) return;
+    
+    if (!groupedMap[normalizedName]) {
+      // 첫 번째 상품을 기준으로 그룹 생성
+      groupedMap[normalizedName] = {
+        ...product,
+        // 대표 상품 정보 (첫 번째 상품 사용)
+        id: product.id,
+        productId: product.productId,
+        name: normalizedName,
+        // variants: 같은 이름의 다른 상품들
+        variants: [product],
+        // 모든 variants의 productId 목록
+        productIds: [product.productId]
+      };
+    } else {
+      // 기존 그룹에 추가
+      const group = groupedMap[normalizedName];
+      group.variants.push(product);
+      group.productIds.push(product.productId);
+      
+      // 가격 범위 업데이트
+      const allMinPrices = group.variants.map(v => v.minPrice || 0).filter(p => p > 0);
+      const allMaxPrices = group.variants.map(v => v.maxPrice || 0).filter(p => p > 0);
+      
+      if (allMinPrices.length > 0) {
+        group.minPrice = Math.min(...allMinPrices);
+      }
+      if (allMaxPrices.length > 0) {
+        group.maxPrice = Math.max(...allMaxPrices);
+        group.price = group.maxPrice;
+      }
+      
+      // availableBranches 통합
+      const allBranches = group.variants.flatMap(v => v.availableBranches || []);
+      group.availableBranches = allBranches;
+      group.availableBranchCount = allBranches.length;
+      
+      // 속성 그룹 통합
+      const allAttributeGroups = {};
+      
+      group.variants.forEach(variant => {
+        if (variant.attributeGroups && variant.attributeGroups.length > 0) {
+          variant.attributeGroups.forEach(attrGroup => {
+            const attrTypeName = attrGroup.attributeTypeName || '기본';
+            
+            if (!allAttributeGroups[attrTypeName]) {
+              allAttributeGroups[attrTypeName] = {
+                attributeTypeName: attrTypeName,
+                values: {}
+              };
+            }
+            
+            if (attrGroup.values && attrGroup.values.length > 0) {
+              attrGroup.values.forEach(valueGroup => {
+                const valueName = valueGroup.attributeValueName || '기본';
+                const valueKey = `${valueGroup.attributeValueId || valueName}`;
+                
+                if (!allAttributeGroups[attrTypeName].values[valueKey]) {
+                  allAttributeGroups[attrTypeName].values[valueKey] = {
+                    attributeValueId: valueGroup.attributeValueId,
+                    attributeValueName: valueGroup.attributeValueName,
+                    attributeTypeName: attrTypeName,
+                    branches: []
+                  };
+                }
+                
+                // branches 통합
+                if (valueGroup.branches && valueGroup.branches.length > 0) {
+                  allAttributeGroups[attrTypeName].values[valueKey].branches.push(...valueGroup.branches);
+                }
+              });
+            }
+          });
+        }
+      });
+      
+      // attributeGroups를 배열로 변환
+      const attributeGroupsArray = Object.values(allAttributeGroups).map(typeGroup => ({
+        attributeTypeName: typeGroup.attributeTypeName,
+        values: Object.values(typeGroup.values)
+      }));
+      
+      group.attributeGroups = attributeGroupsArray.length > 0 ? attributeGroupsArray : null;
+    }
+  });
+  
+  // 그룹화된 상품들을 배열로 변환
+  return Object.values(groupedMap);
+}
+
 export function useShopData() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -136,7 +235,7 @@ export function useShopData() {
               id: item.productId, // productId가 있는 경우만 사용
               productId: item.productId,
               name: item.productName || "상품",
-              price: Number(item.minPrice || item.maxPrice || 0),
+              price: Number(item.maxPrice || item.minPrice || 0),
               minPrice: Number(item.minPrice || 0),
               maxPrice: Number(item.maxPrice || 0),
               promotionPrice: null,
@@ -173,8 +272,11 @@ export function useShopData() {
           const filteredMapped = mapped.filter(item => {
             return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
           });
+          
+          // 상품명 기준으로 그룹화
+          const groupedProducts = groupProductsByName(filteredMapped);
         
-          setProducts(filteredMapped);
+          setProducts(groupedProducts);
         } else {
           const raw = responseData || [];
           const mapped = (Array.isArray(raw) ? raw : [])
@@ -183,9 +285,13 @@ export function useShopData() {
           const filteredMapped = mapped.filter(item => {
             return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
           });
-          setProducts(filteredMapped);
+          
+          // 상품명 기준으로 그룹화
+          const groupedProducts = groupProductsByName(filteredMapped);
+          
+          setProducts(groupedProducts);
           setTotalPages(0);
-          setTotalElements(filteredMapped.length);
+          setTotalElements(groupedProducts.length);
         }
       } catch (e) {
         console.error('❌ 상품 로딩 실패:', e);
