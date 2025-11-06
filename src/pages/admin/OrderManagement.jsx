@@ -62,7 +62,7 @@ const Select = styled.select`
 
 const SummaryCards = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 `;
@@ -135,6 +135,9 @@ const StatusBadge = styled.span`
         return '#fee2e2';
       case 'COMPLETED':
         return '#d1fae5';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '#f3f4f6';
       default:
         return '#f3f4f6';
     }
@@ -149,6 +152,9 @@ const StatusBadge = styled.span`
         return '#991b1b';
       case 'COMPLETED':
         return '#065f46';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '#374151';
       default:
         return '#374151';
     }
@@ -259,12 +265,16 @@ function OrderManagement() {
           id: order.orderId || order.id,
           memberName: order.memberName || '-',
           branchId: order.branchId || '-',
+          branchName: order.branchName,
           totalAmount: order.totalAmount || 0,
           status: normalized,
           createdAt: order.createdAt || new Date().toISOString(),
           orderItems: order.orderItems || [],
           paymentStatus: order.paymentStatus || null,
-          isPaymentCompleted: order.isPaymentCompleted || false
+          isPaymentCompleted: order.isPaymentCompleted || false,
+          rejectedBy: order.rejectedBy,
+          rejectedByName: order.rejectedByName,
+          rejectedAt: order.rejectedAt
         };
       });
 
@@ -300,6 +310,7 @@ function OrderManagement() {
     pending: orders.filter((o) => o.status === 'PENDING').length,
     approved: orders.filter((o) => o.status === 'APPROVED').length,
     rejected: orders.filter((o) => o.status === 'REJECTED').length,
+    cancelled: orders.filter((o) => o.status === 'CANCELLED').length,
   };
 
   // 본점 주문만 승인/거부 가능
@@ -341,11 +352,11 @@ function OrderManagement() {
     }
 
     try {
-      await orderService.rejectOrder(orderId, rejectReason);
+      const userInfo = authService.getCurrentUser();
+      const rejectedBy = userInfo?.id || 1;
+      await orderService.rejectOrder(orderId, rejectReason, rejectedBy);
       alert('주문이 거부되었습니다.');
       // 즉시 카운팅 반영 + 거부자 기록
-      const userInfo = authService.getCurrentUser();
-      const rejectedBy = userInfo?.id || 'me';
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'REJECTED', rejectedBy } : o)));
     } catch (error) {
       console.error('주문 거부 실패:', error);
@@ -368,6 +379,7 @@ function OrderManagement() {
         orderId: detailData.orderId ?? order.orderId ?? order.id,
         memberName: detailData.memberName ?? order.memberName ?? '-',
         branchId: detailData.branchId ?? order.branchId ?? '-',
+        branchName: detailData.branchName ?? order.branchName,
         totalAmount: detailData.totalAmount ?? order.totalAmount ?? 0,
         orderStatus: (detailData.orderStatus ?? order.status),
         status: (() => {
@@ -381,7 +393,14 @@ function OrderManagement() {
         createdAt: detailData.createdAt ?? order.createdAt,
         orderItems: detailData.orderItems ?? order.orderItems ?? [],
         paymentStatus: detailData.paymentStatus ?? order.paymentStatus ?? null,
-        isPaymentCompleted: detailData.isPaymentCompleted ?? order.isPaymentCompleted ?? false
+        isPaymentCompleted: detailData.isPaymentCompleted ?? order.isPaymentCompleted ?? false,
+        approvedBy: detailData.approvedBy ?? order.approvedBy,
+        approvedByName: detailData.approvedByName ?? order.approvedByName,
+        rejectedBy: detailData.rejectedBy ?? order.rejectedBy,
+        rejectedByName: detailData.rejectedByName ?? order.rejectedByName,
+        rejectedAt: detailData.rejectedAt ?? order.rejectedAt,
+        rejectedReason: detailData.rejectedReason ?? order.rejectedReason,
+        cancelledReason: detailData.cancelledReason ?? detailData.cancelReason ?? detailData.cancellationReason ?? order.cancelledReason ?? order.cancelReason ?? order.cancellationReason
       });
       setIsDetailModalOpen(true);
     } catch (error) {
@@ -427,6 +446,10 @@ function OrderManagement() {
           <SummaryLabel>거부됨</SummaryLabel>
           <SummaryValue>{summary.rejected}</SummaryValue>
         </SummaryCard>
+        <SummaryCard>
+          <SummaryLabel>취소됨</SummaryLabel>
+          <SummaryValue>{summary.cancelled}</SummaryValue>
+        </SummaryCard>
       </SummaryCards>
 
       {/* 검색 및 필터 */}
@@ -443,6 +466,7 @@ function OrderManagement() {
           <option value="PENDING">대기중</option>
           <option value="APPROVED">승인됨</option>
           <option value="REJECTED">거부됨</option>
+          <option value="CANCELLED">취소됨</option>
           <option value="COMPLETED">완료</option>
         </Select>
       </SearchFilterContainer>
@@ -473,7 +497,7 @@ function OrderManagement() {
                 <tr key={order.id}>
                   <TableCell>#{order.id}</TableCell>
                   <TableCell>{order.memberName}</TableCell>
-                  <TableCell>{order.branchId}</TableCell>
+                  <TableCell>{order.branchName || (order.branchId ? `지점 ${order.branchId}` : '-')}</TableCell>
                   <TableCell>₩{order.totalAmount.toLocaleString()}</TableCell>
                   <TableCell>
                     <StatusBadge $status={order.status}>{getStatusText(order.status)}</StatusBadge>
@@ -520,7 +544,7 @@ function OrderManagement() {
             handleApprove(orderId);
             setIsDetailModalOpen(false);
           }}
-          onReject={(orderId, reason) => {
+          onReject={(orderId, reason, rejectedBy) => {
             handleReject(orderId, reason);
             setIsDetailModalOpen(false);
           }}

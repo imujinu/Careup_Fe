@@ -92,10 +92,12 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
   console.log("표시할 주문 상품:", orderItems);
 
   const statusText =
-    orderDetail.orderStatus === "CONFIRMED"
+    orderDetail.orderStatus === "CONFIRMED" || orderDetail.orderStatus === "APPROVED"
       ? "구매완료"
       : orderDetail.orderStatus === "PENDING"
       ? "주문대기"
+      : orderDetail.orderStatus === "REJECTED"
+      ? "거부됨"
       : orderDetail.orderStatus === "CANCELLED"
       ? "취소됨"
       : orderDetail.orderStatus || "대기중";
@@ -135,13 +137,31 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
               {orderDetail.branchId && (
                 <div className="info-row">
                   <span className="info-label">지점:</span>
-                  <span className="info-value">{orderDetail.branchName || `지점 ${orderDetail.branchId}`}</span>
+                  <span className="info-value">
+                    {orderDetail.branchName || orderDetail.branch?.name || `지점 ${orderDetail.branchId}`}
+                  </span>
                 </div>
               )}
               {orderDetail.rejectedReason && (
                 <div className="info-row">
                   <span className="info-label">거부 사유:</span>
                   <span className="info-value">{orderDetail.rejectedReason}</span>
+                </div>
+              )}
+              {(orderDetail.rejectedBy || orderDetail.rejectedByName) && (
+                <div className="info-row">
+                  <span className="info-label">거부자:</span>
+                  <span className="info-value">
+                    {orderDetail.rejectedByName || (orderDetail.rejectedBy ? `ID: ${orderDetail.rejectedBy}` : '-')}
+                  </span>
+                </div>
+              )}
+              {orderDetail.rejectedAt && (
+                <div className="info-row">
+                  <span className="info-label">거부 시간:</span>
+                  <span className="info-value">
+                    {new Date(orderDetail.rejectedAt).toLocaleString('ko-KR')}
+                  </span>
                 </div>
               )}
               {(orderDetail.cancelledReason || orderDetail.cancelReason || orderDetail.cancellationReason) && (
@@ -165,7 +185,11 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
               {orderDetail.orderType && (
                 <div className="info-row">
                   <span className="info-label">주문 유형:</span>
-                  <span className="info-value">{orderDetail.orderType}</span>
+                  <span className="info-value">
+                    {orderDetail.orderType === 'ONLINE' ? '온라인 주문' :
+                     orderDetail.orderType === 'OFFLINE' ? '매장 주문' :
+                     orderDetail.orderType}
+                  </span>
                 </div>
               )}
             </div>

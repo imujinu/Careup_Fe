@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiClose } from '@mdi/js';
+import RejectReasonModal from './RejectReasonModal';
+import authService from '../../service/authService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -107,11 +109,15 @@ const StatusBadge = styled.span`
       case 'PENDING':
         return '#fef3c7';
       case 'APPROVED':
+      case 'CONFIRMED':
         return '#dbeafe';
       case 'REJECTED':
         return '#fee2e2';
       case 'COMPLETED':
         return '#d1fae5';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '#f3f4f6';
       default:
         return '#f3f4f6';
     }
@@ -121,11 +127,15 @@ const StatusBadge = styled.span`
       case 'PENDING':
         return '#92400e';
       case 'APPROVED':
+      case 'CONFIRMED':
         return '#1e40af';
       case 'REJECTED':
         return '#991b1b';
       case 'COMPLETED':
         return '#065f46';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '#374151';
       default:
         return '#374151';
     }
@@ -203,9 +213,21 @@ const Button = styled.button`
 `;
 
 function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndReject = true }) {
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+
+  // 상태 정규화 함수 (CONFIRMED -> APPROVED)
+  const normalizeStatus = (status) => {
+    if (!status) return status;
+    const upperStatus = String(status).toUpperCase();
+    if (upperStatus === 'CONFIRMED') return 'APPROVED';
+    if (upperStatus === 'CANCELED') return 'CANCELLED';
+    return upperStatus;
+  };
+
   const getStatusText = (status) => {
     if (!status) return status;
-    switch (status.toUpperCase()) {
+    const normalizedStatus = normalizeStatus(status);
+    switch (normalizedStatus) {
       case 'PENDING':
         return '대기중';
       case 'APPROVED':
@@ -218,6 +240,23 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
         return '취소됨';
       default:
         return status;
+    }
+  };
+
+  const getStatusForBadge = (status) => {
+    return normalizeStatus(status);
+  };
+
+  const getOrderTypeText = (orderType) => {
+    if (!orderType) return '-';
+    const upperType = String(orderType).toUpperCase();
+    switch (upperType) {
+      case 'ONLINE':
+        return '온라인 주문';
+      case 'OFFLINE':
+        return '매장 주문';
+      default:
+        return orderType;
     }
   };
 
@@ -238,16 +277,23 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
   };
 
   const handleReject = () => {
-    const reason = window.prompt('거부 사유를 입력해주세요:');
-    if (!reason) return;
+    setIsRejectModalOpen(true);
+  };
 
+  const handleRejectConfirm = (reason) => {
     const orderId = order.orderId || order.id;
-    onReject(orderId, reason);
+    const userInfo = authService.getCurrentUser();
+    const rejectedBy = userInfo?.id || 1;
+    onReject(orderId, reason, rejectedBy);
+    setIsRejectModalOpen(false);
   };
 
   if (!order) return null;
 
   const orderItems = order.orderItems || [];
+  const orderId = order.orderId || order.id || order.orderNo || '-';
+  const orderStatus = order.orderStatus || order.status;
+  const normalizedStatus = normalizeStatus(orderStatus);
 
   return React.createElement(
     ModalOverlay,
@@ -279,14 +325,14 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
               InfoItem,
               {},
               React.createElement(InfoLabel, {}, '주문번호'),
-              React.createElement(InfoValue, {}, `#${order.orderId || order.id}`)
+              React.createElement(InfoValue, {}, orderId !== '-' ? `#${orderId}` : '-')
             ),
             React.createElement(
               InfoItem,
               {},
               React.createElement(InfoLabel, {}, '상태'),
-              React.createElement(StatusBadge, { $status: order.orderStatus || order.status },
-                getStatusText(order.orderStatus || order.status)
+              React.createElement(StatusBadge, { $status: normalizedStatus },
+                getStatusText(orderStatus)
               )
             ),
             React.createElement(
@@ -298,14 +344,14 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
             React.createElement(
               InfoItem,
               {},
-              React.createElement(InfoLabel, {}, '지점 ID'),
-              React.createElement(InfoValue, {}, order.branchId || '-')
+              React.createElement(InfoLabel, {}, '지점'),
+              React.createElement(InfoValue, {}, order.branchName || order.branch?.name || (order.branchId ? `지점 ${order.branchId}` : '-'))
             ),
-            React.createElement(
+            order.orderType && React.createElement(
               InfoItem,
               {},
               React.createElement(InfoLabel, {}, '주문 유형'),
-              React.createElement(InfoValue, {}, order.orderType || '-')
+              React.createElement(InfoValue, {}, getOrderTypeText(order.orderType))
             ),
             React.createElement(
               InfoItem,
@@ -331,20 +377,32 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
             order.approvedBy && React.createElement(
               InfoItem,
               {},
-              React.createElement(InfoLabel, {}, '승인자 ID'),
-              React.createElement(InfoValue, {}, order.approvedBy)
+              React.createElement(InfoLabel, {}, '승인자'),
+              React.createElement(InfoValue, {}, order.approvedByName || `ID: ${order.approvedBy}`)
             ),
-            order.rejectedBy && React.createElement(
+            normalizedStatus === 'REJECTED' && React.createElement(
               InfoItem,
               {},
-              React.createElement(InfoLabel, {}, '거부자 ID'),
-              React.createElement(InfoValue, {}, order.rejectedBy)
+              React.createElement(InfoLabel, {}, '거부자'),
+              React.createElement(InfoValue, {}, order.rejectedByName || (order.rejectedBy ? `ID: ${order.rejectedBy}` : '-'))
             ),
-            order.rejectedReason && React.createElement(
+            normalizedStatus === 'REJECTED' && React.createElement(
+              InfoItem,
+              {},
+              React.createElement(InfoLabel, {}, '거부 시간'),
+              React.createElement(InfoValue, {}, order.rejectedAt ? formatDate(order.rejectedAt) : '-')
+            ),
+            order.rejectedReason && normalizedStatus === 'REJECTED' && React.createElement(
               InfoItem,
               {},
               React.createElement(InfoLabel, {}, '거부 사유'),
               React.createElement(InfoValue, {}, order.rejectedReason)
+            ),
+            (order.cancelledReason || order.cancelReason || order.cancellationReason) && normalizedStatus === 'CANCELLED' && React.createElement(
+              InfoItem,
+              {},
+              React.createElement(InfoLabel, {}, '취소 사유'),
+              React.createElement(InfoValue, {}, order.cancelledReason || order.cancelReason || order.cancellationReason)
             )
           )
         ),
@@ -388,7 +446,7 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
         ModalFooter,
         {},
         React.createElement(Button, { onClick: onClose }, '닫기'),
-        (order.orderStatus || order.status) === 'PENDING' && canApproveAndReject && React.createElement(
+        normalizedStatus === 'PENDING' && canApproveAndReject && React.createElement(
           React.Fragment,
           {},
           React.createElement(Button, { 
@@ -399,7 +457,12 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
           }, '승인'),
           React.createElement(Button, { $danger: true, onClick: handleReject }, '거부')
         )
-      )
+      ),
+      React.createElement(RejectReasonModal, {
+        isOpen: isRejectModalOpen,
+        onClose: () => setIsRejectModalOpen(false),
+        onConfirm: handleRejectConfirm
+      })
     )
   );
 }
