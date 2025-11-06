@@ -399,6 +399,23 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
   const [branchInfo, setBranchInfo] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
+
   // 발주 상세 정보 조회
   useEffect(() => {
     if (isOpen && item?.id) {
@@ -547,7 +564,7 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
     }
   };
 
-  return React.createElement(ModalOverlay, { onClick: onClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '발주 상세보기'),

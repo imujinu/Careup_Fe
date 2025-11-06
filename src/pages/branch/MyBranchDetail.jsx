@@ -10,7 +10,9 @@ import InfoModal from "../../components/common/InfoModal";
 import styled from "styled-components";
 
 function MyBranchDetail() {
-  const { branchId, userType } = useAppSelector((state) => state.auth);
+  const { branchId, userType, role: rawRole } = useAppSelector((state) => state.auth);
+  const role = String(rawRole || "").replace(/^ROLE_/, "").toUpperCase();
+  const isStaffReadOnly = role === "STAFF";
   const { addToast } = useToast();
   const [branchData, setBranchData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -135,7 +137,12 @@ function MyBranchDetail() {
         userType={userType}
       />
 
-      <BranchDetailTabs branchId={branchData.id || branchData.branchId} branch={branchData} userType={userType} />
+      <BranchDetailTabs 
+        branchId={branchData.id || branchData.branchId} 
+        branch={branchData} 
+        userType={userType} 
+        readOnly={isStaffReadOnly}
+      />
 
       {showDetailModal && (
         <BranchDetailModal

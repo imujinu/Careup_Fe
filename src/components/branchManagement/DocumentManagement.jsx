@@ -229,14 +229,14 @@ function DocumentManagement({ branchId, readOnly = false }) {
         />
       )}
 
-      {!readOnly && showEditModal && (
+      {!readOnly && showEditModal && selectedDocument && (
         <DocumentEditModal
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);
             setSelectedDocument(null);
           }}
-          employeeId={employeeId}
+          employeeId={selectedDocument.employeeId}
           document={selectedDocument}
           onSuccess={handleEditSuccess}
         />

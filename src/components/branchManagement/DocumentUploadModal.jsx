@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiClose, mdiChevronDown } from '@mdi/js';
 import { documentService, DOCUMENT_TYPES } from '../../service/documentService';
+import BaseModal from '../common/BaseModal';
 
 function DocumentUploadModal({ isOpen, onClose, branchId, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -107,17 +108,19 @@ function DocumentUploadModal({ isOpen, onClose, branchId, onSuccess }) {
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <ModalOverlay onClick={handleClose}>
-      <ModalContent onClick={(e) => e.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>문서 업로드</ModalTitle>
-          <CloseButton onClick={handleClose}>
-            <Icon path={mdiClose} size={1.2} />
-          </CloseButton>
-        </ModalHeader>
+    <BaseModal 
+      isOpen={isOpen} 
+      onClose={handleClose}
+      maxWidth="500px"
+      allowBackdropClose={false}
+    >
+      <ModalHeader>
+        <ModalTitle>문서 업로드</ModalTitle>
+        <CloseButton onClick={handleClose}>
+          <Icon path={mdiClose} size={1.2} />
+        </CloseButton>
+      </ModalHeader>
 
         <Form onSubmit={handleSubmit}>
           {/* 직원 선택 제거: 생성 시 직원 불필요 */}
@@ -214,35 +217,11 @@ function DocumentUploadModal({ isOpen, onClose, branchId, onSuccess }) {
             </SubmitButton>
           </ButtonGroup>
         </Form>
-      </ModalContent>
-    </ModalOverlay>
+    </BaseModal>
   );
 }
 
 export default DocumentUploadModal;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-`;
 
 const ModalHeader = styled.div`
   display: flex;

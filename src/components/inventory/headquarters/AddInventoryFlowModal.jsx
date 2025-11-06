@@ -199,6 +199,23 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
   const [selectedBranchProduct, setSelectedBranchProduct] = useState(null);
   const [productAttributeValuesData, setProductAttributeValuesData] = useState([]); // 상품 속성 값 데이터 저장
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
+
   // 상품 목록 (상품명 기준으로 중복 제거)
   const uniqueProducts = useMemo(() => {
     const productMap = new Map();
@@ -971,7 +988,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
   if (!isOpen) return null;
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay>
       <ModalContent onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <ModalTitle>입출고 기록 등록</ModalTitle>

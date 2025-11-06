@@ -17,6 +17,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { fetchBranchSalesStatistics } from "../../stores/slices/salesReportSlice";
+import { salesReportService } from "../../service/salesReportService";
 import { useToast } from "../../components/common/Toast";
 
 const KPI = styled.div`
@@ -162,11 +163,27 @@ const BranchSalesStatistics = React.forwardRef(
 
     useImperativeHandle(ref, () => ({
       exportExcel: async () => {
-        toast.addToast({
-          type: "info",
-          title: "준비중",
-          message: "엑셀 다운로드 기능은 준비중입니다.",
-        });
+        try {
+          const startDateStr = format(startDate, "yyyy-MM-dd");
+          const endDateStr = format(endDate, "yyyy-MM-dd");
+          await salesReportService.exportBranchSalesStatistics(
+            branchId,
+            startDateStr,
+            endDateStr,
+            periodType
+          );
+          toast.addToast({
+            type: "success",
+            title: "다운로드 완료",
+            message: "매출 통계 엑셀 파일이 다운로드되었습니다.",
+          });
+        } catch (error) {
+          toast.addToast({
+            type: "error",
+            title: "다운로드 실패",
+            message: error.message || "엑셀 파일 다운로드에 실패했습니다.",
+          });
+        }
       },
     }));
 
