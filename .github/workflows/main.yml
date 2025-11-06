@@ -1,0 +1,48 @@
+name: Deploy to AWS S3
+on:
+  push:
+    branches:
+      - develop
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: setup node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '20'
+
+    - name: Create .env file
+      run: |
+        echo "VITE_CUSTOMER_API_URL=${{ secrets.VITE_CUSTOMER_API_URL }}" >> .env
+        echo "VITE_CUSTOMER_AUTH_URL=${{ secrets.VITE_CUSTOMER_AUTH_URL }}" >> .env
+        echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" >> .env
+        echo "VITE_KAKAO_CLIENT_ID=${{ secrets.VITE_KAKAO_CLIENT_ID }}" >> .env
+        echo "VITE_GOOGLE_REDIRECT_URI=${{ secrets.VITE_GOOGLE_REDIRECT_URI }}" >> .env
+        echo "VITE_KAKAO_REDIRECT_URI=${{ secrets.VITE_KAKAO_REDIRECT_URI }}" >> .env
+        echo "VITE_BRANCH_URL=${{ secrets.VITE_BRANCH_URL }}" >> .env
+        echo "VITE_ORDERING_URL=${{ secrets.VITE_ORDERING_URL }}" >> .env
+    
+    - name: npm install
+      working-directory: .
+      run: npm install
+
+    - name: npm build
+      working-directory: .
+      run: npm run build
+    
+    - name: setup aws cli
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{secrets.AWS_S3_ACCESS_KEY}}
+        aws-secret-access-key: ${{secrets.AWS_S3_SECRET_KEY}}
+        aws-region: "ap-northeast-2"
+
+    - name: deploy to s3
+      run: |
+        aws s3 cp ./dist s3://www.careup.store/ --recursive
+        
+    - name: invalidate cloudfront cache
+      run: aws cloudfront create-invalidation --distribution-id E3KN680YL3C9Q0 --paths "/*"
