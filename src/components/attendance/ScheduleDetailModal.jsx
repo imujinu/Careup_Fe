@@ -251,17 +251,14 @@ const normalizeId = (val) => {
   return s.includes(':') ? s.split(':')[0] : s;
 };
 
-/* ===== 새로 추가: 캘린더 즉시 동기화용 패치 생성 ===== */
+/* ===== 캘린더 즉시 동기화용 패치 생성 ===== */
 const buildOverridePatchFromDetail = (d) => {
   if (!d) return {};
   const status = pickStatus(d) || undefined;
   return {
-    // 상태 계열
     attendanceStatus: status,
     status,
     missedCheckout: d?.missedCheckout === true,
-
-    // 실제 기록(라벨/색상 연산에 쓰이는 필드들)
     actualStartAt: d?.actualStartAt || d?.actualClockIn || d?.clockInAt || null,
     actualClockIn: d?.actualClockIn || d?.actualStartAt || d?.clockInAt || null,
     actualBreakStart: d?.actualBreakStart || d?.breakStartAt || null,
@@ -423,17 +420,36 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
     let touched = false;
     let error = null;
 
-    let nextIn   = vIn  ?? curIn;
-    let nextOut0 = vOut ?? curOut;
+    let nextIn   = inEdited  ? vIn  : curIn;
+    let nextOut0 = outEdited ? vOut : curOut;
 
-    if ((inEdited || outEdited) && (nextIn && nextOut0)) {
-      const adj = ensureOvernightByPart(part, nextIn, nextOut0);
+    if (inEdited && outEdited) {
+      const adj = ensureOvernightByPart(part, vIn, vOut);
       const ord = ensurePairOrder(adj.inIso, adj.outIso);
       out.clockInAt  = ord.from;
       out.clockOutAt = ord.to;
       touched = true;
-    } else if (inEdited || outEdited) {
-      error = '출근/퇴근 시간은 둘 다 입력(또는 기존값 유지)해야 합니다.';
+    } else if (inEdited && nextOut0) {
+      const adj = ensureOvernightByPart(part, vIn, nextOut0);
+      const ord = ensurePairOrder(adj.inIso, adj.outIso);
+      out.clockInAt  = ord.from;
+      out.clockOutAt = ord.to;
+      touched = true;
+    } else if (outEdited && nextIn) {
+      const adj = ensureOvernightByPart(part, nextIn, vOut);
+      const ord = ensurePairOrder(adj.from, adj.to);
+      out.clockInAt  = ord.from;
+      out.clockOutAt = ord.to;
+      touched = true;
+    } else {
+      if (inEdited && !nextOut0) {
+        out.clockInAt = vIn;
+        touched = true;
+      }
+      if (outEdited && !nextIn) {
+        out.clockOutAt = vOut;
+        touched = true;
+      }
     }
 
     if (!error && (bsEdited || beEdited)) {
@@ -441,7 +457,7 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
       let beVal = vBE ?? curBE;
 
       if (bsVal && beVal) {
-        const inRef = out.clockInAt || nextIn;
+        const inRef = out.clockInAt || nextIn || null;
         if (inRef && part !== 'TAIL') {
           const inMs = new Date(inRef).getTime();
           if (new Date(bsVal).getTime() < inMs) bsVal = addDaysISO(bsVal, 1);
@@ -456,7 +472,8 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
       }
     }
 
-    const canClearMissed = Boolean(out.clockInAt || curIn) && Boolean(out.clockOutAt || curOut);
+    const canClearMissed =
+      Boolean(out.clockInAt || nextIn) && Boolean(out.clockOutAt || nextOut0);
     if (!error && detail?.missedCheckout === true && canClearMissed) {
       out.clearMissedCheckout = true;
       touched = true;
@@ -498,11 +515,9 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
         addToast('계획 값 검증을 통과하지 않아 계획 저장은 생략했습니다.', { color: 'info' });
       }
 
-      // ✅ 최신 상태 재조회 → 뱃지/상태 먼저 반영 + 캘린더 즉시 동기화 패치
       const latest = await getScheduleDetail(scheduleNumId);
       setDetail(latest || detail);
 
-      // 🔁 캘린더에 즉시 반영(색/라벨 동기화) 위한 override 패치 전달
       if (onPatched && latest) {
         onPatched(scheduleNumId, buildOverridePatchFromDetail(latest));
       }
@@ -510,7 +525,6 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
       addToast('스케줄이 저장되었습니다.', { color: 'success' });
       setEdit(false);
 
-      // ✅ UI 반영 확인 후 모달 닫기 + 상위 갱신
       closeAfterBadge(() => {
         if (onSaved) onSaved();
       });
@@ -531,17 +545,14 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
       await deleteAttendanceEvent(scheduleNumId);
       addToast('근무 기록을 삭제했습니다.', { color: 'success' });
 
-      // ✅ 재조회하여 뱃지/상태 갱신
       const d = await getScheduleDetail(scheduleNumId);
       setDetail(d || null);
 
-      // 입력값 리셋
       setASHH(''); setASMM(''); setASAP('AM');
       setAB1HH(''); setAB1MM(''); setAB1AP('PM');
       setAB2HH(''); setAB2MM(''); setAB2AP('PM');
       setAEHH(''); setAEMM(''); setAEAP('PM');
 
-      // 🔁 캘린더 즉시 반영(삭제 상태) override 패치 전달
       if (onPatched) {
         onPatched(scheduleNumId, {
           attendanceStatus: 'PLANNED',
@@ -556,7 +567,6 @@ export function ScheduleDetailModal({ open, scheduleId, baseDate, part, onClose,
         });
       }
 
-      // ✅ UI 반영 잠시 보여준 뒤 닫고 상위 갱신
       closeAfterBadge(() => {
         if (onDeleted) onDeleted();
         else if (onSaved) onSaved();

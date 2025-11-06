@@ -43,6 +43,7 @@ function EmployeeManagement({ branchId, readOnly = false }) {
   } = useAppSelector(state => state.employee);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -137,17 +138,28 @@ function EmployeeManagement({ branchId, readOnly = false }) {
     }
   }, [detailError, addToast, dispatch]);
 
-  const handleSearch = (term) => {
+  // 검색어 입력 핸들러 (내부 state만 업데이트)
+  const handleSearchChange = (term) => {
     setSearchTerm(term);
-    // 검색어가 변경되면 API 호출
+  };
+
+  // 검색 실행 핸들러 (검색 버튼 클릭 또는 엔터키)
+  const handleSearchSubmit = (term) => {
+    setAppliedSearchTerm(term);
+    // 검색과 필터를 함께 적용하여 API 호출
     if (branchId) {
+      const filterParams = Object.entries(filters)
+        .filter(([key, value]) => value !== '')
+        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+      
       dispatch(fetchEmployeeListByBranchAction({ 
         branchId, 
         params: { 
           page: 0, 
           size: 20, 
           sort: 'employmentStatus,asc',
-          search: term
+          ...(term ? { search: term } : {}),
+          ...filterParams
         } 
       }));
     }
@@ -155,7 +167,7 @@ function EmployeeManagement({ branchId, readOnly = false }) {
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    // 필터가 변경되면 API 호출
+    // 필터가 변경되면 검색어와 함께 적용하여 API 호출
     if (branchId) {
       const filterParams = Object.entries(newFilters)
         .filter(([key, value]) => value !== '')
@@ -167,6 +179,7 @@ function EmployeeManagement({ branchId, readOnly = false }) {
           page: 0, 
           size: 20, 
           sort: 'employmentStatus,asc',
+          ...(appliedSearchTerm ? { search: appliedSearchTerm } : {}),
           ...filterParams
         } 
       }));
@@ -176,6 +189,7 @@ function EmployeeManagement({ branchId, readOnly = false }) {
   const handleClearFilters = () => {
     setFilters({});
     setSearchTerm('');
+    setAppliedSearchTerm('');
     // 필터 초기화 시 API 호출
     if (branchId) {
       dispatch(fetchEmployeeListByBranchAction({ 
@@ -289,7 +303,7 @@ function EmployeeManagement({ branchId, readOnly = false }) {
           addToast({
             type: 'success',
             title: '퇴사 처리 완료',
-            message: `${deletingEmployee.name} 점주가 성공적으로 퇴사 처리되었습니다.`,
+            message: `${deletingEmployee.name} 직원이 성공적으로 퇴사 처리되었습니다.`,
             duration: 3000
           });
         } else if (modalAction === 'rehire') {
@@ -298,7 +312,7 @@ function EmployeeManagement({ branchId, readOnly = false }) {
           addToast({
             type: 'success',
             title: '재입사 처리 완료',
-            message: `${deletingEmployee.name} 점주가 성공적으로 재입사 처리되었습니다.`,
+            message: `${deletingEmployee.name} 직원이 성공적으로 재입사 처리되었습니다.`,
             duration: 3000
           });
         }
@@ -353,7 +367,8 @@ function EmployeeManagement({ branchId, readOnly = false }) {
       
       <EmployeeSearchAndFilter
         searchTerm={searchTerm}
-        onSearchChange={handleSearch}
+        onSearchChange={handleSearchChange}
+        onSearchSubmit={handleSearchSubmit}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
         loading={loading}
@@ -385,10 +400,10 @@ function EmployeeManagement({ branchId, readOnly = false }) {
           isOpen={showDeleteModal}
           onClose={handleCloseDeleteModal}
           onConfirm={handleConfirmAction}
-          title={modalAction === 'terminate' ? '점주 퇴사 처리' : '점주 재입사 처리'}
+          title={modalAction === 'terminate' ? '직원 퇴사 처리' : '직원 재입사 처리'}
           message={modalAction === 'terminate' 
-            ? `${deletingEmployee.name} 점주를 퇴사 처리하시겠습니까?`
-            : `${deletingEmployee.name} 점주를 재입사 처리하시겠습니까?`
+            ? `${deletingEmployee.name} 직원 퇴사 처리하시겠습니까?`
+            : `${deletingEmployee.name} 직원 재입사 처리하시겠습니까?`
           }
           confirmText={modalAction === 'terminate' ? '퇴사 처리' : '재입사 처리'}
           loading={modalAction === 'terminate' ? deactivateLoading : rehireLoading}

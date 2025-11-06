@@ -14,19 +14,19 @@ function EmployeeManagementHeader({
   loading = false,
   readOnly = false,
 }) {
-  const { totalEmployees = 0, activeEmployees = 0, recentlyAdded = 0 } = summary;
+  const { totalEmployees = 0, terminatedEmployees = 0, recentlyAdded = 0 } = summary;
 
   return (
     <HeaderContainer>
       <HeaderContent>
         <HeaderInfo>
-          <HeaderTitle>점주 관리</HeaderTitle>
-          <HeaderDescription>지점의 점주 정보를 관리합니다</HeaderDescription>
+          <HeaderTitle>직원 관리</HeaderTitle>
+          <HeaderDescription>지점의 직원 정보를 관리합니다</HeaderDescription>
         </HeaderInfo>
         {!readOnly && (
           <AddButton onClick={onAddEmployee} disabled={loading}>
             <Icon path={mdiPlus} size={1.2} />
-            점주 추가
+            직원 추가
           </AddButton>
         )}
       </HeaderContent>
@@ -38,7 +38,7 @@ function EmployeeManagementHeader({
           </CardIcon>
           <CardContent>
             <CardNumber>{totalEmployees}</CardNumber>
-            <CardLabel>총 점주 수</CardLabel>
+            <CardLabel>총 직원 수</CardLabel>
           </CardContent>
         </SummaryCard>
         
@@ -47,8 +47,8 @@ function EmployeeManagementHeader({
             <Icon path={mdiFileDocument} size={2} />
           </CardIcon>
           <CardContent>
-            <CardNumber>{activeEmployees}</CardNumber>
-            <CardLabel>활성 점주</CardLabel>
+            <CardNumber>{terminatedEmployees}</CardNumber>
+            <CardLabel>퇴사 직원 수</CardLabel>
           </CardContent>
         </SummaryCard>
         
@@ -58,7 +58,7 @@ function EmployeeManagementHeader({
           </CardIcon>
           <CardContent>
             <CardNumber>{recentlyAdded}</CardNumber>
-            <CardLabel>최근 추가</CardLabel>
+            <CardLabel>최근 입사</CardLabel>
           </CardContent>
         </SummaryCard>
       </SummaryCards>

@@ -123,6 +123,7 @@ function BranchDetail() {
         onEdit={isStaffReadOnly ? undefined : handleEdit}
         onDelete={isStaffReadOnly ? undefined : () => setShowDeleteModal(true)}
         showEditButton={isStaffReadOnly}
+        userType={userType}
       />
 
       <BranchDetailTabs

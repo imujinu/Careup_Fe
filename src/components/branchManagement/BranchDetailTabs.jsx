@@ -19,8 +19,8 @@ function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
   // 지점/가맹점 관리자용 탭 (지점 상세 정보로 변경)
   const isBranchAdmin = userType === 'franchise';
   
-  // 지점 관리자는 상세 정보 탭을 기본으로
-  const [activeTab, setActiveTab] = useState(isBranchAdmin ? "dashboard" : "owner");
+  // 모든 권한에서 대시보드 탭을 기본으로 활성화
+  const [activeTab, setActiveTab] = useState("dashboard");
   
   const tabs = [
     {
@@ -40,8 +40,8 @@ function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
       component: <KPIContent branchId={branchId} readOnly={readOnly} />,
     },
     {
-      id: "owner",
-      label: "점주 관리",
+      id: "employee",
+      label: "직원 관리",
       icon: mdiAccountGroup,
       component: <EmployeeManagement branchId={branchId} readOnly={readOnly} />,
     },

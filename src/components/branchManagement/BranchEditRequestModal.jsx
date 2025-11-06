@@ -47,6 +47,27 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
     { value: "NO", label: "가맹점" },
   ];
 
+  // 모달이 열릴 때 배경 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      // 현재 스크롤 위치 저장
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+
+      return () => {
+        // 모달이 닫힐 때 스크롤 위치 복원
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (branch) {
       let openDate = "";
@@ -91,53 +112,93 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
 
   if (!isOpen || !branch) return null;
 
+  // 사업자등록번호 포맷팅 함수 (nnn-nn-nnnnn)
   const formatBusinessNumber = (value) => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers.length > 10) return numbers.slice(0, 10);
-    if (numbers.length === 0) return "";
-    else if (numbers.length <= 3) return numbers;
-    else if (numbers.length <= 5)
+    // 숫자만 추출
+    const numbers = value.replace(/\D/g, '');
+    
+    // 10자리 제한
+    if (numbers.length > 10) {
+      return numbers.slice(0, 10);
+    }
+    
+    // 포맷팅 적용
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 3) {
+      return numbers;
+    } else if (numbers.length <= 5) {
       return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    else
+    } else {
       return `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5)}`;
+    }
   };
 
+  // 법인등록번호 포맷팅 함수 (nnnn-nn-nnnnnn-n)
   const formatCorporationNumber = (value) => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers.length > 13) return numbers.slice(0, 13);
-    if (numbers.length === 0) return "";
-    else if (numbers.length <= 4) return numbers;
-    else if (numbers.length <= 6)
+    // 숫자만 추출
+    const numbers = value.replace(/\D/g, '');
+    
+    // 13자리 제한
+    if (numbers.length > 13) {
+      return numbers.slice(0, 13);
+    }
+    
+    // 포맷팅 적용
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 4) {
+      return numbers;
+    } else if (numbers.length <= 6) {
       return `${numbers.slice(0, 4)}-${numbers.slice(4)}`;
-    else if (numbers.length <= 12)
+    } else if (numbers.length <= 12) {
       return `${numbers.slice(0, 4)}-${numbers.slice(4, 6)}-${numbers.slice(6)}`;
-    else
+    } else {
       return `${numbers.slice(0, 4)}-${numbers.slice(4, 6)}-${numbers.slice(6, 12)}-${numbers.slice(12)}`;
+    }
   };
 
+  // 전화번호 포맷팅 함수
+  // 휴대폰: 0XX-XXXX-XXXX
+  // 서울: 02-XXXX-XXXX 또는 02-XXX-XXXX
+  // 서울 이외 전 지역: 0XX-XXXX-XXXX 또는 0XX-XXX-XXXX
   const formatPhoneNumber = (value) => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers.length > 11) return numbers.slice(0, 11);
-    if (numbers.length === 0) return "";
-    else if (numbers.length <= 3) return numbers;
-    else if (numbers.length <= 7) {
-      if (numbers.startsWith("02")) {
+    // 숫자만 추출
+    const numbers = value.replace(/\D/g, '');
+    
+    // 11자리 제한 (휴대폰 번호 기준)
+    if (numbers.length > 11) {
+      return numbers.slice(0, 11);
+    }
+    
+    // 포맷팅 적용
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 3) {
+      return numbers;
+    } else if (numbers.length <= 7) {
+      // 중간 단계 포맷팅
+      if (numbers.startsWith('02')) {
         return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
       } else {
         return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
       }
     } else if (numbers.length <= 11) {
-      if (numbers.startsWith("02")) {
-        const middleLength = numbers.length - 6;
+      // 최종 포맷팅
+      if (numbers.startsWith('02')) {
+        // 서울: 02-XXXX-XXXX 또는 02-XXX-XXXX
+        const middleLength = numbers.length - 6; // 02(2자리) + 마지막4자리 = 6자리 제외
         if (middleLength === 3) {
           return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
         } else {
           return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6)}`;
         }
-      } else if (numbers.startsWith("01")) {
+      } else if (numbers.startsWith('01')) {
+        // 휴대폰: 0XX-XXXX-XXXX
         return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
       } else {
-        const middleLength = numbers.length - 7;
+        // 서울 이외 전 지역: 0XX-XXXX-XXXX 또는 0XX-XXX-XXXX
+        const middleLength = numbers.length - 7; // 0XX(3자리) + 마지막4자리 = 7자리 제외
         if (middleLength === 3) {
           return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
         } else {
@@ -145,6 +206,7 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
         }
       }
     }
+    
     return numbers;
   };
 
@@ -158,7 +220,7 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
     if (name === "corporationNumber") {
       formattedValue = formatCorporationNumber(value);
     }
-    if (name === "phone") {
+    if (name === "phone" || name === "attorneyPhoneNumber") {
       formattedValue = formatPhoneNumber(value);
     }
 
@@ -301,7 +363,7 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
 
   return (
     <>
-      <ModalOverlay onClick={onClose}>
+      <ModalOverlay>
         <ModalContent onClick={(e) => e.stopPropagation()}>
           <ModalHeader>
             <ModalTitle>지점 정보 수정 요청</ModalTitle>

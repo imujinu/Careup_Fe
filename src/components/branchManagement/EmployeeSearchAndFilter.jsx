@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiMagnify, mdiFilter, mdiClose } from '@mdi/js';
@@ -6,17 +6,46 @@ import { mdiMagnify, mdiFilter, mdiClose } from '@mdi/js';
 function EmployeeSearchAndFilter({ 
   searchTerm, 
   onSearchChange, 
+  onSearchSubmit,
   onFilterChange, 
   onClearFilters,
   loading = false 
 }) {
   const [showFilters, setShowFilters] = useState(false);
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm || '');
   const [filters, setFilters] = useState({
     employmentStatus: '',
     gender: '',
     employmentType: '',
     authorityType: ''
   });
+
+  // 외부 searchTerm 변경 시 내부 state 동기화
+  useEffect(() => {
+    setLocalSearchTerm(searchTerm || '');
+  }, [searchTerm]);
+
+  // 검색어 입력 처리 (내부 state만 업데이트)
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setLocalSearchTerm(value);
+    onSearchChange(value);
+  };
+
+  // 검색 실행 (버튼 클릭 또는 엔터키)
+  const handleSearchSubmit = () => {
+    if (onSearchSubmit) {
+      onSearchSubmit(localSearchTerm);
+    }
+  };
+
+  // 엔터키 처리
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearchSubmit();
+    }
+  };
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
@@ -32,6 +61,7 @@ function EmployeeSearchAndFilter({
       authorityType: ''
     };
     setFilters(clearedFilters);
+    setLocalSearchTerm('');
     onClearFilters();
   };
 
@@ -47,11 +77,20 @@ function EmployeeSearchAndFilter({
           <SearchInput
             type="text"
             placeholder="점주명, 이메일, 전화번호로 검색..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
+            value={localSearchTerm}
+            onChange={handleInputChange}
+            onKeyPress={handleKeyPress}
             disabled={loading}
           />
         </SearchInputContainer>
+        
+        <SearchButton
+          onClick={handleSearchSubmit}
+          disabled={loading}
+        >
+          <Icon path={mdiMagnify} size={1.2} />
+          검색
+        </SearchButton>
         
         <FilterButton
           onClick={() => setShowFilters(!showFilters)}
@@ -185,6 +224,32 @@ const SearchInput = styled.input`
 
   &::placeholder {
     color: #9ca3af;
+  }
+`;
+
+const SearchButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #7c3aed;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
   }
 `;
 

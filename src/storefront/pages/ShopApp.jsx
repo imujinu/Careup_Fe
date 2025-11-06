@@ -20,6 +20,7 @@ import SearchResultsPage from "../components/SearchResultsPage";
 import ProductInquiryModal from "../components/ProductInquiryModal";
 import ShopHeader from "../components/ShopHeader";
 import ShopFooter from "../components/ShopFooter";
+import ProductRanking from "../components/ProductRanking";
 import "../styles/shop.css";
 import axios from "axios";
 import { authService } from "../../service/authService";
@@ -27,6 +28,7 @@ import { addToCart, clearCart } from "../../store/slices/cartSlice";
 import { setSelectedBranch } from "../../store/slices/branchSlice";
 import { cartService } from "../../service/cartService";
 import { customerAuthService } from "../../service/customerAuthService";
+import { customerProductService } from "../../service/customerProductService";
 
 function ShopApp() {
   return (
@@ -530,6 +532,17 @@ function ShopLayout() {
     });
   };
 
+  // 상품 클릭 시 조회 기록 POST 요청 (전역 서비스 사용)
+  const handleProductClick = async (product) => {
+    // 상품 조회 기록 POST 요청
+    const productId = product.productId || product.id;
+    if (productId) {
+      await customerProductService.recordProductView(productId);
+    }
+    
+    setDetailProduct(product);
+  };
+
   const handleAddToCart = async (product) => {
     // 로그인 체크
     if (!isLoggedIn || !currentUser) {
@@ -841,7 +854,7 @@ function ShopLayout() {
            <ProductsPage
              favorites={favorites}
              onToggleFavorite={toggleFavorite}
-             onOpenDetail={(p) => setDetailProduct(p)}
+             onOpenDetail={handleProductClick}
              onAddToCart={handleAddToCart}
              products={products}
              searchQuery="" // shop 페이지에서는 검색어 필터링 안 함
@@ -860,7 +873,7 @@ function ShopLayout() {
              searchError={searchError}
              favorites={favorites}
              onToggleFavorite={toggleFavorite}
-             onOpenDetail={(p) => setDetailProduct(p)}
+             onOpenDetail={handleProductClick}
              onAddToCart={handleAddToCart}
              onBack={() => {
                clearSearch();
@@ -1039,7 +1052,7 @@ function ShopLayout() {
                     </div>
                   )}
                   {!loadingProducts && !productsError && filteredProducts.map((p) => (
-                    <article className="card" key={p.id} onClick={() => setDetailProduct(p)} style={{ cursor: "pointer" }}>
+                    <article className="card" key={p.id} onClick={() => handleProductClick(p)} style={{ cursor: "pointer" }}>
                       <button
                         className={`fav-btn${
                           favorites.has(p.id) ? " active" : ""
@@ -1141,7 +1154,18 @@ function ShopLayout() {
               </section>
             </div>
 
-            {/* 실시간 인기 랭킹 및 선물특가 섹션 제거 */}
+            <section className="section">
+              <div className="container">
+                <div className="section-title">🏆 실시간 인기 랭킹</div>
+                <ProductRanking 
+                  memberId={currentUser?.memberId}
+                  onAddToCart={handleAddToCart}
+                  onOpenDetail={handleProductClick}
+                />
+              </div>
+            </section>
+
+       
           </>
         )}
       </main>
@@ -1180,6 +1204,5 @@ function ShopLayout() {
   );
 }
 
-// (실시간 인기 랭킹 및 선물특가 관련 컴포넌트/데이터 제거됨)
 
 export default ShopApp;
