@@ -282,19 +282,6 @@ const CategoryData = [
   { name: "볶음밥 시리즈", value: 4.7, color: "#059669" },
 ];
 
-const InventoryData = [
-  { branch: "천호점", item: "브라질산 닭고기", shortage: 240 },
-  { branch: "사당점", item: "브라질산 닭고기", shortage: 210 },
-  { branch: "신촌점", item: "브라질산 닭고기", shortage: 190 },
-  { branch: "잠실점", item: "브라질산 닭고기", shortage: 185 },
-  { branch: "판교점", item: "브라질산 닭고기", shortage: 170 },
-  { branch: "강남점", item: "국내산 소고기", shortage: 160 },
-  { branch: "분당정자점", item: "국내산 소고기", shortage: 145 },
-  { branch: "부산서면점", item: "국내산 소고기", shortage: 135 },
-  { branch: "역삼점", item: "스팸", shortage: 100 },
-  { branch: "수원인계점", item: "계란", shortage: 85 },
-];
-
 const NotificationsData = [
   {
     id: 3,
@@ -339,6 +326,7 @@ const HeadquartersDashboard = () => {
   const [lowBranch, setLowBranch] = useState(null);
   const [categorySales, setCategorySales] = useState(null);
   const [branchSalesSummary, setBranchSalesSummary] = useState(null);
+  const [lowStockItems, setLowStockItems] = useState([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -387,6 +375,11 @@ const HeadquartersDashboard = () => {
       const branchSummary = await dashboardService.getBranchSalesSummary(salesPeriod);
       console.log("Branch Sales Summary:", branchSummary);
       setBranchSalesSummary(branchSummary);
+
+      // 재고 부족 현황 조회
+      const lowStock = await dashboardService.getLowStockStatus();
+      console.log("Low Stock Items:", lowStock);
+      setLowStockItems(lowStock);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -758,17 +751,33 @@ const HeadquartersDashboard = () => {
 
         <ResponsiveContainer width="100%" height={400}>
           <BarChart
-            data={InventoryData}
-            layout="vertical"
-            margin={{ top: 20, right: 30, left: 100, bottom: 20 }}
+            data={lowStockItems.map(item => ({
+              label: `${item.branchName} - ${item.productName}`,
+              item: item.productName,
+              branch: item.branchName,
+              shortage: item.shortage,
+            }))}
+            margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
-            <YAxis dataKey="branch" type="category" width={80} />
-            <Tooltip />
-            <Bar dataKey="shortage" fill="#ef4444" />
+            <XAxis dataKey="label" type="category" angle={-45} textAnchor="end" interval={0} height={70} tick={{ fontSize: 11 }} />
+            <YAxis type="number" />
+            <Tooltip 
+              formatter={(value) => `${value}개 부족`}
+              labelFormatter={(label) => label}
+            />
+            <Bar dataKey="shortage" fill="#ef4444" name="부족량">
+              {lowStockItems.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill="#ef4444" />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
+        {lowStockItems.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            재고 부족 상품이 없습니다.
+          </div>
+        )}
       </InventoryCard>
 
       {/* Notifications removed as requested */}

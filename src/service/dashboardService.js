@@ -358,9 +358,58 @@ export const dashboardService = {
   // 재고 부족 현황 조회
   getLowStockStatus: async () => {
     try {
-      // TODO: 재고 부족 현황 API 엔드포인트 확인 및 구현
-      // 임시로 빈 배열 반환
-      return [];
+      // 모든 지점 목록 조회
+      const branches = await dashboardService.getAllBranches();
+      
+      // 각 지점별로 재고 부족 상품 조회
+      const lowStockItems = await Promise.all(
+        branches.map(async (branch) => {
+          try {
+            const branchId = branch.branchId || branch.id;
+            const response = await axios.get(
+              `${ORDERING_API_BASE_URL}/inventory/branch-products/branch/${branchId}`
+            );
+            
+            const products = response.data?.data || response.data?.result || response.data || [];
+            
+            // 재고 부족 상품 필터링 (재고 <= 안전재고)
+            const lowStockProducts = products.filter((p) => {
+              const stock = p.stockQuantity || p.quantity || 0;
+              const safetyStock = p.safetyStock || p.safetystock || 0;
+              return stock <= safetyStock;
+            });
+            
+            // 상위 10개만 반환 (부족량이 많은 순)
+            const sorted = lowStockProducts
+              .map((p) => {
+                const stock = p.stockQuantity || p.quantity || 0;
+                const safetyStock = p.safetyStock || p.safetystock || 0;
+                const shortage = safetyStock - stock;
+                return {
+                  branchId,
+                  branchName: branch.branchName || branch.name || `지점-${branchId}`,
+                  productId: p.productId,
+                  productName: p.productName || p.name || '-',
+                  stockQuantity: stock,
+                  safetyStock,
+                  shortage: shortage > 0 ? shortage : 0,
+                };
+              })
+              .sort((a, b) => b.shortage - a.shortage)
+              .slice(0, 10);
+            
+            return sorted;
+          } catch (error) {
+            console.error(`Failed to get low stock for branch ${branch.branchId || branch.id}:`, error);
+            return [];
+          }
+        })
+      );
+      
+      // 평탄화하고 상위 20개만 반환 (부족량이 많은 순)
+      const allLowStockItems = lowStockItems.flat().sort((a, b) => b.shortage - a.shortage).slice(0, 20);
+      
+      return allLowStockItems;
     } catch (error) {
       console.error("Failed to get low stock status:", error);
       return [];
