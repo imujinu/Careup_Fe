@@ -99,9 +99,16 @@ function FranchiseDashboard() {
           todaySales = todayItem?.totalSales || 0;
         }
 
-        // 미처리 주문
+        // 미처리 주문 (정규화된 상태로 필터링)
+        const normalizeStatus = (status) => {
+          if (!status) return status;
+          const upperStatus = String(status).toUpperCase();
+          if (upperStatus === 'CONFIRMED') return 'APPROVED';
+          if (upperStatus === 'CANCELED') return 'CANCELLED';
+          return upperStatus;
+        };
         const orders = Array.isArray(ordersRes) ? ordersRes : (ordersRes?.result || ordersRes?.data || []);
-        const pendingOrders = orders.filter((o) => (o.orderStatus || o.status) === 'PENDING').length;
+        const pendingOrders = orders.filter((o) => normalizeStatus(o.orderStatus || o.status) === 'PENDING').length;
         const lastOrders = orders
           .slice()
           .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -138,6 +145,28 @@ function FranchiseDashboard() {
       orders: it.totalOrders || 0,
     }));
   }, [salesStats]);
+
+  // 주문 상태를 한국어로 변환하는 함수
+  const translateOrderStatus = (status) => {
+    if (!status) return status;
+    const s = String(status).toUpperCase();
+    switch (s) {
+      case 'PENDING':
+        return '대기중';
+      case 'CONFIRMED':
+      case 'APPROVED':
+        return '승인됨';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '취소됨';
+      case 'REJECTED':
+        return '거부됨';
+      case 'COMPLETED':
+        return '완료';
+      default:
+        return status;
+    }
+  };
 
   if (loading) return <Page><Title>대시보드</Title>로딩 중...</Page>;
 
@@ -211,7 +240,7 @@ function FranchiseDashboard() {
                   <td>#{o.id}</td>
                   <td>{o.memberName}</td>
                   <td>₩{(o.totalAmount||0).toLocaleString()}</td>
-                  <td>{String(o.status).toUpperCase()}</td>
+                  <td>{translateOrderStatus(o.status)}</td>
                   <td>{o.createdAt ? new Date(o.createdAt).toLocaleString('ko-KR') : '-'}</td>
                 </tr>
               ))}

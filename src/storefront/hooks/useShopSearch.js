@@ -77,13 +77,30 @@ export function useShopSearch() {
         raw = responseData;
       }
 
-      const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
-        id: item.productId ?? Math.random(),
-        productId: item.productId,
+      console.log('🔍 검색 API 응답:', { responseData, raw, rawLength: raw.length });
+
+      const mapped = (Array.isArray(raw) ? raw : [])
+        .map((item) => {
+          // productId가 다른 필드명으로 올 수 있으므로 여러 가능성 확인
+          const productId = item.productId ?? item.id ?? item.product_id;
+          
+          // productId가 없으면 null 반환하여 필터링
+          if (!productId) {
+            console.warn('⚠️ productId가 없는 항목 발견:', item);
+            return null;
+          }
+        // 가격 필드 안전하게 추출 (다양한 필드명 지원)
+        const minPrice = Number(item.minPrice ?? item.min_price ?? item.priceMin ?? 0);
+        const maxPrice = Number(item.maxPrice ?? item.max_price ?? item.priceMax ?? 0);
+        const price = Number(item.price ?? item.unitPrice ?? 0);
+        
+        return {
+          id: productId, // productId가 있는 경우만 사용
+          productId: productId,
         name: item.name || item.productName || "상품",
-        price: Number(item.minPrice || item.maxPrice || 0),
-        minPrice: Number(item.minPrice || 0),
-        maxPrice: Number(item.maxPrice || 0),
+          price: minPrice > 0 ? minPrice : (maxPrice > 0 ? maxPrice : price),
+          minPrice: minPrice,
+          maxPrice: maxPrice,
         promotionPrice: null,
         discountRate: null,
         imageAlt: item.name || "상품 이미지",
@@ -107,8 +124,11 @@ export function useShopSearch() {
         availableBranches: [],
         availableBranchCount: 0,
         highlightedName: item.highlightedName || item.name
-      }));
+        };
+      })
+      .filter((item) => item != null); // null 항목 제거 (productId가 없는 경우)
       
+      console.log('✅ 매핑된 검색 결과:', { mappedLength: mapped.length, mapped });
       setSearchResults(mapped);
       
     } catch (e) {

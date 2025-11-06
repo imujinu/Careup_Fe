@@ -9,8 +9,14 @@ export const customerProductService = {
     try {
       const userInfo = customerAuthService.getCurrentUser();
       
-      // 로그인 상태가 아니면 요청하지 않음
-      if (!userInfo || !userInfo.memberId || !productId) {
+      // 유효한 productId인지 확인 (정수이고 0보다 커야 함)
+      const isValidProductId = productId != null && 
+                               typeof productId === 'number' && 
+                               Number.isInteger(productId) && 
+                               productId > 0;
+      
+      // 로그인 상태가 아니거나 유효하지 않은 productId면 요청하지 않음
+      if (!userInfo || !userInfo.memberId || !isValidProductId) {
         return null;
       }
 

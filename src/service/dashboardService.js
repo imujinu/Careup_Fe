@@ -5,6 +5,48 @@ const BRANCH_API_BASE_URL = import.meta.env.VITE_BRANCH_URL || "http://localhost
 const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL || "http://localhost:8081";
 
 export const dashboardService = {
+  // 전체 직원 수 조회
+  getTotalEmployeesCount: async () => {
+    // 여러 후보 경로 시도
+    const candidates = [
+      // 직접 호출 (게이트웨이 없이)
+      { url: `${BRANCH_API_BASE_URL}/employees/list`, params: { page: 0, size: 1 } },
+      // 게이트웨이를 통한 호출
+      { url: `${BRANCH_API_BASE_URL}/branch-service/employees/list`, params: { page: 0, size: 1 } },
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        const response = await axios.get(candidate.url, candidate.params ? { params: candidate.params } : undefined);
+        const data = response.data?.result || response.data;
+        
+        // 페이징 응답에서 totalElements 추출
+        if (data?.totalElements !== undefined) {
+          console.log("Employee API Response:", data);
+          console.log("Total Employees:", data.totalElements);
+          return data.totalElements;
+        }
+        
+        // 리스트 응답인 경우 배열 길이 사용
+        if (Array.isArray(data?.data)) {
+          console.log("Employee List Response (count from array):", data.data.length);
+          return data.data.length;
+        }
+        if (Array.isArray(data)) {
+          console.log("Employee List Response (count from array):", data.length);
+          return data.length;
+        }
+      } catch (error) {
+        // 다음 후보 경로로 계속 시도
+        console.log(`Failed to get employees from ${candidate.url}, trying next...`);
+      }
+    }
+    
+    // 모든 경로 실패 시 fallback
+    console.error("All employee API endpoints failed");
+    return 1247;
+  },
+
   // 전체 지점 수 조회
   getTotalBranchesCount: async () => {
     // 여러 후보 경로 시도
@@ -45,18 +87,109 @@ export const dashboardService = {
     return 324;
   },
 
-  // 전체 직원 수 조회
-  getTotalEmployeesCount: async () => {
+  // 전월 지점 수 조회 (특정 날짜 이전에 생성된 지점 수)
+  getPreviousMonthBranchesCount: async () => {
     try {
-      const response = await axios.get(`${BRANCH_API_BASE_URL}/employees/list?page=0&size=1`);
-      console.log("Employee API Response:", response.data);
-      console.log("Total Employees:", response.data?.result?.totalElements);
-      return response.data?.result?.totalElements || 0;
+      const now = new Date();
+      const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      // 전체 지점 목록을 가져와서 필터링
+      const allBranches = await dashboardService.getAllBranches();
+      if (Array.isArray(allBranches)) {
+        const filtered = allBranches.filter(branch => {
+          if (!branch.createdAt) return false;
+          const createdAt = new Date(branch.createdAt);
+          return createdAt < firstDayOfCurrentMonth;
+        });
+        return filtered.length;
+      }
+      
+      // 전체 지점 수 API에서 추정
+      const currentCount = await dashboardService.getTotalBranchesCount();
+      return Math.max(0, currentCount - 1); // 최소 0
     } catch (error) {
-      console.error("Failed to get total employees count:", error);
-      // Fallback to dummy data for demonstration
-      return 1247;
+      console.error("Failed to get previous month branches count:", error);
+      const currentCount = await dashboardService.getTotalBranchesCount();
+      return Math.max(0, currentCount - 1);
     }
+  },
+
+  // 전월 직원 수 조회
+  getPreviousMonthEmployeesCount: async () => {
+    try {
+      const now = new Date();
+      const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      // 직원 목록 전체 조회 시도
+      try {
+        const response = await axios.get(`${BRANCH_API_BASE_URL}/employees/list?page=0&size=1000`);
+        const data = response.data?.result || response.data;
+        let employees = [];
+        
+        if (Array.isArray(data?.data)) {
+          employees = data.data;
+        } else if (Array.isArray(data)) {
+          employees = data;
+        } else if (data?.totalElements !== undefined) {
+          // 페이징 응답인 경우
+          if (data?.data && Array.isArray(data.data)) {
+            employees = data.data;
+          } else {
+            // 전체 개수만 알 수 있는 경우 현재에서 추정
+            return Math.max(0, data.totalElements - 1);
+          }
+        }
+        
+        if (employees.length > 0) {
+          const filtered = employees.filter(emp => {
+            if (!emp.createdAt && !emp.hireDate) return false;
+            const date = new Date(emp.createdAt || emp.hireDate);
+            return date < firstDayOfCurrentMonth;
+          });
+          return filtered.length;
+        }
+      } catch (error) {
+        console.log("Failed to get employee list, using estimation");
+      }
+      
+      // 실패 시 현재 직원 수에서 추정
+      const currentCount = await dashboardService.getTotalEmployeesCount();
+      return Math.max(0, currentCount - 1);
+    } catch (error) {
+      console.error("Failed to get previous month employees count:", error);
+      const currentCount = await dashboardService.getTotalEmployeesCount();
+      return Math.max(0, currentCount - 1);
+    }
+  },
+
+  // 전월 매출 통계 조회
+  getPreviousMonthSalesStatistics: async () => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      // 전월 첫날부터 전월 말일까지
+      startDate.setMonth(endDate.getMonth() - 1);
+      startDate.setDate(1);
+      const lastDayOfPreviousMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+      
+      const response = await axios.get(
+        `${ORDERING_API_BASE_URL}/hq/sales/all?startDate=${formatDate(startDate)}&endDate=${formatDate(lastDayOfPreviousMonth)}&periodType=MONTH`
+      );
+      
+      return response.data?.result || null;
+    } catch (error) {
+      console.error("Failed to get previous month sales statistics:", error);
+      return null;
+    }
+  },
+
+  // 성장률 계산 헬퍼 함수
+  calculateGrowthRate: (current, previous) => {
+    if (!previous || previous === 0) {
+      return current > 0 ? 100 : 0;
+    }
+    return ((current - previous) / previous) * 100;
   },
 
   // 전체 지점 목록 조회 (간단한 정보만)
@@ -125,10 +258,18 @@ export const dashboardService = {
   // 대시보드 주요 지표 조회
   getDashboardKPI: async () => {
     try {
+      // 현재 월 데이터 조회
       const [branches, employees, salesStats] = await Promise.all([
         dashboardService.getTotalBranchesCount(),
         dashboardService.getTotalEmployeesCount(),
         dashboardService.getSalesStatistics("MONTH"),
+      ]);
+
+      // 전월 데이터 조회
+      const [previousBranches, previousEmployees, previousSalesStats] = await Promise.all([
+        dashboardService.getPreviousMonthBranchesCount(),
+        dashboardService.getPreviousMonthEmployeesCount(),
+        dashboardService.getPreviousMonthSalesStatistics(),
       ]);
 
       // 매출 통계에서 평균 매출 계산 (원 단위로 유지)
@@ -136,13 +277,21 @@ export const dashboardService = {
       if (salesStats && salesStats.salesData) {
         const totalSales = salesStats.totalSales || 0;
         const branchCount = salesStats.totalBranchCount || branches;
-        avgMonthlySales = Math.floor(totalSales / branchCount); // 원 단위
+        avgMonthlySales = branchCount > 0 ? Math.floor(totalSales / branchCount) : 0; // 원 단위
       }
 
-      // 전월 대비 증가율 계산 (임시로 더미 데이터 사용)
-      const branchGrowthRate = 12.5;
-      const employeeGrowthRate = 8.2;
-      const salesGrowthRate = 23.1;
+      // 전월 평균 매출 계산
+      let previousAvgMonthlySales = 0;
+      if (previousSalesStats && previousSalesStats.salesData) {
+        const previousTotalSales = previousSalesStats.totalSales || 0;
+        const previousBranchCount = previousSalesStats.totalBranchCount || previousBranches;
+        previousAvgMonthlySales = previousBranchCount > 0 ? Math.floor(previousTotalSales / previousBranchCount) : 0;
+      }
+
+      // 전월 대비 증가율 계산
+      const branchGrowthRate = dashboardService.calculateGrowthRate(branches, previousBranches);
+      const employeeGrowthRate = dashboardService.calculateGrowthRate(employees, previousEmployees);
+      const salesGrowthRate = dashboardService.calculateGrowthRate(avgMonthlySales, previousAvgMonthlySales);
       
       // 연간 매출 조회
       const annualSales = await dashboardService.getAnnualSales();
@@ -151,9 +300,9 @@ export const dashboardService = {
         totalBranches: branches,
         totalEmployees: employees,
         avgMonthlySales,
-        branchGrowthRate,
-        employeeGrowthRate,
-        salesGrowthRate,
+        branchGrowthRate: Math.round(branchGrowthRate * 10) / 10, // 소수점 첫째자리까지
+        employeeGrowthRate: Math.round(employeeGrowthRate * 10) / 10,
+        salesGrowthRate: Math.round(salesGrowthRate * 10) / 10,
         annualSales,
       };
     } catch (error) {
@@ -322,6 +471,8 @@ export const dashboardService = {
         ownerName: branch?.ownerName || branch?.managerName || "-",
         totalSales: result.totalSales || 0,
         totalOrders: result.totalOrders || 0,
+        averageSales: result.averageSales || 0,
+        differenceFromAverage: result.differenceFromAverage || 0,
       };
     } catch (error) {
       console.error("Failed to get top branch:", error);
@@ -360,6 +511,8 @@ export const dashboardService = {
         ownerName: branch?.ownerName || branch?.managerName || "-",
         totalSales: result.totalSales || 0,
         totalOrders: result.totalOrders || 0,
+        averageSales: result.averageSales || 0,
+        differenceFromAverage: result.differenceFromAverage || 0,
       };
     } catch (error) {
       console.error("Failed to get low sales branch:", error);

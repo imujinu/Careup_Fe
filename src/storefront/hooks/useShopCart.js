@@ -90,6 +90,19 @@ export function useShopCart() {
 
   const handleProductClick = async (product) => {
     const productId = product.productId || product.id;
+    
+    // 유효한 productId인지 확인 (정수이고 0보다 커야 함)
+    const isValidProductId = productId != null && 
+                             typeof productId === 'number' && 
+                             Number.isInteger(productId) && 
+                             productId > 0;
+    
+    if (!isValidProductId) {
+      console.error('❌ 유효하지 않은 상품 ID:', productId);
+      alert('상품 정보를 불러올 수 없습니다.');
+      return;
+    }
+    
     if (productId) {
       await customerProductService.recordProductView(productId);
     }

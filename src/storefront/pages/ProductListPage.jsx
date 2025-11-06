@@ -42,8 +42,10 @@ const ProductListPage = () => {
       const raw = res?.data?.data ?? res?.data ?? [];
       console.log('📦 원본 데이터:', raw);
       
-      const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
-        id: item.branchProductId ?? item.productId ?? Math.random(),
+      const mapped = (Array.isArray(raw) ? raw : [])
+        .filter((item) => item.branchProductId != null || item.productId != null) // ID가 없는 항목 제외
+        .map((item) => ({
+        id: item.branchProductId ?? item.productId, // ID가 있는 경우만 사용
         productId: item.productId,
         branchProductId: item.branchProductId,
         branchId: item.branchId,

@@ -471,9 +471,16 @@ const HeadquartersDashboard = () => {
     // 상위 10개 지점만 표시 (너무 많으면 차트가 복잡해짐)
     const topBranches = branchSalesSummary.branches.slice(0, 10);
     
-    return topBranches.map((branch) => ({
+    // 각 지점마다 다른 색상 적용
+    const colors = [
+      "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+      "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6"
+    ];
+    
+    return topBranches.map((branch, index) => ({
       name: branch.branchName?.length > 6 ? branch.branchName.substring(0, 6) + '...' : branch.branchName,
       매출: branch.totalSales ? Math.round(branch.totalSales / 1000) : 0, // 천원 단위
+      color: colors[index % colors.length],
     }));
   };
 
@@ -517,9 +524,6 @@ const HeadquartersDashboard = () => {
           </KPIIcon>
           <KPILabel>총 지점 수</KPILabel>
           <KPIValue>{kpiData.totalBranches}</KPIValue>
-          <KPIChange $positive>
-            +{kpiData.branchGrowthRate}% 전월 대비
-          </KPIChange>
         </KPICard>
 
         <KPICard>
@@ -528,7 +532,6 @@ const HeadquartersDashboard = () => {
           </KPIIcon>
           <KPILabel>총 직원 수</KPILabel>
           <KPIValue>{kpiData.totalEmployees.toLocaleString()}</KPIValue>
-          <KPIChange $positive>+{kpiData.employeeGrowthRate}% 전월 대비</KPIChange>
         </KPICard>
 
         <KPICard>
@@ -537,7 +540,9 @@ const HeadquartersDashboard = () => {
           </KPIIcon>
           <KPILabel>평균 월간 매출</KPILabel>
           <KPIValue>{formatCurrency(kpiData.avgMonthlySales)}</KPIValue>
-          <KPIChange $positive>+{kpiData.salesGrowthRate}% 전월 대비</KPIChange>
+          <KPIChange $positive={kpiData.salesGrowthRate >= 0}>
+            {kpiData.salesGrowthRate >= 0 ? '+' : ''}{kpiData.salesGrowthRate}% 전월 대비
+          </KPIChange>
         </KPICard>
 
         <KPICard>
@@ -589,6 +594,11 @@ const HeadquartersDashboard = () => {
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
             {topBranch?.ownerName || "-"}
           </KPILabel>
+          {topBranch && topBranch.averageSales !== undefined && topBranch.differenceFromAverage !== undefined && (
+            <KPILabel style={{ fontSize: "11px", marginTop: "4px", color: "#10b981" }}>
+              평균 대비 {topBranch.differenceFromAverage >= 0 ? '+' : ''}{formatCurrency(topBranch.differenceFromAverage)}
+            </KPILabel>
+          )}
         </HighlightCard>
 
         <HighlightCard $warning>
@@ -602,6 +612,11 @@ const HeadquartersDashboard = () => {
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
             {lowBranch?.ownerName || "-"}
           </KPILabel>
+          {lowBranch && lowBranch.averageSales !== undefined && lowBranch.differenceFromAverage !== undefined && (
+            <KPILabel style={{ fontSize: "11px", marginTop: "4px", color: "#ef4444" }}>
+              평균 대비 {lowBranch.differenceFromAverage >= 0 ? '+' : ''}{formatCurrency(lowBranch.differenceFromAverage)}
+            </KPILabel>
+          )}
         </HighlightCard>
       </HighlightsGrid>
 
@@ -655,7 +670,11 @@ const HeadquartersDashboard = () => {
                 labelFormatter={(label) => `지점: ${label}`}
               />
               <Legend />
-              <Bar dataKey="매출" fill="#10b981" />
+              <Bar dataKey="매출">
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

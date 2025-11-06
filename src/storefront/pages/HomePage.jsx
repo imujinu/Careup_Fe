@@ -2,15 +2,12 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeroSlider from '../components/HeroSlider';
 import Tabs from '../components/Tabs';
-import ProductRanking from '../components/ProductRanking';
 import { useShopData } from '../hooks/useShopData';
-import { useShopAuth } from '../hooks/useShopAuth';
 import { useShopCart } from '../hooks/useShopCart';
 
 function HomePage() {
   const navigate = useNavigate();
   const { categories, products, loadingProducts, productsError, favorites, toggleFavorite, getCategoryIdByName } = useShopData();
-  const { currentUser } = useShopAuth();
   const { handleAddToCart } = useShopCart();
 
   const [activeTab, setActiveTab] = React.useState("전체");
@@ -206,17 +203,6 @@ function HomePage() {
           </div>
         </section>
       </div>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-title">🏆 실시간 인기 랭킹</div>
-          <ProductRanking 
-            memberId={currentUser?.memberId}
-            onAddToCart={handleAddToCart}
-            onOpenDetail={handleProductClick}
-          />
-        </div>
-      </section>
     </>
   );
 }

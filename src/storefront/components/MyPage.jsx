@@ -243,8 +243,9 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
                               {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ko-KR') : '-'}
                             </div>
                             <div className={`purchase-status ${order.orderStatus?.toLowerCase() || 'pending'}`}>
-                              {order.orderStatus === 'CONFIRMED' ? '구매완료' : 
+                              {order.orderStatus === 'CONFIRMED' || order.orderStatus === 'APPROVED' ? '구매완료' : 
                                order.orderStatus === 'PENDING' ? '주문대기' :
+                               order.orderStatus === 'REJECTED' ? '거부됨' :
                                order.orderStatus === 'CANCELLED' ? '취소됨' : order.orderStatus || '대기중'}
                             </div>
                           </div>

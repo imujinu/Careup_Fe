@@ -24,6 +24,17 @@ function ProductDetailPage() {
         setLoading(true);
         setError(null);
 
+        // URL 파라미터에서 productId 추출 및 유효성 검사
+        const parsedProductId = Number(productId);
+        const isValidProductId = !isNaN(parsedProductId) && 
+                                 Number.isInteger(parsedProductId) && 
+                                 parsedProductId > 0;
+
+        if (!isValidProductId) {
+          setError('유효하지 않은 상품 ID입니다.');
+          return;
+        }
+
         // 상품 상세 정보 로드
         const response = await shopApi.get(`/api/public/products/with-branches`, {
           params: { 
@@ -36,19 +47,53 @@ function ProductDetailPage() {
         const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
         const products = isPageResponse ? (responseData.content || []) : (responseData || []);
 
-        const foundProduct = products.find(p => p.productId === Number(productId));
+        const foundProduct = products.find(p => p.productId === parsedProductId);
 
         if (!foundProduct) {
           setError('상품을 찾을 수 없습니다.');
           return;
         }
 
-        // 상품 조회 기록 POST 요청
-        await customerProductService.recordProductView(Number(productId));
+        // 상품 조회 기록 POST 요청 (유효한 productId만 전달)
+        await customerProductService.recordProductView(parsedProductId);
+
+        // 속성별로 상품을 그룹화하기 위해 availableBranches를 속성 타입별로 분류
+        const branchesByAttributeType = {};
+        
+        if (foundProduct.availableBranches && foundProduct.availableBranches.length > 0) {
+          foundProduct.availableBranches.forEach(branch => {
+            // 속성 타입별로 그룹화
+            const attributeTypeName = branch.attributeTypeName || '기본';
+            
+            if (!branchesByAttributeType[attributeTypeName]) {
+              branchesByAttributeType[attributeTypeName] = {
+                attributeTypeName: attributeTypeName,
+                values: {} // 속성 값별로 분류
+              };
+            }
+            
+            // 속성 값별로 분류
+            const valueName = branch.attributeValueName || '기본';
+            if (!branchesByAttributeType[attributeTypeName].values[valueName]) {
+              branchesByAttributeType[attributeTypeName].values[valueName] = {
+                attributeValueId: branch.attributeValueId,
+                attributeValueName: branch.attributeValueName,
+                branches: []
+              };
+            }
+            branchesByAttributeType[attributeTypeName].values[valueName].branches.push(branch);
+          });
+        }
+        
+        // 속성 그룹을 배열로 변환
+        const attributeGroups = Object.values(branchesByAttributeType).map(typeGroup => ({
+          attributeTypeName: typeGroup.attributeTypeName,
+          values: Object.values(typeGroup.values)
+        }));
 
         // 상품 데이터 매핑
         const mappedProduct = {
-          id: foundProduct.productId ?? Math.random(),
+          id: foundProduct.productId, // productId가 항상 있음
           productId: foundProduct.productId,
           name: foundProduct.productName || "상품",
           price: Number(foundProduct.minPrice || foundProduct.maxPrice || 0),
@@ -75,7 +120,9 @@ function ProductDetailPage() {
           images: [foundProduct.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
           relatedProducts: [],
           availableBranches: foundProduct.availableBranches || [],
-          availableBranchCount: foundProduct.availableBranchCount || 0
+          availableBranchCount: foundProduct.availableBranchCount || 0,
+          // 속성별 상품 정보 추가
+          attributeGroups: attributeGroups.length > 0 ? attributeGroups : null
         };
 
         setProduct(mappedProduct);

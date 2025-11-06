@@ -6,6 +6,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [isInCart, setIsInCart] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedAttributeValueId, setSelectedAttributeValueId] = useState(null);
 
   // 이미지 배열 처리 - images 배열이 있으면 사용, 없으면 image를 배열로 변환
   const productImages = product?.images && product.images.length > 0 
@@ -158,6 +159,56 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               </p>
             </div>
 
+            {/* 속성 선택 (색상, 사이즈 등) */}
+            {product?.attributeGroups && product.attributeGroups.length > 0 && (
+              product.attributeGroups.map((attrGroup, idx) => {
+                if (!attrGroup.attributeTypeName || !attrGroup.values || attrGroup.values.length === 0) return null;
+                
+                return (
+                  <div key={idx} className="option-section">
+                    <label className="option-label">{attrGroup.attributeTypeName}</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {attrGroup.values.map((valueGroup, valueIdx) => {
+                        // 각 속성 값의 첫 번째 브랜치를 확인하여 재고 확인
+                        const firstBranch = valueGroup.branches && valueGroup.branches.length > 0 ? valueGroup.branches[0] : null;
+                        const hasStock = firstBranch ? firstBranch.stockQuantity > 0 : false;
+                        const isSelected = selectedAttributeValueId === valueGroup.attributeValueId;
+                        
+                        return (
+                          <button
+                            key={valueIdx}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAttributeValueId(valueGroup.attributeValueId);
+                              // 속성 선택 시 해당 속성의 첫 번째 지점을 기본 선택
+                              if (firstBranch && firstBranch.branchId) {
+                                setSelectedBranchId(firstBranch.branchId);
+                              }
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              border: `2px solid ${isSelected ? '#111' : '#e5e7eb'}`,
+                              background: isSelected ? '#111' : 'white',
+                              color: isSelected ? 'white' : hasStock ? '#111' : '#9ca3af',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              cursor: hasStock ? 'pointer' : 'not-allowed',
+                              opacity: hasStock ? 1 : 0.5,
+                              fontWeight: isSelected ? 'bold' : 'normal'
+                            }}
+                            disabled={!hasStock}
+                          >
+                            {valueGroup.attributeValueName || '기본'}
+                            {!hasStock && ' (품절)'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
             {/* 구매 가능한 지점 선택 */}
             {product?.availableBranches && product.availableBranches.length > 0 && (
               <div className="option-section">
@@ -168,11 +219,19 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   onChange={(e) => setSelectedBranchId(e.target.value)}
                 >
                   <option value="">구매할 지점을 선택하세요</option>
-                  {product.availableBranches.map(branch => (
-                    <option key={branch.branchId} value={branch.branchId}>
-                      {branch.branchName} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
-                    </option>
-                  ))}
+                  {product.availableBranches
+                    .filter(branch => {
+                      // 속성이 선택된 경우 해당 속성의 지점만 표시
+                      if (selectedAttributeValueId) {
+                        return branch.attributeValueId === selectedAttributeValueId;
+                      }
+                      return true;
+                    })
+                    .map(branch => (
+                      <option key={branch.branchId} value={branch.branchId}>
+                        {branch.branchName} {branch.attributeValueName ? `(${branch.attributeTypeName}: ${branch.attributeValueName})` : ''} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
+                      </option>
+                    ))}
                 </select>
               </div>
             )}

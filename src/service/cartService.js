@@ -167,10 +167,14 @@ export const cartService = {
     }
   },
 
-  // 주문 취소
-  cancelOrder: async (orderId) => {
+  // 주문 취소 (고객만 가능, 사유는 선택사항)
+  cancelOrder: async (orderId, reason = null) => {
     try {
-      const response = await customerAxios.delete(`/api/orders/${orderId}`);
+      const params = {};
+      if (reason) {
+        params.reason = reason;
+      }
+      const response = await customerAxios.delete(`/api/orders/${orderId}`, { params });
       return response.data;
     } catch (error) {
       console.error('주문 취소 실패:', error);

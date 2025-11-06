@@ -8,6 +8,63 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
     }
     return new Set();
   }, [favorites]);
+
+  // 가격 표시 함수
+  const renderPrice = (product) => {
+    if (product.promotionPrice && product.discountRate) {
+      return (
+        <>
+          <div className="promotion-price">
+            {product.promotionPrice.toLocaleString()}원
+          </div>
+          <div className="original-price">
+            {product.price.toLocaleString()}원
+          </div>
+          <div className="discount-badge">
+            {product.discountRate}% 할인
+          </div>
+        </>
+      );
+    }
+
+    const minPrice = product.minPrice || 0;
+    const maxPrice = product.maxPrice || 0;
+    const price = product.price || 0;
+
+    // minPrice와 maxPrice가 모두 있고 다른 경우 가격 범위 표시
+    if (minPrice > 0 && maxPrice > 0 && minPrice !== maxPrice) {
+      return (
+        <div className="price">
+          {minPrice.toLocaleString()}원 ~ {maxPrice.toLocaleString()}원
+        </div>
+      );
+    }
+    
+    // maxPrice가 있으면 표시
+    if (maxPrice > 0) {
+      return (
+        <div className="price">
+          {maxPrice.toLocaleString()}원
+        </div>
+      );
+    }
+    
+    // price가 있으면 표시
+    if (price > 0) {
+      return (
+        <div className="price">
+          {price.toLocaleString()}원
+        </div>
+      );
+    }
+    
+    // 가격이 없으면 "가격 문의" 표시
+    return (
+      <div className="price" style={{ color: '#6b7280' }}>
+        가격 문의
+      </div>
+    );
+  };
   
   return (
     <div className="container search-results-page">
@@ -96,23 +153,7 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                     )}
                   </div>
                   <div className="price-section">
-                    {product.promotionPrice && product.discountRate ? (
-                      <>
-                        <div className="promotion-price">
-                          {product.promotionPrice.toLocaleString()}원
-                        </div>
-                        <div className="original-price">
-                          {product.price.toLocaleString()}원
-                        </div>
-                        <div className="discount-badge">
-                          {product.discountRate}% 할인
-                        </div>
-                      </>
-                    ) : (
-                      <div className="price">
-                        {product.price.toLocaleString()}원
-                      </div>
-                    )}
+                    {renderPrice(product)}
                   </div>
                   <button 
                     className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`}

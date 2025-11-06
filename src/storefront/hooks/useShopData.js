@@ -97,38 +97,78 @@ export function useShopData() {
           setTotalElements(responseData.totalElements || 0);
           const raw = responseData.content || [];
           
-          const mapProduct = (item) => ({
-            id: item.productId ?? Math.random(),
-            productId: item.productId,
-            name: item.productName || "상품",
-            price: Number(item.minPrice || item.maxPrice || 0),
-            minPrice: Number(item.minPrice || 0),
-            maxPrice: Number(item.maxPrice || 0),
-            promotionPrice: null,
-            discountRate: null,
-            imageAlt: item.productName || "상품 이미지",
-            image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
-            category: item.categoryName || "미분류",
-            stock: 0,
-            safetyStock: 0,
-            isOutOfStock: false,
-            isLowStock: false,
-            brand: "",
-            likes: 0,
-            reviews: 0,
-            pop: 0,
-            discount: 0,
-            description: item.description || "상품에 대한 자세한 설명이 없습니다.",
-            specifications: [
-              { name: "카테고리", value: item.categoryName || "정보 없음" },
-            ],
-            images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
-            relatedProducts: [],
-            availableBranches: item.availableBranches || [],
-            availableBranchCount: item.availableBranchCount || 0
-          });
+          const mapProduct = (item) => {
+            // 속성별로 상품을 그룹화하기 위해 availableBranches를 속성 타입별로 분류
+            const branchesByAttributeType = {};
+            
+            if (item.availableBranches && item.availableBranches.length > 0) {
+              item.availableBranches.forEach(branch => {
+                // 속성 타입별로 그룹화
+                const attributeTypeName = branch.attributeTypeName || '기본';
+                
+                if (!branchesByAttributeType[attributeTypeName]) {
+                  branchesByAttributeType[attributeTypeName] = {
+                    attributeTypeName: attributeTypeName,
+                    values: {} // 속성 값별로 분류
+                  };
+                }
+                
+                // 속성 값별로 분류
+                const valueName = branch.attributeValueName || '기본';
+                if (!branchesByAttributeType[attributeTypeName].values[valueName]) {
+                  branchesByAttributeType[attributeTypeName].values[valueName] = {
+                    attributeValueId: branch.attributeValueId,
+                    attributeValueName: branch.attributeValueName,
+                    branches: []
+                  };
+                }
+                branchesByAttributeType[attributeTypeName].values[valueName].branches.push(branch);
+              });
+            }
+            
+            // 속성 그룹을 배열로 변환
+            const attributeGroups = Object.values(branchesByAttributeType).map(typeGroup => ({
+              attributeTypeName: typeGroup.attributeTypeName,
+              values: Object.values(typeGroup.values)
+            }));
+            
+            return {
+              id: item.productId, // productId가 있는 경우만 사용
+              productId: item.productId,
+              name: item.productName || "상품",
+              price: Number(item.minPrice || item.maxPrice || 0),
+              minPrice: Number(item.minPrice || 0),
+              maxPrice: Number(item.maxPrice || 0),
+              promotionPrice: null,
+              discountRate: null,
+              imageAlt: item.productName || "상품 이미지",
+              image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+              category: item.categoryName || "미분류",
+              stock: 0,
+              safetyStock: 0,
+              isOutOfStock: false,
+              isLowStock: false,
+              brand: "",
+              likes: 0,
+              reviews: 0,
+              pop: 0,
+              discount: 0,
+              description: item.description || "상품에 대한 자세한 설명이 없습니다.",
+              specifications: [
+                { name: "카테고리", value: item.categoryName || "정보 없음" },
+              ],
+              images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
+              relatedProducts: [],
+              availableBranches: item.availableBranches || [],
+              availableBranchCount: item.availableBranchCount || 0,
+              // 속성별 상품 정보 추가
+              attributeGroups: attributeGroups.length > 0 ? attributeGroups : null
+            };
+          };
 
-          const mapped = (Array.isArray(raw) ? raw : []).map(mapProduct);
+          const mapped = (Array.isArray(raw) ? raw : [])
+            .filter((item) => item.productId != null) // productId가 없는 항목 제외
+            .map(mapProduct);
         
           const filteredMapped = mapped.filter(item => {
             return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
@@ -137,7 +177,9 @@ export function useShopData() {
           setProducts(filteredMapped);
         } else {
           const raw = responseData || [];
-          const mapped = (Array.isArray(raw) ? raw : []).map(mapProduct);
+          const mapped = (Array.isArray(raw) ? raw : [])
+            .filter((item) => item.productId != null) // productId가 없는 항목 제외
+            .map(mapProduct);
           const filteredMapped = mapped.filter(item => {
             return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
           });
