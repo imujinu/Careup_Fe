@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useAppSelector, useAppDispatch } from "../../stores/hooks";
-import { removeNotification, clearNotifications } from "../../stores/slices/alertsSlice";
+import { removeNotification, markNotificationAsRead, clearNotifications } from "../../stores/slices/alertsSlice";
 import { notificationService } from "../../service/notificationService";
 import { useNavigate } from "react-router-dom";
 import "./AlertPage.css";
@@ -45,12 +45,10 @@ function AlertsPanel({ onClose, isOpen }) {
     });
   }, [notifications, active]);
 
-  // 특정 알림 읽음 처리
-  const handleNotificationRead = async (notificationId, e) => {
-    e?.stopPropagation(); // 버블링 방지
-    
-    // Optimistic update: 즉시 알림 제거 (UI 반응성 향상)
-    dispatch(removeNotification(notificationId));
+  // 특정 알림 읽음 처리 (삭제하지 않고 읽음 상태만 변경)
+  const handleNotificationRead = async (notificationId) => {
+    // Optimistic update: 즉시 읽음 상태 변경
+    dispatch(markNotificationAsRead(notificationId));
     
     try {
       // 백그라운드에서 읽음 처리 API 호출
@@ -58,9 +56,58 @@ function AlertsPanel({ onClose, isOpen }) {
       console.log('알림 읽음 처리 완료:', notificationId);
     } catch (error) {
       console.error('알림 읽음 처리 오류:', error);
-      // API 호출 실패 시에도 이미 UI에서 제거했으므로 그대로 유지
+      // API 호출 실패 시에도 이미 UI에서 읽음 처리했으므로 그대로 유지
       // (서버 동기화는 다음 알림 목록 조회 시 해결됨)
     }
+  };
+
+  // 알림 삭제 (X 버튼 클릭 시에만 사용)
+  const handleNotificationDelete = async (notificationId, e) => {
+    e?.stopPropagation(); // 버블링 방지
+    
+    // Optimistic update: 즉시 알림 제거
+    dispatch(removeNotification(notificationId));
+    
+    try {
+      // 삭제 API 호출
+      await notificationService.deleteNotification(notificationId);
+      console.log('알림 삭제 완료:', notificationId);
+    } catch (error) {
+      console.error('알림 삭제 오류:', error);
+      // 실패 시 롤백 (다시 알림 추가)
+      // TODO: 필요시 롤백 로직 추가
+    }
+  };
+
+  // 전체 삭제
+  const handleDeleteAll = async () => {
+    if (filtered.length === 0) return;
+    
+    try {
+      // 필터링된 알림들의 ID 목록 추출
+      const notificationIds = filtered.map((n) => n.id);
+      const success = await notificationService.deleteAllNotifications(notificationIds);
+      if (success) {
+        // 전체 삭제 성공 시 필터링된 알림들 제거
+        notificationIds.forEach((id) => {
+          dispatch(removeNotification(id));
+        });
+      }
+    } catch (error) {
+      console.error('전체 삭제 오류:', error);
+    }
+  };
+
+  // 카테고리별 경로 매핑
+  const getCategoryPath = (category) => {
+    const categoryMap = {
+      "근태": "/attendance",
+      "발주": "/purchase-order",
+      "재고": "/inventory",
+      "주문": "/order",
+      "지점": "/branch",
+    };
+    return categoryMap[category] || "/dashboard";
   };
 
   // 전체 읽음 처리
@@ -72,9 +119,9 @@ function AlertsPanel({ onClose, isOpen }) {
       const notificationIds = filtered.map((n) => n.id);
       const success = await notificationService.markAllAsRead(notificationIds);
       if (success) {
-        // 전체 읽음 처리 성공 시 필터링된 알림들 제거
+        // 전체 읽음 처리 성공 시 필터링된 알림들 읽음 상태로 변경
         notificationIds.forEach((id) => {
-          dispatch(removeNotification(id));
+          dispatch(markNotificationAsRead(id));
         });
       }
     } catch (error) {
@@ -122,17 +169,26 @@ function AlertsPanel({ onClose, isOpen }) {
               {t}
             </button>
           ))}
-          {filtered.length > 0 && (
-            <button
-              className="pill mark-all-read-btn"
-              onClick={handleMarkAllAsRead}
-              title="전체 읽음"
-            >
-              전체 읽음
-            </button>
-          )}
         </div>
         <div className="drawer-body">
+          {filtered.length > 0 && (
+            <div className="action-buttons-container">
+              <button
+                className="pill mark-all-read-btn"
+                onClick={handleMarkAllAsRead}
+                title="전체 읽음"
+              >
+                전체 읽음
+              </button>
+              <button
+                className="pill mark-all-delete-btn"
+                onClick={handleDeleteAll}
+                title="전체 삭제"
+              >
+                전체 삭제
+              </button>
+            </div>
+          )}
           {filtered.length > 0 ? (
             filtered.map((d) => {
               const isBranchNotification = (d.cat === "지점" || d.cat?.trim() === "지점") && (d.status === "pending" || d.status === "대기중");
@@ -141,17 +197,27 @@ function AlertsPanel({ onClose, isOpen }) {
               return (
                 <div
                   key={d.id}
-                  className="alert-row"
+                  className={`alert-row ${d.isRead ? 'read' : ''}`}
                   onClick={() => {
-                    if (isBranchNotification && requestId) {
-                      // 지점 수정 요청 상세 페이지로 이동
-                      // 이동 전 알림 읽음 처리
+                    // 알림 읽음 처리
+                    if (!d.isRead) {
                       handleNotificationRead(d.id);
+                    }
+                    
+                    // 해당 카테고리 탭으로 이동
+                    if (d.cat && d.cat !== "전체") {
+                      setActive(d.cat);
+                    }
+                    
+                    // 특정 알림의 경우 상세 페이지로 이동
+                    if (isBranchNotification && requestId) {
                       navigate(`/branch/update-requests/${requestId}`);
                       onClose();
                     } else {
-                      // 일반 알림 읽음 처리
-                      handleNotificationRead(d.id);
+                      // 일반 알림은 해당 카테고리 페이지로 이동
+                      const categoryPath = getCategoryPath(d.cat);
+                      navigate(categoryPath);
+                      onClose();
                     }
                   }}
                 >
@@ -159,10 +225,10 @@ function AlertsPanel({ onClose, isOpen }) {
                     className="alert-close-btn"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleNotificationRead(d.id, e);
+                      handleNotificationDelete(d.id, e);
                     }}
-                    title="읽음 처리"
-                    aria-label="읽음 처리"
+                    title="삭제"
+                    aria-label="삭제"
                   >
                     ✕
                   </button>
@@ -182,7 +248,9 @@ function AlertsPanel({ onClose, isOpen }) {
                         onClick={(e) => {
                           e.stopPropagation();
                           // 상세보기 클릭 시에도 알림 읽음 처리
-                          handleNotificationRead(d.id, e);
+                          if (!d.isRead) {
+                            handleNotificationRead(d.id);
+                          }
                           navigate(`/branch/update-requests/${requestId}`);
                           onClose();
                         }}

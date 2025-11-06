@@ -63,16 +63,24 @@ const NotificationIcon = styled.div`
   img { width: 20px; height: 20px; }
 `;
 
-const NotificationBadgeStandalone = styled.div`
+const NotificationBadge = styled.div`
+  position: absolute;
+  top: -6px;
+  right: -6px;
   background: #ef4444;
   color: white;
   font-size: 10px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 12px;
-  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  margin-right: 8px;
+  border: 2px solid white;
+  box-sizing: border-box;
 `;
 
 const UserSection = styled.div`
@@ -174,7 +182,7 @@ function Header({ onToggleSidebar, sidebarVisible }) {
   const navigate = useNavigate();
   const { isOpen: isAlertsOpen } = useAppSelector((s) => s.alerts);
   const notifications = useAppSelector((s) => s.alerts.notifications);
-  const unreadCount = notifications.length; // 읽지 않은 알림 수 = 전체 알림 수
+  const unreadCount = notifications.filter((n) => !n.isRead).length; // 읽지 않은 알림 수
   const { user: reduxUser } = useAppSelector((s) => s.auth);
 
   // 리덕스 비어있을 시 LocalStorage 폴백 → 초기 깜빡임 방지
@@ -226,14 +234,13 @@ function Header({ onToggleSidebar, sidebarVisible }) {
         React.createElement("img", {
           src: "/notification-icon.svg",
           alt: "알림",
-        })
-      ),
-      (unreadCount ?? 0) > 0 &&
+        }),
         React.createElement(
-          NotificationBadgeStandalone,
+          NotificationBadge,
           null,
-          unreadCount
-        ),
+          unreadCount ?? 0
+        )
+      ),
       React.createElement(
         UserSection,
         null,

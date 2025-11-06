@@ -126,23 +126,42 @@
 .drawer-body {
   padding: 16px;
   overflow: auto;
+  position: relative;
 }
 .drawer-tabs {
   display: flex;
   gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid #e5e7eb;
-  flex-wrap: wrap;
-  overflow: visible;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: visible;
+  align-items: center;
+}
+
+.action-buttons-container {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  white-space: nowrap;
 }
 .pill {
   border: none;
   background: #eef2f7;
   color: #334155;
-  padding: 8px 12px;
+  padding: 8px 16px;
   border-radius: 999px;
   cursor: pointer;
-  margin-bottom: 6px;
+  margin-bottom: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  line-height: 1.2;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .pill.active {
   background: #111;
@@ -159,11 +178,20 @@
   margin-bottom: 10px;
   position: relative;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
+  opacity: 1; /* 읽지 않은 알림은 선명하게 */
 }
 
 .alert-row:hover {
   background-color: #f9fafb;
+}
+
+.alert-row.read {
+  opacity: 0.5; /* 읽은 알림은 투명하게 */
+}
+
+.alert-row.read:hover {
+  opacity: 0.7;
 }
 
 .alert-actions {
@@ -231,11 +259,37 @@
 .mark-all-read-btn {
   background: #3b82f6 !important;
   color: #fff !important;
-  margin-left: auto;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  margin-bottom: 0 !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  min-height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .mark-all-read-btn:hover {
   background: #2563eb !important;
+}
+
+.mark-all-delete-btn {
+  background: #ef4444 !important;
+  color: #fff !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  margin-bottom: 0 !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  min-height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.mark-all-delete-btn:hover {
+  background: #dc2626 !important;
 }
 .row-head {
   display: flex;
