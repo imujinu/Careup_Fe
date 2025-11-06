@@ -61,13 +61,40 @@ export const dashboardService = {
 
   // 전체 지점 목록 조회 (간단한 정보만)
   getAllBranches: async () => {
-    try {
-      const response = await axios.get(`${BRANCH_API_BASE_URL}/branch?page=0&size=1000`);
-      return response.data?.result?.data || [];
-    } catch (error) {
-      console.error("Failed to get branches:", error);
-      return [];
+    // 여러 후보 경로를 순차적으로 시도
+    const candidates = [
+      { url: `${BRANCH_API_BASE_URL}/branch`, params: { page: 0, size: 1000 } },
+      { url: `${BRANCH_API_BASE_URL}/branch-service/branch`, params: { page: 0, size: 1000 } },
+      { url: `${BRANCH_API_BASE_URL}/branch/public/list` },
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        const response = await axios.get(
+          candidate.url,
+          candidate.params ? { params: candidate.params } : undefined
+        );
+        const body = response.data;
+
+        // 다양한 형태를 정규화 시도
+        const paged = body?.result || body;
+        if (Array.isArray(paged?.data)) {
+          return paged.data;
+        }
+        if (Array.isArray(body?.result)) {
+          return body.result;
+        }
+        if (Array.isArray(body)) {
+          return body;
+        }
+      } catch (error) {
+        // 다음 후보로 진행
+        console.log(`getAllBranches failed for ${candidate.url}, trying next...`);
+      }
     }
+
+    console.error("All branch list endpoints failed");
+    return [];
   },
 
   // 전체 매출 통계 조회
@@ -116,7 +143,9 @@ export const dashboardService = {
       const branchGrowthRate = 12.5;
       const employeeGrowthRate = 8.2;
       const salesGrowthRate = 23.1;
-      const annualGrowthRate = 18.2;
+      
+      // 연간 매출 조회
+      const annualSales = await dashboardService.getAnnualSales();
 
       return {
         totalBranches: branches,
@@ -125,7 +154,7 @@ export const dashboardService = {
         branchGrowthRate,
         employeeGrowthRate,
         salesGrowthRate,
-        annualGrowthRate,
+        annualSales,
       };
     } catch (error) {
       console.error("Failed to get dashboard KPI:", error);
@@ -136,7 +165,7 @@ export const dashboardService = {
         branchGrowthRate: 12.5,
         employeeGrowthRate: 8.2,
         salesGrowthRate: 23.1,
-        annualGrowthRate: 18.2,
+        annualSales: 288000000, // 원 단위 (2억 8,800만원)
       };
     }
   },
@@ -201,23 +230,126 @@ export const dashboardService = {
     }
   },
 
-  // 인기 상품 조회
+  // 인기 상품 조회 (매출이 가장 높은 상품)
   getPopularProducts: async () => {
     try {
-      // TODO: 인기 상품 API 엔드포인트 확인 및 구현
-      // 임시로 더미 데이터 반환
-      return null;
+      const endDate = new Date();
+      const startDate1 = new Date();
+      startDate1.setMonth(endDate.getMonth() - 1);
+
+      const url1 = `${ORDERING_API_BASE_URL}/hq/sales/products?startDate=${formatDate(startDate1)}&endDate=${formatDate(endDate)}&sortType=HIGH_SALES&size=1`;
+      const res1 = await axios.get(url1);
+      let products = res1.data?.result?.content || res1.data?.result || [];
+      if (Array.isArray(products) && products.length > 0) return products[0];
+
+      // 최근 1개월에 데이터가 없으면 최근 3개월로 재조회
+      const startDate3 = new Date();
+      startDate3.setMonth(endDate.getMonth() - 3);
+      const url3 = `${ORDERING_API_BASE_URL}/hq/sales/products?startDate=${formatDate(startDate3)}&endDate=${formatDate(endDate)}&sortType=HIGH_SALES&size=1`;
+      const res3 = await axios.get(url3);
+      products = res3.data?.result?.content || res3.data?.result || [];
+      return Array.isArray(products) && products.length > 0 ? products[0] : null;
     } catch (error) {
       console.error("Failed to get popular products:", error);
       return null;
     }
   },
 
+  // 비인기 상품 조회 (매출이 가장 낮은 상품)
+  getUnpopularProducts: async () => {
+    try {
+      const endDate = new Date();
+      const startDate1 = new Date();
+      startDate1.setMonth(endDate.getMonth() - 1);
+
+      const url1 = `${ORDERING_API_BASE_URL}/hq/sales/products?startDate=${formatDate(startDate1)}&endDate=${formatDate(endDate)}&sortType=LOW_SALES&size=1`;
+      const res1 = await axios.get(url1);
+      let products = res1.data?.result?.content || res1.data?.result || [];
+      if (Array.isArray(products) && products.length > 0) return products[0];
+
+      // 최근 1개월에 데이터가 없으면 최근 3개월로 재조회
+      const startDate3 = new Date();
+      startDate3.setMonth(endDate.getMonth() - 3);
+      const url3 = `${ORDERING_API_BASE_URL}/hq/sales/products?startDate=${formatDate(startDate3)}&endDate=${formatDate(endDate)}&sortType=LOW_SALES&size=1`;
+      const res3 = await axios.get(url3);
+      products = res3.data?.result?.content || res3.data?.result || [];
+      return Array.isArray(products) && products.length > 0 ? products[0] : null;
+    } catch (error) {
+      console.error("Failed to get unpopular products:", error);
+      return null;
+    }
+  },
+
+  // 연간 매출 조회
+  getAnnualSales: async () => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setFullYear(endDate.getFullYear() - 1);
+      
+      const response = await axios.get(
+        `${ORDERING_API_BASE_URL}/hq/sales/all?startDate=${formatDate(startDate)}&endDate=${formatDate(endDate)}&periodType=YEAR`
+      );
+      
+      const result = response.data?.result || null;
+      if (result && result.totalSales) {
+        return result.totalSales;
+      }
+      return 0;
+    } catch (error) {
+      console.error("Failed to get annual sales:", error);
+      return 0;
+    }
+  },
+
   // 우수 지점 조회
   getTopBranch: async () => {
     try {
-      // TODO: 우수 지점 API 엔드포인트 확인 및 구현
-      return null;
+      // 1) 지점 목록 조회 (간단한 정보)
+      const branches = await dashboardService.getAllBranches();
+      if (!Array.isArray(branches) || branches.length === 0) return null;
+
+      // 2) 최근 1개월 기간 설정
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(endDate.getMonth() - 1);
+
+      // 3) 가맹점 간 매출 비교 조회
+      const branchIds = branches
+        .map((b) => b.branchId || b.id)
+        .filter((id) => id != null);
+
+      if (branchIds.length === 0) return null;
+
+      const params = new URLSearchParams({
+        branchIds: branchIds.join(','),
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        periodType: 'DAY',
+      });
+
+      const response = await axios.get(
+        `${ORDERING_API_BASE_URL}/hq/sales/comparison?${params.toString()}`
+      );
+
+      const result = response.data?.result?.content || response.data?.result || [];
+      if (!Array.isArray(result) || result.length === 0) return null;
+
+      // 4) 총매출이 가장 높은 지점 선택
+      let top = null;
+      for (const item of result) {
+        const totalSales = Number(item?.totalSales ?? item?.sales ?? 0);
+        if (top == null || totalSales > top.totalSales) {
+          top = {
+            branchId: item?.branchId,
+            branchName: item?.branchName || item?.name || '',
+            ownerName: item?.ownerName || item?.managerName || '',
+            totalSales,
+          };
+        }
+      }
+
+      return top;
     } catch (error) {
       console.error("Failed to get top branch:", error);
       return null;

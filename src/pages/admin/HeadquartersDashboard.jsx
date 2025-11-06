@@ -23,7 +23,6 @@ import {
   mdiTrendingUp,
   mdiGift,
   mdiTrophy,
-  mdiCrown,
   mdiAlertCircle,
 } from "@mdi/js";
 import dashboardService from "../../service/dashboardService";
@@ -330,10 +329,13 @@ const HeadquartersDashboard = () => {
     branchGrowthRate: 12.5,
     employeeGrowthRate: 8.2,
     salesGrowthRate: 23.1,
-    annualGrowthRate: 18.2,
+    annualSales: 288000000, // 원 단위 (2억 8,800만원)
   });
   const [loading, setLoading] = useState(true);
   const [salesData, setSalesData] = useState(null);
+  const [popularProduct, setPopularProduct] = useState(null);
+  const [unpopularProduct, setUnpopularProduct] = useState(null);
+  const [topBranch, setTopBranch] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -352,6 +354,21 @@ const HeadquartersDashboard = () => {
       const sales = await dashboardService.getSalesStatistics(salesPeriod);
       console.log("Sales Data:", sales);
       setSalesData(sales);
+
+      // 인기 상품 조회 (매출이 가장 높은 상품)
+      const popular = await dashboardService.getPopularProducts();
+      console.log("Popular Product:", popular);
+      setPopularProduct(popular);
+
+      // 비인기 상품 조회 (매출이 가장 낮은 상품)
+      const unpopular = await dashboardService.getUnpopularProducts();
+      console.log("Unpopular Product:", unpopular);
+      setUnpopularProduct(unpopular);
+
+      // 우수 지점 조회
+      const top = await dashboardService.getTopBranch();
+      console.log("Top Branch:", top);
+      setTopBranch(top);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -479,9 +496,9 @@ const HeadquartersDashboard = () => {
           <KPIIcon $bgColor="#fef3c7">
             <Icon path={mdiTrendingUp} size={1.5} color="#f59e0b" />
           </KPIIcon>
-          <KPILabel>연간 성장률</KPILabel>
-          <KPIValue>{kpiData.annualGrowthRate}%</KPIValue>
-          <KPIChange $positive>전년 동월 대비 +4.3% 전월 대비</KPIChange>
+          <KPILabel>연간 매출</KPILabel>
+          <KPIValue>{formatCurrency(kpiData.annualSales)}</KPIValue>
+          <KPIChange $positive>전년 동월 대비</KPIChange>
         </KPICard>
       </KPIGrid>
 
@@ -492,9 +509,24 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiGift} size={1.5} color="#6b46c1" />
           </KPIIcon>
           <KPILabel>월간 인기 상품</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>빅치킨마요</KPIValue>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {popularProduct?.productName || "빅치킨마요"}
+          </KPIValue>
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            전국 지점
+            {`${formatCurrency(popularProduct?.totalSales || 0)} (월간)`}
+          </KPILabel>
+        </HighlightCard>
+
+        <HighlightCard>
+          <KPIIcon $bgColor="#fee2e2">
+            <Icon path={mdiAlertCircle} size={1.5} color="#ef4444" />
+          </KPIIcon>
+          <KPILabel>월간 비인기 상품</KPILabel>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {unpopularProduct?.productName || "상품명"}
+          </KPIValue>
+          <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
+            {`${formatCurrency(unpopularProduct?.totalSales || 0)} (월간)`}
           </KPILabel>
         </HighlightCard>
 
@@ -503,20 +535,11 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiTrophy} size={1.5} color="#f59e0b" />
           </KPIIcon>
           <KPILabel>이달의 우수 지점</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>동작 1점</KPIValue>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {topBranch?.branchName || "-"}
+          </KPIValue>
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            김상환
-          </KPILabel>
-        </HighlightCard>
-
-        <HighlightCard>
-          <KPIIcon $bgColor="#fce7f3">
-            <Icon path={mdiCrown} size={1.5} color="#ec4899" />
-          </KPIIcon>
-          <KPILabel>이달의 판매왕</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>김상환</KPIValue>
-          <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            동작 1점
+            {topBranch?.ownerName || "-"}
           </KPILabel>
         </HighlightCard>
 
@@ -668,44 +691,7 @@ const HeadquartersDashboard = () => {
         </ResponsiveContainer>
       </InventoryCard>
 
-      {/* Notifications */}
-      <NotificationsCard>
-        <ChartHeader>
-          <div>
-            <ChartTitle>공지사항</ChartTitle>
-            <ChartSubtitle>전국 지점</ChartSubtitle>
-          </div>
-          <MoreLink>더보기</MoreLink>
-        </ChartHeader>
-
-        <Table>
-          <thead>
-            <tr>
-              <TableHeader>ID</TableHeader>
-              <TableHeader>제목</TableHeader>
-              <TableHeader>작성자</TableHeader>
-              <TableHeader>작성일시</TableHeader>
-              <TableHeader>수정일시</TableHeader>
-              <TableHeader>조치</TableHeader>
-            </tr>
-          </thead>
-          <tbody>
-            {NotificationsData.map((notification) => (
-              <tr key={notification.id}>
-                <TableCell>{notification.id}</TableCell>
-                <TableCell>{notification.title}</TableCell>
-                <TableCell>{notification.author}</TableCell>
-                <TableCell>{notification.createdAt}</TableCell>
-                <TableCell>{notification.modifiedAt}</TableCell>
-                <TableCell>
-                  <ActionButton>수정</ActionButton>
-                  <ActionButton $danger>삭제</ActionButton>
-                </TableCell>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </NotificationsCard>
+      {/* Notifications removed as requested */}
     </DashboardContainer>
   );
 };
