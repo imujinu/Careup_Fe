@@ -134,8 +134,20 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
               )}
               {orderDetail.branchId && (
                 <div className="info-row">
-                  <span className="info-label">지점 ID:</span>
-                  <span className="info-value">{orderDetail.branchId}</span>
+                  <span className="info-label">지점:</span>
+                  <span className="info-value">{orderDetail.branchName || `지점 ${orderDetail.branchId}`}</span>
+                </div>
+              )}
+              {orderDetail.rejectedReason && (
+                <div className="info-row">
+                  <span className="info-label">거부 사유:</span>
+                  <span className="info-value">{orderDetail.rejectedReason}</span>
+                </div>
+              )}
+              {(orderDetail.cancelledReason || orderDetail.cancelReason || orderDetail.cancellationReason) && (
+                <div className="info-row">
+                  <span className="info-label">취소 사유:</span>
+                  <span className="info-value">{orderDetail.cancelledReason || orderDetail.cancelReason || orderDetail.cancellationReason}</span>
                 </div>
               )}
               <div className="info-row">

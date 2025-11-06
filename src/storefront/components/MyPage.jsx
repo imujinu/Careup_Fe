@@ -4,9 +4,22 @@ import { cartService } from "../../service/cartService";
 import { productInquiryService } from "../../service/productInquiryService";
 import customerAxios from "../../utils/customerAxios";
 import OrderDetailModal from "./OrderDetailModal";
+import { useShopAuth } from "../hooks/useShopAuth";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
-  const [activeTab, setActiveTab] = useState(initialTab);
+const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }) => {
+  const { currentUser: hookCurrentUser, isLoggedIn } = useShopAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // prop으로 전달된 currentUser가 있으면 우선 사용, 없으면 hook에서 가져옴
+  const currentUser = propCurrentUser || hookCurrentUser;
+  
+  // URL 파라미터에서 탭 가져오기
+  const tabFromUrl = searchParams.get('tab');
+  const resolvedInitialTab = tabFromUrl || initialTab;
+  
+  const [activeTab, setActiveTab] = useState(resolvedInitialTab);
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
   const [inquiries, setInquiries] = useState([]);
@@ -15,17 +28,39 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isOrderDetailModalOpen, setIsOrderDetailModalOpen] = useState(false);
 
+  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.memberId) {
+      navigate('/shop/login');
+    }
+  }, [isLoggedIn, currentUser?.memberId, navigate]);
+
   // initialTab이 변경되면 activeTab 업데이트
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
+    if (resolvedInitialTab) {
+      setActiveTab(resolvedInitialTab);
     }
-  }, [initialTab]);
+  }, [resolvedInitialTab]);
+
+  // URL 파라미터와 동기화
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // 탭 변경 시 URL 업데이트
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate(`/shop/mypage?tab=${tab}`, { replace: true });
+  };
 
   // 마이페이지 정보 로드
   useEffect(() => {
     const loadMyPageData = async () => {
-      if (!currentUser?.memberId) {
+      const memberId = currentUser?.memberId;
+      if (!memberId) {
         setLoading(false);
         return;
       }
@@ -38,12 +73,12 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
         setProfile(profileRes?.data?.result);
         
         // 주문 내역
-        const ordersRes = await cartService.getOrdersByMember(currentUser.memberId);
+        const ordersRes = await cartService.getOrdersByMember(memberId);
         setOrders(ordersRes?.data || ordersRes || []);
         
         // 문의 목록
         try {
-          const inquiriesRes = await productInquiryService.getMyInquiries(currentUser.memberId);
+          const inquiriesRes = await productInquiryService.getMyInquiries(memberId);
           setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
         } catch (inquiryErr) {
           console.error('문의 목록 조회 실패:', inquiryErr);
@@ -58,7 +93,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
     };
 
     loadMyPageData();
-  }, [currentUser]);
+  }, [currentUser?.memberId]); // memberId만 의존성으로 사용
 
   // 탭 변경 시 문의 목록 다시 로드
   useEffect(() => {
@@ -94,7 +129,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
   return (
     <div className="mypage">
       <div className="container">
-        <button className="back-btn" onClick={onBack}>
+        <button className="back-btn" onClick={onBack || (() => navigate('/shop'))}>
           ← 홈으로
         </button>
 
@@ -111,7 +146,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                       className={`nav-item ${
                         activeTab === "profile" ? "active" : ""
                       }`}
-                      onClick={() => setActiveTab("profile")}
+                      onClick={() => handleTabChange("profile")}
                     >
                       프로필 관리
                     </button>
@@ -121,7 +156,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                       className={`nav-item ${
                         activeTab === "purchase" ? "active" : ""
                       }`}
-                      onClick={() => setActiveTab("purchase")}
+                      onClick={() => handleTabChange("purchase")}
                     >
                       구매 내역
                     </button>
@@ -131,7 +166,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                       className={`nav-item ${
                         activeTab === "inquiries" ? "active" : ""
                       }`}
-                      onClick={() => setActiveTab("inquiries")}
+                      onClick={() => handleTabChange("inquiries")}
                     >
                       문의 목록
                     </button>

@@ -1,6 +1,14 @@
-import React from "react";
+import React, { useMemo } from "react";
 
 function SearchResultsPage({ searchQuery, searchResults, isSearching, searchError, favorites, onToggleFavorite, onOpenDetail, onAddToCart, onBack }) {
+  // favorites가 없거나 Set이 아닌 경우를 대비한 안전 처리 (메모이제이션)
+  const favoritesSet = useMemo(() => {
+    if (favorites instanceof Set) {
+      return favorites;
+    }
+    return new Set();
+  }, [favorites]);
+  
   return (
     <div className="container search-results-page">
       <div className="search-header">
@@ -28,8 +36,8 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
             {searchResults.map((product) => (
               <article className="card" key={product.id} onClick={() => onOpenDetail(product)} style={{ cursor: "pointer" }}>
                 <button
-                  className={`fav-btn${favorites.has(product.id) ? " active" : ""}`}
-                  aria-pressed={favorites.has(product.id)}
+                  className={`fav-btn${favoritesSet.has(product.id) ? " active" : ""}`}
+                  aria-pressed={favoritesSet.has(product.id)}
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleFavorite(product.id);
@@ -44,8 +52,8 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                   >
                     <path
                       d="M12 21s-6.716-4.21-9.193-7.44C.502 10.781 2.117 7 5.6 7c2.098 0 3.342 1.27 4.4 2.6C11.058 8.27 12.302 7 14.4 7c3.483 0 5.098 3.781 2.793 6.56C18.716 16.79 12 21 12 21z"
-                      fill={favorites.has(product.id) ? "#ef4444" : "rgba(0,0,0,0.0)"}
-                      stroke={favorites.has(product.id) ? "#ef4444" : "rgba(0,0,0,0.35)"}
+                      fill={favoritesSet.has(product.id) ? "#ef4444" : "rgba(0,0,0,0.0)"}
+                      stroke={favoritesSet.has(product.id) ? "#ef4444" : "rgba(0,0,0,0.35)"}
                       strokeWidth="1.6"
                     />
                   </svg>
