@@ -1,9 +1,14 @@
-// src/service/authService.js
-
 import axios from 'axios';
 import { decodeToken } from '../utils/jwt';
 
-const AUTH_API_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8080';
+// 주의: axiosConfig가 authService를 import 하므로 여기서 axiosConfig를 import하지 말 것(순환 참조 방지)
+const AUTH_API_URL =
+  import.meta.env.VITE_AUTH_URL ||
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
+
+// axios 인터셉터에서 참조하는 키와 동일한 문자열을 로컬 정의(순환참조 방지)
+const SKIP_FLAG = '__skipAuthRefresh';
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem('accessToken'),
@@ -154,8 +159,7 @@ export const authService = {
     };
 
     // 로그인 요청은 401이어도 리프레시 시도 금지
-    const config = {};
-    config['__skipAuthRefresh'] = true;
+    const config = { [SKIP_FLAG]: true };
 
     const { data } = await axios.post(`${AUTH_API_URL}/auth/login`, payload, config);
 
@@ -195,7 +199,8 @@ export const authService = {
     const rt = tokenStorage.getRefreshToken();
     try {
       if (rt) {
-        await axios.post(`${AUTH_API_URL}/auth/logout`, { refreshToken: rt });
+        // 로그아웃은 항상 리프레시 스킵 (401이어도 재시도/리프레시 금지)
+        await axios.post(`${AUTH_API_URL}/auth/logout`, { refreshToken: rt }, { [SKIP_FLAG]: true });
       }
     } catch (_e) {
       // 이미 폐기되었을 수 있으므로 무시
@@ -208,7 +213,8 @@ export const authService = {
     const rt = tokenStorage.getRefreshToken();
     if (!rt) throw new Error('No refresh token available');
 
-    const { data } = await axios.post(`${AUTH_API_URL}/auth/refresh`, { refreshToken: rt });
+    // 리프레시 요청 자체도 인터셉터에서 건드리지 않도록 스킵
+    const { data } = await axios.post(`${AUTH_API_URL}/auth/refresh`, { refreshToken: rt }, { [SKIP_FLAG]: true });
 
     const box = data?.result ?? data?.data ?? data;
     const newAT = box?.accessToken ?? box?.access_token;

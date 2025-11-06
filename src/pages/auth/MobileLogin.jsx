@@ -17,7 +17,9 @@ const Screen = styled.div`
 `;
 
 const TopBar = styled.header`
-  padding: max(14px, env(safe-area-inset-top)) 16px 36px;
+  /* ⬇︎ 헤더 영역을 가로/세로 정중앙 정렬 */
+  min-height: 84px;
+  padding: max(14px, env(safe-area-inset-top)) 16px 14px;
   background: linear-gradient(135deg, #29a6ff 0%, #8b5cf6 100%);
   color: #fff;
   display: grid;
@@ -32,15 +34,17 @@ const BrandRow = styled.div`
 `;
 
 const Logo = styled.img`
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 3px;
+  /* ⬇︎ 로고 크기 살짝 확대 + 뒤 배경/둥근 사각형 제거 */
+  width: 32px;
+  height: 32px;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 `;
 
 const Brand = styled.span`
-  font-size: 18px;
+  /* ⬇︎ 텍스트 크기 소폭 확대 */
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.2px;
 `;
@@ -356,9 +360,9 @@ export default function MobileLogin() {
           </Submit>
 
           <HelpRow>
-            <a href="/employee/find-id">아이디 찾기</a>
+            <a href="/m/find-id">아이디 찾기</a>
             <Divider />
-            <a href="/password/forgot">비밀번호 찾기</a>
+            <a href="/m/password/forgot">비밀번호 찾기</a>
           </HelpRow>
         </Card>
 

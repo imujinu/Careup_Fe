@@ -11,16 +11,27 @@ const BASE_URL = (() => {
   return `${api}/branch-service`;
 })();
 
-/** CommonSuccessDto 언랩 */
+/** CommonSuccessDto / CommonResponseDto 언랩 (비 JSON 방어 포함) */
 const unwrap = (res) => {
-  const data = res?.data;
-  if (data && typeof data === 'object' && 'result' in data) return data.result;
-  return data;
+  try {
+    const ct = (res?.headers?.['content-type'] || '').toLowerCase();
+    const data = res?.data;
+    if (typeof data === 'string' && !ct.includes('application/json')) return null;
+    if (data && typeof data === 'object') {
+      if ('result' in data) return data.result;
+      if ('data' in data) return data.data;
+      return data;
+    }
+    return data ?? null;
+  } catch {
+    return null;
+  }
 };
 
 /** 숫자 파싱(유효하지 않으면 null) */
 const toNum = (v) => {
   if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v === 'string') {
     const trimmed = v.trim();
     if (trimmed === '') return null;
@@ -43,7 +54,7 @@ const pickNumber = (obj, keys = []) => {
   return null;
 };
 
-/** 중첩 후보 경로에서 lat/lng/radius 검색 */
+/** 중첩 후보 컨테이너 목록 */
 const nestedCandidates = (dto) => {
   const candidates = [];
   if (!dto || typeof dto !== 'object') return candidates;
@@ -55,7 +66,8 @@ const nestedCandidates = (dto) => {
     'branchGeofence',
     'branchLocation',
     'coordinates',
-    'center',       // 추가 후보
+    'center',
+    'position',
   ];
   for (const key of containerKeys) {
     if (dto[key] && typeof dto[key] === 'object') candidates.push(dto[key]);
@@ -70,6 +82,7 @@ const mapBranchGeo = (dto = {}) => {
   let lng = pickNumber(dto, ['longitude', 'lng', 'lon', 'long', 'branchLng', 'branchLong', 'centerLongitude', 'centerLng']);
   let radius = pickNumber(dto, [
     'geofenceRadius',
+    'geoFenceRadius',
     'geofenceRadiusMeters',
     'branchRadiusMeters',
     'radiusMeters',
@@ -89,6 +102,7 @@ const mapBranchGeo = (dto = {}) => {
       if (radius === null) {
         radius = pickNumber(nest, [
           'geofenceRadius',
+          'geoFenceRadius',
           'geofenceRadiusMeters',
           'branchRadiusMeters',
           'radiusMeters',
@@ -143,12 +157,16 @@ const mapBranchGeo = (dto = {}) => {
   };
 };
 
+/** 합리적 범위 검증 */
+const inRange = (v, min, max) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+
 /** 지점 지오펜스 설정 유효성 */
 export const isBranchGeofenceConfigured = (g) => {
   if (!g) return false;
-  const latOk = typeof g.lat === 'number' && Number.isFinite(g.lat);
-  const lngOk = typeof g.lng === 'number' && Number.isFinite(g.lng);
-  const rOk = typeof g.radius === 'number' && Number.isFinite(g.radius) && g.radius > 0;
+  const latOk = inRange(g.lat, -90, 90);
+  const lngOk = inRange(g.lng, -180, 180);
+  const rOk = isFiniteNumber(g.radius) && g.radius > 0;
   return latOk && lngOk && rOk;
 };
 
@@ -157,9 +175,7 @@ const toRad = (deg) => (deg * Math.PI) / 180;
 
 /** 하버사인 거리(m) */
 export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
-  if ([lat1, lon1, lat2, lon2].some((v) => typeof v !== 'number' || !Number.isFinite(v))) {
-    return NaN;
-  }
+  if ([lat1, lon1, lat2, lon2].some((v) => !isFiniteNumber(v))) return NaN;
   const R = 6371000;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -191,11 +207,28 @@ export function isInsideGeofence(userLat, userLng, branchGeo, slackMeters = 0) {
   return { inside: dist <= radius, distance: dist };
 }
 
+/** 명시적 403 에러 타입 */
+export class ForbiddenError extends Error {
+  constructor(message = '권한이 없습니다.') {
+    super(message);
+    this.name = 'ForbiddenError';
+    this.code = 403;
+  }
+}
+
 /** 내 소속 지점 지오펜스 조회 */
 export async function fetchMyBranchGeofence() {
-  const res = await axios.get(`${BASE_URL}/branch/my`);
-  const dto = unwrap(res) || {};
-  return mapBranchGeo(dto);
+  try {
+    const res = await axios.get(`${BASE_URL}/branch/my`);
+    const dto = unwrap(res) || {};
+    return mapBranchGeo(dto);
+  } catch (e) {
+    const status = e?.response?.status;
+    if (status === 403) {
+      throw new ForbiddenError(e?.response?.data?.status_message || '권한이 없습니다.');
+    }
+    throw e;
+  }
 }
 
 /** 특정 지점 지오펜스 조회 */
@@ -220,4 +253,5 @@ export default {
   isInsideGeofence,
   fetchMyBranchGeofence,
   fetchBranchGeofenceById,
+  ForbiddenError,
 };

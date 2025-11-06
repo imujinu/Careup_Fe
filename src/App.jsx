@@ -39,6 +39,8 @@ import EmployeePasswordReset from "./pages/auth/EmployeePasswordReset";
 // 직원 근태용 모바일 로그인
 import MobileLogin from "./pages/auth/MobileLogin";
 import MobileStaffHome from "./pages/mobile/MobileStaffHome";
+import MobileFindEmployeeId from "./pages/auth/MobileFindEmployeeId";
+import MobilePasswordResetRequest from "./pages/auth/MobilePasswordResetRequest";
 
 // 고객 아이디 찾기
 import FindCustomerId from "./pages/auth/FindCustomerId";
@@ -282,6 +284,8 @@ export default function App() {
           {/* 직원 근태용 모바일 로그인 */}
           <Route path="/m/login" element={<MobileLogin />} />
           <Route path="/m" element={<MobileStaffHome />} />
+          <Route path="/m/find-id" element={<MobileFindEmployeeId />} />
+          <Route path="/m/password/forgot" element={<MobilePasswordResetRequest />} />
         </Routes>
 
         {/* 챗봇 */}
