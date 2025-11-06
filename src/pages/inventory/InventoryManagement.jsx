@@ -580,13 +580,14 @@ function InventoryManagement() {
           minPrice: formData.minPrice || 0,
           maxPrice: formData.maxPrice || 0,
           supplyPrice: formData.supplyPrice || 0,
-          imageUrl: formData.imageUrl || '',
-          visibility: formData.visibility || 'ALL'
+          visibility: formData.visibility || 'ALL',
+          imageFile: formData.imageFile || null // 이미지 파일 추가
         };
         
         console.log('상품 등록 데이터:', productData);
+        console.log('이미지 파일:', formData.imageFile);
         
-        const productResponse = await inventoryService.createProduct(productData, null);
+        const productResponse = await inventoryService.createProduct(productData);
         
         console.log('상품 등록 응답:', productResponse);
         

@@ -157,7 +157,14 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
           {items.map(item => (
             <div key={item.branchProductId} className="order-item">
               <div className="item-image">
-                <img src={item.imageUrl || 'https://via.placeholder.com/80'} alt={item.productName} />
+                <img 
+                  src={item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80"} 
+                  alt={item.productName}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
+                  }}
+                />
               </div>
               <div className="item-info">
                 <h4 className="item-name">{item.productName}</h4>

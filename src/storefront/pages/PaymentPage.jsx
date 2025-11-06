@@ -7,9 +7,6 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   const dispatch = useDispatch();
   const { items: cartItems, totalAmount } = useSelector(state => state.cart);
   
-  // orderData에 items가 있으면 단일 주문 (구매하기), 없으면 장바구니 주문
-  const items = orderData?.items || cartItems;
-  
   const [loading, setLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
@@ -35,6 +32,18 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     }
     return null;
   });
+
+  // orderData prop이 변경되면 actualOrderData 업데이트
+  useEffect(() => {
+    if (orderData) {
+      console.log('🔄 orderData prop 변경됨:', orderData);
+      setActualOrderData(orderData);
+      localStorage.setItem('currentOrderData', JSON.stringify(orderData));
+    }
+  }, [orderData]);
+
+  // orderData에 items가 있으면 단일 주문 (구매하기), 없으면 장바구니 주문
+  const items = actualOrderData?.items || orderData?.items || cartItems;
 
   // 토스페이먼츠 SDK 로드 (v2)
   useEffect(() => {
@@ -320,7 +329,14 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
           {items.map(item => (
             <div key={item.branchProductId} className="payment-item">
               <div className="item-image">
-                <img src={item.imageUrl || 'https://via.placeholder.com/60'} alt={item.productName} />
+                <img 
+                  src={item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80"} 
+                  alt={item.productName}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
+                  }}
+                />
               </div>
               <div className="item-info">
                 <h4 className="item-name">{item.productName}</h4>

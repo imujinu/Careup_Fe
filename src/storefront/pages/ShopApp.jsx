@@ -86,6 +86,14 @@ function ShopLayout() {
   const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
+  // 페이지 변경 디버깅
+  useEffect(() => {
+    console.log('📄 페이지 변경:', page);
+    if (page === 'payment') {
+      console.log('💳 결제 페이지 orderData:', orderData);
+    }
+  }, [page, orderData]);
+
   // URL 체크 및 결제 완료 처리
   useEffect(() => {
     let processed = false;
@@ -270,7 +278,7 @@ function ShopLayout() {
         id: item.productId ?? Math.random(),
         productId: item.productId,
         name: item.name || item.productName || "상품",
-        price: Number(item.maxPrice || item.minPrice || 0),
+        price: Number(item.minPrice || item.maxPrice || 0),
         minPrice: Number(item.minPrice || 0),
         maxPrice: Number(item.maxPrice || 0),
         promotionPrice: null,
@@ -442,7 +450,7 @@ function ShopLayout() {
             id: item.productId ?? Math.random(),
             productId: item.productId,
             name: item.productName || "상품",
-            price: Number(item.maxPrice || item.minPrice || 0),
+            price: Number(item.minPrice || item.maxPrice || 0),
             minPrice: Number(item.minPrice || 0),  // 권장 최소 판매가
             maxPrice: Number(item.maxPrice || 0),  // 권장 최대 판매가
             promotionPrice: null,
@@ -564,13 +572,24 @@ function ShopLayout() {
 
       await cartService.addToCart(cartData);
 
+      // 선택 지점 가격 결정 (선택 지점 우선, 없으면 최소가 사용)
+      let resolvedPrice = product?.minPrice || product?.price || 0;
+      if (product.availableBranches && product.availableBranches.length > 0) {
+        const selected = product.selectedBranchId != null
+          ? product.availableBranches.find((b) => String(b.branchId) === String(product.selectedBranchId))
+          : product.availableBranches[0];
+        if (selected && selected.price) {
+          resolvedPrice = Number(selected.price);
+        }
+      }
+
       // Redux 상태 업데이트 (API에 사용된 동일 값 사용)
       dispatch(addToCart({
         productId: product.productId,
         branchProductId: resolvedBranchProductId,
         branchId: resolvedBranchId || 1,
         productName: product.name,
-        price: product.promotionPrice || product.price,
+        price: resolvedPrice,
         quantity: 1,
         imageUrl: product.image
       }));
@@ -578,7 +597,17 @@ function ShopLayout() {
       alert(`${product.name}이(가) 장바구니에 추가되었습니다.`);
     } catch (error) {
       console.error('장바구니 추가 실패:', error);
-      alert(error.response?.data?.message || error.message || '장바구니 추가에 실패했습니다.');
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        alert('장바구니를 사용하려면 로그인이 필요합니다.');
+        setPage("login");
+        return;
+      }
+      const errorMessage =
+        error?.response?.data?.status_message ||
+        error?.response?.data?.message ||
+        '장바구니 추가에 실패했습니다.';
+      alert(errorMessage);
     }
   };
 
@@ -635,11 +664,8 @@ function ShopLayout() {
       return;
     }
 
-    // 지점 선택 확인 (없으면 첫 지점 자동 선택)
+    // 지점 선택 확인 (자동 선택 제거 - 반드시 사용자가 선택해야 함)
     let selectedBranchId = product.selectedBranchId;
-    if (!selectedBranchId && product?.availableBranches && product.availableBranches.length > 0) {
-      selectedBranchId = product.availableBranches[0]?.branchId;
-    }
     if (!selectedBranchId) {
       alert('구매 지점을 선택해주세요.');
       return;
@@ -662,6 +688,8 @@ function ShopLayout() {
 
     // 주문을 즉시 생성하고 결제 페이지로 이동
     try {
+      console.log('🛒 구매하기 시작:', { product, selectedBranch });
+      
       const orderRequestData = {
         memberId: Number(currentUser?.memberId || 1),
         branchId: Number(selectedBranch.branchId),
@@ -673,10 +701,22 @@ function ShopLayout() {
         couponId: null
       };
 
+      console.log('📝 주문 생성 요청:', orderRequestData);
+
       const response = await cartService.createOrder(orderRequestData);
+      console.log('✅ 주문 생성 응답:', response);
+      
       const created = response?.data?.data || response?.data || response;
       const orderId = created?.orderId;
       const totalAmount = created?.totalAmount ?? selectedBranch.price;
+
+      console.log('📦 주문 정보:', { orderId, totalAmount, created });
+
+      if (!orderId) {
+        console.error('❌ 주문 ID가 없습니다:', created);
+        alert('주문 생성은 완료되었지만 주문 ID를 받지 못했습니다. 관리자에게 문의해주세요.');
+        return;
+      }
 
       const immediateOrderData = {
         orderId,
@@ -691,15 +731,26 @@ function ShopLayout() {
           imageUrl: product.image
         }],
         branchId: Number(selectedBranch.branchId),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        isSingleOrder: true // 단일 주문 표시
       };
 
+      console.log('💾 orderData 설정:', immediateOrderData);
+      
       setOrderData(immediateOrderData);
       localStorage.setItem('currentOrderData', JSON.stringify(immediateOrderData));
+      
+      console.log('💳 결제 페이지로 이동');
+      // 페이지를 먼저 변경한 후 detailProduct는 조건부 렌더링에서 처리됨
       setPage("payment");
+      console.log('✅ 페이지 전환 완료: payment');
     } catch (error) {
-      console.error('단일 상품 주문 생성 실패:', error);
-      alert(error.response?.data?.message || error.message || '주문 생성에 실패했습니다.');
+      console.error('❌ 단일 상품 주문 생성 실패:', error);
+      const errorMessage = error.response?.data?.status_message || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '주문 생성에 실패했습니다.';
+      alert(`주문 생성 실패: ${errorMessage}`);
     }
   };
 
@@ -771,7 +822,7 @@ function ShopLayout() {
             product={checkoutProduct}
             onBack={() => setCheckoutProduct(null)}
           />
-        ) : detailProduct ? (
+        ) : detailProduct && page !== "payment" ? (
           <ProductDetail
             product={detailProduct}
             onBack={() => setDetailProduct(null)}
@@ -878,7 +929,14 @@ function ShopLayout() {
            ) : (
              <PaymentPage 
                orderData={orderData}
-               onBack={() => setPage("order")} 
+               onBack={() => {
+                 // 단일 주문인 경우 상품 상세로, 아닌 경우 주문 페이지로
+                 if (orderData?.isSingleOrder) {
+                   setPage("detail");
+                 } else {
+                   setPage("order");
+                 }
+               }}
                onPaymentSuccess={handlePaymentSuccess}
                currentUser={currentUser}
              />
@@ -919,7 +977,14 @@ function ShopLayout() {
                     style={{ cursor: "pointer" }}
                   >
                     <div className="cat-figure">
-                      <img src={c.photo} alt={c.name} />
+                      <img 
+                        src={c.photo || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=300&q=80"} 
+                        alt={c.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=300&q=80";
+                        }}
+                      />
                     </div>
                     <div className="cat-text">{c.name}</div>
                   </div>
@@ -1044,7 +1109,7 @@ function ShopLayout() {
                             </>
                           ) : (
                             <div className="price">
-                              {p.price.toLocaleString()}원
+                              {(p.maxPrice ?? p.price ?? 0).toLocaleString()}원
                             </div>
                           )}
                         </div>
@@ -1076,22 +1141,7 @@ function ShopLayout() {
               </section>
             </div>
 
-            <section className="section">
-              <div className="container">
-                <div className="section-title">🏆 실시간 인기 랭킹</div>
-                <Ranking />
-              </div>
-            </section>
-
-            <section className="section pre-footer-gap">
-              <div className="container">
-                <div className="section-title">선물특가</div>
-                <Deals />
-                <div style={{ textAlign: "center", marginTop: 16 }}>
-                  <button className="tab">전체보기 ▸</button>
-                </div>
-              </div>
-            </section>
+            {/* 실시간 인기 랭킹 및 선물특가 섹션 제거 */}
           </>
         )}
       </main>
@@ -1130,115 +1180,6 @@ function ShopLayout() {
   );
 }
 
-function Deals() {
-  const end = new Date(Date.now() + 1000 * 60 * 60 * 13 + 1000 * 60 * 41);
-  const [now, setNow] = useState(Date.now());
-  const remain = Math.max(0, end.getTime() - now);
-  const hh = String(Math.floor(remain / 3600000)).padStart(2, "0");
-  const mm = String(Math.floor((remain % 3600000) / 60000)).padStart(2, "0");
-  const ss = String(Math.floor((remain % 60000) / 1000)).padStart(2, "0");
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div className="deals">
-      <div className="deals-aside">
-        <div className="deals-title">🎁 선물특가</div>
-        <div className="deals-timer">
-          {hh}:{mm}:{ss}
-        </div>
-        <div className="deals-sub">망설이면 늦어요!</div>
-      </div>
-      <div className="deals-card">
-        <img
-          src="https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?auto=format&fit=crop&w=900&q=80"
-          alt="스포츠웨어 특가"
-        />
-        <button className="deal-cta">🛒 담기</button>
-        <div className="deal-meta">
-          <div className="deal-name">[선물특가] 런닝/트레이닝 웨어 세트</div>
-          <div className="deal-price">
-            <b>30%</b> 39,900원 <span className="strike">57,000원</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Ranking() {
-  const items = rankingItems;
-  return (
-    <>
-      <div className="grid ranking-grid">
-        {items.slice(0, 5).map((it, i) => (
-          <article className="rank-card" key={i}>
-            <div className="rank-badge">{i + 1}</div>
-            <div className="rank-img">
-              <img src={it.image} alt={it.name} />
-              {it.sticker && <span className="rank-sticker">{it.sticker}</span>}
-            </div>
-            <button className="deal-cta">🛒 담기</button>
-            <div className="card-body">
-              <div className="name">{it.name}</div>
-              <div className="price">
-                <b>{it.sale}%</b> {it.price.toLocaleString()}원
-                <span className="strike"> {it.origin.toLocaleString()}원</span>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-      <div style={{ textAlign: "center", marginTop: 16 }}>
-        <button className="tab">전체보기 ▸</button>
-      </div>
-    </>
-  );
-}
-
-const rankingItems = [
-  {
-    name: "러닝화 경량 모델",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
-    sale: 20,
-    price: 89000,
-    origin: 112000,
-    sticker: "FESTA DEAL",
-  },
-  {
-    name: "트레이닝 조거 팬츠",
-    image: "https://images.unsplash.com/photo-1545912452-8aea7e25a3d3?auto=format&fit=crop&w=900&q=80",
-    sale: 18,
-    price: 36000,
-    origin: 44000,
-    sticker: "멤버특가",
-  },
-  {
-    name: "퍼포먼스 드라이 티셔츠",
-    image: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
-    sale: 15,
-    price: 18900,
-    origin: 22900,
-    sticker: "+10% 쿠폰",
-  },
-  {
-    name: "아웃도어 트레일 자켓",
-    image: "https://images.unsplash.com/photo-1549576490-b0b4831ef60a?auto=format&fit=crop&w=900&q=80",
-    sale: 22,
-    price: 129000,
-    origin: 165000,
-    sticker: "HOT",
-  },
-  {
-    name: "컴프레션 레깅스",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
-    sale: 28,
-    price: 24900,
-    origin: 34900,
-    sticker: "쿠폰",
-  },
-];
+// (실시간 인기 랭킹 및 선물특가 관련 컴포넌트/데이터 제거됨)
 
 export default ShopApp;

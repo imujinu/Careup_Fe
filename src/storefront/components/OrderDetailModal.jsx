@@ -184,8 +184,8 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                               src={imageUrl}
                               alt={productName}
                               onError={(e) => {
-                                e.currentTarget.src = "/vite.svg";
-                                e.currentTarget.onerror = null; // 무한 루프 방지
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
                               }}
                             />
                           ) : (
@@ -199,7 +199,14 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                               color: '#999',
                               fontSize: '12px'
                             }}>
-                              이미지 없음
+                              <img 
+                                src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80" 
+                                alt="기본 이미지"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
                             </div>
                           )}
                         </div>

@@ -5,6 +5,14 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [activeTab, setActiveTab] = useState("reviews");
   const [isInCart, setIsInCart] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // 이미지 배열 처리 - images 배열이 있으면 사용, 없으면 image를 배열로 변환
+  const productImages = product?.images && product.images.length > 0 
+    ? product.images 
+    : (product?.image ? [product.image] : []);
+
+  const currentImage = productImages[selectedImageIndex] || productImages[0] || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
 
   const handleAddToCart = () => {
     // 지점 선택 강제 검사 제거 - 장바구니 담을 때는 지점 확인 불필요
@@ -19,20 +27,17 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   };
 
   const handleBuy = () => {
-    // 지점이 여러 개인 경우 선택이 없으면 첫 지점을 자동 설정 후 진행
-    let chosenBranchId = selectedBranchId;
-    if (!chosenBranchId && product?.availableBranches && product.availableBranches.length > 0) {
-      chosenBranchId = product.availableBranches[0]?.branchId ?? null;
-    }
-
-    if (product?.availableBranches && product.availableBranches.length > 0 && !chosenBranchId) {
-      alert('구매 지점을 선택해주세요.');
-      return;
+    // 지점이 여러 개인 경우 반드시 선택해야 함
+    if (product?.availableBranches && product.availableBranches.length > 0) {
+      if (!selectedBranchId) {
+        alert('구매 지점을 선택해주세요.');
+        return;
+      }
     }
 
     const productWithBranch = {
       ...product,
-      selectedBranchId: chosenBranchId
+      selectedBranchId: selectedBranchId
     };
 
     if (onBuy) {
@@ -53,77 +58,65 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
           <div className="product-images">
             <div className="main-image">
               <img
-                src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80"}
+                src={currentImage}
                 alt={product?.name || "New Balance 204L Suede Mushroom Arid Stone"}
                 onError={(e) => {
                   e.currentTarget.onerror = null;
                   e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
                 }}
               />
-              <div className="image-nav">
-                <button className="nav-btn prev">‹</button>
-                <button className="nav-btn next">›</button>
-              </div>
+              {productImages.length > 1 && (
+                <>
+                  <div className="image-nav">
+                    <button 
+                      className="nav-btn prev"
+                      onClick={() => setSelectedImageIndex((prev) => 
+                        prev > 0 ? prev - 1 : productImages.length - 1
+                      )}
+                    >
+                      ‹
+                    </button>
+                    <button 
+                      className="nav-btn next"
+                      onClick={() => setSelectedImageIndex((prev) => 
+                        prev < productImages.length - 1 ? prev + 1 : 0
+                      )}
+                    >
+                      ›
+                    </button>
+                  </div>
+                  <div className="image-indicator">
+                    {productImages.map((_, index) => (
+                      <div
+                        key={index}
+                        className={`indicator-dot ${index === selectedImageIndex ? 'active' : ''}`}
+                        onClick={() => setSelectedImageIndex(index)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-            <div className="image-indicator">
-              <div className="indicator-dot active"></div>
-              <div className="indicator-dot"></div>
-              <div className="indicator-dot"></div>
-              <div className="indicator-dot"></div>
-              <div className="indicator-dot"></div>
-            </div>
-            <div className="thumbnail-gallery">
-              <div className="thumbnail active">
-                <img
-                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
-                  alt="thumb1"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
-                  }}
-                />
+            {productImages.length > 1 && (
+              <div className="thumbnail-gallery">
+                {productImages.map((image, index) => (
+                  <div
+                    key={index}
+                    className={`thumbnail ${index === selectedImageIndex ? 'active' : ''}`}
+                    onClick={() => setSelectedImageIndex(index)}
+                  >
+                    <img
+                      src={image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
+                      alt={`thumb${index + 1}`}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
-              <div className="thumbnail">
-                <img
-                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
-                  alt="thumb2"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
-                  }}
-                />
-              </div>
-              <div className="thumbnail">
-                <img
-                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
-                  alt="thumb3"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
-                  }}
-                />
-              </div>
-              <div className="thumbnail">
-                <img
-                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
-                  alt="thumb4"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
-                  }}
-                />
-              </div>
-              <div className="thumbnail">
-                <img
-                  src={product?.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
-                  alt="thumb5"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
-                  }}
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* 오른쪽: 상품 정보 및 구매 */}
@@ -235,8 +228,13 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 onClick={handleAddToCart}
               >
                 <div className="btn-price">
-                  {selectedBranchId && product?.availableBranches?.[selectedBranchId]?.price 
-                    ? `${product.availableBranches[selectedBranchId].price.toLocaleString()}원`
+                  {selectedBranchId && product?.availableBranches
+                    ? (() => {
+                        const selectedBranch = product.availableBranches.find(b => String(b.branchId) === String(selectedBranchId));
+                        return selectedBranch?.price
+                          ? `${selectedBranch.price.toLocaleString()}원`
+                          : '가격보기';
+                      })()
                     : product?.maxPrice
                     ? `₩${product.maxPrice.toLocaleString()}`
                     : (product?.availableBranches && product.availableBranches.length > 0)
@@ -298,7 +296,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                     })()
                   : '가격 문의'}
               </span>
-``            </div>
+            </div>
             <div className="price-info-item">
               <span className="info-label">상품ID</span>
               <span className="info-value">{product?.productId || '-'}</span>
@@ -338,13 +336,90 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
           {activeTab === "reviews" && (
             <div className="reviews-content">
               <div className="product-description">
-                <h3>상품 상세 정보</h3>
+                <h3>
+                  <span className="description-icon">📄</span>
+                  상품 상세 정보
+                </h3>
+                
+                {/* 상품 기본 정보 */}
+                <div className="product-basic-info">
+                  {product?.productId && (
+                    <div className="info-row">
+                      <span className="info-label">품번</span>
+                      <span className="info-value">{product.productId}</span>
+                    </div>
+                  )}
+                  {product?.category && (
+                    <div className="info-row">
+                      <span className="info-label">카테고리</span>
+                      <span className="info-value">{product.category.categoryName || product.category}</span>
+                    </div>
+                  )}
+                  {product?.brand && (
+                    <div className="info-row">
+                      <span className="info-label">브랜드</span>
+                      <span className="info-value">{product.brand}</span>
+                    </div>
+                  )}
+                  {product?.status && (
+                    <div className="info-row">
+                      <span className="info-label">상태</span>
+                      <span className="info-value">{product.status === 'ACTIVE' ? '판매중' : '판매중지'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 상품 설명 */}
                 <div className="description-text">
                   {product?.description || product?.productDescription || "상품 설명이 없습니다."}
                 </div>
+
+                {/* 소재 정보 (있는 경우) */}
+                {product?.material && (
+                  <div className="material-info">
+                    <div className="material-item">
+                      <span className="material-label">겉감</span>
+                      <span className="material-value">{product.material.outer || product.material}</span>
+                    </div>
+                    {product.material?.lining && (
+                      <div className="material-item">
+                        <span className="material-label">안감</span>
+                        <span className="material-value">{product.material.lining}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 관리 방법 */}
+                <div className="care-instructions">
+                  <h4>관리 방법</h4>
+                  <ul>
+                    <li>단독 손세탁하여 주십시오.</li>
+                    <li>열과 수축에 주의하여 주십시오.</li>
+                    <li>이염에 주의하여 주십시오.</li>
+                    <li>건조기 사용을 지양해 주십시오.</li>
+                  </ul>
+                </div>
+
+                {/* 색상 안내 */}
+                <div className="color-notice">
+                  <ul>
+                    <li>품의 색상은 상품 상세 이미지와 가장 흡사함으로 해당 이미지를 참고해주세요.</li>
+                    <li>모니터에 따라 컬러의 오차가 있을 수 있습니다.</li>
+                  </ul>
+                </div>
+
+                {/* 상품 이미지 */}
                 {product?.image && (
                   <div className="product-detail-image">
-                    <img src={product.image} alt={product.name || product.productName} />
+                    <img 
+                      src={product.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80"} 
+                      alt={product.name || product.productName}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
+                      }}
+                    />
                   </div>
                 )}
               </div>

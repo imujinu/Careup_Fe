@@ -68,7 +68,15 @@ function ProductInquiryModal({ product, memberId, isOpen, onClose, onSuccess }) 
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <div className="inquiry-product-info">
-          <img src={product.image} alt={product.name} className="product-thumbnail" />
+          <img 
+            src={product.image || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80"} 
+            alt={product.name} 
+            className="product-thumbnail"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
+            }}
+          />
           <div className="product-details">
             <h4>{product.name}</h4>
             <p className="product-price">{product.promotionPrice ? `${product.promotionPrice.toLocaleString()}원` : `${product.price.toLocaleString()}원`}</p>
