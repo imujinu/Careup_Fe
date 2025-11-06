@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
+import Icon from '@mdi/react';
+import { mdiMagnify } from '@mdi/js';
 import { inventoryService } from '../../service/inventoryService';
 import { autoOrderService } from '../../service/autoOrderService';
 
@@ -216,10 +218,134 @@ const LoadingSpinner = styled.div`
   color: #6b7280;
 `;
 
+const SearchFilterContainer = styled.div`
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+`;
+
+const SearchContainer = styled.div`
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+`;
+
+const SearchIcon = styled.div`
+  position: absolute;
+  left: 16px;
+  color: #9ca3af;
+  font-size: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  height: 44px;
+  padding: 0 16px 0 48px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  outline: none;
+  
+  &::placeholder {
+    color: #9ca3af;
+  }
+  
+  &:focus {
+    border-color: #6b46c1;
+  }
+`;
+
+const TableContainer = styled.div`
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+`;
+
+const PaginationContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+`;
+
+const PageSizeContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const PageSizeLabel = styled.span`
+  font-size: 14px;
+  color: #6b7280;
+`;
+
+const PageSizeSelect = styled.select`
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  background: #ffffff;
+  
+  &:focus {
+    border-color: #6b46c1;
+  }
+`;
+
+const PaginationControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const PaginationButton = styled.button`
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  background: ${props => props.active ? '#6b46c1' : '#ffffff'};
+  color: ${props => props.active ? '#ffffff' : '#374151'};
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background: ${props => props.active ? '#553c9a' : '#f3f4f6'};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const AutoOrderSettings = () => {
   const [autoOrderEnabled, setAutoOrderEnabled] = useState(false);
   const [inventoryData, setInventoryData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     const loadData = async () => {
@@ -237,26 +363,58 @@ const AutoOrderSettings = () => {
       const branchId = 2; // TODO: 실제 로그인한 사용자의 branchId 사용
       const response = await inventoryService.getBranchProducts(branchId);
       
-      console.log('재고 데이터 API 응답:', response);
-      console.log('재고 데이터:', response.data);
-      
       // API 응답 구조에 따라 데이터 추출
       const inventoryList = Array.isArray(response) ? response : (response.data || []);
-      console.log('재고 목록:', inventoryList);
       
-      // 재고 데이터를 자동 발주 설정 형태로 변환
-      const autoOrderData = inventoryList.map(item => {
-        console.log('재고 아이템:', item);
+      // 각 BranchProduct의 속성 정보 조회 (각 행별로 표시)
+      const autoOrderData = await Promise.all(inventoryList.map(async (item) => {
+        let attributes = [];
+        try {
+          // 상품의 속성 정보 조회
+          const productAttributes = await inventoryService.getProductAttributeValues(item.productId);
+          if (productAttributes && Array.isArray(productAttributes)) {
+            // 속성 타입별로 그룹화하여 최대 2개까지만 선택
+            const attributeMap = new Map();
+            productAttributes.forEach(attr => {
+              const typeId = String(attr.attributeTypeId || attr.attributeType?.id || '');
+              const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
+              const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
+              const valueName = attr.displayName || attr.attributeValue?.name || attr.value || '';
+              
+              if (typeId && typeName && !attributeMap.has(typeId)) {
+                attributeMap.set(typeId, {
+                  attributeTypeId: typeId,
+                  attributeTypeName: typeName,
+                  attributeValueId: valueId,
+                  attributeValueName: valueName
+                });
+              }
+            });
+            
+            attributes = Array.from(attributeMap.values()).slice(0, 2);
+          }
+        } catch (err) {
+          // 속성 정보 조회 실패 시 무시
+        }
+        
+        // 속성 표시 문자열 생성
+        const attributeDisplay = attributes.length > 0
+          ? attributes.map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`).join(', ')
+          : null;
+        
         return {
-          id: item.productId,
-          name: item.productName || `상품 ${item.productId}`, // productName이 없을 경우 대체
+          id: item.branchProductId || item.productId,
+          productId: item.productId,
+          branchProductId: item.branchProductId,
+          name: item.productName || `상품 ${item.productId}`,
+          attributeDisplay: attributeDisplay, // 속성 정보 표시용
+          attributes: attributes,
           currentStock: item.stockQuantity || 0,
           safetyStock: item.safetyStock || 0,
           autoOrderEnabled: item.autoOrderEnabled || false
         };
-      });
+      }));
       
-      console.log('변환된 자동 발주 데이터:', autoOrderData);
       setInventoryData(autoOrderData);
     } catch (error) {
       console.error('재고 데이터 조회 실패:', error);
@@ -278,7 +436,6 @@ const AutoOrderSettings = () => {
   const fetchAutoOrderStatus = async () => {
     try {
       const response = await autoOrderService.getFranchiseAutoOrderSettings();
-      console.log('자동 발주 설정 API 응답:', response);
       
       // 전체 자동 발주 설정
       setAutoOrderEnabled(response.autoOrderEnabled || false);
@@ -286,16 +443,27 @@ const AutoOrderSettings = () => {
       // 상품별 자동 발주 설정이 있으면 기존 재고 데이터와 병합
       if (response.products && response.products.length > 0) {
         setInventoryData(prev => {
+          // branchProductId를 우선으로 매칭, 없으면 productId로 매칭
           const productSettingsMap = new Map(
-            response.products.map(p => [p.productId, p])
+            response.products.map(p => [
+              p.branchProductId ? `bp_${p.branchProductId}` : `p_${p.productId}`, 
+              p
+            ])
           );
           
           return prev.map(item => {
-            const productSetting = productSettingsMap.get(item.id);
+            // branchProductId 우선 매칭, 없으면 productId로 매칭
+            const key = item.branchProductId ? `bp_${item.branchProductId}` : `p_${item.productId}`;
+            const productSetting = productSettingsMap.get(key);
+            
+            // branchProductId가 없으면 productId로도 시도 (하위 호환성)
+            const fallbackSetting = !productSetting && !item.branchProductId 
+              ? productSettingsMap.get(`p_${item.productId}`)
+              : productSetting;
+            
             return {
               ...item,
-              autoOrderEnabled: productSetting ? productSetting.autoOrderEnabled : false,
-              // 안전재고는 항상 재고 목록의 값 사용 (자동발주 설정에서 변경 불가)
+              autoOrderEnabled: fallbackSetting ? fallbackSetting.autoOrderEnabled : false,
               safetyStock: item.safetyStock
             };
           });
@@ -327,7 +495,8 @@ const AutoOrderSettings = () => {
       const transformedData = {
         autoOrderEnabled: enabled,
         products: updatedInventoryData.map(item => ({
-          productId: item.id,
+          productId: item.productId || item.id,
+          branchProductId: item.branchProductId || null, // 실제 branchProductId 전송
           productName: item.name,
           autoOrderEnabled: item.autoOrderEnabled,
           safetyStock: item.safetyStock,
@@ -336,8 +505,6 @@ const AutoOrderSettings = () => {
       };
       
       await autoOrderService.updateFranchiseAutoOrderSettings(transformedData);
-      
-      console.log('전체 자동 발주 설정 업데이트 완료:', transformedData);
       
     } catch (error) {
       console.error('자동 발주 설정 변경 실패:', error);
@@ -367,7 +534,8 @@ const AutoOrderSettings = () => {
       const transformedData = {
         autoOrderEnabled: autoOrderEnabled,
         products: updatedInventoryData.map(item => ({
-          productId: item.id,
+          productId: item.productId || item.id,
+          branchProductId: item.branchProductId || null, // 실제 branchProductId 전송
           productName: item.name,
           autoOrderEnabled: item.autoOrderEnabled,
           safetyStock: item.safetyStock,
@@ -376,8 +544,6 @@ const AutoOrderSettings = () => {
       };
       
       await autoOrderService.updateFranchiseAutoOrderSettings(transformedData);
-      
-      console.log('상품 자동 발주 설정 업데이트 완료:', transformedData);
       alert(`상품 자동 발주가 ${enabled ? '활성화' : '비활성화'}되었습니다.`);
     } catch (error) {
       console.error('상품 자동 발주 설정 변경 실패:', error);
@@ -403,7 +569,8 @@ const AutoOrderSettings = () => {
       const transformedData = {
         autoOrderEnabled: autoOrderEnabled,
         products: updatedInventoryData.map(item => ({
-          productId: item.id,
+          productId: item.productId || item.id,
+          branchProductId: item.branchProductId || null, // 실제 branchProductId 전송
           productName: item.name,
           autoOrderEnabled: true,
           safetyStock: item.safetyStock,
@@ -412,14 +579,45 @@ const AutoOrderSettings = () => {
       };
 
       await autoOrderService.updateFranchiseAutoOrderSettings(transformedData);
-
-      console.log('모든 상품 자동 발주 활성화 완료:', transformedData);
       alert('모든 상품의 자동 발주가 활성화되었습니다.');
     } catch (error) {
       console.error('모든 상품 자동 발주 활성화 실패:', error);
       alert('모든 상품 자동 발주 활성화 실패: ' + error.message);
       await fetchAutoOrderStatus();
     }
+  };
+
+  // 필터링된 데이터
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return inventoryData;
+    }
+    
+    const term = searchTerm.toLowerCase().trim();
+    return inventoryData.filter(item => {
+      const productName = (item.name || '').toLowerCase();
+      return productName.includes(term);
+    });
+  }, [inventoryData, searchTerm]);
+
+  // 페이지네이션
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedData = filteredData.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
   };
 
 
@@ -489,78 +687,138 @@ const AutoOrderSettings = () => {
             재고 데이터가 없습니다. 먼저 지점에 상품을 추가해주세요.
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHeaderCell>상품명</TableHeaderCell>
-                <TableHeaderCell>현재 재고</TableHeaderCell>
-                <TableHeaderCell>안전 재고</TableHeaderCell>
-                <TableHeaderCell>자동 발주</TableHeaderCell>
-                <TableHeaderCell>상태</TableHeaderCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {inventoryData.map(product => (
-                <TableRow key={product.id}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell>
-                    <Badge count={product.currentStock}>
-                      {product.currentStock}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={product.safetyStock}
-                      readOnly
-                      disabled
-                      style={{
-                        backgroundColor: '#f9fafb',
-                        color: '#6b7280',
-                        cursor: 'not-allowed'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <ToggleSwitch>
-                      <ToggleInput
-                        type="checkbox"
-                        checked={product.autoOrderEnabled}
-                        disabled={!autoOrderEnabled}
-                        onChange={(e) => handleToggleProductAutoOrder(product.id, e.target.checked)}
-                      />
-                      <ToggleSlider style={{ 
-                        opacity: !autoOrderEnabled ? 0.5 : 1,
-                        cursor: !autoOrderEnabled ? 'not-allowed' : 'pointer'
-                      }} />
-                    </ToggleSwitch>
-                  </TableCell>
-                  <TableCell>
-                    {product.currentStock < product.safetyStock ? (
-                      <span style={{ color: '#ef4444', fontWeight: '600' }}>발주 필요</span>
-                    ) : (
-                      <span style={{ color: '#10b981', fontWeight: '600' }}>충분</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+          <>
+            {/* 검색 필터 */}
+            <SearchFilterContainer>
+              <SearchContainer>
+                <SearchIcon>
+                  <Icon path={mdiMagnify} size={1} />
+                </SearchIcon>
+                <SearchInput
+                  type="text"
+                  placeholder="상품명으로 검색"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+              </SearchContainer>
+            </SearchFilterContainer>
 
-      {/* 자동 발주 히스토리 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>자동 발주 히스토리</CardTitle>
-          <Button onClick={() => alert('자동 발주 히스토리 조회 기능은 개발 중입니다')}>
-            📋 히스토리 조회
-          </Button>
-        </CardHeader>
-        
-        <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-          자동 발주 히스토리가 여기에 표시됩니다.
-        </div>
+            {/* 테이블 */}
+            <TableContainer>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHeaderCell>상품명</TableHeaderCell>
+                    <TableHeaderCell>속성</TableHeaderCell>
+                    <TableHeaderCell>현재 재고</TableHeaderCell>
+                    <TableHeaderCell>안전 재고</TableHeaderCell>
+                    <TableHeaderCell>자동 발주</TableHeaderCell>
+                    <TableHeaderCell>상태</TableHeaderCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                        검색 결과가 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedData.map(product => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <div style={{ fontWeight: '600', color: '#1f2937' }}>{product.name}</div>
+                        </TableCell>
+                        <TableCell>
+                          {product.attributeDisplay || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge count={product.currentStock}>
+                            {product.currentStock}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={product.safetyStock}
+                            readOnly
+                            disabled
+                            style={{
+                              backgroundColor: '#f9fafb',
+                              color: '#6b7280',
+                              cursor: 'not-allowed'
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <ToggleSwitch>
+                            <ToggleInput
+                              type="checkbox"
+                              checked={product.autoOrderEnabled}
+                              disabled={!autoOrderEnabled}
+                              onChange={(e) => handleToggleProductAutoOrder(product.id, e.target.checked)}
+                            />
+                            <ToggleSlider style={{ 
+                              opacity: !autoOrderEnabled ? 0.5 : 1,
+                              cursor: !autoOrderEnabled ? 'not-allowed' : 'pointer'
+                            }} />
+                          </ToggleSwitch>
+                        </TableCell>
+                        <TableCell>
+                          {product.currentStock < product.safetyStock ? (
+                            <span style={{ color: '#ef4444', fontWeight: '600' }}>발주 필요</span>
+                          ) : (
+                            <span style={{ color: '#10b981', fontWeight: '600' }}>충분</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              
+              {/* 페이지네이션 */}
+              {filteredData.length > 0 && (
+                <PaginationContainer>
+                  <PageSizeContainer>
+                    <PageSizeLabel>페이지당 표시</PageSizeLabel>
+                    <PageSizeSelect
+                      value={pageSize}
+                      onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </PageSizeSelect>
+                  </PageSizeContainer>
+                  <PaginationControls>
+                    <PaginationButton
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      &lt;
+                    </PaginationButton>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+                      <PaginationButton
+                        key={pageNum}
+                        active={pageNum === currentPage}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationButton>
+                    ))}
+                    <PaginationButton
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      &gt;
+                    </PaginationButton>
+                  </PaginationControls>
+                </PaginationContainer>
+              )}
+            </TableContainer>
+          </>
+        )}
       </Card>
     </PageContainer>
   );

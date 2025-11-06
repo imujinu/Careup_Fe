@@ -18,7 +18,7 @@ const ModalOverlay = styled.div`
 const ModalContainer = styled.div`
   background: #ffffff;
   border-radius: 12px;
-  width: 1000px;
+  width: 700px;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
@@ -83,7 +83,7 @@ const ModalBody = styled.div`
 
 const InfoPanels = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 20px;
   margin-bottom: 32px;
 `;
@@ -188,16 +188,19 @@ const AttributeValueHeader = styled.div`
 `;
 
 const InventoryDetails = styled.div`
-  padding: 12px 16px 12px 48px;
+  padding: 12px 16px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  align-items: center;
 `;
 
 const DetailItem = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
+  align-items: center;
+  text-align: center;
 `;
 
 const DetailLabel = styled.span`
@@ -216,6 +219,8 @@ const StatusBadge = styled.span`
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
+  display: inline-block;
+  width: fit-content;
   background: ${props => {
     if (props.status === 'low') return '#fef2f2';
     if (props.status === 'normal') return '#dcfce7';
@@ -294,12 +299,45 @@ const EmptyMessage = styled.div`
   font-size: 14px;
 `;
 
+const FilterSection = styled.div`
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+`;
+
+const FilterLabel = styled.label`
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+`;
+
+const FilterSelect = styled.select`
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  color: #1f2937;
+  min-width: 150px;
+  cursor: pointer;
+  
+  &:focus {
+    outline: none;
+    border-color: #6b46c1;
+    box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
+  }
+`;
+
 function InventoryDetailModal({ isOpen, onClose, item }) {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [productInfo, setProductInfo] = useState(null);
   const [branchProducts, setBranchProducts] = useState([]);
   const [categoryAttributes, setCategoryAttributes] = useState([]);
+  const [productAttributeValuesData, setProductAttributeValuesData] = useState([]); // 상품 속성 값 원본 데이터
 
   useEffect(() => {
     if (isOpen && item) {
@@ -317,15 +355,156 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
       const productData = response.data?.data || response.data;
       setProductInfo(productData);
       
+      // 상품 속성 값 먼저 가져오기
+      let productAttributeValues = [];
+      try {
+        productAttributeValues = await inventoryService.getProductAttributeValues(item.product.id);
+        console.log('상세보기 - 상품 속성 값:', productAttributeValues);
+        setProductAttributeValuesData(productAttributeValues || []);
+      } catch (err) {
+        console.warn('상품 속성 값 조회 실패:', err);
+        setProductAttributeValuesData([]);
+      }
+      
       // 카테고리 속성 조회
       if (productData?.category?.id) {
         try {
           const attributes = await inventoryService.getCategoryAttributes(productData.category.id);
-          setCategoryAttributes(attributes || []);
+          console.log('상세보기 - 카테고리 속성:', attributes);
+          
+          // 속성 정보 정규화
+          let normalizedAttributes = [];
+          
+          if (Array.isArray(attributes) && attributes.length > 0) {
+            normalizedAttributes = attributes.map(attr => {
+              const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id || '');
+              const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name || '속성';
+              
+              // 상품 속성 값에서 해당 타입의 값 가져오기
+              let availableValues = attr.availableValues || attr.attributeType?.attributeValues || [];
+              
+              if (Array.isArray(productAttributeValues) && productAttributeValues.length > 0) {
+                const productValues = productAttributeValues
+                  .filter(pav => {
+                    const pavTypeId = String(pav.attributeTypeId || pav.attributeType?.id || '');
+                    const pavTypeName = pav.attributeTypeName || '';
+                    return pavTypeId === typeId || pavTypeName === typeName;
+                  })
+                  .map(pav => ({
+                    id: pav.attributeValueId || pav.attributeValue?.id || pav.id,
+                    name: pav.attributeValueName || pav.attributeValue?.name || pav.displayName || pav.name
+                  }))
+                  .filter(val => val.id && val.name); // 유효한 값만
+                
+                if (productValues.length > 0) {
+                  availableValues = productValues;
+                }
+              }
+              
+              // availableValues 정규화
+              const normalizedValues = availableValues
+                .map(val => ({
+                  id: val.id || val.attributeValueId,
+                  name: val.name || val.attributeValueName
+                }))
+                .filter(val => val.id && val.name); // 유효한 값만
+              
+              return {
+                ...attr,
+                attributeTypeId: typeId || typeName,
+                attributeTypeName: typeName,
+                availableValues: normalizedValues
+              };
+            });
+          } else if (Array.isArray(productAttributeValues) && productAttributeValues.length > 0) {
+            // 카테고리 속성이 없으면 상품 속성 값에서 속성 타입별로 그룹화
+            const productAttrMap = new Map();
+            productAttributeValues.forEach(pav => {
+              const typeId = String(pav.attributeTypeId || pav.attributeType?.id || pav.attributeTypeName || '');
+              const typeName = pav.attributeTypeName || pav.attributeType?.name || '속성';
+              const valueId = pav.attributeValueId || pav.attributeValue?.id || pav.id;
+              const valueName = pav.attributeValueName || pav.attributeValue?.name || pav.displayName || pav.name;
+              
+              if (typeName && valueId && valueName) {
+                if (!productAttrMap.has(typeId)) {
+                  productAttrMap.set(typeId, {
+                    attributeTypeId: typeId,
+                    attributeTypeName: typeName,
+                    availableValues: []
+                  });
+                }
+                productAttrMap.get(typeId).availableValues.push({
+                  id: valueId,
+                  name: valueName
+                });
+              }
+            });
+            
+            normalizedAttributes = Array.from(productAttrMap.values());
+          }
+          
+          console.log('상세보기 - 정규화된 속성:', normalizedAttributes);
+          setCategoryAttributes(normalizedAttributes);
         } catch (error) {
           console.error('카테고리 속성 조회 실패:', error);
+          // 카테고리 속성 조회 실패 시 상품 속성 값에서만 추출
+          if (Array.isArray(productAttributeValues) && productAttributeValues.length > 0) {
+            const productAttrMap = new Map();
+            productAttributeValues.forEach(pav => {
+              const typeId = String(pav.attributeTypeId || pav.attributeType?.id || pav.attributeTypeName || '');
+              const typeName = pav.attributeTypeName || pav.attributeType?.name || '속성';
+              const valueId = pav.attributeValueId || pav.attributeValue?.id || pav.id;
+              const valueName = pav.attributeValueName || pav.attributeValue?.name || pav.displayName || pav.name;
+              
+              if (typeName && valueId && valueName) {
+                if (!productAttrMap.has(typeId)) {
+                  productAttrMap.set(typeId, {
+                    attributeTypeId: typeId,
+                    attributeTypeName: typeName,
+                    availableValues: []
+                  });
+                }
+                productAttrMap.get(typeId).availableValues.push({
+                  id: valueId,
+                  name: valueName
+                });
+              }
+            });
+            
+            const extractedAttributes = Array.from(productAttrMap.values());
+            console.log('상세보기 - 상품 속성 값에서 추출한 속성:', extractedAttributes);
+            setCategoryAttributes(extractedAttributes);
+          } else {
           setCategoryAttributes([]);
         }
+        }
+      } else if (Array.isArray(productAttributeValues) && productAttributeValues.length > 0) {
+        // 카테고리 정보가 없어도 상품 속성 값이 있으면 사용
+        const productAttrMap = new Map();
+        productAttributeValues.forEach(pav => {
+          const typeId = String(pav.attributeTypeId || pav.attributeType?.id || pav.attributeTypeName || '');
+          const typeName = pav.attributeTypeName || pav.attributeType?.name || '속성';
+          const valueId = pav.attributeValueId || pav.attributeValue?.id || pav.id;
+          const valueName = pav.attributeValueName || pav.attributeValue?.name || pav.displayName || pav.name;
+          
+          if (typeName && valueId && valueName) {
+            if (!productAttrMap.has(typeId)) {
+              productAttrMap.set(typeId, {
+                attributeTypeId: typeId,
+                attributeTypeName: typeName,
+                availableValues: []
+              });
+            }
+            productAttrMap.get(typeId).availableValues.push({
+              id: valueId,
+              name: valueName
+            });
+          }
+        });
+        
+        const extractedAttributes = Array.from(productAttrMap.values());
+        console.log('상세보기 - 상품 속성 값에서 추출한 속성 (카테고리 없음):', extractedAttributes);
+        setCategoryAttributes(extractedAttributes);
       }
     } catch (error) {
       console.error('상품 상세 정보 조회 실패:', error);
@@ -379,7 +558,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
     }
   };
 
-  // 속성별로 재고를 그룹화하는 함수
+  // 속성별로 재고를 그룹화하는 함수 - 같은 상품의 모든 속성을 하나로 묶음
   const groupedInventory = useMemo(() => {
     if (!branchProducts.length) {
       return [];
@@ -388,8 +567,7 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
     // 속성이 없으면 단순 목록으로 표시
     if (!categoryAttributes.length) {
       return [{
-        attributeTypeName: null,
-        attributeValueName: null,
+        attributeDisplay: null,
         items: branchProducts
       }];
     }
@@ -399,97 +577,109 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
       (a.displayOrder || 0) - (b.displayOrder || 0)
     );
 
-    const firstAttributeType = sortedAttributes[0];
-    const hasSecondAttribute = sortedAttributes.length > 1;
-
-    // 첫 번째 속성 타입의 값으로 그룹화
-    const grouped = {};
+    // 같은 상품의 BranchProduct들을 하나로 묶기
+    const productMap = new Map(); // productId -> { attributes: [], branchProducts: [] }
 
     branchProducts.forEach(bp => {
-      // API 응답에서 직접 속성 정보 가져오기
-      const attributeTypeName = bp.attributeTypeName;
-      const attributeValueName = bp.attributeValueName;
-
-      if (!attributeTypeName || !attributeValueName) {
-        // 속성 정보가 없는 경우
-        if (!grouped['_no_attribute']) {
-          grouped['_no_attribute'] = {
-            attributeTypeName: null,
-            attributeValueName: null,
-            items: []
-          };
+      const productId = bp.productId;
+      
+      if (!productMap.has(productId)) {
+        productMap.set(productId, {
+          attributes: [],
+          branchProducts: []
+        });
+      }
+      
+      const productData = productMap.get(productId);
+      productData.branchProducts.push(bp);
+      
+      // 속성 정보 수집
+      if (bp.attributeTypeName && bp.attributeValueName) {
+        const existingAttr = productData.attributes.find(attr => 
+          attr.attributeTypeName === bp.attributeTypeName
+        );
+        
+        if (!existingAttr) {
+          productData.attributes.push({
+            attributeTypeName: bp.attributeTypeName,
+            attributeValueName: bp.attributeValueName
+          });
         }
-        grouped['_no_attribute'].items.push(bp);
-        return;
       }
-
-      // 첫 번째 속성 타입의 값으로 그룹화
-      const groupKey = `${attributeTypeName}_${attributeValueName}`;
-      if (!grouped[groupKey]) {
-        grouped[groupKey] = {
-          attributeTypeName,
-          attributeValueName,
-          items: []
-        };
-      }
-      grouped[groupKey].items.push(bp);
     });
 
-    // 두 번째 속성 타입이 있으면 하위 그룹화
-    if (hasSecondAttribute) {
-      const secondAttributeType = sortedAttributes[1];
-      const result = [];
-
-      Object.values(grouped).forEach(group => {
-        const subGrouped = {};
+    // 상품 속성 값 데이터에서도 속성 정보 수집
+    if (productAttributeValuesData.length > 0) {
+      productMap.forEach((productData, productId) => {
+        const productAttrs = productAttributeValuesData.filter(pav => 
+          String(pav.productId || '') === String(productId)
+        );
         
-        group.items.forEach(bp => {
-          // 각 BranchProduct는 하나의 속성 값만 가지고 있으므로
-          // 첫 번째 속성 타입의 값인지 두 번째 속성 타입의 값인지 확인
-          const bpAttributeTypeName = bp.attributeTypeName;
+        productAttrs.forEach(pav => {
+          const typeName = pav.attributeTypeName || pav.attributeType?.name;
+          const valueName = pav.attributeValueName || pav.attributeValue?.name || pav.value;
           
-          if (bpAttributeTypeName === secondAttributeType.attributeTypeName) {
-            // 두 번째 속성 타입의 값인 경우
-            const subGroupKey = `${bpAttributeTypeName}_${bp.attributeValueName}`;
-            if (!subGrouped[subGroupKey]) {
-              subGrouped[subGroupKey] = {
-                attributeTypeName: bpAttributeTypeName,
-                attributeValueName: bp.attributeValueName,
-                items: []
-              };
+          if (typeName && valueName) {
+            const existingAttr = productData.attributes.find(attr => 
+              attr.attributeTypeName === typeName
+            );
+            
+            if (!existingAttr) {
+              productData.attributes.push({
+                attributeTypeName: typeName,
+                attributeValueName: valueName
+              });
             }
-            subGrouped[subGroupKey].items.push(bp);
-          } else {
-            // 첫 번째 속성 타입의 값인 경우 (하위 그룹 없음)
-            if (!subGrouped['_no_sub']) {
-              subGrouped['_no_sub'] = {
-                attributeTypeName: null,
-                attributeValueName: null,
-                items: []
-              };
-            }
-            subGrouped['_no_sub'].items.push(bp);
           }
         });
+      });
+    }
 
-        // 하위 그룹이 있으면 추가
-        if (Object.keys(subGrouped).length > 0) {
+    // 속성 정보를 display_order 순으로 정렬
+    productMap.forEach((productData) => {
+      productData.attributes.sort((a, b) => {
+        const aOrder = sortedAttributes.find(attr => 
+          attr.attributeTypeName === a.attributeTypeName
+        )?.displayOrder || 0;
+        const bOrder = sortedAttributes.find(attr => 
+          attr.attributeTypeName === b.attributeTypeName
+        )?.displayOrder || 0;
+        return aOrder - bOrder;
+      });
+    });
+
+    // 결과 생성: 각 상품의 모든 속성을 한 줄로 표시
+    const result = [];
+    
+    productMap.forEach((productData, productId) => {
+      // 속성 정보를 "색상: 블랙, 사이즈: M" 형식으로 조합
+      const attributeDisplay = productData.attributes.length > 0
+        ? productData.attributes
+            .map(attr => `${attr.attributeTypeName}: ${attr.attributeValueName}`)
+            .join(', ')
+        : null;
+
+      // 첫 번째 BranchProduct를 기준으로 재고 정보 표시 (재고는 합산)
+      const firstBP = productData.branchProducts[0];
+      const totalStock = productData.branchProducts.reduce((sum, bp) => sum + (bp.stockQuantity || 0), 0);
+      const totalReserved = productData.branchProducts.reduce((sum, bp) => sum + (bp.reservedQuantity || 0), 0);
+      
+      // 합산된 재고 정보를 가진 BranchProduct 생성
+      const combinedBP = {
+        ...firstBP,
+        stockQuantity: totalStock,
+        reservedQuantity: totalReserved,
+        availableQuantity: totalStock - totalReserved
+      };
+
           result.push({
-            ...group,
-            subGroups: Object.values(subGrouped)
+        attributeDisplay,
+        items: [combinedBP]
           });
-        } else {
-          // 하위 그룹이 없으면 그대로 추가
-          result.push(group);
-        }
       });
 
       return result;
-    }
-
-    // 속성 타입이 하나만 있는 경우
-    return Object.values(grouped);
-  }, [branchProducts, categoryAttributes]);
+  }, [branchProducts, categoryAttributes, productAttributeValuesData]);
 
   const getStatus = (stockQuantity, safetyStock) => {
     if (stockQuantity < safetyStock) return 'low';
@@ -503,10 +693,6 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '재고 상세보기'),
         React.createElement(HeaderButtons, null,
-          React.createElement(PrintButton, null,
-            React.createElement('span', null, '🖨️'),
-            '인쇄'
-          ),
           React.createElement(CloseButton, { onClick: onClose }, '×')
         )
       ),
@@ -526,6 +712,14 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(InfoLabel, null, '카테고리명:'),
                 React.createElement(InfoValue, null, productInfo?.category?.name || item.category || '미분류')
               ),
+              groupedInventory.length > 0 && groupedInventory[0]?.attributeDisplay && React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '속성:'),
+                React.createElement(InfoValue, null, groupedInventory[0].attributeDisplay)
+              ),
+              React.createElement(InfoRow, null,
+                React.createElement(InfoLabel, null, '지점명:'),
+                React.createElement(InfoValue, null, item.branch)
+              ),
               React.createElement(InfoRow, null,
                 React.createElement(InfoLabel, null, '최저가격:'),
                 React.createElement(InfoValue, null, `₩${(productInfo?.minPrice || item.product?.minPrice || 0).toLocaleString()}`)
@@ -535,27 +729,11 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(InfoValue, null, `₩${(productInfo?.maxPrice || item.product?.maxPrice || 0).toLocaleString()}`)
               ),
             )
-          ),
-          React.createElement(InfoPanel, null,
-            React.createElement(PanelHeader, null,
-              React.createElement('span', null, '🏢'),
-              '지점 정보'
-            ),
-            React.createElement(PanelContent, null,
-              React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '지점명:'),
-                React.createElement(InfoValue, null, item.branch)
-              ),
-              React.createElement(InfoRow, null,
-                React.createElement(InfoLabel, null, '지점 ID:'),
-                React.createElement(InfoValue, null, item.branchId || 1)
-              )
-            )
           )
         ),
         React.createElement(InventorySection, null,
           React.createElement(SectionHeader, null,
-            React.createElement(SectionTitle, null, '속성별 재고 현황')
+            React.createElement(SectionTitle, null, '재고 현황')
           ),
           branchProducts.length === 0 ? (
             React.createElement(EmptyMessage, null, '등록된 재고가 없습니다.')
@@ -588,77 +766,33 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
               )
             )
           ) : (
-            // 속성이 있는 경우 계층 구조 표시
-            groupedInventory.map((group, groupIndex) => {
-              // 하위 그룹이 있는 경우 (속성 타입이 2개 이상)
-              if (group.subGroups) {
-                return React.createElement(AttributeGroup, { key: groupIndex },
-                  React.createElement(AttributeGroupHeader, null, 
-                    `${group.attributeTypeName}: ${group.attributeValueName}`
-                  ),
-                  group.subGroups.map((subGroup, subIndex) => 
-                    React.createElement(AttributeValueGroup, { key: subIndex },
-                      subGroup.attributeTypeName && subGroup.attributeValueName !== '-' ? (
-                        React.createElement(AttributeValueHeader, null,
-                          `${subGroup.attributeTypeName}: ${subGroup.attributeValueName}`
-                        )
-                      ) : null,
-                      subGroup.items.map((bp, itemIndex) =>
-                        React.createElement(InventoryDetails, { key: itemIndex },
-                          React.createElement(DetailItem, null,
-                            React.createElement(DetailLabel, null, '재고'),
-                            React.createElement(DetailValue, null, `${bp.stockQuantity || 0}개`)
-                          ),
-                          React.createElement(DetailItem, null,
-                            React.createElement(DetailLabel, null, '안전재고'),
-                            React.createElement(DetailValue, null, `${bp.safetyStock || 0}개`)
-                          ),
-                          React.createElement(DetailItem, null,
-                            React.createElement(DetailLabel, null, '판매가'),
-                            React.createElement(DetailValue, null, `₩${(bp.price || 0).toLocaleString()}`)
-                          ),
-                          React.createElement(DetailItem, null,
-                            React.createElement(DetailLabel, null, '상태'),
-                            React.createElement(StatusBadge, { 
-                              status: getStatus(bp.stockQuantity || 0, bp.safetyStock || 0) 
-                            }, getStatus(bp.stockQuantity || 0, bp.safetyStock || 0) === 'low' ? '부족' : '정상')
-                          )
-                        )
-                      )
+            // 속성이 있는 경우 - 재고 정보만 표시 (속성 정보는 상품 정보 패널에 표시됨)
+            groupedInventory.map((group, groupIndex) => 
+              React.createElement(AttributeGroup, { key: groupIndex },
+                group.items.map((bp, itemIndex) =>
+                  React.createElement(InventoryDetails, { key: itemIndex },
+                    React.createElement(DetailItem, null,
+                      React.createElement(DetailLabel, null, '재고'),
+                      React.createElement(DetailValue, null, `${bp.stockQuantity || 0}개`)
+                    ),
+                    React.createElement(DetailItem, null,
+                      React.createElement(DetailLabel, null, '안전재고'),
+                      React.createElement(DetailValue, null, `${bp.safetyStock || 0}개`)
+                    ),
+                    React.createElement(DetailItem, null,
+                      React.createElement(DetailLabel, null, '판매가'),
+                      React.createElement(DetailValue, null, `₩${(bp.price || 0).toLocaleString()}`)
+                    ),
+                    React.createElement(DetailItem, null,
+                      React.createElement(DetailLabel, null, '상태'),
+                      React.createElement(StatusBadge, { 
+                        status: getStatus(bp.stockQuantity || 0, bp.safetyStock || 0) 
+                      }, getStatus(bp.stockQuantity || 0, bp.safetyStock || 0) === 'low' ? '부족' : '정상')
                     )
                   )
-                );
-              } else {
-                // 하위 그룹이 없는 경우 (속성 타입이 1개)
-                return React.createElement(AttributeGroup, { key: groupIndex },
-                  React.createElement(AttributeGroupHeader, null, 
-                    `${group.attributeTypeName}: ${group.attributeValueName}`
-                  ),
-                  group.items.map((bp, itemIndex) =>
-                    React.createElement(InventoryDetails, { key: itemIndex },
-                      React.createElement(DetailItem, null,
-                        React.createElement(DetailLabel, null, '재고'),
-                        React.createElement(DetailValue, null, `${bp.stockQuantity || 0}개`)
-                      ),
-                      React.createElement(DetailItem, null,
-                        React.createElement(DetailLabel, null, '안전재고'),
-                        React.createElement(DetailValue, null, `${bp.safetyStock || 0}개`)
-                      ),
-                      React.createElement(DetailItem, null,
-                        React.createElement(DetailLabel, null, '판매가'),
-                        React.createElement(DetailValue, null, `₩${(bp.price || 0).toLocaleString()}`)
-                      ),
-                      React.createElement(DetailItem, null,
-                        React.createElement(DetailLabel, null, '상태'),
-                        React.createElement(StatusBadge, { 
-                          status: getStatus(bp.stockQuantity || 0, bp.safetyStock || 0) 
-                        }, getStatus(bp.stockQuantity || 0, bp.safetyStock || 0) === 'low' ? '부족' : '정상')
-                      )
-                    )
-                  )
-                );
-              }
-            })
+                )
+              )
+            )
           )
         ),
         React.createElement(HistorySection, null,
@@ -671,7 +805,6 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                 React.createElement(TableHeaderCell, null, '일시'),
                 React.createElement(TableHeaderCell, null, '구분'),
                 React.createElement(TableHeaderCell, null, '수량'),
-                React.createElement(TableHeaderCell, null, '속성'),
                 React.createElement(TableHeaderCell, null, '사유'),
                 React.createElement(TableHeaderCell, null, '비고')
               )
@@ -679,11 +812,11 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
             React.createElement(TableBody, null,
               loading ? 
                 React.createElement(TableRow, null,
-                  React.createElement(TableCell, { colSpan: 6, style: { textAlign: 'center', padding: '20px' } }, '로딩 중...')
+                  React.createElement(TableCell, { colSpan: 5, style: { textAlign: 'center', padding: '20px' } }, '로딩 중...')
                 ) :
                 historyData.length === 0 ?
                   React.createElement(TableRow, null,
-                    React.createElement(TableCell, { colSpan: 6, style: { textAlign: 'center', padding: '20px' } }, '입출고 내역이 없습니다.')
+                    React.createElement(TableCell, { colSpan: 5, style: { textAlign: 'center', padding: '20px' } }, '입출고 내역이 없습니다.')
                   ) :
                   historyData.map((history, index) => {
                     const inQty = history.inQuantity || 0;
@@ -705,9 +838,6 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                       quantity = '0';
                     }
                     const date = new Date(history.createdAt).toLocaleString('ko-KR');
-                    const attributeInfo = history.attributeTypeName && history.attributeValueName
-                      ? `${history.attributeTypeName} ${history.attributeValueName}`
-                      : '-';
                     
                     return React.createElement(TableRow, { key: index },
                       React.createElement(TableCell, null, date),
@@ -715,7 +845,6 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                         React.createElement(TypeBadge, { type }, type)
                       ),
                       React.createElement(TableCell, null, quantity),
-                      React.createElement(TableCell, null, attributeInfo),
                       React.createElement(TableCell, null, history.reason || '-'),
                       React.createElement(TableCell, null, history.remark || '-')
                     );

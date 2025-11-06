@@ -149,11 +149,9 @@ function InventoryManagement() {
           branches = branchResponse.result.data;
         }
       } catch (err) {
-        console.warn('지점 목록 조회 실패, purchaseOrderService 시도:', err);
         try {
           branches = await purchaseOrderService.getBranchList();
         } catch (e) {
-          console.error('지점 목록 API 모두 실패:', e);
           branches = [{ id: 1, name: '본점' }];
         }
       }
@@ -178,33 +176,43 @@ function InventoryManagement() {
       
       const branchIds = normalizedBranches.map(b => b.id).filter(id => id != null);
       
-      console.log('조회할 지점 목록:', normalizedBranches);
-      
       // 모든 지점의 재고를 병렬로 조회
       const allBranchProductsPromises = branchIds.map(async (bid) => {
         try {
           const products = await inventoryService.getBranchProducts(bid);
-          return products.map(item => ({
-            ...item,
-            branchId: bid,
-            branchName: normalizedBranches.find(b => b.id === bid)?.name || (bid === 1 ? '본사' : `지점-${bid}`)
-          }));
+          
+          // API 응답의 실제 branchId를 사용하고, 요청한 bid와 일치하는지 검증
+          return products
+            .filter(item => {
+              // 응답에 branchId가 있으면 그것을 사용하고, 없으면 요청한 bid 사용
+              const itemBranchId = item.branchId || bid;
+              
+              // 응답의 branchId가 요청한 bid와 일치하는지 확인 (데이터 무결성 검증)
+              const itemBranchIdNum = typeof itemBranchId === 'string' ? Number(itemBranchId) : itemBranchId;
+              const bidNum = typeof bid === 'string' ? Number(bid) : bid;
+              
+              // branchId가 일치하는 항목만 반환 (본점에만 등록된 상품이 다른 지점에 표시되는 것을 방지)
+              return itemBranchIdNum === bidNum;
+            })
+            .map(item => {
+              // 응답의 실제 branchId를 우선 사용하고, 없으면 요청한 bid 사용
+              const actualBranchId = item.branchId || bid;
+              const branchName = normalizedBranches.find(b => b.id === actualBranchId)?.name || 
+                                (actualBranchId === 1 ? '본점' : `지점-${actualBranchId}`);
+              
+              return {
+                ...item,
+                branchId: actualBranchId,  // API 응답의 실제 branchId 사용
+                branchName: branchName
+              };
+            });
         } catch (err) {
-          console.error(`지점 ${bid} 재고 조회 실패:`, err);
           return [];
         }
       });
       
       const allBranchProductsResults = await Promise.all(allBranchProductsPromises);
       const allBranchProducts = allBranchProductsResults.flat();
-      
-      console.log('모든 지점 재고 데이터:', allBranchProducts);
-      console.log('첫 번째 재고 항목 상세:', allBranchProducts[0]);
-      if (allBranchProducts[0]) {
-        console.log('reservedQuantity:', allBranchProducts[0].reservedQuantity);
-        console.log('availableQuantity:', allBranchProducts[0].availableQuantity);
-        console.log('stockQuantity:', allBranchProducts[0].stockQuantity);
-      }
       
       // 전체 상품 목록 가져오기 (재고가 없는 상품도 표시하기 위해)
       let allProducts = [];
@@ -213,7 +221,6 @@ function InventoryManagement() {
         const pageData = productsResponse.data?.data || productsResponse.data;
         allProducts = pageData?.content || [];
       } catch (err) {
-        console.error('getAllProducts 실패:', err);
       }
       
       // 상품 ID로 상품 정보를 빠르게 찾기 위한 Map 생성
@@ -222,73 +229,184 @@ function InventoryManagement() {
         productMap.set(product.productId, product);
       });
       
-      // 모든 지점의 재고 데이터 변환
-      const productsWithStock = allBranchProducts.map(item => {
-        const currentStock = item.stockQuantity || 0;
-        const reservedStock = item.reservedQuantity || 0;  // 예약재고
-        const availableStock = item.availableQuantity !== undefined ? item.availableQuantity : (currentStock - reservedStock);  // 사용 가능한 재고
-        const safetyStock = item.safetyStock || 0;
+      // 상품별 속성 정보를 가져오기 위한 Map (캐싱)
+      const productAttributesMap = new Map();
+      
+      // 먼저 모든 고유한 상품 ID 수집
+      const uniqueProductIds = [...new Set(allBranchProducts.map(bp => bp.productId).filter(Boolean))];
+      
+      // 모든 상품의 속성 정보를 배치로 가져오기 (동시 요청 수 제한)
+      const batchSize = 10; // 한 번에 10개씩 처리
+      for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+        const batch = uniqueProductIds.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (productId) => {
+          if (!productAttributesMap.has(productId)) {
+            try {
+              const productAttributes = await inventoryService.getProductAttributeValues(productId);
+              // 속성 타입별로 그룹화
+              const attributeMap = new Map();
+              (productAttributes || []).forEach(attr => {
+                const typeId = String(attr.attributeTypeId || attr.attributeType?.id || '');
+                const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
+                const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
+                const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName || '';
+                const displayOrder = attr.attributeType?.displayOrder || attr.displayOrder || 0;
+                
+                // typeId가 없으면 typeName을 키로 사용
+                const key = typeId || typeName;
+                
+                if (!key) {
+                  return;
+                }
+                
+                if (!attributeMap.has(key)) {
+                  attributeMap.set(key, {
+                    attributeTypeId: typeId,
+                    attributeTypeName: typeName,
+                    displayOrder: displayOrder,
+                    values: []
+                  });
+                }
+                
+                if (valueId && valueName) {
+                  attributeMap.get(key).values.push({
+                    attributeValueId: valueId,
+                    attributeValueName: valueName
+                  });
+                }
+              });
+              
+              // 속성 타입별로 정렬하고 최대 2개까지만 선택
+              // 각 속성 타입의 모든 값들을 포함 (나중에 BranchProduct와 매칭)
+              const sortedAttributes = Array.from(attributeMap.values())
+                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+              
+              const attributes = sortedAttributes
+                .slice(0, 2) // 최대 2개
+                .map(attr => ({
+                  attributeTypeId: attr.attributeTypeId,
+                  attributeTypeName: attr.attributeTypeName,
+                  attributeValueId: attr.values[0]?.attributeValueId || null,
+                  attributeValueName: attr.values[0]?.attributeValueName || null,
+                  allValues: attr.values // 모든 값 보관 (나중에 매칭용)
+                }));
+              
+              productAttributesMap.set(productId, attributes);
+            } catch (err) {
+              productAttributesMap.set(productId, []);
+            }
+          }
+        }));
+      }
+      
+      // 같은 상품(productId)과 지점(branchId)을 가진 BranchProduct들을 그룹화
+      const productGroupMap = new Map();
+      allBranchProducts.forEach((item) => {
+        const key = `${item.productId}-${item.branchId}`;
+        
+        if (!productGroupMap.has(key)) {
+          productGroupMap.set(key, []);
+        }
+        productGroupMap.get(key).push(item);
+      });
+      
+      // 그룹화된 데이터를 하나의 행으로 변환
+      const productsWithStock = Array.from(productGroupMap.entries()).map(([key, items]) => {
+        // 첫 번째 항목을 기준으로 기본 정보 설정
+        const firstItem = items[0];
+        const currentStock = items.reduce((sum, item) => sum + (item.stockQuantity || 0), 0);
+        const reservedStock = items.reduce((sum, item) => sum + (item.reservedQuantity || 0), 0);
+        const availableStock = items.reduce((sum, item) => sum + (item.availableQuantity !== undefined ? item.availableQuantity : (item.stockQuantity || 0) - (item.reservedQuantity || 0)), 0);
+        const safetyStock = firstItem.safetyStock || 0;
+        
         // 공급가는 Product.supplyPrice에서 가져오기
-        const product = productMap.get(item.productId);
+        const product = productMap.get(firstItem.productId);
         const unitPrice = product?.supplyPrice || 0;
-        // 판매가는 BranchProduct.price에서 가져오기
-        const salesPrice = item.price || 0;
+        // 판매가는 첫 번째 BranchProduct.price 사용
+        const salesPrice = firstItem.price || 0;
         const status = currentStock < safetyStock ? 'low' : 'normal';
-        let branchName = item.branchName || (item.branchId === 1 ? '본점' : `지점-${item.branchId}`);
+        let branchName = firstItem.branchName || (firstItem.branchId === 1 ? '본점' : `지점-${firstItem.branchId}`);
         // 본사가 들어오면 본점으로 변경
         if (branchName === '본사' || branchName.includes('본사')) {
           branchName = '본점';
         }
         
+        // 상품 속성 정보 가져오기 (캐시 사용)
+        // 상품에 연결된 모든 속성 값을 표시 (각 속성 타입별로 첫 번째 값 사용)
+        let attributes = productAttributesMap.get(firstItem.productId) || [];
+        
+        if (attributes.length > 0) {
+          attributes = attributes.map(attr => ({
+            attributeTypeId: attr.attributeTypeId,
+            attributeTypeName: attr.attributeTypeName,
+            attributeValueId: attr.attributeValueId,
+            attributeValueName: attr.attributeValueName
+          }));
+        } else {
+          // 속성 정보가 없으면 BranchProduct에서 수집
+          const attributeMap = new Map();
+          items.forEach(item => {
+            if (item.attributeValueId && item.attributeTypeName && item.attributeValueName) {
+              const typeKey = item.attributeTypeId || item.attributeTypeName;
+              if (!attributeMap.has(typeKey)) {
+                attributeMap.set(typeKey, {
+                  attributeTypeId: item.attributeTypeId || '',
+                  attributeTypeName: item.attributeTypeName,
+                  attributeValueId: item.attributeValueId,
+                  attributeValueName: item.attributeValueName
+                });
+              }
+            }
+          });
+          attributes = Array.from(attributeMap.values()).slice(0, 2);
+        }
+        
         return {
-          id: `${item.branchId}-${item.branchProductId}`, // 지점별로 고유한 ID
-          branchProductId: item.branchProductId,
+          id: `${firstItem.branchId}-${firstItem.productId}`, // 지점-상품 조합으로 고유 ID
+          branchProductId: firstItem.branchProductId, // 첫 번째 BranchProduct ID
           product: { 
-            name: item.productName || '알 수 없음', 
-            id: item.productId || 'N/A'
+            name: firstItem.productName || '알 수 없음', 
+            id: firstItem.productId || 'N/A'
           },
-          category: item.categoryName || '미분류',
-          branchId: item.branchId,
-          branch: branchName,
+          category: firstItem.categoryName || '미분류',
+          branchId: firstItem.branchId,
+          branch: branchName, // branchName은 이미 올바르게 설정됨 (targetBranchId 기준)
           currentStock: currentStock,
-          reservedStock: reservedStock,  // 예약재고 추가
-          availableStock: availableStock,  // 사용 가능한 재고 추가
+          reservedStock: reservedStock,
+          availableStock: availableStock,
           safetyStock: safetyStock,
           status: status,
           unitPrice: unitPrice,
           salesPrice: salesPrice,
           totalValue: currentStock * unitPrice,
-          // 사이즈 정보 추가
-          attributeValueId: item.attributeValueId || null,
-          attributeValueName: item.attributeValueName || null,
-          attributeTypeName: item.attributeTypeName || null
+          // 속성 정보 배열 (최대 2개)
+          attributes: attributes,
+          // 하위 호환성을 위한 필드
+          attributeValueId: attributes[0]?.attributeValueId || null,
+          attributeValueName: attributes[0]?.attributeValueName || null,
+          attributeTypeName: attributes[0]?.attributeTypeName || null
         };
       });
       
-      // 각 지점별로 재고가 없는 상품 추가 (본사 기준)
-      const allProductIds = new Set(allBranchProducts.map(bp => bp.productId));
-      const productsWithoutStock = allProducts
-        .filter(product => !allProductIds.has(product.productId))
-        .map(product => ({
-          id: `1-product-${product.productId}`, // 본점 임시 ID
-          branchProductId: null,
-          product: { 
-            name: product.name || '알 수 없음', 
-            id: product.productId || 'N/A'
-          },
-          category: product.categoryName || '미분류',
-          branchId: 1,
-          branch: '본점',
-          currentStock: 0,
-          safetyStock: 0,
-          status: 'normal',
-          unitPrice: product.supplyPrice || 0,
-          salesPrice: null, // 재고가 없는 상품은 판매가 없음
-          totalValue: 0
-        }));
+      // 상품별로 본점 재고 정보 매핑 (본점 필터에서 모든 상품을 표시하기 위해)
+      const mainBranchStockMap = new Map(); // productId -> 본점 재고 정보
+      allBranchProducts
+        .filter(bp => bp.branchId === 1) // 본점 재고만
+        .forEach(bp => {
+          const key = `${bp.productId}-${bp.attributeValueId || 'no-attr'}`;
+          if (!mainBranchStockMap.has(key)) {
+            mainBranchStockMap.set(key, []);
+          }
+          mainBranchStockMap.get(key).push(bp);
+        });
+      
+      // 본점에 재고가 없는 상품은 추가하지 않음
+      // 본점 필터에서는 본점에 실제 재고가 있는 것만 표시
+      // 전체 지점 필터에서는 productsWithStock에 모든 지점의 재고가 포함되어 있으므로 모두 표시됨
+      const productsWithoutMainBranchStock = [];
       
       // 전체 데이터 합치기
-      const formattedData = [...productsWithStock, ...productsWithoutStock];
+      const formattedData = [...productsWithStock, ...productsWithoutMainBranchStock];
       
       setInventoryData(formattedData);
       
@@ -297,20 +415,22 @@ function InventoryManagement() {
       const lowStockItems = formattedData.filter(item => item.status === 'low').length;
       const totalValue = formattedData.reduce((sum, item) => sum + item.totalValue, 0);
       
-      // 지점 목록도 업데이트
-      if (normalizedBranches.length > 0) {
+      // 지점 목록은 재고 데이터와 무관하게 고정 (재고가 없는 지점도 포함)
+      // branchList가 비어있을 때만 설정 (이미 설정되어 있으면 업데이트하지 않음)
+      if (normalizedBranches.length > 0 && branchList.length === 0) {
         setBranchList(normalizedBranches);
       }
       
       // 총 지점 수는 모든 지점 목록 기준으로 계산 (재고가 없는 지점도 포함)
+      // 현재 branchList의 길이를 사용 (재고 데이터 기반이 아님)
+      const totalBranches = branchList.length > 0 ? branchList.length : (normalizedBranches.length > 0 ? normalizedBranches.length : 1);
       setSummary({
         totalItems,
         lowStockItems,
-        totalBranches: normalizedBranches.length > 0 ? normalizedBranches.length : 1, // 최소 본사 1개
+        totalBranches: totalBranches,
         totalValue
       });
     } catch (err) {
-      console.error('재고 조회 실패:', err);
       setError('재고 데이터를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
@@ -326,14 +446,70 @@ function InventoryManagement() {
       const userInfo = authService.getCurrentUser();
       const data = await inventoryService.getInventoryFlows();
       
-      setInventoryFlowData(data);
+      // 각 입출고 기록에 상품 속성 정보 추가
+      if (data && Array.isArray(data) && data.length > 0) {
+        // 고유한 productId 수집
+        const uniqueProductIds = [...new Set(data.map(item => item.productId).filter(Boolean))];
+        
+        // 각 상품의 속성 정보를 배치로 가져오기
+        const productAttributesMap = new Map();
+        const batchSize = 10;
+        
+        for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+          const batch = uniqueProductIds.slice(i, i + batchSize);
+          const promises = batch.map(async (productId) => {
+            try {
+              const attrs = await inventoryService.getProductAttributeValues(productId);
+              if (Array.isArray(attrs)) {
+                productAttributesMap.set(String(productId), attrs);
+              }
+            } catch (err) {
+              // 속성 정보 조회 실패 시 무시
+            }
+          });
+          
+          await Promise.all(promises);
+        }
+        
+        // 입출고 기록 데이터에 속성 정보 추가
+        const enrichedData = data.map(item => {
+          const productId = String(item.productId || '');
+          const productAttributes = productAttributesMap.get(productId) || [];
+          
+          // 속성 정보를 배열로 변환 (최대 2개)
+          const attributes = [];
+          
+          // displayOrder 순으로 정렬
+          const sortedAttrs = [...productAttributes].sort((a, b) => {
+            const aOrder = a.displayOrder || 0;
+            const bOrder = b.displayOrder || 0;
+            return aOrder - bOrder;
+          });
+          
+          // 최대 2개까지 속성 추가
+          sortedAttrs.slice(0, 2).forEach(attr => {
+            attributes.push({
+              attributeTypeId: attr.attributeTypeId || attr.attributeType?.id,
+              attributeTypeName: attr.attributeTypeName || attr.attributeType?.name,
+              attributeValueId: attr.attributeValueId || attr.attributeValue?.id || attr.id,
+              attributeValueName: attr.attributeValueName || attr.attributeValue?.name || attr.displayName
+            });
+          });
+          
+          return {
+            ...item,
+            attributes: attributes
+          };
+        });
+        
+        setInventoryFlowData(enrichedData);
       
       // 입출고 기록을 불러온 후 지점 목록 갱신
-      if (data && data.length > 0) {
-        await fetchBranchListWithFlowData(data);
+        await fetchBranchListWithFlowData(enrichedData);
+      } else {
+        setInventoryFlowData(data || []);
       }
     } catch (err) {
-      console.error('입출고 기록 조회 실패:', err);
       setError('입출고 기록을 불러오는데 실패했습니다.');
     } finally {
       setFlowLoading(false);
@@ -348,8 +524,6 @@ function InventoryManagement() {
       let branches = null;
       try {
         const branchResponse = await branchService.fetchBranches({ page: 0, size: 100 });
-        console.log('branchService.fetchBranches 응답:', branchResponse);
-        
         if (branchResponse?.data && Array.isArray(branchResponse.data)) {
           branches = branchResponse.data;
         } else if (branchResponse?.content && Array.isArray(branchResponse.content)) {
@@ -358,14 +532,10 @@ function InventoryManagement() {
           branches = branchResponse;
         }
       } catch (err) {
-        console.warn('branchService.fetchBranches 실패, purchaseOrderService.getBranchList 시도:', err);
-        branches = await purchaseOrderService.getBranchList().catch((err) => {
-          console.error('지점 목록 API 호출 실패:', err);
+        branches = await purchaseOrderService.getBranchList().catch(() => {
           return null;
         });
       }
-      
-      console.log('지점 목록 API 응답:', branches);
       
       // API 응답이 배열이 아닌 경우 처리
       let branchArray = null;
@@ -392,71 +562,15 @@ function InventoryManagement() {
             name: branch.name || branch.branchName || String(branch.id || branch.branchId)
           };
         });
-        console.log('정규화된 지점 목록:', normalizedBranches);
         setBranchList(normalizedBranches);
         return;
       }
       
-      // API 실패 시 발주 목록에서 지점명 찾기
-      console.warn('지점 목록 API가 실패했습니다. 발주 목록에서 지점명을 찾습니다.');
-      
-      // 입출고 기록의 모든 지점 ID 수집
-      const branchIds = new Set();
-      if (dataToUse && dataToUse.length > 0) {
-        dataToUse.forEach(item => {
-          if (item.branchId) {
-            branchIds.add(item.branchId);
-          }
-        });
-      }
-      
-      // 발주 목록에서 지점명 매핑 생성
-      const branchNameMap = {};
-      try {
-        // 본사(branchId=1)의 발주 목록을 가져오면 모든 지점의 발주가 포함될 수 있음
-        const orders = await purchaseOrderService.getPurchaseOrders(1);
-        if (orders && Array.isArray(orders)) {
-          orders.forEach(order => {
-            if (order.branchId && order.branchName) {
-              branchNameMap[order.branchId] = order.branchName;
-            }
-          });
-        }
-        console.log('발주 목록에서 찾은 지점명 매핑:', branchNameMap);
-      } catch (err) {
-        console.error('발주 목록 조회 실패:', err);
-      }
-      
-      // 최종 지점 목록 생성
-      const uniqueBranches = {};
-      if (dataToUse && dataToUse.length > 0) {
-        dataToUse.forEach(item => {
-          const branchId = item.branchId;
-          if (!uniqueBranches[branchId]) {
-            // 우선순위: 1) item.branchName, 2) 발주 목록의 branchName, 3) fallback
-            let branchName = item.branchName || branchNameMap[branchId] || 
-              (branchId === 1 ? '본점' : `지점-${branchId}`);
-            // 본사가 들어오면 본점으로 변경
-            if (branchName === '본사' || branchName.includes('본사')) {
-              branchName = '본점';
-            }
-            uniqueBranches[branchId] = {
-              id: branchId,
-              name: branchName
-            };
-          }
-        });
-      }
-      
-      const extractedBranches = Object.values(uniqueBranches);
-      console.log('입출고 기록에서 추출한 지점 목록:', extractedBranches);
-      if (extractedBranches.length > 0) {
-        setBranchList(extractedBranches);
-      } else {
-        setBranchList([{ id: 1, name: '본점' }]);
-      }
+      // API 실패 시 기본값 (본점만)
+      // 지점 목록은 재고 데이터나 입출고 기록 데이터 기반으로 동적으로 생성하지 않음
+      // 재고가 없는 지점도 필터에서 선택할 수 있어야 하므로, API에서만 가져온 고정 목록 사용
+      setBranchList([{ id: 1, name: '본점' }]);
     } catch (err) {
-      console.error('지점 목록 조회 실패:', err);
       setBranchList([{ id: 1, name: '본점' }]);
     }
   };
@@ -484,7 +598,6 @@ function InventoryManagement() {
         })));
       }
     } catch (err) {
-      console.error('카테고리 목록 조회 실패:', err);
       setCategoryList([]);
     }
   };
@@ -519,26 +632,28 @@ function InventoryManagement() {
     }
   }, [branchList]);
   
-  useEffect(() => {
-    if (inventoryFlowData.length > 0 && branchList.length <= 1) {
-      // API에서 지점 목록을 가져오지 못한 경우에만 발주 목록에서 추출
-      const uniqueBranches = {};
-      inventoryFlowData.forEach(item => {
-        const branchName = item.branchId === 1 ? '본점' : `지점-${item.branchId}`;
-        if (!uniqueBranches[branchName]) {
-          uniqueBranches[branchName] = {
-            id: item.branchId,
-            name: branchName
-          };
-        }
-      });
-      
-      const extractedBranches = Object.values(uniqueBranches);
-      if (extractedBranches.length > branchList.length) {
-        setBranchList(extractedBranches);
-      }
-    }
-  }, [inventoryFlowData]);
+  // 지점 목록은 입출고 기록 데이터 기반으로 동적으로 변경하지 않음
+  // 지점 목록은 fetchBranchList에서 API로 가져온 고정 목록만 사용
+  // useEffect(() => {
+  //   if (inventoryFlowData.length > 0 && branchList.length <= 1) {
+  //     // API에서 지점 목록을 가져오지 못한 경우에만 발주 목록에서 추출
+  //     const uniqueBranches = {};
+  //     inventoryFlowData.forEach(item => {
+  //       const branchName = item.branchId === 1 ? '본점' : `지점-${item.branchId}`;
+  //       if (!uniqueBranches[branchName]) {
+  //         uniqueBranches[branchName] = {
+  //           id: item.branchId,
+  //           name: branchName
+  //         };
+  //       }
+  //     });
+  //     
+  //     const extractedBranches = Object.values(uniqueBranches);
+  //     if (extractedBranches.length > branchList.length) {
+  //       setBranchList(extractedBranches);
+  //     }
+  //   }
+  // }, [inventoryFlowData]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -560,8 +675,6 @@ function InventoryManagement() {
 
   const handleSaveAddModal = async (formData) => {
     try {
-      console.log('Saving data:', formData);
-      
       const userInfo = authService.getCurrentUser();
       const userRole = userInfo?.role;
       
@@ -584,40 +697,113 @@ function InventoryManagement() {
           imageFile: formData.imageFile || null // 이미지 파일 추가
         };
         
-        console.log('상품 등록 데이터:', productData);
-        console.log('이미지 파일:', formData.imageFile);
-        
-        const productResponse = await inventoryService.createProduct(productData);
-        
-        console.log('상품 등록 응답:', productResponse);
+        const productResponse = await inventoryService.createProduct(productData, null);
         
         // 등록된 상품의 ID 추출 (ResponseDto 구조 고려)
         const responseData = productResponse.data?.data || productResponse.data;
         const productId = responseData?.productId;
         
         if (productId) {
-          // 본사 지점에 재고 추가 (초기 재고 0)
-          // 판매가가 있으면 판매가를 price로 사용, 없으면 공급가 사용
-          const price = formData.sellingPrice ? parseInt(formData.sellingPrice) : (formData.supplyPrice || 0);
-          await inventoryService.createBranchProduct({
-            productId: productId,
-            branchId: userInfo.branchId || 1, // 본사 branchId
-            serialNumber: `HQ-${productId}-${Date.now()}`,
-            stockQuantity: 0,
-            safetyStock: 0,
-            price: price
-          });
-          
-          // 선택한 속성 값들을 상품에 연결
+          // 선택한 속성 값들을 상품에 연결 (먼저 연결)
           if (formData.attributeValueIds && formData.attributeValueIds.length > 0) {
             try {
               await inventoryService.addProductAttributeValues(productId, formData.attributeValueIds);
-              console.log('상품 속성 값 등록 완료');
             } catch (attrError) {
-              console.error('상품 속성 값 등록 실패:', attrError);
               // 속성 값 등록 실패해도 상품은 등록됨 (경고만 표시)
               alert('상품은 등록되었지만 속성 값 등록에 실패했습니다.');
             }
+          }
+          
+          // 본사 지점에 재고 추가 (초기 재고 0)
+          // 판매가가 있으면 판매가를 price로 사용, 없으면 공급가 사용
+          const price = formData.sellingPrice ? parseInt(formData.sellingPrice) : (formData.supplyPrice || 0);
+          
+          // 선택한 속성 값이 있으면 하나의 BranchProduct만 생성
+          // 백엔드에서는 하나의 attributeValueId만 받으므로,
+          // 여러 속성 중 displayOrder가 더 큰(두 번째) 속성 값을 사용
+          if (formData.attributeValueIds && formData.attributeValueIds.length > 0) {
+            // 카테고리 속성 정보를 가져와서 displayOrder 기준으로 정렬
+            let selectedAttributeValueId = null;
+            
+            try {
+              const categoryAttributes = await inventoryService.getCategoryAttributes(formData.category);
+              
+              // 선택된 속성 값들을 속성 타입별로 매핑
+              const attributeValueMap = new Map(); // attributeValueId -> attributeType 정보
+              
+              if (Array.isArray(categoryAttributes) && categoryAttributes.length > 0) {
+                categoryAttributes.forEach(attr => {
+                  const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id || '');
+                  const displayOrder = attr.displayOrder || 0;
+                  const availableValues = attr.availableValues || [];
+                  
+                  availableValues.forEach(val => {
+                    const valueId = String(val.id || val.attributeValueId || '');
+                    if (formData.attributeValueIds.includes(Number(valueId)) || 
+                        formData.attributeValueIds.includes(valueId)) {
+                      attributeValueMap.set(valueId, {
+                        attributeValueId: valueId,
+                        attributeTypeId: typeId,
+                        displayOrder: displayOrder
+                      });
+                    }
+                  });
+                });
+                
+                // displayOrder가 더 큰 속성 값을 선택 (두 번째 속성)
+                const sortedAttributes = Array.from(attributeValueMap.values())
+                  .sort((a, b) => (b.displayOrder || 0) - (a.displayOrder || 0));
+                
+                if (sortedAttributes.length > 0) {
+                  // displayOrder가 가장 큰 속성 값 사용 (두 번째 속성)
+                  selectedAttributeValueId = Number(sortedAttributes[0].attributeValueId);
+                } else {
+                  // 매핑 실패 시 마지막 속성 값 사용
+                  selectedAttributeValueId = formData.attributeValueIds[formData.attributeValueIds.length - 1];
+                }
+              } else {
+                // 카테고리 속성 정보가 없으면 마지막 속성 값 사용
+                selectedAttributeValueId = formData.attributeValueIds[formData.attributeValueIds.length - 1];
+              }
+            } catch (err) {
+              // 실패 시 마지막 속성 값 사용
+              selectedAttributeValueId = formData.attributeValueIds[formData.attributeValueIds.length - 1];
+            }
+            
+            // 본점(branchId: 1)에만 BranchProduct 생성
+            // 선택한 속성 값들에 대해 각각 BranchProduct 생성 (최대 2개 속성 조합)
+            // 실제로는 각 속성 값 조합별로 하나의 BranchProduct만 생성
+            try {
+              // 본점에만 등록 (branchId: 1로 고정) - 절대 다른 지점에 등록하지 않음
+              const branchProductData = {
+                productId: productId,
+                branchId: 1, // 본점에만 등록 (고정) - 다른 지점에는 등록하지 않음
+                serialNumber: `HQ-${productId}-${Date.now()}-${selectedAttributeValueId}`,
+                stockQuantity: 0,
+                safetyStock: 0,
+                price: price,
+                attributeValueId: selectedAttributeValueId
+              };
+              
+              await inventoryService.createBranchProduct(branchProductData);
+            } catch (bpError) {
+              // 이미 존재하는 속성 조합인 경우 무시 (중복 등록 방지)
+              if (bpError.response?.status !== 400 && bpError.response?.status !== 409) {
+                throw bpError;
+              }
+            }
+          } else {
+            // 속성 값이 없으면 본점에만 생성
+            const branchProductData = {
+              productId: productId,
+              branchId: 1, // 본점에만 등록 (고정) - 다른 지점에는 등록하지 않음
+              serialNumber: `HQ-${productId}-${Date.now()}`,
+              stockQuantity: 0,
+              safetyStock: 0,
+              price: price
+            };
+            
+            await inventoryService.createBranchProduct(branchProductData);
           }
         }
         
@@ -636,7 +822,6 @@ function InventoryManagement() {
       
       // 데이터 새로고침 (이미 위에서 fetchInventoryData 호출됨)
     } catch (err) {
-      console.error('등록 실패:', err);
       // API 에러 시에만 alert 표시 (유효성 검사는 이미 처리됨)
       if (err.response) {
         alert('등록에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
@@ -658,21 +843,14 @@ function InventoryManagement() {
   const handleDelete = async (item) => {
     if (window.confirm(`'${item.product.name}' 상품을 삭제하시겠습니까?\n\n주의: 삭제된 상품은 복구할 수 없습니다.`)) {
       try {
-        console.log('삭제할 상품:', item);
-        console.log('상품 ID:', item.product.id);
-        
         // 상품 삭제 API 호출
-        const response = await inventoryService.deleteProduct(item.product.id);
-        console.log('삭제 API 응답:', response);
+        await inventoryService.deleteProduct(item.product.id);
         
         alert('상품이 성공적으로 삭제되었습니다.');
         
         // 데이터 새로고침
         await fetchInventoryData();
       } catch (err) {
-        console.error('상품 삭제 실패:', err);
-        console.error('에러 상세:', err.response);
-        
         let errorMessage = '상품 삭제에 실패했습니다.';
         if (err.response?.data?.status_message) {
           errorMessage += '\n' + err.response.data.status_message;
@@ -697,8 +875,6 @@ function InventoryManagement() {
 
   const handleSaveModal = async (formData) => {
     try {
-      console.log('Saving inventory data:', formData);
-      
       const productId = formData.productId || selectedItem?.product?.id;
       const branchProductId = selectedItem?.branchProductId || selectedItem?.id;
       
@@ -725,10 +901,7 @@ function InventoryManagement() {
             imageFile: imageFileToSend,
             imageUrl: imageUrlToSend
           });
-          
-          console.log('상품 정보가 성공적으로 수정되었습니다.');
         } catch (err) {
-          console.error('상품 정보 수정 실패:', err);
           alert('상품 정보 수정에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
           return;
         }
@@ -738,9 +911,7 @@ function InventoryManagement() {
       if (productId && formData.attributeValueIds !== undefined) {
         try {
           await inventoryService.updateProductAttributeValues(productId, formData.attributeValueIds);
-          console.log('상품 속성 값 업데이트 완료');
         } catch (attrError) {
-          console.error('상품 속성 값 업데이트 실패:', attrError);
           alert('상품 속성 값 업데이트에 실패했습니다.');
         }
       }
@@ -773,7 +944,7 @@ function InventoryManagement() {
               imageUrl: existingProduct.imageUrl
             });
           } catch (err) {
-            console.error('공급가 업데이트 실패:', err);
+            // 공급가 업데이트 실패 시 무시
           }
         }
         
@@ -784,7 +955,6 @@ function InventoryManagement() {
         fetchInventoryData();
       }
     } catch (err) {
-      console.error('재고 수정 실패:', err);
       alert('재고 수정에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
     }
   };
@@ -807,7 +977,6 @@ function InventoryManagement() {
       const branchId = 1; // 본점
       
       const branchProductsData = await inventoryService.getBranchProducts(branchId);
-      console.log('입출고 기록 등록 - 본점 재고 데이터:', branchProductsData);
       
       // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환 (사이즈 정보 포함)
       const formattedBranchProducts = (branchProductsData.data || branchProductsData || []).map(item => {
@@ -827,12 +996,9 @@ function InventoryManagement() {
         };
       });
       
-      console.log('입출고 기록 등록 - 변환된 상품 목록:', formattedBranchProducts);
-      
       setBranchProducts(formattedBranchProducts);
       setIsFlowAddModalOpen(true);
     } catch (err) {
-      console.error('상품 목록 조회 실패:', err);
       alert('상품 목록을 불러오는데 실패했습니다: ' + (err.response?.data?.status_message || err.message));
     }
   };
@@ -849,7 +1015,6 @@ function InventoryManagement() {
       fetchInventoryFlowData(); // 목록 새로고침
       fetchInventoryData(); // 재고도 새로고침
     } catch (err) {
-      console.error('입출고 기록 등록 실패:', err);
       alert('입출고 기록 등록에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
     }
   };
@@ -866,21 +1031,18 @@ function InventoryManagement() {
 
   const handleFlowSaveEditModal = async (formData) => {
     try {
-      console.log('수정할 아이템:', selectedFlowItem); // 디버깅용
       await inventoryService.updateInventoryFlow(selectedFlowItem.flowId || selectedFlowItem.id, formData);
       alert('입출고 기록이 성공적으로 수정되었습니다.');
       handleFlowCloseEditModal();
       fetchInventoryFlowData(); // 목록 새로고침
       fetchInventoryData(); // 재고도 새로고침
     } catch (err) {
-      console.error('입출고 기록 수정 실패:', err);
       alert('입출고 기록 수정에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
     }
   };
 
   const handleFlowDelete = async (item) => {
     try {
-      console.log('삭제할 아이템:', item); // 디버깅용
       await inventoryService.deleteInventoryFlow(item.flowId || item.id);
       alert('입출고 기록이 성공적으로 삭제되었습니다.');
       
@@ -894,7 +1056,6 @@ function InventoryManagement() {
       }
       
     } catch (err) {
-      console.error('입출고 기록 삭제 실패:', err);
       alert('입출고 기록 삭제에 실패했습니다: ' + (err.response?.data?.status_message || err.message));
     }
   };
@@ -918,9 +1079,48 @@ function InventoryManagement() {
       const matchesCategory = filters.categoryFilter === '' ||
         (item.category && item.category.includes(filters.categoryFilter));
       
-      const matchesBranch = filters.branchFilter === '' || 
-        item.branch === filters.branchFilter ||
-        (filters.branchFilter === '본점' && (item.branch === '본점' || item.branch === '본사' || item.branchId === 1));
+      // 지점 필터: branchId 기준으로 정확히 매칭
+      let matchesBranch = true;
+      if (filters.branchFilter !== '') {
+        // branchList에서 선택한 지점 이름에 해당하는 branchId 찾기
+        const selectedBranch = branchList.find(b => {
+          const branchName = b.name || '';
+          const filterName = filters.branchFilter || '';
+          // 정확한 이름 일치 또는 본점인 경우
+          return branchName === filterName || 
+                 branchName.trim() === filterName.trim() ||
+                 (filterName === '본점' && (branchName === '본점' || branchName === '본사' || b.id === 1)) ||
+                 (filterName === '본사' && (branchName === '본점' || branchName === '본사' || b.id === 1));
+        });
+        
+        if (selectedBranch) {
+          const selectedBranchId = selectedBranch.id;
+          
+          // 본점 필터인 경우: 본점에 실제 재고가 있는 상품만 표시
+          if (selectedBranchId === 1 || selectedBranchId === '1') {
+            // 본점 필터에서는 본점에 실제로 재고가 있는 상품만 표시 (item.branchId === 1)
+            const itemBranchId = typeof item.branchId === 'string' ? Number(item.branchId) : item.branchId;
+            matchesBranch = itemBranchId === 1;
+          } else {
+            // 다른 지점 필터인 경우: 해당 지점의 재고만 표시
+            // branchId를 숫자와 문자열 모두 비교 (타입 불일치 문제 해결)
+            const itemBranchId = typeof item.branchId === 'string' ? Number(item.branchId) : item.branchId;
+            const targetBranchId = typeof selectedBranchId === 'string' ? Number(selectedBranchId) : selectedBranchId;
+            matchesBranch = itemBranchId === targetBranchId;
+          }
+        } else {
+          // branchList에서 찾지 못한 경우 이름으로 비교 (fallback)
+          if (filters.branchFilter === '본점' || filters.branchFilter === '본사') {
+            // 본점 필터 fallback: 본점에 실제 재고가 있는 상품만 표시
+            const itemBranchId = typeof item.branchId === 'string' ? Number(item.branchId) : item.branchId;
+            matchesBranch = itemBranchId === 1;
+          } else {
+            // 이름으로 직접 비교 (fallback)
+            matchesBranch = item.branch === filters.branchFilter || 
+                           (item.branch && item.branch.trim() === filters.branchFilter.trim());
+          }
+        }
+      }
       
       const matchesStatus = filters.statusFilter === '' ||
         item.status === filters.statusFilter;
@@ -977,7 +1177,7 @@ function InventoryManagement() {
     }
 
     return filtered;
-  }, [inventoryData, filters, inventorySort]);
+  }, [inventoryData, filters, inventorySort, branchList]);
 
   // 필터된 데이터 기준으로 Summary 계산
   const filteredSummary = useMemo(() => {

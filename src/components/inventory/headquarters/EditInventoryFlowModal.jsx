@@ -16,12 +16,13 @@ const ModalOverlay = styled.div`
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: 8px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 28px;
   width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
+  max-width: 520px;
+  max-height: 85vh;
   overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 `;
 
 const ModalHeader = styled.div`
@@ -32,9 +33,9 @@ const ModalHeader = styled.div`
 `;
 
 const ModalTitle = styled.h2`
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
   margin: 0;
 `;
 
@@ -51,7 +52,7 @@ const CloseButton = styled.button`
 `;
 
 const FormGroup = styled.div`
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 `;
 
 const Label = styled.label`
@@ -136,19 +137,82 @@ const Button = styled.button`
 
 const ReadOnlyInfo = styled.div`
   background: #f9fafb;
-  padding: 12px;
-  border-radius: 6px;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  border: 1px solid #e5e7eb;
+`;
+
+const InfoSection = styled.div`
   margin-bottom: 16px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
 `;
 
-const ReadOnlyLabel = styled.div`
-  font-size: 12px;
+const InfoRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const InfoLabel = styled.span`
+  font-size: 13px;
+  font-weight: 600;
   color: #6b7280;
-  margin-bottom: 4px;
+  min-width: 70px;
+  margin-right: 8px;
 `;
 
-const ReadOnlyValue = styled.div`
+const InfoValue = styled.span`
   font-size: 14px;
+  color: #1f2937;
+  font-weight: 500;
+  flex: 1;
+`;
+
+const AttributeSection = styled.div`
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+`;
+
+const AttributeTitle = styled.div`
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+`;
+
+const AttributeList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const AttributeItem = styled.div`
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #374151;
+  padding: 6px 0;
+`;
+
+const AttributeLabel = styled.span`
+  font-weight: 600;
+  color: #6b7280;
+  margin-right: 8px;
+  min-width: 50px;
+`;
+
+const AttributeValue = styled.span`
   color: #1f2937;
   font-weight: 500;
 `;
@@ -188,7 +252,7 @@ function EditInventoryFlowModal({ isOpen, onClose, item, onSave }) {
       });
       onClose();
     } catch (error) {
-      console.error('입출고 기록 수정 실패:', error);
+      // 에러 처리
     } finally {
       setLoading(false);
     }
@@ -211,14 +275,57 @@ function EditInventoryFlowModal({ isOpen, onClose, item, onSave }) {
       ),
       React.createElement('form', { onSubmit: handleSubmit },
         React.createElement(ReadOnlyInfo, null,
-          React.createElement(ReadOnlyLabel, null, '상품명'),
-          React.createElement(ReadOnlyValue, null, item.productName || '-'),
-          item.attributeValueName && React.createElement(React.Fragment, null,
-            React.createElement(ReadOnlyLabel, { style: { marginTop: '8px' } }, '속성'),
-            React.createElement(ReadOnlyValue, null, `${item.attributeTypeName || ''} ${item.attributeValueName}`)
+          React.createElement(InfoSection, null,
+            React.createElement(InfoRow, null,
+              React.createElement(InfoLabel, null, '상품명'),
+              React.createElement(InfoValue, null, item.productName || '-')
+            ),
+            React.createElement(InfoRow, null,
+              React.createElement(InfoLabel, null, '지점'),
+              React.createElement(InfoValue, null, item.branchId === 1 ? '본점' : `지점-${item.branchId}`)
+            )
           ),
-          React.createElement(ReadOnlyLabel, { style: { marginTop: '8px' } }, '지점'),
-          React.createElement(ReadOnlyValue, null, item.branchId === 1 ? '본점' : `지점-${item.branchId}`)
+          (() => {
+            // 속성 정보 배열로 변환 (최대 2개)
+            const attributes = [];
+            
+            // item.attributes가 배열인 경우
+            if (Array.isArray(item.attributes)) {
+              attributes.push(...item.attributes.slice(0, 2));
+            } 
+            // 단일 속성 정보가 있는 경우
+            else if (item.attributeTypeName && item.attributeValueName) {
+              attributes.push({
+                attributeTypeName: item.attributeTypeName,
+                attributeValueName: item.attributeValueName
+              });
+            }
+            
+            const option1 = attributes[0];
+            const option2 = attributes[1];
+            
+            if (!option1 && !option2) {
+              return null;
+            }
+            
+            return React.createElement(AttributeSection, null,
+              React.createElement(AttributeTitle, null, '속성'),
+              React.createElement(AttributeList, null,
+                option1 && React.createElement(AttributeItem, null,
+                  React.createElement(AttributeLabel, null, '옵션1'),
+                  React.createElement(AttributeValue, null, 
+                    `${option1.attributeTypeName || '-'} ${option1.attributeValueName || ''}`.trim()
+                  )
+                ),
+                option2 && React.createElement(AttributeItem, null,
+                  React.createElement(AttributeLabel, null, '옵션2'),
+                  React.createElement(AttributeValue, null, 
+                    `${option2.attributeTypeName || '-'} ${option2.attributeValueName || ''}`.trim()
+                  )
+                )
+              )
+            );
+          })()
         ),
         React.createElement(FormGroup, null,
           React.createElement(Label, null, '입고수량'),

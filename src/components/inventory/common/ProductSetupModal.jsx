@@ -154,6 +154,75 @@ const AddButton = styled.button`
   }
 `;
 
+const AttributeSection = styled.div`
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+`;
+
+const AttributeTitle = styled.div`
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+`;
+
+const AttributeList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const AttributeItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const AttributeTypeName = styled.div`
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 4px;
+  
+  .required {
+    color: #ef4444;
+  }
+`;
+
+const AttributeValueList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const RadioWrapper = styled.label`
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  transition: all 0.2s;
+  
+  &:hover {
+    border-color: #6b46c1;
+    background: #f3f4f6;
+  }
+  
+  input[type="radio"] {
+    margin-right: 6px;
+  }
+  
+  &:has(input[type="radio"]:checked) {
+    border-color: #6b46c1;
+    background: #ede9fe;
+  }
+`;
+
 function ProductSetupModal({ isOpen, onClose, product, onSave }) {
   const [formData, setFormData] = useState({
     serialNumber: '',
@@ -165,8 +234,10 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
 
   const [productInfo, setProductInfo] = useState({
     minPrice: 0,
-    maxPrice: 0
+    maxPrice: 0,
+    categoryId: null
   });
+
 
   useEffect(() => {
     if (product && isOpen && product.productId) {
@@ -174,23 +245,33 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
         serialNumber: `BR-${product.productId}-${Date.now()}`,
         stockQuantity: 0,
         safetyStock: 0,
-        supplyPrice: product.price || product.supplyPrice || 0,
+        supplyPrice: 0, // fetchProductDetails에서 Product의 supplyPrice로 설정됨
         sellingPrice: 0
       });
 
-      // 상품 상세 정보 가져오기 (최저가격, 최고가격)
+      // 상품 상세 정보 가져오기 (공급가, 최저가격, 최고가격, 카테고리)
       const fetchProductDetails = async () => {
         try {
           const response = await inventoryService.getProduct(product.productId);
           const productData = response.data?.data || response.data;
           
+          // 공급가는 Product의 supplyPrice (본사 -> 가맹점 공급가)
+          const supplyPrice = productData?.supplyPrice || product?.supplyPrice || 0;
           const minPrice = productData?.minPrice || product?.minPrice || 0;
           const maxPrice = productData?.maxPrice || product?.maxPrice || 0;
+          const categoryId = productData?.categoryId || productData?.category?.categoryId || product?.categoryId || null;
           
           setProductInfo({
             minPrice: minPrice,
-            maxPrice: maxPrice
+            maxPrice: maxPrice,
+            categoryId: categoryId
           });
+          
+          // 공급가 설정
+          setFormData(prev => ({
+            ...prev,
+            supplyPrice: supplyPrice
+          }));
           
           // 판매가를 최대가격으로 초기 설정
           if (maxPrice > 0) {
@@ -202,13 +283,22 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
         } catch (err) {
           console.error('상품 상세 정보 조회 실패:', err);
           // product prop에서 직접 가져오기
+          const supplyPrice = product?.supplyPrice || 0;
           const minPrice = product?.minPrice || 0;
           const maxPrice = product?.maxPrice || 0;
+          const categoryId = product?.categoryId || null;
           
           setProductInfo({
             minPrice: minPrice,
-            maxPrice: maxPrice
+            maxPrice: maxPrice,
+            categoryId: categoryId
           });
+          
+          // 공급가 설정
+          setFormData(prev => ({
+            ...prev,
+            supplyPrice: supplyPrice
+          }));
           
           // 판매가를 최대가격으로 초기 설정
           if (maxPrice > 0) {
@@ -247,13 +337,14 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
       }
     }
 
+    // 선택된 속성 값 ID는 product에서 가져옴 (ProductSelectionModal에서 이미 선택됨)
     onSave({
       productId: product.productId,
       serialNumber: formData.serialNumber,
       stockQuantity: 0,
       safetyStock: parseInt(formData.safetyStock),
-      price: formData.sellingPrice ? parseInt(formData.sellingPrice) : parseInt(formData.supplyPrice),  // 판매가를 price로 매핑 (판매가가 없으면 공급가 사용)
-      sellingPrice: formData.sellingPrice ? parseInt(formData.sellingPrice) : null
+      sellingPrice: formData.sellingPrice ? parseInt(formData.sellingPrice) : null,  // 판매가만 전달
+      attributeValueId: product.attributeValueId || null  // ProductSelectionModal에서 선택한 속성 값 ID
     });
     
     handleClose();
@@ -269,7 +360,8 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
     });
     setProductInfo({
       minPrice: 0,
-      maxPrice: 0
+      maxPrice: 0,
+      categoryId: null
     });
     onClose();
   };
@@ -286,6 +378,9 @@ function ProductSetupModal({ isOpen, onClose, product, onSave }) {
         React.createElement(ProductInfo, null,
           React.createElement(ProductName, null, product.productName || '알 수 없음'),
           React.createElement(ProductDetails, null, `카테고리: ${product.categoryName || '미분류'}`),
+          product.attributeDisplay && React.createElement(ProductDetails, { 
+            style: { color: '#6b46c1', fontWeight: '500' } 
+          }, `속성: ${product.attributeDisplay}`),
           React.createElement(ProductDetails, null, `설명: ${product.productDescription || '-'}`)
         ),
         React.createElement(FormGroup, null,

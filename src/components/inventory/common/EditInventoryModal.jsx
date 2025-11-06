@@ -458,14 +458,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   
   // 속성 관련 상태
   const [categoryAttributes, setCategoryAttributes] = useState([]);
-  const [selectedAttributeValues, setSelectedAttributeValues] = useState([]);
+  const [selectedAttributeValues, setSelectedAttributeValues] = useState({});
   const [loadingAttributes, setLoadingAttributes] = useState(false);
   
   // 속성 값 추가 모달 상태
   const [valueModalOpen, setValueModalOpen] = useState(false);
   const [selectedAttributeType, setSelectedAttributeType] = useState(null);
   const [valueForm, setValueForm] = useState({
-    value: '',
     displayName: '',
     displayOrder: 0
   });
@@ -560,7 +559,9 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           const categoryId = productData?.categoryId || productData?.category?.categoryId;
           if (categoryId) {
             await fetchCategoryAttributes(categoryId);
-            await fetchProductAttributeValues(productId);
+            setTimeout(async () => {
+              await fetchProductAttributeValues(productId);
+            }, 100);
           }
         } catch (err) {
           console.error('상품 정보 조회 실패:', err);
@@ -574,6 +575,13 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
       setRemoveImage(false);
     }
   }, [item, isOpen]);
+
+  // 카테고리 속성이 로드된 후 기존 속성 값 다시 매핑
+  useEffect(() => {
+    if (categoryAttributes.length > 0 && item?.product?.id && isOpen) {
+      fetchProductAttributeValues(item.product.id);
+    }
+  }, [categoryAttributes, item?.product?.id, isOpen]);
 
   // 카테고리 변경 시 속성 타입 조회
   useEffect(() => {
@@ -639,24 +647,58 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
       console.log('상품 속성 값 API 응답:', data);
       
       if (Array.isArray(data) && data.length > 0) {
-        const existingIds = data.map(av => av.attributeValueId || av.id).filter(Boolean);
-        setSelectedAttributeValues(existingIds);
+        // 속성 타입별로 그룹화하여 각 타입당 하나만 선택 (첫 번째 값 사용)
+        const selectedByType = {};
+        data.forEach(av => {
+          // attributeTypeId를 우선 사용, 없으면 categoryAttributes에서 찾기
+          let typeId = av.attributeTypeId;
+          
+          // attributeTypeId가 없으면 categoryAttributes에서 attributeTypeName으로 찾기
+          if (!typeId && av.attributeTypeName && categoryAttributes.length > 0) {
+            const matchedAttr = categoryAttributes.find(ca => 
+              (ca.attributeTypeName || ca.attributeType?.name) === av.attributeTypeName
+            );
+            if (matchedAttr) {
+              typeId = matchedAttr.attributeTypeId || matchedAttr.attributeType?.id || matchedAttr.id;
+            }
+          }
+          
+          const valueId = av.attributeValueId || av.id;
+          if (typeId && valueId) {
+            const typeIdStr = String(typeId);
+            // 같은 타입의 값이 이미 있으면 첫 번째 것만 사용 (또는 마지막 것 사용)
+            if (!selectedByType[typeIdStr]) {
+              selectedByType[typeIdStr] = valueId;
+            }
+          }
+        });
+        console.log('선택된 속성 값 (타입별):', selectedByType);
+        setSelectedAttributeValues(selectedByType);
       } else {
-        setSelectedAttributeValues([]);
+        setSelectedAttributeValues({});
       }
     } catch (error) {
       console.error('상품 속성 값 조회 실패:', error);
-      setSelectedAttributeValues([]);
+      setSelectedAttributeValues({});
     }
   };
 
-  // 속성 값 선택/해제 핸들러
-  const handleAttributeValueToggle = (attributeValueId) => {
+  // 속성 값 선택/해제 핸들러 (속성 타입별로 하나만 선택 가능)
+  const handleAttributeValueToggle = (attributeTypeId, attributeValueId) => {
     setSelectedAttributeValues(prev => {
-      if (prev.includes(attributeValueId)) {
-        return prev.filter(id => id !== attributeValueId);
+      const typeId = String(attributeTypeId);
+      // 같은 속성 타입의 다른 값이 선택되어 있으면 교체, 없으면 추가
+      if (prev[typeId] === attributeValueId) {
+        // 이미 선택된 경우 제거 (선택 해제)
+        const newState = { ...prev };
+        delete newState[typeId];
+        return newState;
       } else {
-        return [...prev, attributeValueId];
+        // 새로운 값 선택 (같은 타입의 기존 값은 자동으로 교체됨)
+        return {
+          ...prev,
+          [typeId]: attributeValueId
+        };
       }
     });
   };
@@ -665,7 +707,6 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   const openAddValueModal = (categoryAttr) => {
     setSelectedAttributeType(categoryAttr);
     setValueForm({
-      value: '',
       displayName: '',
       displayOrder: categoryAttr.availableValues?.length || 0
     });
@@ -677,7 +718,6 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     setValueModalOpen(false);
     setSelectedAttributeType(null);
     setValueForm({
-      value: '',
       displayName: '',
       displayOrder: 0
     });
@@ -805,14 +845,9 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
   // 속성 값 추가 핸들러
   const handleAddAttributeValue = async (e) => {
     e.preventDefault();
-    
-    if (!valueForm.value || valueForm.value.trim() === '') {
-      alert('값을 입력해주세요.');
-      return;
-    }
 
     if (!valueForm.displayName || valueForm.displayName.trim() === '') {
-      alert('표시명을 입력해주세요.');
+      alert('속성 값을 입력해주세요.');
       return;
     }
 
@@ -825,10 +860,10 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
         return;
       }
 
+      const displayName = valueForm.displayName.trim();
       const newValue = await inventoryService.createAttributeValue({
         attributeTypeId: attributeTypeId,
-        value: valueForm.value.trim(),
-        displayName: valueForm.displayName.trim(),
+        displayName: displayName,
         displayOrder: valueForm.displayOrder || 0,
         isActive: true
       });
@@ -838,7 +873,12 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
       // 새로 추가된 속성 값을 선택 목록에 추가
       const newValueId = newValue.id || newValue.attributeValueId;
       if (newValueId) {
-        setSelectedAttributeValues(prev => [...prev, newValueId]);
+        // 새로 추가된 속성 값을 해당 속성 타입에 자동 선택
+        const typeId = String(selectedAttributeType.attributeTypeId || selectedAttributeType.attributeType?.id || selectedAttributeType.id);
+        setSelectedAttributeValues(prev => ({
+          ...prev,
+          [typeId]: newValueId
+        }));
       }
 
       // 속성 목록 다시 로드 (with-values로 다시 조회)
@@ -999,24 +1039,25 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     // 필수 속성 검증
     for (const categoryAttr of categoryAttributes) {
       if (categoryAttr.isRequired) {
-        const activeValues = categoryAttr.availableValues?.filter(av => av.isActive !== false) || [];
-        const hasSelectedValue = selectedAttributeValues.some(id => 
-          activeValues.some(av => (av.id || av.attributeValueId) === id)
-        );
+        const typeId = String(categoryAttr.attributeTypeId || categoryAttr.attributeType?.id || categoryAttr.id);
+        const hasSelectedValue = selectedAttributeValues[typeId] != null;
         
         if (!hasSelectedValue) {
-          alert(`'${categoryAttr.attributeTypeName || categoryAttr.attributeType?.name}' 속성은 필수입니다. 최소 1개를 선택해주세요.`);
+          alert(`'${categoryAttr.attributeTypeName || categoryAttr.attributeType?.name}' 속성은 필수입니다. 1개를 선택해주세요.`);
           return;
         }
       }
     }
+    
+    // selectedAttributeValues 객체를 배열로 변환
+    const attributeValueIds = Object.values(selectedAttributeValues).filter(id => id != null);
     
     onSave({
       ...formData,
       imageFile: imageFile || null,
       removeImage: removeImage,
       productId: item.product?.id,
-      attributeValueIds: selectedAttributeValues.length > 0 ? selectedAttributeValues : [] // 선택한 속성 값 ID들 (없어도 됨)
+      attributeValueIds: attributeValueIds // 선택한 속성 값 ID들 (속성 타입별로 하나씩)
     });
   };
 
@@ -1145,9 +1186,9 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               React.createElement(React.Fragment, null,
                 categoryAttributes.length > 0 ? categoryAttributes.map(categoryAttr => {
               const activeValues = categoryAttr.availableValues?.filter(av => av.isActive !== false) || [];
-              const hasSelectedValue = selectedAttributeValues.some(id => 
-                activeValues.some(av => (av.id || av.attributeValueId) === id)
-              );
+              const typeId = String(categoryAttr.attributeTypeId || categoryAttr.attributeType?.id || categoryAttr.id);
+              const selectedValueId = selectedAttributeValues[typeId];
+              const hasSelectedValue = selectedValueId != null;
               
               return React.createElement(AttributeSection, { key: categoryAttr.id || categoryAttr.categoryAttributeId },
                 React.createElement(AttributeTypeTitle, null,
@@ -1157,22 +1198,25 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
                 loadingAttributes ? React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '속성 로딩 중...') :
                 React.createElement(React.Fragment, null,
                   activeValues.length > 0 ? React.createElement(AttributeValueList, null,
-                    activeValues.map(attrValue => 
-                      React.createElement(CheckboxWrapper, {
-                        key: attrValue.id || attrValue.attributeValueId,
+                    activeValues.map(attrValue => {
+                      const valueId = attrValue.id || attrValue.attributeValueId;
+                      const isSelected = selectedValueId === valueId;
+                      return React.createElement(CheckboxWrapper, {
+                        key: valueId,
                         style: {
-                          borderColor: selectedAttributeValues.includes(attrValue.id || attrValue.attributeValueId) ? '#6b46c1' : '#d1d5db',
-                          background: selectedAttributeValues.includes(attrValue.id || attrValue.attributeValueId) ? '#ede9fe' : '#ffffff'
+                          borderColor: isSelected ? '#6b46c1' : '#d1d5db',
+                          background: isSelected ? '#ede9fe' : '#ffffff'
                         }
                       },
                         React.createElement('input', {
-                          type: 'checkbox',
-                          checked: selectedAttributeValues.includes(attrValue.id || attrValue.attributeValueId),
-                          onChange: () => handleAttributeValueToggle(attrValue.id || attrValue.attributeValueId)
+                          type: 'radio',
+                          name: `attribute-${typeId}`, // 같은 속성 타입끼리 같은 name을 가져서 하나만 선택됨
+                          checked: isSelected,
+                          onChange: () => handleAttributeValueToggle(typeId, valueId)
                         }),
-                        React.createElement('span', null, attrValue.displayName || attrValue.value)
-                      )
-                    )
+                        React.createElement('span', null, attrValue.displayName || '-')
+                      );
+                    })
                   ) : React.createElement(AttributeInfo, null, '등록된 속성 값이 없습니다. 아래 버튼을 클릭하여 추가하세요.'),
                   React.createElement(AddValueButton, {
                     type: 'button',
@@ -1384,34 +1428,18 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
           React.createElement('form', { onSubmit: handleAddAttributeValue },
             React.createElement(ValueFormGroup, null,
               React.createElement(ValueLabel, null,
-                '값 ',
-                React.createElement('span', { className: 'required' }, '*')
-              ),
-              React.createElement(ValueInput, {
-                type: 'text',
-                value: valueForm.value,
-                onChange: (e) => setValueForm({ ...valueForm, value: e.target.value }),
-                placeholder: '예: red, small, cotton',
-                required: true
-              }),
-              React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
-                '시스템에서 사용하는 실제 값 (영문 권장)'
-              )
-            ),
-            React.createElement(ValueFormGroup, null,
-              React.createElement(ValueLabel, null,
-                '표시명 ',
+                '속성 값 ',
                 React.createElement('span', { className: 'required' }, '*')
               ),
               React.createElement(ValueInput, {
                 type: 'text',
                 value: valueForm.displayName,
                 onChange: (e) => setValueForm({ ...valueForm, displayName: e.target.value }),
-                placeholder: '예: 빨강, S, 면',
+                placeholder: '예: 빨강, S, 면, Red, Small',
                 required: true
               }),
               React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
-                '사용자에게 표시되는 이름'
+                '사용자에게 표시되는 속성 값 이름'
               )
             ),
             React.createElement(ValueFormGroup, null,

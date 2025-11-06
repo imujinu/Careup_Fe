@@ -226,6 +226,10 @@ function FranchiseInventoryTable({
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.category)
           }, '카테고리', getSortIndicator(SORTABLE_COLUMNS.category)),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션2'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명2'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             $center: true,
@@ -253,14 +257,23 @@ function FranchiseInventoryTable({
         )
       ),
       React.createElement(TableBody, null,
-        data.map((item, index) =>
-          React.createElement(TableRow, { key: index },
+        data.map((item, index) => {
+          // 속성 정보 추출 (최대 2개)
+          const attributes = item.attributes || [];
+          const option1 = attributes[0] || null;
+          const option2 = attributes[1] || null;
+          
+          return React.createElement(TableRow, { key: index },
             React.createElement(TableCell, { $productName: true },
               React.createElement(ProductInfo, null,
                 React.createElement(ProductName, null, item.product.name)
               )
             ),
             React.createElement(TableCell, { $category: true }, item.category || '미분류'),
+            React.createElement(TableCell, { $center: true }, option1?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true }, option1?.attributeValueName || '-'),
+            React.createElement(TableCell, { $center: true }, option2?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true }, option2?.attributeValueName || '-'),
             React.createElement(TableCell, { $center: true }, `${item.currentStock}개`),
             React.createElement(TableCell, { $center: true }, `${item.safetyStock}개`),
             React.createElement(TableCell, { $center: true },
@@ -278,8 +291,8 @@ function FranchiseInventoryTable({
                 React.createElement(DeleteLink, { onClick: () => onDelete(item) }, '삭제')
               )
             )
-          )
-        )
+          );
+        })
       )
     ),
     React.createElement(PaginationContainer, null,
