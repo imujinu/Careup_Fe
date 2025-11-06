@@ -51,6 +51,7 @@ function transformNotificationFromAPI(apiData) {
     time: timeStr,
     eventType: eventName,
     rawData: apiData,
+    isRead: apiData?.isRead || apiData?.read || false,
   };
 }
 
@@ -129,6 +130,7 @@ const alertsSlice = createSlice({
           time: timeStr,
           eventType: eventName,
           rawData: data, // 원본 데이터 저장
+          isRead: false,
         };
         
         // 최신 알림을 맨 앞에 추가
@@ -147,6 +149,15 @@ const alertsSlice = createSlice({
       state.notifications = state.notifications.filter(
         (n) => n.id !== action.payload
       );
+    },
+    // 알림 읽음 처리 (삭제하지 않고 읽음 상태만 변경)
+    markNotificationAsRead: (state, action) => {
+      const notification = state.notifications.find(
+        (n) => n.id === action.payload
+      );
+      if (notification) {
+        notification.isRead = true;
+      }
     },
     // 모든 알림 제거
     clearNotifications: (state) => {
@@ -239,6 +250,7 @@ export const {
   closeAlerts,
   addNotification,
   removeNotification,
+  markNotificationAsRead,
   clearNotifications,
   setNotifications,
 } = alertsSlice.actions;
