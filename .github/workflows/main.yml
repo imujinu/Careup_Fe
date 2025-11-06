@@ -34,4 +34,4 @@ jobs:
         aws s3 cp ./dist s3://www.careup.store/ --recursive
         
     - name: invalidate cloudfront cache
-      run: aws cloudfront create-invalidation --distribution-id EQASEN1HMYFDK --paths "/*"
+      run: aws cloudfront create-invalidation --distribution-id E3KN680YL3C9Q0 --paths "/*"
