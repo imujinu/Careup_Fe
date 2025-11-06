@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import { Icon } from "@mdi/react";
 import {
   mdiPlus,
@@ -424,7 +424,53 @@ function KPIManagement({ branchId, readOnly = false }) {
   if (loading) {
     return (
       <Container>
-        <LoadingMessage>로딩 중...</LoadingMessage>
+        <SummaryCards>
+          {[1, 2, 3, 4].map((i) => (
+            <SummaryCard key={i}>
+              <CardIcon color="#6d28d9">
+                <SkeletonCircle />
+              </CardIcon>
+              <CardContent>
+                <SkeletonText width="80px" height="14px" />
+                <SkeletonText width="60px" height="24px" style={{ marginTop: '4px' }} />
+              </CardContent>
+            </SummaryCard>
+          ))}
+        </SummaryCards>
+        <FilterSection>
+          <SearchContainer>
+            <SkeletonText height="40px" />
+          </SearchContainer>
+          <SkeletonText width="150px" height="40px" />
+          <SkeletonText width="150px" height="40px" />
+        </FilterSection>
+        <KPICardsGrid>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <KPICard key={i}>
+              <CardHeader>
+                <SkeletonCircle size="40px" />
+                <CardTitleContainer>
+                  <SkeletonText width="120px" height="18px" />
+                </CardTitleContainer>
+                <SkeletonText width="60px" height="24px" />
+              </CardHeader>
+              <CardBody>
+                <StatSection>
+                  <SkeletonText width="100px" height="24px" />
+                  <SkeletonText width="80px" height="14px" />
+                </StatSection>
+                <ProgressSection>
+                  <SkeletonText width="100%" height="8px" />
+                  <SkeletonText width="60px" height="16px" />
+                </ProgressSection>
+                <InfoSection>
+                  <SkeletonText width="60px" height="20px" />
+                </InfoSection>
+                <SkeletonText width="100%" height="40px" />
+              </CardBody>
+            </KPICard>
+          ))}
+        </KPICardsGrid>
       </Container>
     );
   }
@@ -1137,4 +1183,43 @@ const PageNumber = styled.div`
   font-weight: 600;
   min-width: 80px;
   text-align: center;
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+`;
+
+const SkeletonBase = styled.div`
+  background: #e5e7eb;
+  background-image: linear-gradient(
+    to right,
+    #e5e7eb 0%,
+    #f3f4f6 20%,
+    #e5e7eb 40%,
+    #e5e7eb 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 4px;
+`;
+
+const SkeletonCircle = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'size',
+})`
+  width: ${props => props.size || '48px'};
+  height: ${props => props.size || '48px'};
+  border-radius: 50%;
+`;
+
+const SkeletonText = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'height',
+})`
+  height: ${props => props.height || '16px'};
+  width: ${props => props.width || '100%'};
 `;

@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiDownload, mdiDelete, mdiFileDocument, mdiPencil } from '@mdi/js';
 import { DOCUMENT_TYPES } from '../../service/documentService';
@@ -72,9 +72,43 @@ function DocumentTable({ documents, onDownload, onDelete, onEdit, loading, readO
   if (loading) {
     return (
       <TableContainer>
-        <LoadingContainer>
-          <LoadingSpinner>로딩 중...</LoadingSpinner>
-        </LoadingContainer>
+        <DocumentGrid>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <DocumentCard key={i}>
+              <CardHeader>
+                <SkeletonText width="60px" height="24px" style={{ borderRadius: '20px' }} />
+              </CardHeader>
+              <CardContent>
+                <SkeletonText width="150px" height="16px" style={{ marginBottom: '8px' }} />
+                <SkeletonText width="100px" height="14px" style={{ marginBottom: '4px' }} />
+                <SkeletonText width="80px" height="14px" style={{ marginBottom: '16px' }} />
+                <DocumentDetails>
+                  <DetailItem>
+                    <SkeletonText width="60px" height="13px" />
+                    <SkeletonText width="100px" height="13px" style={{ marginLeft: '8px' }} />
+                  </DetailItem>
+                  <DetailItem>
+                    <SkeletonText width="60px" height="13px" />
+                    <SkeletonText width="80px" height="13px" style={{ marginLeft: '8px' }} />
+                  </DetailItem>
+                  <DetailItem>
+                    <SkeletonText width="60px" height="13px" />
+                    <SkeletonText width="120px" height="13px" style={{ marginLeft: '8px' }} />
+                  </DetailItem>
+                  <DetailItem>
+                    <SkeletonText width="60px" height="13px" />
+                    <SkeletonText width="100px" height="13px" style={{ marginLeft: '8px' }} />
+                  </DetailItem>
+                </DocumentDetails>
+              </CardContent>
+              <CardActions>
+                <SkeletonCircle size="40px" />
+                <SkeletonCircle size="40px" />
+                <SkeletonCircle size="40px" />
+              </CardActions>
+            </DocumentCard>
+          ))}
+        </DocumentGrid>
       </TableContainer>
     );
   }
@@ -355,4 +389,43 @@ const ActionButton = styled.button.withConfig({
       box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
     }
   `}
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+`;
+
+const SkeletonBase = styled.div`
+  background: #e5e7eb;
+  background-image: linear-gradient(
+    to right,
+    #e5e7eb 0%,
+    #f3f4f6 20%,
+    #e5e7eb 40%,
+    #e5e7eb 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 4px;
+`;
+
+const SkeletonCircle = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'size',
+})`
+  width: ${props => props.size || '40px'};
+  height: ${props => props.size || '40px'};
+  border-radius: 50%;
+`;
+
+const SkeletonText = styled(SkeletonBase).withConfig({
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'height',
+})`
+  height: ${props => props.height || '16px'};
+  width: ${props => props.width || '100%'};
 `;

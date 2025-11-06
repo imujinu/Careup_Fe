@@ -343,9 +343,9 @@ function EmployeeModal({
       allowBackdropClose={false}
     >
       <ModalHeader>
-        <ModalTitle>{isEdit ? "점주 정보 수정" : "점주 등록"}</ModalTitle>
+        <ModalTitle>{isEdit ? "직원 정보 수정" : "직원 등록"}</ModalTitle>
         <ModalSubtitle>
-          {isEdit ? "점주의 정보를 수정합니다" : "새로운 점주를 등록합니다"}
+          {isEdit ? "직원 정보를 수정합니다" : "새로운 직원을 등록합니다"}
         </ModalSubtitle>
         <CloseButton onClick={handleClose}>
           <Icon path={mdiClose} size={1.2} />

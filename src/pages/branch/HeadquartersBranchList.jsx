@@ -20,8 +20,8 @@ function HeadquartersBranchList() {
   const dispatch = useAppDispatch();
   const { addToast } = useToast();
   const { list, pagination, loading, error, params, deleteLoading, deleteError } = useAppSelector((s) => s.branch);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({ status: '' });
+  const [searchTerm, setSearchTerm] = useState(params.keyword || '');
+  const [filters, setFilters] = useState({ status: params.status || '' });
   const [searchTargets, setSearchTargets] = useState(() => {
     const saved = localStorage.getItem(SEARCH_IN_KEY);
     return saved ? JSON.parse(saved) : { name: true, businessDomain: true, address: true };
@@ -51,9 +51,23 @@ function HeadquartersBranchList() {
   const searchPickerRef = useRef(null);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, branch: null });
 
+  // params.keyword와 searchTerm 동기화 (초기 로드 시에만)
+  useEffect(() => {
+    if (params.keyword !== searchTerm && params.keyword !== undefined) {
+      setSearchTerm(params.keyword || '');
+    }
+  }, [params.keyword]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // params.status와 filters.status 동기화 (초기 로드 시에만)
+  useEffect(() => {
+    if (params.status !== filters.status && params.status !== undefined) {
+      setFilters(prev => ({ ...prev, status: params.status || '' }));
+    }
+  }, [params.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     dispatch(fetchBranchList(params));
-  }, [dispatch, params.page, params.size, params.sort, params.search, params.status]);
+  }, [dispatch, params.page, params.size, params.sort, params.keyword, params.status]);
 
   const handleChangePage = (page) => {
     dispatch(setParams({ page }));
@@ -72,32 +86,27 @@ function HeadquartersBranchList() {
     return { field, direction: direction || 'asc' };
   }, [params.sort]);
 
-  // 검색/필터링 (클라이언트 사이드 보조)
-  const filteredList = useMemo(() => {
-    let data = list;
-    if (filters.status) {
-      data = data.filter(b => (b.status || '').toLowerCase() === filters.status.toLowerCase());
-    }
-    // 업종 필터 입력창 제거: 검색창 필드 체크 방식 사용
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      data = data.filter(branch => 
-        branch.name?.toLowerCase().includes(term) ||
-        branch.businessDomain?.toLowerCase().includes(term) ||
-        branch.status?.toLowerCase().includes(term) ||
-        branch.phone?.includes(term) ||
-        branch.businessNumber?.includes(term) ||
-        branch.address?.toLowerCase().includes(term)
-      );
-    }
-    return data;
-  }, [list, searchTerm, filters]);
+  // 백엔드에서 검색과 필터링을 처리하므로, 클라이언트 사이드 필터링은 제거
+  // 서버에서 받은 데이터를 그대로 사용
+  const filteredList = list;
+
+  // 검색어 디바운싱을 위한 ref
+  const searchTimeoutRef = useRef(null);
 
   const handleSearch = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
-    // 서버 파라미터 동기화 (지원 시)
-    dispatch(setParams({ search: value, page: 0 }));
+    
+    // 기존 타이머 취소
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // 디바운싱: 500ms 후에 서버에 요청
+    searchTimeoutRef.current = setTimeout(() => {
+      // 서버 파라미터 동기화 (백엔드 API는 keyword 파라미터 사용)
+      dispatch(setParams({ keyword: value.trim() || undefined, page: 0 }));
+    }, 500);
   };
 
   // 검색 대상 저장
@@ -113,7 +122,7 @@ function HeadquartersBranchList() {
   const handleClearFilters = () => {
     setFilters({ status: '' });
     setSearchTerm('');
-    dispatch(setParams({ search: undefined, status: undefined, page: 0 }));
+    dispatch(setParams({ keyword: undefined, status: undefined, page: 0 }));
   };
 
   const handleRegisterClick = () => {
@@ -159,6 +168,15 @@ function HeadquartersBranchList() {
     };
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
