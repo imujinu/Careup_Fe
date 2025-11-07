@@ -3,16 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import HeroSlider from '../components/HeroSlider';
 import Tabs from '../components/Tabs';
 import { useShopData } from '../hooks/useShopData';
-import { useShopCart } from '../hooks/useShopCart';
 
 function HomePage() {
   const navigate = useNavigate();
-  const { categories, products, loadingProducts, productsError, favorites, toggleFavorite, getCategoryIdByName } = useShopData();
-  const { handleAddToCart } = useShopCart();
+  const { categories, loadingCategories, categoriesError, products, loadingProducts, productsError, favorites, toggleFavorite, getCategoryIdByName } = useShopData();
+  
+  // 카테고리가 로딩되기 전에는 카테고리 클릭 무시
+  const isCategoryReady = !loadingCategories && categories.length > 0;
 
   const [activeTab, setActiveTab] = React.useState("전체");
 
   const handleTabChange = (tabName) => {
+    // 카테고리가 아직 로딩 중이면 대기
+    if (loadingCategories) {
+      console.warn('카테고리가 아직 로딩 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    
     setActiveTab(tabName);
     const categoryId = getCategoryIdByName(tabName);
     if (categoryId) {
@@ -32,6 +39,12 @@ function HomePage() {
   };
 
   const handleCategoryClick = (categoryName) => {
+    // 카테고리가 준비되지 않았으면 클릭 무시
+    if (!isCategoryReady) {
+      console.warn('카테고리가 아직 준비되지 않았습니다.');
+      return;
+    }
+    
     setActiveTab(categoryName);
     handleTabChange(categoryName);
   };
@@ -48,26 +61,49 @@ function HomePage() {
 
       <div className="container">
         <section className="cat-row">
-          {categories.map((c) => (
-            <div
-              className="cat-item"
-              key={c.name}
-              onClick={() => handleCategoryClick(c.name)}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="cat-figure">
-                <img 
-                  src={c.photo || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=300&q=80"} 
-                  alt={c.name}
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=300&q=80";
-                  }}
-                />
-              </div>
-              <div className="cat-text">{c.name}</div>
+          {loadingCategories ? (
+            <div style={{ 
+              gridColumn: "1 / -1", 
+              textAlign: "center", 
+              padding: "20px 0",
+              color: "#6b7280"
+            }}>
+              🔄 카테고리를 불러오는 중...
             </div>
-          ))}
+          ) : categories.length === 0 ? (
+            <div style={{ 
+              gridColumn: "1 / -1", 
+              textAlign: "center", 
+              padding: "20px 0",
+              color: "#6b7280"
+            }}>
+              📦 카테고리가 없습니다.
+            </div>
+          ) : (
+            categories.map((c) => (
+              <div
+                className="cat-item"
+                key={c.id || c.name}
+                onClick={() => handleCategoryClick(c.name)}
+                style={{ 
+                  cursor: isCategoryReady ? "pointer" : "not-allowed",
+                  opacity: isCategoryReady ? 1 : 0.6
+                }}
+              >
+                <div className="cat-figure">
+                  <img 
+                    src={c.photo || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=300&q=80"} 
+                    alt={c.name}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=300&q=80";
+                    }}
+                  />
+                </div>
+                <div className="cat-text">{c.name}</div>
+              </div>
+            ))
+          )}
         </section>
 
         <section className="section">
@@ -185,18 +221,6 @@ function HomePage() {
                       <span className="in-stock">재고 있음</span>
                     )}
                   </div>
-                  <button 
-                    className={`add-to-cart-btn ${p.isOutOfStock ? 'disabled' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!p.isOutOfStock) {
-                        handleAddToCart(p);
-                      }
-                    }}
-                    disabled={p.isOutOfStock}
-                  >
-                    {p.isOutOfStock ? '품절' : '장바구니 담기'}
-                  </button>
                 </div>
               </article>
             ))}

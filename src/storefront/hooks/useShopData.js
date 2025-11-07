@@ -106,6 +106,8 @@ function groupProductsByName(products) {
 
 export function useShopData() {
   const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [categoriesError, setCategoriesError] = useState(null);
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productsError, setProductsError] = useState(null);
@@ -134,11 +136,16 @@ export function useShopData() {
 
     async function loadCategories() {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/categories`);
+        setLoadingCategories(true);
+        setCategoriesError(null);
+        
+        const res = await axios.get(`${API_BASE_URL}/api/categories`, {
+          timeout: 10000 // 10초 타임아웃
+        });
         const data = res?.data?.data ?? res?.data ?? [];
         const list = Array.isArray(data) ? data : [];
-        const mapped = list.map((c) => ({
-          id: c.id || c.categoryId,
+        const mapped = list.map((c, index) => ({
+          id: c.id || c.categoryId || `default-${index}`, // id가 없으면 기본값 사용
           name: c.name || "기타",
           photo: categoryImageMap[c.name] || categoryImageMap["의류"],
           description: c.description || ""
@@ -147,18 +154,27 @@ export function useShopData() {
         if (mapped.length > 0) {
           setCategories(mapped);
         } else {
-          setCategories(
-            Object.keys(categoryImageMap).map((name) => ({ name, photo: categoryImageMap[name] }))
-          );
+          // API 응답이 빈 배열이면 기본 카테고리 사용
+          const defaultCategories = Object.keys(categoryImageMap).map((name, index) => ({
+            id: `default-${index}`,
+            name,
+            photo: categoryImageMap[name]
+          }));
+          setCategories(defaultCategories);
         }
       } catch (e) {
         console.error('❌ 카테고리 로딩 실패:', e);
-        setCategories([
-          { name: "신발", photo: categoryImageMap["신발"] },
-          { name: "의류", photo: categoryImageMap["의류"] },
-          { name: "가방", photo: categoryImageMap["가방"] },
-          { name: "모자", photo: categoryImageMap["모자"] },
-        ]);
+        setCategoriesError(e?.message || '카테고리를 불러오지 못했습니다.');
+        // 에러 발생 시 기본 카테고리 사용
+        const defaultCategories = [
+          { id: 'default-0', name: "신발", photo: categoryImageMap["신발"] },
+          { id: 'default-1', name: "의류", photo: categoryImageMap["의류"] },
+          { id: 'default-2', name: "가방", photo: categoryImageMap["가방"] },
+          { id: 'default-3', name: "모자", photo: categoryImageMap["모자"] },
+        ];
+        setCategories(defaultCategories);
+      } finally {
+        setLoadingCategories(false);
       }
     }
 
@@ -173,30 +189,62 @@ export function useShopData() {
         setProductsError(null);
         
         const page = currentPage;
-        const size = 12;
+        const targetSize = 12; // 목표 상품 개수
+        let allRawProducts = [];
+        let currentPageNum = 0; // 항상 처음부터 시작
+        let hasMore = true;
+        let totalPagesFromApi = 0;
+        let totalElementsFromApi = 0;
         
-        const params = {
-          page: page,
-          size: size
-        };
+        // 전체 상품을 모두 요청해서 그룹화 후 페이지네이션
+        // 최대 1000개까지 요청 (너무 많으면 성능 문제)
+        const maxRequests = 50; // 최대 50페이지 (50 * 24 = 1200개)
+        let requestCount = 0;
         
-        if (selectedCategoryId) {
-          params.categoryId = selectedCategoryId;
+        while (hasMore && requestCount < maxRequests) {
+          const params = {
+            page: currentPageNum,
+            size: 24 // 한 번에 24개씩 요청
+          };
+          
+          if (selectedCategoryId) {
+            params.categoryId = selectedCategoryId;
+          }
+          
+          const res = await shopApi.get('/api/public/products/with-branches', {
+            params: params
+          });
+          
+          const responseData = res?.data?.data;
+          const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
+          
+          if (isPageResponse) {
+            if (currentPageNum === 0) {
+              // 첫 페이지에서 전체 페이지 정보 저장
+              totalPagesFromApi = responseData.totalPages || 0;
+              totalElementsFromApi = responseData.totalElements || 0;
+            }
+            
+            const raw = responseData.content || [];
+            
+            if (raw.length === 0) {
+              hasMore = false;
+            } else {
+              allRawProducts.push(...raw);
+              // 다음 페이지가 있는지 확인
+              if (currentPageNum >= totalPagesFromApi - 1) {
+                hasMore = false;
+              } else {
+                currentPageNum++;
+                requestCount++;
+              }
+            }
+          } else {
+            hasMore = false;
+          }
         }
         
-        const res = await shopApi.get('/api/public/products/with-branches', {
-          params: params
-        });
-        
-        const responseData = res?.data?.data;
-        const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
-        
-        if (isPageResponse) {
-          setTotalPages(responseData.totalPages || 0);
-          setTotalElements(responseData.totalElements || 0);
-          const raw = responseData.content || [];
-          
-          const mapProduct = (item) => {
+        const mapProduct = (item) => {
             // 속성별로 상품을 그룹화하기 위해 availableBranches를 속성 타입별로 분류
             const branchesByAttributeType = {};
             
@@ -265,7 +313,7 @@ export function useShopData() {
             };
           };
 
-          const mapped = (Array.isArray(raw) ? raw : [])
+          const mapped = (Array.isArray(allRawProducts) ? allRawProducts : [])
             .filter((item) => item.productId != null) // productId가 없는 항목 제외
             .map(mapProduct);
         
@@ -275,24 +323,20 @@ export function useShopData() {
           
           // 상품명 기준으로 그룹화
           const groupedProducts = groupProductsByName(filteredMapped);
+          
+          // 그룹화 후 전체 상품 수를 기반으로 totalPages 재계산
+          const groupedTotalElements = groupedProducts.length;
+          const groupedTotalPages = Math.ceil(groupedTotalElements / targetSize);
+          
+          // 그룹화 후에도 페이지당 12개가 되도록 슬라이스
+          const startIndex = page * targetSize;
+          const endIndex = startIndex + targetSize;
+          const paginatedProducts = groupedProducts.slice(startIndex, endIndex);
         
-          setProducts(groupedProducts);
-        } else {
-          const raw = responseData || [];
-          const mapped = (Array.isArray(raw) ? raw : [])
-            .filter((item) => item.productId != null) // productId가 없는 항목 제외
-            .map(mapProduct);
-          const filteredMapped = mapped.filter(item => {
-            return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
-          });
-          
-          // 상품명 기준으로 그룹화
-          const groupedProducts = groupProductsByName(filteredMapped);
-          
-          setProducts(groupedProducts);
-          setTotalPages(0);
-          setTotalElements(groupedProducts.length);
-        }
+          setProducts(paginatedProducts);
+          // 그룹화 후 실제 상품 수를 기반으로 페이지네이션 정보 업데이트
+          setTotalPages(groupedTotalPages);
+          setTotalElements(groupedTotalElements);
       } catch (e) {
         console.error('❌ 상품 로딩 실패:', e);
         setProductsError(e?.message || "상품을 불러오지 못했습니다.");
@@ -308,7 +352,20 @@ export function useShopData() {
 
   const getCategoryIdByName = (categoryName) => {
     if (!categoryName || categoryName === '전체') return null;
-    const category = categories.find(c => c.name === categoryName);
+    if (!categories || categories.length === 0) return null;
+    
+    // 정확한 이름 매칭 시도
+    let category = categories.find(c => c.name === categoryName);
+    
+    // 정확한 매칭이 실패하면 대소문자 무시하고 공백 제거 후 매칭
+    if (!category) {
+      const normalizedName = categoryName.trim().toLowerCase();
+      category = categories.find(c => {
+        const normalized = (c.name || '').trim().toLowerCase();
+        return normalized === normalizedName;
+      });
+    }
+    
     return category?.id || null;
   };
 
@@ -323,6 +380,8 @@ export function useShopData() {
 
   return {
     categories,
+    loadingCategories,
+    categoriesError,
     products,
     loadingProducts,
     productsError,

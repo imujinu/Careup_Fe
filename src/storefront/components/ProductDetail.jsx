@@ -50,20 +50,58 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   // 옵션 선택에 따라 지점 자동 선택(재고 있는 첫 지점)
   useEffect(() => {
     if (!product?.availableBranches) return;
-    const keys = Object.keys(selectedAttributes);
-    let candidates = product.availableBranches;
+    const type1 = product.optionTypes?.[0];
+    const type2 = product.optionTypes?.[1];
+    const opt1Selected = type1 ? selectedAttributes[type1] : undefined;
+    const opt2Selected = type2 ? selectedAttributes[type2] : undefined;
+    let candidates = [];
+    
     // 두 옵션이 모두 선택된 조합 우선
-    if (Array.isArray(product.optionCombos) && product.optionTypes && selectedAttributes[product.optionTypes[0]] && product.optionTypes[1] && selectedAttributes[product.optionTypes[1]]) {
-      const combo = product.optionCombos.find(c => String(c.opt1Id) === String(selectedAttributes[product.optionTypes[0]]) && String(c.opt2Id) === String(selectedAttributes[product.optionTypes[1]]));
+    if (Array.isArray(product.optionCombos) && opt1Selected && opt2Selected) {
+      const combo = product.optionCombos.find(c => 
+        String(c.opt1Id) === String(opt1Selected) && 
+        String(c.opt2Id) === String(opt2Selected)
+      );
       candidates = combo?.branches || [];
-    } else if (keys.length === 1) {
-      // 단일 옵션 선택 시 해당 옵션에 맞는 브랜치
-      const type = keys[0];
-      const val = selectedAttributes[type];
-      candidates = product.availableBranches.filter(b => b.attributeTypeName === type && String(b.attributeValueId) === String(val));
+    } 
+    // 옵션1만 선택된 경우: 옵션1에 맞는 모든 조합의 브랜치 수집
+    else if (opt1Selected && !opt2Selected && Array.isArray(product.optionCombos)) {
+      const matchingCombos = product.optionCombos.filter(c => 
+        String(c.opt1Id) === String(opt1Selected)
+      );
+      const allBranches = [];
+      matchingCombos.forEach(combo => {
+        if (combo.branches) {
+          allBranches.push(...combo.branches);
+        }
+      });
+      // 중복 제거
+      const uniqueBranches = Array.from(
+        new Map(allBranches.map(b => [`${b.branchId}-${b.attributeValueId || 'no-attr'}`, b])).values()
+      );
+      candidates = uniqueBranches;
     }
+    // 단일 옵션 선택 시 (일반적인 경우)
+    else {
+      const keys = Object.keys(selectedAttributes);
+      if (keys.length > 0) {
+        const type = keys[0];
+        const val = selectedAttributes[type];
+        candidates = product.availableBranches.filter(b => 
+          b.attributeTypeName === type && String(b.attributeValueId) === String(val)
+        );
+      } else {
+        candidates = product.availableBranches;
+      }
+    }
+    
     const firstInStock = candidates.find(b => (b.stockQuantity || 0) > 0) || candidates[0];
-    if (firstInStock?.branchId) setSelectedBranchId(firstInStock.branchId);
+    if (firstInStock?.branchId) {
+      setSelectedBranchId(firstInStock.branchId);
+    } else if (candidates.length === 0) {
+      // 선택 가능한 지점이 없으면 선택 해제
+      setSelectedBranchId(null);
+    }
   }, [selectedAttributes, product?.availableBranches, product?.optionCombos, product?.optionTypes]);
 
   // 이미지 배열 처리 - images 배열이 있으면 사용, 없으면 image를 배열로 변환
@@ -76,7 +114,60 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const currentImage = productImages[selectedImageIndex] || productImages[0] || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
 
   const handleAddToCart = () => {
-    // 지점 선택 강제 검사 제거 - 장바구니 담을 때는 지점 확인 불필요
+    // 옵션1+옵션2 조합 검증 (2단 옵션이 있는 경우)
+    const type1 = product?.optionTypes?.[0];
+    const type2 = product?.optionTypes?.[1];
+    const opt1Selected = type1 ? selectedAttributes[type1] : undefined;
+    const opt2Selected = type2 ? selectedAttributes[type2] : undefined;
+    
+    // 2단 옵션이 있는 경우, 두 옵션이 모두 선택되어야 함
+    if (type1 && type2) {
+      if (!opt1Selected || !opt2Selected) {
+        alert('옵션1과 옵션2를 모두 선택해주세요.');
+        return;
+      }
+      
+      // 선택된 조합에 해당하는 지점만 사용
+      if (Array.isArray(product.optionCombos)) {
+        const combo = product.optionCombos.find(c => 
+          String(c.opt1Id) === String(opt1Selected) && 
+          String(c.opt2Id) === String(opt2Selected)
+        );
+        
+        if (!combo || !combo.branches || combo.branches.length === 0) {
+          alert('선택하신 옵션 조합에 해당하는 상품이 없습니다.');
+          return;
+        }
+        
+        // 선택된 지점이 해당 조합의 지점인지 확인
+        if (selectedBranchId) {
+          const isValidBranch = combo.branches.some(b => 
+            String(b.branchId) === String(selectedBranchId)
+          );
+          if (!isValidBranch) {
+            // 조합에 맞는 첫 번째 지점으로 자동 선택
+            const firstBranch = combo.branches.find(b => (b.stockQuantity || 0) > 0) || combo.branches[0];
+            if (firstBranch) {
+              setSelectedBranchId(firstBranch.branchId);
+              alert(`선택하신 옵션 조합에 맞는 지점(${firstBranch.branchName})으로 변경되었습니다.`);
+            }
+          }
+        } else {
+          // 지점이 선택되지 않았으면 조합에 맞는 첫 번째 지점 자동 선택
+          const firstBranch = combo.branches.find(b => (b.stockQuantity || 0) > 0) || combo.branches[0];
+          if (firstBranch) {
+            setSelectedBranchId(firstBranch.branchId);
+          }
+        }
+      }
+    }
+    
+    // 지점 선택 확인 (옵션이 없는 경우에도 지점이 필요할 수 있음)
+    if (product?.availableBranches && product.availableBranches.length > 0 && !selectedBranchId) {
+      alert('구매 지점을 선택해주세요.');
+      return;
+    }
+    
     setIsInCart(true);
     if (onAddToCart) {
       const productWithBranch = {
@@ -341,13 +432,49 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                         .filter(branch => {
                       // 선택된 모든 속성과 일치하는 브랜치만 표시
                       const selectedKeys = Object.keys(selectedAttributes);
+                      const type1 = product.optionTypes?.[0];
+                      const type2 = product.optionTypes?.[1];
+                      const opt1Selected = type1 ? selectedAttributes[type1] : undefined;
+                      const opt2Selected = type2 ? selectedAttributes[type2] : undefined;
+                      
                       // 두 옵션이 모두 선택되면 조합 브랜치만 사용
-                      if (Array.isArray(product.optionCombos) && product.optionTypes && selectedAttributes[product.optionTypes[0]] && product.optionTypes[1] && selectedAttributes[product.optionTypes[1]]) {
-                        const combo = product.optionCombos.find(c => String(c.opt1Id) === String(selectedAttributes[product.optionTypes[0]]) && String(c.opt2Id) === String(selectedAttributes[product.optionTypes[1]]));
-                        const comboKeys = new Set((combo?.branches || []).map(b => `${b.branchId}-${b.attributeValueId || 'no-attr'}`));
-                        const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
-                        return comboKeys.has(key);
+                      if (Array.isArray(product.optionCombos) && opt1Selected && opt2Selected) {
+                        const combo = product.optionCombos.find(c => 
+                          String(c.opt1Id) === String(opt1Selected) && 
+                          String(c.opt2Id) === String(opt2Selected)
+                        );
+                        if (combo && combo.branches) {
+                          const comboKeys = new Set(combo.branches.map(b => `${b.branchId}-${b.attributeValueId || 'no-attr'}`));
+                          const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
+                          return comboKeys.has(key);
+                        }
+                        return false;
                       }
+                      
+                      // 옵션1만 선택된 경우: 옵션1의 값과 일치하는 모든 브랜치 표시
+                      if (opt1Selected && !opt2Selected && type1) {
+                        // 브랜치가 옵션1의 속성 타입을 가지고 있고 값이 일치하면 표시
+                        if (branch.attributeTypeName === type1 && branch.attributeValueId) {
+                          return String(branch.attributeValueId) === String(opt1Selected);
+                        }
+                        // 또는 조합에서 옵션1이 일치하는 모든 조합의 브랜치를 찾아서 표시
+                        if (Array.isArray(product.optionCombos)) {
+                          const matchingCombos = product.optionCombos.filter(c => 
+                            String(c.opt1Id) === String(opt1Selected)
+                          );
+                          const allBranchKeys = new Set();
+                          matchingCombos.forEach(combo => {
+                            if (combo.branches) {
+                              combo.branches.forEach(b => {
+                                allBranchKeys.add(`${b.branchId}-${b.attributeValueId || 'no-attr'}`);
+                              });
+                            }
+                          });
+                          const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
+                          return allBranchKeys.has(key);
+                        }
+                      }
+                      
                       if (selectedKeys.length === 0) {
                         return true; // 속성이 선택되지 않았으면 모든 브랜치 표시
                       }
@@ -356,7 +483,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                       // 브랜치는 하나의 속성만 가지므로, 해당 속성 타입이 선택되어 있고 값이 일치하면 표시
                       if (branch.attributeTypeName && branch.attributeValueId) {
                         const selectedValueId = selectedAttributes[branch.attributeTypeName];
-                        return selectedValueId === branch.attributeValueId;
+                        return selectedValueId && String(selectedValueId) === String(branch.attributeValueId);
                       }
                       
                       return false;

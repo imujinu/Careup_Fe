@@ -107,8 +107,12 @@ function ShopLayout({ children }) {
 
   const getCurrentPage = () => {
     const path = location.pathname;
+    // 정확한 경로 매칭 우선
     if (path === '/shop' || path === '/shop/') return 'home';
-    if (path.includes('/products/')) return 'product-detail';
+    // 상품 상세 페이지 (숫자 ID 포함)
+    if (path.match(/^\/shop\/products\/\d+$/)) return 'product-detail';
+    // 상품 목록 페이지
+    if (path === '/shop/products' || path.startsWith('/shop/products?')) return 'products';
     if (path.includes('/search')) return 'search';
     if (path.includes('/login')) return 'login';
     if (path.includes('/mypage')) return 'mypage';

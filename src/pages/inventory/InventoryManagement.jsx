@@ -477,24 +477,51 @@ function InventoryManagement() {
           const productAttributes = productAttributesMap.get(productId) || [];
           
           // 속성 정보를 배열로 변환 (최대 2개)
-          const attributes = [];
-          
-          // displayOrder 순으로 정렬
-          const sortedAttrs = [...productAttributes].sort((a, b) => {
-            const aOrder = a.displayOrder || 0;
-            const bOrder = b.displayOrder || 0;
-            return aOrder - bOrder;
+        const attributes = [];
+
+        // 백엔드에서 내려준 실제 속성 정보 우선 반영
+        if (item.attributeTypeName && item.attributeValueName) {
+          attributes.push({
+            attributeTypeId: item.attributeTypeId || null,
+            attributeTypeName: item.attributeTypeName,
+            attributeValueId: item.attributeValueId || null,
+            attributeValueName: item.attributeValueName
           });
+        }
+        
+        // displayOrder 순으로 정렬
+        const sortedAttrs = [...productAttributes].sort((a, b) => {
+          const aOrder = a.displayOrder || 0;
+          const bOrder = b.displayOrder || 0;
+          return aOrder - bOrder;
+        });
+        
+        // 최대 2개까지 속성 추가하되, 이미 추가된 값은 제외
+        for (const attr of sortedAttrs) {
+          if (attributes.length >= 2) {
+            break;
+          }
           
-          // 최대 2개까지 속성 추가
-          sortedAttrs.slice(0, 2).forEach(attr => {
+          const typeName = attr.attributeTypeName || attr.attributeType?.name;
+          const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName;
+          
+          if (!typeName || !valueName) {
+            continue;
+          }
+
+          const isDuplicate = attributes.some(existing => 
+            existing.attributeTypeName === typeName && existing.attributeValueName === valueName
+          );
+
+          if (!isDuplicate) {
             attributes.push({
               attributeTypeId: attr.attributeTypeId || attr.attributeType?.id,
-              attributeTypeName: attr.attributeTypeName || attr.attributeType?.name,
+              attributeTypeName: typeName,
               attributeValueId: attr.attributeValueId || attr.attributeValue?.id || attr.id,
-              attributeValueName: attr.attributeValueName || attr.attributeValue?.name || attr.displayName
+              attributeValueName: valueName
             });
-          });
+          }
+        }
           
           return {
             ...item,
@@ -693,8 +720,8 @@ function InventoryManagement() {
           minPrice: formData.minPrice || 0,
           maxPrice: formData.maxPrice || 0,
           supplyPrice: formData.supplyPrice || 0,
-          visibility: formData.visibility || 'ALL',
-          imageFile: formData.imageFile || null // 이미지 파일 추가
+          imageUrl: formData.imageUrl || '',
+          visibility: formData.visibility || 'ALL'
         };
         
         const productResponse = await inventoryService.createProduct(productData, null);
