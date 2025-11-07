@@ -3,7 +3,7 @@
 import axios from 'axios';
 import { decodeToken } from '../utils/jwt';
 
-const AUTH_API_URL = "https://server.careup.store/branch-service/auth/login";
+const AUTH_API_URL = "https://server.careup.store/branch-service";
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem('accessToken'),
