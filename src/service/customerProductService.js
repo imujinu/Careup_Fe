@@ -1,7 +1,7 @@
 import customerAxios from '../utils/customerAxios';
 import { customerAuthService } from './customerAuthService';
 
-const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
+const API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
 
 export const customerProductService = {
   // 상품 조회 기록 POST 요청 (로그인 상태에서만)
