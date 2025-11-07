@@ -1,6 +1,6 @@
 import axios from '../utils/axiosConfig'; // Interceptor가 설정된 axios 사용
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_CUSTOMER_API_URL;
 
 // axios 인스턴스 대신 기본 axios 사용 (interceptor가 적용됨)
 const inventoryApi = axios;
