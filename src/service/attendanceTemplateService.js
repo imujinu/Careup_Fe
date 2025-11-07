@@ -1,18 +1,45 @@
 // src/service/attendanceTemplateService.js
 import axios from '../utils/axiosConfig';
 
-const BASE_URL = (() => {
-  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
-  if (explicit) return explicit;
-  const api = (
-    import.meta.env.VITE_API_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '')
-  ).replace(/\/$/, '');
-  return `${api}/branch-service`;
-})();
+/** 브랜치 서비스 BASE 계산: 절대 URL 강제 + /branch-service 중복 제거 */
+function buildBranchBase() {
+  const rawBranch = (import.meta.env.VITE_BRANCH_URL || '').trim();
+  const rawApi = (import.meta.env.VITE_API_URL || '').trim();
 
+  // 상대 경로가 들어와도 절대 URL로 변환
+  const absolutize = (u) => {
+    if (!u) return '';
+    const s = u.replace(/\/+$/, ''); // 뒤 슬래시 제거
+    if (/^https?:\/\//i.test(s)) return s;
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      const lead = s.startsWith('/') ? '' : '/';
+      return `${window.location.origin}${lead}${s}`;
+    }
+    return s; // SSR 등 특수 환경에서는 원본 유지
+  };
+
+  // 1순위: VITE_BRANCH_URL, 2순위: VITE_API_URL, 3순위: window.location.origin
+  let base = absolutize(rawBranch) || absolutize(rawApi) ||
+             (typeof window !== 'undefined' ? window.location.origin : '');
+
+  base = base.replace(/\/+$/, ''); // 뒤 슬래시 제거
+
+  // 끝이 /branch-service가 아니면 한 번만 붙임
+  if (!/\/branch-service$/i.test(base)) {
+    base = `${base}/branch-service`;
+  }
+
+  // 혹시라도 중복되어 있다면 전역으로 한 번으로 축약
+  // …/branch-service/branch-service → …/branch-service
+  base = base.replace(/(?:\/branch-service)+/gi, '/branch-service');
+
+  return base;
+}
+
+const BASE_URL = buildBranchBase();
 const BASE = `${BASE_URL}/attendance-template`;
 
+/** 공통 언랩 */
 function unwrap(res) {
   const ct = (res?.headers?.['content-type'] || '').toLowerCase();
   const d = res?.data;
@@ -24,6 +51,7 @@ function unwrap(res) {
   return d ?? null;
 }
 
+/** 페이지 응답 정규화 */
 function normalizePage(body) {
   if (!body) return { content: [], totalPages: 0, totalElements: 0 };
   if (Array.isArray(body)) return { content: body, totalPages: 1, totalElements: body.length };
@@ -44,12 +72,14 @@ function normalizePage(body) {
   return { content: [], totalPages: 0, totalElements: 0 };
 }
 
+/** HH:mm → HH:mm:ss 보정 */
 function toHHMMSS(v) {
   if (!v) return null;
   if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) return `${v}:00`;
   return v;
 }
 
+/** ===== API ===== */
 export async function listAttendanceTemplates(params = {}) {
   const { page = 0, size = 20, sort = 'name,asc' } = params;
   const res = await axios.get(`${BASE}/list`, { params: { page, size, sort } });
@@ -103,6 +133,7 @@ export async function fetchAttendanceTemplates(limit = 1000) {
   return [];
 }
 
+/** 변경 브로드캐스트 */
 export function broadcastAttendanceTemplateChanged() {
   try {
     window.dispatchEvent(new Event('attendanceTemplate:changed'));
