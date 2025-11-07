@@ -127,7 +127,8 @@
   color: #8B7FE6;
 }
 
-.refresh-btn {
+.refresh-btn,
+.reset-btn {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -143,13 +144,24 @@
   box-shadow: 0 4px 12px rgba(139, 127, 230, 0.3);
 }
 
-.refresh-btn:hover {
+.refresh-btn:hover,
+.reset-btn:hover {
   box-shadow: 0 6px 20px rgba(139, 127, 230, 0.4);
   transform: translateY(-2px) scale(1.05);
 }
 
-.refresh-btn:active {
+.refresh-btn:active,
+.reset-btn:active {
   transform: translateY(0) scale(0.95);
+}
+
+.reset-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.reset-btn:hover {
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
 }
 
 /* React Grid Layout 스타일 */
@@ -240,7 +252,8 @@
   justify-content: center;
 }
 
-.dashboard-item-wrapper:hover .drag-handle {
+.dashboard-item-wrapper:hover .drag-handle,
+.dashboard-card:hover .drag-handle {
   opacity: 1;
 }
 
