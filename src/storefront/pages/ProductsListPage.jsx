@@ -71,6 +71,7 @@ function ProductsListPage() {
       currentPage={currentPage}
       setCurrentPage={setCurrentPage}
       totalPages={totalPages}
+      loadingProducts={loadingProducts}
     />
   );
 }

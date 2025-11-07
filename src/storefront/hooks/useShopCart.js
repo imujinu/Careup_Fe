@@ -41,12 +41,34 @@ export function useShopCart() {
         }
       }
 
+      // 선택된 옵션 정보 추출
+      let attributeName = null;
+      let attributeValue = null;
+      
+      if (product.selectedOptionInfo && Object.keys(product.selectedOptionInfo).length > 0) {
+        // 첫 번째 옵션 정보 사용 (또는 모든 옵션을 조합)
+        const optionKeys = Object.keys(product.selectedOptionInfo);
+        if (optionKeys.length > 0) {
+          const firstOption = product.selectedOptionInfo[optionKeys[0]];
+          attributeName = firstOption.attributeTypeName || null;
+          attributeValue = firstOption.attributeValueName || null;
+          
+          // 여러 옵션이 있는 경우 조합 (예: "Hot, Large")
+          if (optionKeys.length > 1) {
+            const optionValues = optionKeys.map(key => 
+              product.selectedOptionInfo[key].attributeValueName
+            ).filter(Boolean);
+            attributeValue = optionValues.join(', ');
+          }
+        }
+      }
+
       const cartData = {
         memberId: currentUser.memberId,
         branchProductId: resolvedBranchProductId,
         quantity: 1,
-        attributeName: null,
-        attributeValue: null
+        attributeName: attributeName,
+        attributeValue: attributeValue
       };
 
       await cartService.addToCart(cartData);
@@ -68,7 +90,11 @@ export function useShopCart() {
         productName: product.name,
         price: resolvedPrice,
         quantity: 1,
-        imageUrl: product.image
+        imageUrl: product.image,
+        attributeName: attributeName,
+        attributeValue: attributeValue,
+        selectedAttributes: product.selectedAttributes || {},
+        selectedOptionInfo: product.selectedOptionInfo || {}
       }));
 
       alert(`${product.name}이(가) 장바구니에 추가되었습니다.`);

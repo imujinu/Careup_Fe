@@ -69,12 +69,12 @@ function ProductInquiryModal({ product, memberId, isOpen, onClose, onSuccess }) 
         </div>
         <div className="inquiry-product-info">
           <img 
-            src={product.image || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80"} 
+            src={product.image || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
             alt={product.name} 
             className="product-thumbnail"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
+              e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
             }}
           />
           <div className="product-details">

@@ -81,6 +81,23 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       );
       candidates = uniqueBranches;
     }
+    // 옵션2만 선택된 경우: 옵션2에 맞는 모든 조합의 브랜치 수집
+    else if (!opt1Selected && opt2Selected && Array.isArray(product.optionCombos)) {
+      const matchingCombos = product.optionCombos.filter(c => 
+        String(c.opt2Id) === String(opt2Selected)
+      );
+      const allBranches = [];
+      matchingCombos.forEach(combo => {
+        if (combo.branches) {
+          allBranches.push(...combo.branches);
+        }
+      });
+      // 중복 제거
+      const uniqueBranches = Array.from(
+        new Map(allBranches.map(b => [`${b.branchId}-${b.attributeValueId || 'no-attr'}`, b])).values()
+      );
+      candidates = uniqueBranches;
+    }
     // 단일 옵션 선택 시 (일반적인 경우)
     else {
       const keys = Object.keys(selectedAttributes);
@@ -111,7 +128,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       ? product.images 
       : (product?.image ? [product.image] : []));
 
-  const currentImage = productImages[selectedImageIndex] || productImages[0] || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
+  const currentImage = productImages[selectedImageIndex] || productImages[0] || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
 
   const handleAddToCart = () => {
     // 옵션1+옵션2 조합 검증 (2단 옵션이 있는 경우)
@@ -170,15 +187,52 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
     
     setIsInCart(true);
     if (onAddToCart) {
+      // 선택된 옵션 정보 추출
+      const selectedOptionInfo = {};
+      if (product?.attributeGroups && Object.keys(selectedAttributes).length > 0) {
+        product.attributeGroups.forEach(attrGroup => {
+          const attributeTypeName = attrGroup.attributeTypeName;
+          const selectedValueId = selectedAttributes[attributeTypeName];
+          if (selectedValueId) {
+            const valueGroup = attrGroup.values?.find(v => 
+              String(v.attributeValueId) === String(selectedValueId)
+            );
+            if (valueGroup) {
+              selectedOptionInfo[attributeTypeName] = {
+                attributeTypeName: attributeTypeName,
+                attributeValueId: selectedValueId,
+                attributeValueName: valueGroup.attributeValueName
+              };
+            }
+          }
+        });
+      }
+      
       const productWithBranch = {
         ...product,
-        selectedBranchId: selectedBranchId
+        selectedBranchId: selectedBranchId,
+        selectedAttributes: selectedAttributes,
+        selectedOptionInfo: selectedOptionInfo
       };
       onAddToCart(productWithBranch);
     }
   };
 
   const handleBuy = () => {
+    // 옵션1+옵션2 조합 검증 (2단 옵션이 있는 경우)
+    const type1 = product?.optionTypes?.[0];
+    const type2 = product?.optionTypes?.[1];
+    const opt1Selected = type1 ? selectedAttributes[type1] : undefined;
+    const opt2Selected = type2 ? selectedAttributes[type2] : undefined;
+    
+    // 2단 옵션이 있는 경우, 두 옵션이 모두 선택되어야 함
+    if (type1 && type2) {
+      if (!opt1Selected || !opt2Selected) {
+        alert('옵션1과 옵션2를 모두 선택해주세요.');
+        return;
+      }
+    }
+    
     // 지점이 여러 개인 경우 반드시 선택해야 함
     if (product?.availableBranches && product.availableBranches.length > 0) {
       if (!selectedBranchId) {
@@ -187,9 +241,32 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       }
     }
 
+    // 선택된 옵션 정보 추출
+    const selectedOptionInfo = {};
+    if (product?.attributeGroups && Object.keys(selectedAttributes).length > 0) {
+      product.attributeGroups.forEach(attrGroup => {
+        const attributeTypeName = attrGroup.attributeTypeName;
+        const selectedValueId = selectedAttributes[attributeTypeName];
+        if (selectedValueId) {
+          const valueGroup = attrGroup.values?.find(v => 
+            String(v.attributeValueId) === String(selectedValueId)
+          );
+          if (valueGroup) {
+            selectedOptionInfo[attributeTypeName] = {
+              attributeTypeName: attributeTypeName,
+              attributeValueId: selectedValueId,
+              attributeValueName: valueGroup.attributeValueName
+            };
+          }
+        }
+      });
+    }
+
     const productWithBranch = {
       ...product,
-      selectedBranchId: selectedBranchId
+      selectedBranchId: selectedBranchId,
+      selectedAttributes: selectedAttributes,
+      selectedOptionInfo: selectedOptionInfo
     };
 
     if (onBuy) {
@@ -214,7 +291,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 alt={product?.name || "New Balance 204L Suede Mushroom Arid Stone"}
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
+                  e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                 }}
               />
               {productImages.length > 1 && (
@@ -258,11 +335,11 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                     onClick={() => setSelectedImageIndex(index)}
                   >
                     <img
-                      src={image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80"}
+                      src={image || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"}
                       alt={`thumb${index + 1}`}
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80";
+                        e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                       }}
                     />
                   </div>
@@ -305,9 +382,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
 
             <div className="product-title">
               <h1>{product?.name || product?.productName || "상품명"}</h1>
-              <p className="product-subtitle">
-                {product?.description || product?.productDescription || "상품 설명이 없습니다."}
-              </p>
             </div>
 
             {/* 속성 선택 (색상, 사이즈 등) - 옵션1 → 옵션2 단계 */}
@@ -371,20 +445,8 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                                 return newAttributes;
                               });
                               
-                              // 선택 조합의 브랜치로 기본 선택
-                              if (!isSelected) {
-                                let candidateBranches = [];
-                                if (product.optionCombos && Object.keys(selectedAttributes).length > 0) {
-                                  const t1 = product.optionTypes?.[0];
-                                  const t2 = product.optionTypes?.[1];
-                                  const chosen1 = selectedAttributes[t1];
-                                  const chosen2 = attributeTypeName === t2 ? valueGroup.attributeValueId : selectedAttributes[t2];
-                                  const combo = product.optionCombos.find(c => String(c.opt1Id) === String(chosen1) && String(c.opt2Id) === String(chosen2));
-                                  candidateBranches = combo?.branches || [];
-                                }
-                                const b = candidateBranches[0] || firstBranch;
-                                if (b?.branchId) setSelectedBranchId(b.branchId);
-                              }
+                              // 선택 조합의 브랜치로 기본 선택 (useEffect에서 처리하므로 여기서는 간단히 처리)
+                              // 실제 브랜치 선택은 useEffect에서 selectedAttributes 변경을 감지하여 처리됨
                               
                               // 속성 선택 시 해당 상품의 이미지로 변경
                               if (!isSelected && valueGroup.imageUrl) {
@@ -461,6 +523,30 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                         if (Array.isArray(product.optionCombos)) {
                           const matchingCombos = product.optionCombos.filter(c => 
                             String(c.opt1Id) === String(opt1Selected)
+                          );
+                          const allBranchKeys = new Set();
+                          matchingCombos.forEach(combo => {
+                            if (combo.branches) {
+                              combo.branches.forEach(b => {
+                                allBranchKeys.add(`${b.branchId}-${b.attributeValueId || 'no-attr'}`);
+                              });
+                            }
+                          });
+                          const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
+                          return allBranchKeys.has(key);
+                        }
+                      }
+                      
+                      // 옵션2만 선택된 경우: 옵션2의 값과 일치하는 모든 브랜치 표시
+                      if (!opt1Selected && opt2Selected && type2) {
+                        // 브랜치가 옵션2의 속성 타입을 가지고 있고 값이 일치하면 표시
+                        if (branch.attributeTypeName === type2 && branch.attributeValueId) {
+                          return String(branch.attributeValueId) === String(opt2Selected);
+                        }
+                        // 또는 조합에서 옵션2가 일치하는 모든 조합의 브랜치를 찾아서 표시
+                        if (Array.isArray(product.optionCombos)) {
+                          const matchingCombos = product.optionCombos.filter(c => 
+                            String(c.opt2Id) === String(opt2Selected)
                           );
                           const allBranchKeys = new Set();
                           matchingCombos.forEach(combo => {
@@ -697,9 +783,24 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 </div>
 
                 {/* 상품 설명 */}
-                <div className="description-text">
-                  {product?.description || product?.productDescription || "상품 설명이 없습니다."}
-                </div>
+                {(product?.description || product?.productDescription) && (
+                  <div style={{ marginTop: '24px' }}>
+                    <h4 style={{ 
+                      fontSize: '18px', 
+                      fontWeight: '600', 
+                      color: '#333', 
+                      marginBottom: '12px' 
+                    }}>
+                      상품 설명
+                    </h4>
+                    <div 
+                      className="description-text"
+                      dangerouslySetInnerHTML={{
+                        __html: product?.description || product?.productDescription
+                      }}
+                    />
+                  </div>
+                )}
 
                 {/* 소재 정보 (있는 경우) */}
                 {product?.material && (
@@ -740,11 +841,11 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 {product?.image && (
                   <div className="product-detail-image">
                     <img 
-                      src={product.image || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80"} 
+                      src={product.image || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
                       alt={product.name || product.productName}
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80";
+                        e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                       }}
                     />
                   </div>

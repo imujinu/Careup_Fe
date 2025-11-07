@@ -330,11 +330,11 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
             <div key={item.branchProductId} className="payment-item">
               <div className="item-image">
                 <img 
-                  src={item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80"} 
+                  src={item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
                   alt={item.productName}
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
+                    e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                   }}
                 />
               </div>

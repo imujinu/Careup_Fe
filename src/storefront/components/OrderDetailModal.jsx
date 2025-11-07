@@ -221,7 +221,7 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                               alt={productName}
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
-                                e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80";
+                                e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                               }}
                             />
                           ) : (
@@ -236,7 +236,7 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                               fontSize: '12px'
                             }}>
                               <img 
-                                src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=200&q=80" 
+                                src="https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png" 
                                 alt="기본 이미지"
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 onError={(e) => {

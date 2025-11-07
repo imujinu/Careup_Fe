@@ -199,7 +199,7 @@ function ProductDetailPage() {
           promotionPrice: null,
           discountRate: null,
           imageAlt: foundProduct.productName || "상품 이미지",
-          image: foundProduct.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+          image: foundProduct.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
           category: foundProduct.categoryName || "미분류",
           stock: 0,
           safetyStock: 0,
@@ -214,7 +214,7 @@ function ProductDetailPage() {
           specifications: [
             { name: "카테고리", value: foundProduct.categoryName || "정보 없음" },
           ],
-          images: [foundProduct.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
+          images: [foundProduct.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"],
           relatedProducts: [],
           availableBranches: allBranches, // 모든 상품의 브랜치 통합
           availableBranchCount: allBranches.length,
@@ -293,6 +293,27 @@ function ProductDetailPage() {
         return;
       }
 
+      // 선택된 옵션 정보 추출
+      let attributeName = null;
+      let attributeValue = null;
+      
+      if (product.selectedOptionInfo && Object.keys(product.selectedOptionInfo).length > 0) {
+        const optionKeys = Object.keys(product.selectedOptionInfo);
+        if (optionKeys.length > 0) {
+          const firstOption = product.selectedOptionInfo[optionKeys[0]];
+          attributeName = firstOption.attributeTypeName || null;
+          attributeValue = firstOption.attributeValueName || null;
+          
+          // 여러 옵션이 있는 경우 조합 (예: "Hot, Large")
+          if (optionKeys.length > 1) {
+            const optionValues = optionKeys.map(key => 
+              product.selectedOptionInfo[key].attributeValueName
+            ).filter(Boolean);
+            attributeValue = optionValues.join(', ');
+          }
+        }
+      }
+
       const immediateOrderData = {
         orderId,
         totalAmount,
@@ -303,7 +324,11 @@ function ProductDetailPage() {
           productName: product.name || product.productName,
           price: selectedBranch.price,
           quantity: 1,
-          imageUrl: product.image
+          imageUrl: product.image,
+          attributeName: attributeName,
+          attributeValue: attributeValue,
+          selectedAttributes: product.selectedAttributes || {},
+          selectedOptionInfo: product.selectedOptionInfo || {}
         }],
         branchId: Number(selectedBranch.branchId),
         createdAt: new Date().toISOString(),

@@ -148,7 +148,7 @@ export function useShopSearch() {
         promotionPrice: null,
         discountRate: null,
         imageAlt: item.name || "상품 이미지",
-        image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+        image: item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
         category: item.categoryName || "미분류",
         stock: 0,
         safetyStock: 0,
@@ -163,7 +163,7 @@ export function useShopSearch() {
         specifications: [
           { name: "카테고리", value: item.categoryName || "정보 없음" },
         ],
-        images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
+        images: [item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"],
         relatedProducts: [],
         availableBranches: [],
         availableBranchCount: 0,

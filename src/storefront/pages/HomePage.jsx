@@ -113,8 +113,8 @@ function HomePage() {
             onChange={handleTabChange}
             tabs={["전체", ...Array.from(new Set(categories.map((c) => c.name)))]}
           />
-          <div className="grid">
-            {loadingProducts && (
+          <div className="grid" style={{ position: 'relative' }}>
+            {loadingProducts && products.length === 0 && (
               <div style={{ 
                 gridColumn: "1 / -1", 
                 textAlign: "center", 
@@ -147,7 +147,17 @@ function HomePage() {
                 📦 등록된 상품이 없습니다.
               </div>
             )}
-            {!loadingProducts && !productsError && filteredProducts.slice(0, 12).map((p) => (
+            <div style={{ 
+              opacity: loadingProducts && products.length > 0 ? 0.5 : 1,
+              transition: 'opacity 0.2s ease',
+              pointerEvents: loadingProducts && products.length > 0 ? 'none' : 'auto',
+              width: '100%',
+              gridColumn: "1 / -1",
+              display: 'grid',
+              gridTemplateColumns: 'inherit',
+              gap: 'inherit'
+            }}>
+              {filteredProducts.slice(0, 12).map((p) => (
               <article className="card" key={p.id} onClick={() => handleProductClick(p)} style={{ cursor: "pointer" }}>
                 <button
                   className={`fav-btn${favorites.has(p.id) ? " active" : ""}`}
@@ -174,11 +184,11 @@ function HomePage() {
                 </button>
                 <div className="card-img">
                   <img
-                    src={p.image || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"}
+                    src={p.image || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"}
                     alt={p.imageAlt}
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                      e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                     }}
                     style={{
                       width: "100%",
@@ -217,13 +227,29 @@ function HomePage() {
                       <span className="out-of-stock">품절</span>
                     ) : p.isLowStock ? (
                       <span className="low-stock">재고 부족</span>
-                    ) : (
-                      <span className="in-stock">재고 있음</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </article>
-            ))}
+              ))}
+            </div>
+            {loadingProducts && products.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                background: 'rgba(255, 255, 255, 0.9)',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: "#6b7280",
+                fontSize: '14px',
+                zIndex: 10
+              }}>
+                🔄 업데이트 중...
+              </div>
+            )}
           </div>
         </section>
       </div>

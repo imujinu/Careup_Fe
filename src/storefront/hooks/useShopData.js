@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { customerProductService } from '../../service/customerProductService';
 
@@ -116,6 +116,9 @@ export function useShopData() {
   const [totalElements, setTotalElements] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [favorites, setFavorites] = useState(new Set());
+  const isLoadingRef = useRef(false); // 로딩 중인지 추적
+  const productsRef = useRef([]); // 이전 products 저장
+  const abortControllerRef = useRef(null); // 요청 취소를 위한 AbortController
 
   // 카테고리 로딩
   useEffect(() => {
@@ -184,7 +187,20 @@ export function useShopData() {
   // 상품 로딩
   useEffect(() => {
     async function loadBranchProducts() {
+      // 이전 요청이 있으면 취소하고 로딩 상태 해제
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        isLoadingRef.current = false;
+        setLoadingProducts(false);
+      }
+      
+      // 새로운 AbortController 생성
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      
       try {
+        isLoadingRef.current = true;
+        // 로딩 상태 설정 (이전 데이터가 있어도 로딩 상태 표시)
         setLoadingProducts(true);
         setProductsError(null);
         
@@ -212,8 +228,14 @@ export function useShopData() {
           }
           
           const res = await shopApi.get('/api/public/products/with-branches', {
-            params: params
+            params: params,
+            signal: abortController.signal
           });
+          
+          // 요청이 취소되었는지 확인
+          if (abortController.signal.aborted) {
+            return;
+          }
           
           const responseData = res?.data?.data;
           const isPageResponse = responseData && typeof responseData === 'object' && 'content' in responseData;
@@ -289,7 +311,7 @@ export function useShopData() {
               promotionPrice: null,
               discountRate: null,
               imageAlt: item.productName || "상품 이미지",
-              image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+              image: item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
               category: item.categoryName || "미분류",
               stock: 0,
               safetyStock: 0,
@@ -304,7 +326,7 @@ export function useShopData() {
               specifications: [
                 { name: "카테고리", value: item.categoryName || "정보 없음" },
               ],
-              images: [item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
+              images: [item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"],
               relatedProducts: [],
               availableBranches: item.availableBranches || [],
               availableBranchCount: item.availableBranchCount || 0,
@@ -333,22 +355,46 @@ export function useShopData() {
           const endIndex = startIndex + targetSize;
           const paginatedProducts = groupedProducts.slice(startIndex, endIndex);
         
+          // 로딩이 완료된 후에만 products 업데이트 (깜빡임 방지)
           setProducts(paginatedProducts);
+          productsRef.current = paginatedProducts; // ref에도 저장
           // 그룹화 후 실제 상품 수를 기반으로 페이지네이션 정보 업데이트
           setTotalPages(groupedTotalPages);
           setTotalElements(groupedTotalElements);
       } catch (e) {
+        // 요청 취소로 인한 에러는 무시
+        if (e.name === 'AbortError' || e.name === 'CanceledError' || abortController.signal.aborted) {
+          return;
+        }
+        
         console.error('❌ 상품 로딩 실패:', e);
         setProductsError(e?.message || "상품을 불러오지 못했습니다.");
-        setProducts([]);
+        // 에러 발생 시에만 products를 빈 배열로 설정 (이전 데이터가 있으면 유지)
+        if (productsRef.current.length === 0) {
+          setProducts([]);
+          productsRef.current = [];
+        }
         setTotalPages(0);
         setTotalElements(0);
       } finally {
-        setLoadingProducts(false);
+        // 요청이 취소되지 않았을 때만 로딩 상태 해제
+        if (!abortController.signal.aborted && abortControllerRef.current === abortController) {
+          setLoadingProducts(false);
+          isLoadingRef.current = false;
+        }
+        // 현재 요청이면 ref 초기화
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
       }
     }
     loadBranchProducts();
   }, [currentPage, selectedCategoryId]);
+
+  // products 상태가 변경될 때 ref도 동기화
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
 
   const getCategoryIdByName = (categoryName) => {
     if (!categoryName || categoryName === '전체') return null;

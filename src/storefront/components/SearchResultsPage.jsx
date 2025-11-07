@@ -117,11 +117,11 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                 </button>
                 <div className="card-img">
                   <img
-                    src={product.image || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"}
+                    src={product.image || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"}
                     alt={product.imageAlt || product.name}
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                      e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                     }}
                     style={{
                       width: "100%",
@@ -155,18 +155,6 @@ function SearchResultsPage({ searchQuery, searchResults, isSearching, searchErro
                   <div className="price-section">
                     {renderPrice(product)}
                   </div>
-                  <button 
-                    className={`add-to-cart-btn ${product.isOutOfStock ? 'disabled' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!product.isOutOfStock) {
-                        onAddToCart(product);
-                      }
-                    }}
-                    disabled={product.isOutOfStock}
-                  >
-                    {product.isOutOfStock ? '품절' : '장바구니 담기'}
-                  </button>
                 </div>
               </article>
             ))}

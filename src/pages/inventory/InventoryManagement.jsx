@@ -906,7 +906,7 @@ function InventoryManagement() {
       const branchProductId = selectedItem?.branchProductId || selectedItem?.id;
       
       // 상품 정보 수정 (이름, 카테고리, 이미지 등)
-      if (productId && (formData.productName || formData.category || formData.imageFile || formData.removeImage || formData.minPrice !== undefined || formData.maxPrice !== undefined || formData.unitPrice !== undefined)) {
+      if (productId && (formData.productName || formData.category || formData.imageFile || formData.removeImage || formData.minPrice !== undefined || formData.maxPrice !== undefined || formData.unitPrice !== undefined || formData.description !== undefined)) {
         try {
           // 기존 상품 정보 가져오기
           const productResponse = await inventoryService.getProduct(productId);
@@ -919,7 +919,7 @@ function InventoryManagement() {
           // 상품 수정 API 호출
           await inventoryService.updateProduct(productId, {
             name: formData.productName || existingProduct.name,
-            description: existingProduct.description || '',
+            description: formData.description !== undefined ? formData.description : (existingProduct.description || ''),
             categoryId: formData.category || existingProduct.categoryId || existingProduct.category?.categoryId,
             minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
             maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),
@@ -961,7 +961,7 @@ function InventoryManagement() {
             
             await inventoryService.updateProduct(productId, {
               name: existingProduct.name,
-              description: existingProduct.description || '',
+              description: formData.description !== undefined ? formData.description : (existingProduct.description || ''),
               categoryId: formData.category || existingProduct.categoryId || existingProduct.category?.categoryId,
               minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
               maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),

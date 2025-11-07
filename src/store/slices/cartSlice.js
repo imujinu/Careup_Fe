@@ -9,7 +9,19 @@ const cartSlice = createSlice({
   },
   reducers: {
     addToCart: (state, action) => {
-      const { productId, branchProductId, branchId, productName, price, quantity = 1, imageUrl } = action.payload;
+      const { 
+        productId, 
+        branchProductId, 
+        branchId, 
+        productName, 
+        price, 
+        quantity = 1, 
+        imageUrl,
+        attributeName,
+        attributeValue,
+        selectedAttributes,
+        selectedOptionInfo
+      } = action.payload;
       
       // 다른 지점의 상품인지 확인
       if (state.branchId && state.branchId !== branchId) {
@@ -21,8 +33,29 @@ const cartSlice = createSlice({
         state.branchId = branchId;
       }
       
-      // 이미 장바구니에 있는 상품인지 확인
-      const existingItem = state.items.find(item => item.branchProductId === branchProductId);
+      // 이미 장바구니에 있는 상품인지 확인 (옵션도 고려)
+      // 같은 branchProductId이고 같은 옵션인 경우에만 수량 증가
+      const existingItem = state.items.find(item => {
+        if (item.branchProductId !== branchProductId) return false;
+        // 옵션이 있는 경우 옵션도 비교
+        if (selectedAttributes && Object.keys(selectedAttributes).length > 0) {
+          const itemAttrs = item.selectedAttributes || {};
+          const newAttrs = selectedAttributes || {};
+          // 옵션 키와 값이 모두 일치해야 함
+          const itemKeys = Object.keys(itemAttrs).sort();
+          const newKeys = Object.keys(newAttrs).sort();
+          if (itemKeys.length !== newKeys.length) return false;
+          return itemKeys.every(key => 
+            String(itemAttrs[key]) === String(newAttrs[key])
+          );
+        }
+        // 옵션이 없는 경우 attributeName/attributeValue로 비교
+        if (attributeName || attributeValue) {
+          return item.attributeName === attributeName && item.attributeValue === attributeValue;
+        }
+        // 옵션이 없는 경우
+        return !item.selectedAttributes || Object.keys(item.selectedAttributes).length === 0;
+      });
       
       if (existingItem) {
         existingItem.quantity += quantity;
@@ -35,6 +68,10 @@ const cartSlice = createSlice({
           price,
           quantity,
           imageUrl,
+          attributeName: attributeName || null,
+          attributeValue: attributeValue || null,
+          selectedAttributes: selectedAttributes || {},
+          selectedOptionInfo: selectedOptionInfo || {}
         });
       }
       

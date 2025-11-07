@@ -845,6 +845,91 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     }
   };
 
+  // 상품 설명에 이미지 삽입 핸들러
+  const handleInsertDescriptionImage = async () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // 이미지 파일만 허용
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return;
+      }
+
+      // 파일 크기 제한 (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 파일 크기는 10MB 이하로 제한됩니다.');
+        return;
+      }
+
+      try {
+        // 업로드 시작 알림
+        alert('이미지 업로드 중...');
+        
+        // 이미지 업로드
+        const imageUrl = await inventoryService.uploadDescriptionImage(file);
+        
+        console.log('업로드된 이미지 URL:', imageUrl);
+        
+        if (!imageUrl) {
+          alert('이미지 URL을 받지 못했습니다. 응답을 확인해주세요.');
+          console.error('API 응답:', imageUrl);
+          return;
+        }
+        
+        // textarea 찾기 (여러 방법 시도)
+        let textarea = document.getElementById('addProductDescription');
+        if (!textarea) {
+          textarea = document.querySelector('textarea[placeholder*="상품에 대한 설명"]');
+        }
+        if (!textarea) {
+          // 모든 textarea 중에서 찾기
+          const textareas = document.querySelectorAll('textarea');
+          textarea = Array.from(textareas).find(ta => 
+            ta.placeholder && ta.placeholder.includes('상품에 대한 설명')
+          );
+        }
+        
+        if (textarea) {
+          const start = textarea.selectionStart || 0;
+          const end = textarea.selectionEnd || 0;
+          const text = formData.description || '';
+          const imageTag = `<img src="${imageUrl}" alt="상품 설명 이미지" style="max-width: 100%; height: auto;" />`;
+          const newText = text.substring(0, start) + imageTag + text.substring(end);
+          handleInputChange('description', newText);
+          
+          // 커서 위치 조정
+          setTimeout(() => {
+            textarea.focus();
+            const newPosition = start + imageTag.length;
+            textarea.setSelectionRange(newPosition, newPosition);
+          }, 100);
+          
+          alert('이미지가 삽입되었습니다.');
+        } else {
+          // textarea를 찾을 수 없으면 끝에 추가
+          const imageTag = `<img src="${imageUrl}" alt="상품 설명 이미지" style="max-width: 100%; height: auto;" />`;
+          const currentDescription = formData.description || '';
+          handleInputChange('description', currentDescription + (currentDescription ? '\n' : '') + imageTag);
+          alert('이미지가 설명 끝에 추가되었습니다.');
+        }
+      } catch (error) {
+        console.error('이미지 업로드 실패:', error);
+        console.error('에러 상세:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
+        alert('이미지 업로드에 실패했습니다: ' + (error.response?.data?.status_message || error.response?.data?.message || error.message));
+      }
+    };
+    fileInput.click();
+  };
+
   const handleSave = async () => {
     try {
       // 필수 항목 검증 - 상품명과 카테고리 먼저 검증
@@ -1029,18 +1114,46 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: '12px'
+                  fontSize: '12px',
+                  whiteSpace: 'nowrap'
                 }
               }, '+ 카테고리 추가')
             )
           ),
-          React.createElement(FormGroup, null,
-            React.createElement(Label, null, '상품설명'),
+          React.createElement(FormGroup, { style: { marginTop: '24px' } },
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } },
+              React.createElement(Label, { style: { margin: 0 } }, '상품설명'),
+              React.createElement('button', {
+                type: 'button',
+                onClick: handleInsertDescriptionImage,
+                style: {
+                  padding: '8px 12px',
+                  backgroundColor: '#6b46c1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap'
+                }
+              },
+                React.createElement('span', null, '📷'),
+                React.createElement('span', null, '이미지 삽입')
+              )
+            ),
             React.createElement(TextArea, {
-              placeholder: '상품에 대한 설명을 입력하세요',
+              id: 'addProductDescription',
+              placeholder: '상품에 대한 설명을 입력하세요. 이미지를 삽입하려면 위의 "이미지 삽입" 버튼을 클릭하세요.',
               value: formData.description,
-              onChange: (e) => handleInputChange('description', e.target.value)
-            })
+              onChange: (e) => handleInputChange('description', e.target.value),
+              style: { minHeight: '120px' }
+            }),
+            React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
+              '💡 이미지를 삽입하면 HTML 형식으로 저장됩니다.'
+            )
           ),
           // 속성 선택 섹션
           React.createElement(FormGroup, null,
