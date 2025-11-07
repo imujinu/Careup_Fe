@@ -3,7 +3,7 @@
 import axios from 'axios';
 import { decodeToken } from '../utils/jwt';
 
-const AUTH_API_URL = import.meta.env.VITE_CUSTOMER_AUTH_URL;
+const AUTH_API_URL = "https://server.careup.store/branch-service/auth/login";
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem('accessToken'),
