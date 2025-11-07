@@ -1,7 +1,7 @@
 import axios from '../utils/axiosConfig';
 
 // API Gateway를 통해 ordering 서버로 라우팅 (다른 서비스들과 동일)
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BRANCH_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_CUSTOMER_API_URL;
 
 /**
  * 단골고객 관리 서비스
