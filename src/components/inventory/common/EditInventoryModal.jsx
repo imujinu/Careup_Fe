@@ -842,6 +842,45 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     }
   };
 
+  // 속성 타입 삭제 핸들러
+  const handleDeleteAttributeType = async (categoryAttr) => {
+    const typeName = categoryAttr.attributeTypeName || categoryAttr.attributeType?.name || '속성 타입';
+    
+    if (!window.confirm(`'${typeName}' 속성 타입을 삭제하시겠습니까?\n\n주의: 이 속성 타입과 연결된 모든 속성 값도 함께 삭제됩니다.`)) {
+      return;
+    }
+
+    try {
+      const categoryAttributeId = categoryAttr.id || categoryAttr.categoryAttributeId;
+      if (!categoryAttributeId) {
+        alert('속성 타입 ID를 찾을 수 없습니다.');
+        return;
+      }
+
+      await inventoryService.deleteCategoryAttribute(categoryAttributeId);
+      
+      // 선택된 속성 값에서도 제거
+      const typeId = String(categoryAttr.attributeTypeId || categoryAttr.attributeType?.id || categoryAttr.id);
+      setSelectedAttributeValues(prev => {
+        const newState = { ...prev };
+        delete newState[typeId];
+        return newState;
+      });
+
+      // 속성 목록 다시 로드
+      setTimeout(async () => {
+        if (formData.category) {
+          await fetchCategoryAttributes(formData.category);
+        }
+      }, 300);
+
+      alert(`'${typeName}' 속성 타입이 삭제되었습니다.`);
+    } catch (error) {
+      console.error('속성 타입 삭제 실패:', error);
+      alert(error.response?.data?.status_message || '속성 타입 삭제에 실패했습니다.');
+    }
+  };
+
   // 속성 값 추가 핸들러
   const handleAddAttributeValue = async (e) => {
     e.preventDefault();
@@ -1304,9 +1343,31 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
               const hasSelectedValue = selectedValueId != null;
               
               return React.createElement(AttributeSection, { key: categoryAttr.id || categoryAttr.categoryAttributeId },
-                React.createElement(AttributeTypeTitle, null,
-                  categoryAttr.attributeTypeName || categoryAttr.attributeType?.name,
-                  categoryAttr.isRequired && React.createElement('span', { className: 'required' }, '*')
+                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } },
+                  React.createElement(AttributeTypeTitle, { style: { margin: 0 } },
+                    categoryAttr.attributeTypeName || categoryAttr.attributeType?.name,
+                    categoryAttr.isRequired && React.createElement('span', { className: 'required' }, '*')
+                  ),
+                  React.createElement('button', {
+                    type: 'button',
+                    onClick: () => handleDeleteAttributeType(categoryAttr),
+                    style: {
+                      padding: '4px 8px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    },
+                    title: '속성 타입 삭제'
+                  },
+                    React.createElement('span', null, '🗑️'),
+                    React.createElement('span', null, '삭제')
+                  )
                 ),
                 loadingAttributes ? React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '속성 로딩 중...') :
                 React.createElement(React.Fragment, null,

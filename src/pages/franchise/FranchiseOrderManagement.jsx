@@ -358,7 +358,8 @@ function FranchiseOrderManagement() {
 
     try {
       const userInfo = authService.getCurrentUser();
-      const rejectedBy = userInfo?.id || 1;
+      const rejectedBy = userInfo?.id || userInfo?.employeeId || 1;
+      const rejectedByName = userInfo?.name || '-';
       await orderService.rejectOrder(orderId, rejectReason, rejectedBy);
       alert('주문이 거부되었습니다.');
       fetchOrders(); // 목록 새로고침
@@ -374,7 +375,8 @@ function FranchiseOrderManagement() {
 
     try {
       const userInfo = authService.getCurrentUser();
-      const rejectedBy = userInfo?.id || 1;
+      const rejectedBy = userInfo?.id || userInfo?.employeeId || 1;
+      const rejectedByName = userInfo?.name || '-';
       await orderService.rejectOrder(pendingRejectOrderId, reason, rejectedBy);
       alert('주문이 거부되었습니다.');
       setIsRejectModalOpen(false);
@@ -562,7 +564,7 @@ function FranchiseOrderManagement() {
             handleApprove(orderId);
             setIsDetailModalOpen(false);
           }}
-          onReject={(orderId, reason, rejectedBy) => {
+          onReject={(orderId, reason, rejectedBy, rejectedByName) => {
             handleReject(orderId, reason);
             setIsDetailModalOpen(false);
           }}

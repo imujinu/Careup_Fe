@@ -283,8 +283,9 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
   const handleRejectConfirm = (reason) => {
     const orderId = order.orderId || order.id;
     const userInfo = authService.getCurrentUser();
-    const rejectedBy = userInfo?.id || 1;
-    onReject(orderId, reason, rejectedBy);
+    const rejectedBy = userInfo?.id || userInfo?.employeeId || 1;
+    const rejectedByName = userInfo?.name || '-';
+    onReject(orderId, reason, rejectedBy, rejectedByName);
     setIsRejectModalOpen(false);
   };
 
@@ -384,7 +385,7 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
               InfoItem,
               {},
               React.createElement(InfoLabel, {}, '거부자'),
-              React.createElement(InfoValue, {}, order.rejectedByName || (order.rejectedBy ? `ID: ${order.rejectedBy}` : '-'))
+              React.createElement(InfoValue, {}, order.rejectedByName || '-')
             ),
             normalizedStatus === 'REJECTED' && React.createElement(
               InfoItem,

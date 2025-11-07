@@ -6,10 +6,26 @@ import axios from 'axios';
 
 const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const dispatch = useDispatch();
-  const { items, branchId, totalAmount } = useSelector(state => state.cart);
+  const { items, branchId, totalAmount } = useSelector(state => {
+    console.log('🛒 CartPage Redux store 읽기:', {
+      itemsCount: state.cart?.items?.length || 0,
+      items: state.cart?.items,
+      branchId: state.cart?.branchId,
+      totalAmount: state.cart?.totalAmount,
+      fullState: state.cart
+    });
+    return state.cart;
+  });
   // 수량 입력 중 임시 값 저장
   const [quantityInputs, setQuantityInputs] = useState({});
   const selectedBranch = useSelector(state => state.branch.selectedBranch);
+  
+  console.log('🛒 CartPage 렌더링:', {
+    itemsCount: items?.length || 0,
+    items,
+    branchId,
+    totalAmount
+  });
   
   const [loading, setLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
@@ -158,17 +174,40 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
   const handleBranchSelect = (item, branchProductId) => {
     const productId = item.productId;
     const itemKey = getItemKey(item);
+    const numericBranchProductId = Number(branchProductId);
+    
+    console.log('📍 장바구니 지점 선택:', {
+      itemKey,
+      branchProductId,
+      numericBranchProductId,
+      availableBranches: availableBranches[productId]?.length || 0
+    });
+    
+    if (isNaN(numericBranchProductId) || numericBranchProductId <= 0) {
+      console.error('❌ 유효하지 않은 branchProductId:', branchProductId);
+      return;
+    }
+    
     setSelectedBranches(prev => ({
       ...prev,
-      [itemKey]: String(branchProductId)
+      [itemKey]: String(numericBranchProductId)
     }));
+    
     // 스토어에도 선택 정보 반영 (선택된 branchProductId/가격 포함)
-    const branch = availableBranches[productId]?.find(b => String(b.branchProductId) === String(branchProductId));
+    const branch = availableBranches[productId]?.find(b => String(b.branchProductId) === String(numericBranchProductId));
+    
+    console.log('📍 찾은 지점:', branch ? {
+      branchName: branch.branchName,
+      branchId: branch.branchId,
+      branchProductId: branch.branchProductId,
+      price: branch.price
+    } : '없음');
+    
     dispatch(setItemBranchSelection({
       productId,
-        selectedBranchId: branch?.branchId ? Number(branch.branchId) : item.selectedBranchId || item.branchId || null,
-        selectedBranchProductId: branch?.branchProductId ? Number(branch.branchProductId) : item.selectedBranchProductId || item.branchProductId || null,
-        selectedPrice: branch?.price ?? item.selectedPrice ?? item.price
+      selectedBranchId: branch?.branchId ? Number(branch.branchId) : item.selectedBranchId || item.branchId || null,
+      selectedBranchProductId: branch?.branchProductId ? Number(branch.branchProductId) : item.selectedBranchProductId || item.branchProductId || null,
+      selectedPrice: branch?.price ?? item.selectedPrice ?? item.price
     }));
   };
 
@@ -423,7 +462,14 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
     }
   };
 
-  if (items.length === 0) {
+  console.log('🛒 CartPage 렌더링 체크:', {
+    itemsLength: items?.length || 0,
+    items,
+    isEmpty: !items || items.length === 0
+  });
+
+  if (!items || items.length === 0) {
+    console.log('⚠️ 장바구니가 비어있음 - 빈 화면 표시');
     return (
       <div className="container cart-page">
         <div className="empty-cart">
@@ -481,25 +527,40 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
               ? availableBranches[item.productId]
               : referenceList;
 
+            console.log('🔍 branchList 구성:', {
+              productId: item.productId,
+              availableBranchesCount: availableBranches[item.productId]?.length || 0,
+              referenceListCount: referenceList.length,
+              rawBranchListCount: rawBranchList?.length || 0,
+              fallbackBranchProductId: fallbackBranch.branchProductId,
+              fallbackBranchName: fallbackBranch.branchName
+            });
+
             const branchMap = new Map();
+            // availableBranches의 데이터를 먼저 추가 (최신 데이터 우선)
             if (rawBranchList && rawBranchList.length > 0) {
               rawBranchList.forEach(bp => {
                 if (bp && bp.branchProductId) {
-                  branchMap.set(String(bp.branchProductId), { ...bp });
+                  const key = String(bp.branchProductId);
+                  // 이미 있는 경우 덮어쓰지 않음 (첫 번째 데이터가 우선)
+                  if (!branchMap.has(key)) {
+                    branchMap.set(key, { ...bp });
+                    console.log(`✅ branchMap에 추가: ${key} - ${bp.branchName} (branchId: ${bp.branchId})`);
+                  }
                 }
               });
             }
+            // fallbackBranch는 availableBranches에 없는 경우에만 추가
             if (fallbackBranch.branchProductId) {
               const key = String(fallbackBranch.branchProductId);
-              const existing = branchMap.get(key) || {};
-              branchMap.set(key, {
-                ...existing,
-                ...fallbackBranch,
-                stockQuantity: fallbackBranch.stockQuantity ?? existing.stockQuantity,
-                price: fallbackBranch.price ?? existing.price,
-                branchName: fallbackBranch.branchName || existing.branchName,
-                branchId: fallbackBranch.branchId || existing.branchId,
-              });
+              const existing = branchMap.get(key);
+              if (!existing) {
+                // availableBranches에 없을 때만 fallbackBranch 추가
+                branchMap.set(key, { ...fallbackBranch });
+                console.log(`⚠️ fallbackBranch 추가: ${key} - ${fallbackBranch.branchName}`);
+              } else {
+                console.log(`ℹ️ fallbackBranch 무시 (기존 데이터 있음): ${key} - 기존: ${existing.branchName}, fallback: ${fallbackBranch.branchName}`);
+              }
             }
             const branchList = branchMap.size > 0
               ? Array.from(branchMap.values())
@@ -509,8 +570,31 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
               ?? item.branchProductId
               ?? '';
             const selectedBranchProductValue = selectedBranchProductId ? String(selectedBranchProductId) : '';
-            let selectedBranch = branchList.find(b => String(b.branchProductId) === String(selectedBranchProductId));
+            
+            console.log('🛒 장바구니 아이템 렌더링:', {
+              itemKey,
+              selectedBranchProductId,
+              selectedBranchProductValue,
+              branchListLength: branchList.length,
+              itemBranchProductId: item.branchProductId,
+              branchListBranchProductIds: branchList.map(b => b.branchProductId)
+            });
+            
+            let selectedBranch = null;
+            if (selectedBranchProductId) {
+              selectedBranch = branchList.find(b => {
+                const match = String(b.branchProductId) === String(selectedBranchProductId);
+                console.log(`🔍 지점 찾기: ${b.branchProductId} === ${selectedBranchProductId}? ${match}`, {
+                  branchName: b.branchName,
+                  branchProductId: b.branchProductId,
+                  selectedBranchProductId
+                });
+                return match;
+              });
+            }
+            
             if (!selectedBranch && item.branchProductId && String(item.branchProductId) === String(selectedBranchProductId)) {
+              console.log('⚠️ fallback 지점 사용:', item.branchName);
               selectedBranch = {
                 branchProductId: item.branchProductId,
                 branchId: item.branchId,
@@ -522,6 +606,12 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
                 attributeValueName: item.attributeValueName
               };
             }
+            
+            console.log('✅ 최종 selectedBranch:', selectedBranch ? {
+              branchName: selectedBranch.branchName,
+              branchProductId: selectedBranch.branchProductId,
+              branchId: selectedBranch.branchId
+            } : '없음');
             const optionList = Array.isArray(item.options) && item.options.length > 0
               ? item.options
               : (item.attributeName || item.attributeValue)
@@ -556,7 +646,17 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
                   </div>
                 )}
                 <div className="item-price">
-                  {(selectedBranch?.price || item.price).toLocaleString()}원
+                  {(() => {
+                    const displayPrice = selectedBranch?.price ?? item.selectedPrice ?? item.price;
+                    console.log('💰 가격 표시:', {
+                      selectedBranchPrice: selectedBranch?.price,
+                      itemSelectedPrice: item.selectedPrice,
+                      itemPrice: item.price,
+                      displayPrice,
+                      selectedBranchName: selectedBranch?.branchName
+                    });
+                    return displayPrice.toLocaleString();
+                  })()}원
                 </div>
                 
                 {/* 지점 선택 드롭다운 */}
@@ -564,13 +664,16 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
                   <label style={{ marginRight: 8 }}>구매 지점:</label>
                   <select
                     value={selectedBranchProductValue}
-                    onChange={(e) => handleBranchSelect(item, e.target.value)}
+                    onChange={(e) => {
+                      console.log('📍 드롭다운 변경:', e.target.value);
+                      handleBranchSelect(item, e.target.value);
+                    }}
                     className="branch-select"
                   >
                     <option value="">지점을 선택하세요</option>
                     {branchList.map(branch => (
-                      <option key={`${item.productId}-${branch.branchProductId}`} value={branch.branchProductId}>
-                        {branch.branchName || `지점 ${branch.branchId}`} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
+                      <option key={`${item.productId}-${branch.branchProductId}`} value={String(branch.branchProductId)}>
+                        {branch.branchName || `지점 ${branch.branchId}`} (재고: {branch.stockQuantity || 0}개, 가격: {branch.price?.toLocaleString() || '0'}원)
                       </option>
                     ))}
                   </select>

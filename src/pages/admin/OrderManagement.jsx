@@ -294,15 +294,22 @@ function OrderManagement() {
     fetchOrders();
   }, []);
 
-  // 필터링된 주문 목록
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.id.toString().includes(searchTerm);
-    const matchesStatus = !statusFilter || order.status === statusFilter;
+  // 필터링된 주문 목록 (주문번호 최신순 정렬)
+  const filteredOrders = orders
+    .filter((order) => {
+      const matchesSearch =
+        order.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toString().includes(searchTerm);
+      const matchesStatus = !statusFilter || order.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // 주문번호 기준 최신순 정렬 (내림차순)
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
+      return idB - idA;
+    });
 
   // 통계 계산
   const summary = {
@@ -353,11 +360,12 @@ function OrderManagement() {
 
     try {
       const userInfo = authService.getCurrentUser();
-      const rejectedBy = userInfo?.id || 1;
+      const rejectedBy = userInfo?.id || userInfo?.employeeId || 1;
+      const rejectedByName = userInfo?.name || '-';
       await orderService.rejectOrder(orderId, rejectReason, rejectedBy);
       alert('주문이 거부되었습니다.');
-      // 즉시 카운팅 반영 + 거부자 기록
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'REJECTED', rejectedBy } : o)));
+      // 즉시 카운팅 반영 + 거부자 기록 (이름 포함)
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'REJECTED', rejectedBy, rejectedByName } : o)));
     } catch (error) {
       console.error('주문 거부 실패:', error);
       alert('주문 거부에 실패했습니다.');
@@ -544,7 +552,7 @@ function OrderManagement() {
             handleApprove(orderId);
             setIsDetailModalOpen(false);
           }}
-          onReject={(orderId, reason, rejectedBy) => {
+          onReject={(orderId, reason, rejectedBy, rejectedByName) => {
             handleReject(orderId, reason);
             setIsDetailModalOpen(false);
           }}

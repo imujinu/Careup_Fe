@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { Icon } from '@mdi/react';
 import { mdiCash, mdiPackageVariant, mdiAlertCircle, mdiTrendingUp } from '@mdi/js';
-import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useAppSelector } from '../../stores/hooks';
 import { salesReportService } from '../../service/salesReportService';
 import orderService from '../../service/orderService';
@@ -60,6 +60,14 @@ const ChartCard = styled.div`
 
 const Grid2 = styled.div`
   display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+`;
+
+const GridLeftRight = styled.div`
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+`;
+
+const ChartsColumn = styled.div`
+  display: flex; flex-direction: column; gap: 16px;
 `;
 
 const Table = styled.table`
@@ -204,21 +212,36 @@ function FranchiseDashboard() {
         </KPICard>
       </KPI>
 
-      <Grid2>
-        <ChartCard>
-          <div style={{fontWeight:600, marginBottom:12}}>일별 매출 추이 (천원)</div>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="sales" name="매출(천원)" stroke="#10b981" strokeWidth={2} />
-              <Line type="monotone" dataKey="orders" name="주문수" stroke="#3b82f6" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      <GridLeftRight>
+        <ChartsColumn>
+          <ChartCard>
+            <div style={{fontWeight:600, marginBottom:12}}>일별 매출 추이 (금액)</div>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={chartData} barCategoryGap="20%" maxBarSize={100}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" />
+                <YAxis />
+                <Tooltip formatter={(value) => `${value}천원`} />
+                <Legend />
+                <Bar dataKey="sales" name="매출(천원)" fill="#10b981" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard>
+            <div style={{fontWeight:600, marginBottom:12}}>일별 주문 추이 (주문 수)</div>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={chartData} barCategoryGap="20%" maxBarSize={100}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" />
+                <YAxis />
+                <Tooltip formatter={(value) => `${value}건`} />
+                <Legend />
+                <Bar dataKey="orders" name="주문수" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </ChartsColumn>
 
         <ChartCard>
           <div style={{fontWeight:600, marginBottom:12}}>최근 주문</div>
@@ -247,7 +270,7 @@ function FranchiseDashboard() {
             </tbody>
           </Table>
         </ChartCard>
-      </Grid2>
+      </GridLeftRight>
     </Page>
   );
 }

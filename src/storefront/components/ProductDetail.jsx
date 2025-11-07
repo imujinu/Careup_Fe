@@ -214,11 +214,19 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       }
     }
     
-    // 지점 선택 확인 (옵션이 없는 경우에도 지점이 필요할 수 있음)
-    if (product?.availableBranches && product.availableBranches.length > 0 && !resolvedSelectedBranch) {
-      alert('구매 지점을 선택해주세요.');
-      return;
-    }
+    // 지점 선택은 필수가 아님 - 장바구니에서 선택하도록 함
+    console.log('🛒 ProductDetail - 장바구니 추가 버튼 클릭:', {
+      resolvedSelectedBranch: resolvedSelectedBranch ? {
+        branchName: resolvedSelectedBranch.branchName,
+        branchId: resolvedSelectedBranch.branchId,
+        branchProductId: resolvedSelectedBranch.branchProductId
+      } : null,
+      product: {
+        productId: product?.productId,
+        name: product?.name,
+        availableBranches: product?.availableBranches?.length || 0
+      }
+    });
     
     setIsInCart(true);
     if (onAddToCart) {
@@ -229,9 +237,13 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
         selectedBranchId: branchData?.branchId,
         selectedBranchProductId: branchData?.branchProductId,
         selectedBranchKey: getBranchKey(branchData),
-        selectedOptions
+        selectedOptions,
+        availableBranches: product?.availableBranches || []
       };
+      console.log('📤 ProductDetail - onAddToCart 호출:', productWithBranch);
       onAddToCart(productWithBranch);
+    } else {
+      console.error('❌ onAddToCart 함수가 없습니다!');
     }
   };
 
@@ -500,7 +512,13 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   className="size-select branch-select"
                   value={resolvedSelectedBranch ? getBranchKey(resolvedSelectedBranch) : ''}
                   onChange={(e) => {
+                    console.log('📍 지점 선택 변경:', e.target.value);
                     const branch = product.availableBranches.find(b => getBranchKey(b) === e.target.value);
+                    console.log('📍 찾은 지점:', branch ? {
+                      branchName: branch.branchName,
+                      branchId: branch.branchId,
+                      branchProductId: branch.branchProductId
+                    } : '없음');
                     setSelectedBranch(branch || null);
                   }}
                 >
@@ -684,12 +702,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
             >
               상품설명
             </button>
-            <button
-              className={`tab-btn ${activeTab === "qa" ? "active" : ""}`}
-              onClick={() => setActiveTab("qa")}
-            >
-              구매정보
-            </button>
           </div>
 
           {/* 상품 설명 탭 */}
@@ -759,24 +771,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   </div>
                 )}
 
-                {/* 관리 방법 */}
-                <div className="care-instructions">
-                  <h4>관리 방법</h4>
-                  <ul>
-                    <li>단독 손세탁하여 주십시오.</li>
-                    <li>열과 수축에 주의하여 주십시오.</li>
-                    <li>이염에 주의하여 주십시오.</li>
-                    <li>건조기 사용을 지양해 주십시오.</li>
-                  </ul>
-                </div>
-
-                {/* 색상 안내 */}
-                <div className="color-notice">
-                  <ul>
-                    <li>품의 색상은 상품 상세 이미지와 가장 흡사함으로 해당 이미지를 참고해주세요.</li>
-                    <li>모니터에 따라 컬러의 오차가 있을 수 있습니다.</li>
-                  </ul>
-                </div>
 
                 {/* 상품 이미지 */}
                 {product?.image && (
@@ -791,35 +785,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                     />
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* 구매정보 탭 */}
-          {activeTab === "qa" && (
-            <div className="qa-content">
-              <div className="purchase-info">
-                <h3>구매 안내</h3>
-                <div className="info-section">
-                  <h4>배송 정보</h4>
-                  <p>• 배송비: 무료 배송</p>
-                  <p>• 배송 소요일: 1-3일</p>
-                </div>
-                <div className="info-section">
-                  <h4>교환/환불 안내</h4>
-                  <p>• 제품 하자 또는 오배송 시 100% 재발송 또는 환불 처리</p>
-                  <p>• 고객 단순 변심 시 7일 이내 교환/환불 가능</p>
-                </div>
-                <div className="info-section">
-                  <h4>결제 안내</h4>
-                  <p>• 무통장입금 / 카드결제 / 휴대폰결제</p>
-                  <p>• 할부 결제 가능 (3개월 무이자)</p>
-                </div>
-                <div className="info-section">
-                  <h4>포인트 적립</h4>
-                  <p>• 구매금액의 1% 포인트 적립</p>
-                  <p>• 다음 결제 시 사용 가능</p>
-                </div>
               </div>
             </div>
           )}

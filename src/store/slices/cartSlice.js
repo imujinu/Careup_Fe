@@ -22,17 +22,32 @@ const cartSlice = createSlice({
         stockQuantity,
         attributeTypeName,
         attributeValueId,
-        attributeValueName
+        attributeValueName,
+        attributeName,
+        attributeValue,
+        selectedAttributes
       } = action.payload;
+      
+      console.log('🛒 Redux addToCart 호출:', {
+        productId,
+        branchProductId,
+        branchId,
+        productName,
+        currentBranchId: state.branchId,
+        currentItemsCount: state.items.length
+      });
       
       // 다른 지점의 상품인지 확인
       if (state.branchId && branchId && state.branchId !== branchId) {
-        throw new Error('다른 지점의 상품은 담을 수 없습니다. 지점을 변경하면 장바구니가 비워집니다.');
+        const errorMsg = '다른 지점의 상품은 담을 수 없습니다. 지점을 변경하면 장바구니가 비워집니다.';
+        console.error('❌ 지점 불일치:', { currentBranchId: state.branchId, newBranchId: branchId });
+        throw new Error(errorMsg);
       }
       
       // 첫 상품이거나 같은 지점 상품
       if (!state.branchId && branchId) {
         state.branchId = branchId;
+        console.log('✅ 첫 상품 추가, 지점 설정:', branchId);
       }
       
       // 이미 장바구니에 있는 상품인지 확인 (옵션도 고려)
@@ -59,7 +74,10 @@ const cartSlice = createSlice({
         return !item.selectedAttributes || Object.keys(item.selectedAttributes).length === 0;
       });
       
+      console.log('🔍 기존 아이템 찾기:', existingItem ? '찾음' : '없음');
+      
       if (existingItem) {
+        console.log('➕ 기존 아이템 수량 증가:', existingItem.quantity, '->', existingItem.quantity + quantity);
         existingItem.quantity += quantity;
         if (options && options.length > 0) {
           existingItem.options = options;
@@ -70,6 +88,7 @@ const cartSlice = createSlice({
         if (attributeValueId) existingItem.attributeValueId = attributeValueId;
         if (attributeValueName) existingItem.attributeValueName = attributeValueName;
       } else {
+        console.log('➕ 새 아이템 추가:', { productName, branchProductId, branchId });
         state.items.push({
           productId,
           branchProductId,
@@ -84,11 +103,19 @@ const cartSlice = createSlice({
           attributeTypeName,
           attributeValueId,
           attributeValueName,
+          attributeName,
+          attributeValue,
+          selectedAttributes
         });
       }
       
       // 총 금액 계산
       state.totalAmount = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      console.log('✅ 장바구니 업데이트 완료:', {
+        itemsCount: state.items.length,
+        totalAmount: state.totalAmount,
+        branchId: state.branchId
+      });
     },
     
     // 각 상품에 선택된 지점 정보를 저장 (주문 전 UI/로직용)

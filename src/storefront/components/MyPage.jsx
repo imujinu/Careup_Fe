@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "./MyPage.css";
 import { cartService } from "../../service/cartService";
-import { productInquiryService } from "../../service/productInquiryService";
 import customerAxios from "../../utils/customerAxios";
 import OrderDetailModal from "./OrderDetailModal";
 import { useShopAuth } from "../hooks/useShopAuth";
@@ -15,14 +14,13 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
   // prop으로 전달된 currentUser가 있으면 우선 사용, 없으면 hook에서 가져옴
   const currentUser = propCurrentUser || hookCurrentUser;
   
-  // URL 파라미터에서 탭 가져오기
+  // URL 파라미터에서 탭 가져오기 (문의 목록 탭은 제거됨)
   const tabFromUrl = searchParams.get('tab');
-  const resolvedInitialTab = tabFromUrl || initialTab;
+  const resolvedInitialTab = (tabFromUrl && tabFromUrl !== 'inquiries') ? tabFromUrl : initialTab;
   
   const [activeTab, setActiveTab] = useState(resolvedInitialTab);
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -42,13 +40,17 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
     }
   }, [resolvedInitialTab]);
 
-  // URL 파라미터와 동기화
+  // URL 파라미터와 동기화 (문의 목록 탭은 제거됨)
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && tab !== activeTab) {
+    if (tab === 'inquiries') {
+      // 문의 목록 탭이 선택되면 프로필 탭으로 리다이렉트
+      navigate('/shop/mypage?tab=profile', { replace: true });
+      setActiveTab('profile');
+    } else if (tab && tab !== activeTab) {
       setActiveTab(tab);
     }
-  }, [searchParams]);
+  }, [searchParams, navigate, activeTab]);
 
   // 탭 변경 시 URL 업데이트
   const handleTabChange = (tab) => {
@@ -75,15 +77,6 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
         // 주문 내역
         const ordersRes = await cartService.getOrdersByMember(memberId);
         setOrders(ordersRes?.data || ordersRes || []);
-        
-        // 문의 목록
-        try {
-          const inquiriesRes = await productInquiryService.getMyInquiries(memberId);
-          setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
-        } catch (inquiryErr) {
-          console.error('문의 목록 조회 실패:', inquiryErr);
-          setInquiries([]);
-        }
       } catch (err) {
         console.error('마이페이지 데이터 로드 실패:', err);
         setError('정보를 불러오는데 실패했습니다.');
@@ -94,22 +87,6 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
 
     loadMyPageData();
   }, [currentUser?.memberId]); // memberId만 의존성으로 사용
-
-  // 탭 변경 시 문의 목록 다시 로드
-  useEffect(() => {
-    if (activeTab === "inquiries" && currentUser?.memberId) {
-      const loadInquiries = async () => {
-        try {
-          const inquiriesRes = await productInquiryService.getMyInquiries(currentUser.memberId);
-          setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
-        } catch (err) {
-          console.error('문의 목록 조회 실패:', err);
-          setInquiries([]);
-        }
-      };
-      loadInquiries();
-    }
-  }, [activeTab, currentUser?.memberId]);
 
   const handleOrderDetailClick = (order) => {
     setSelectedOrder(order);
@@ -159,16 +136,6 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
                       onClick={() => handleTabChange("purchase")}
                     >
                       구매 내역
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className={`nav-item ${
-                        activeTab === "inquiries" ? "active" : ""
-                      }`}
-                      onClick={() => handleTabChange("inquiries")}
-                    >
-                      문의 목록
                     </button>
                   </li>
                 </ul>
@@ -234,7 +201,12 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
                         <p>구매 내역이 없습니다.</p>
                       </div>
                     ) : (
-                      orders.map((order) => (
+                      [...orders].sort((a, b) => {
+                        // 주문번호 기준 최신순 정렬 (내림차순)
+                        const idA = parseInt(a.orderId || a.id) || 0;
+                        const idB = parseInt(b.orderId || b.id) || 0;
+                        return idB - idA;
+                      }).map((order) => (
                         <div key={order.orderId || order.id} className="purchase-item">
                           <div className="purchase-info">
                             <div className="purchase-name">주문번호: {order.orderId || order.id}</div>
@@ -261,51 +233,6 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
                       ))
                     )}
                   </div>
-                </div>
-              )}
-
-              {activeTab === "inquiries" && (
-                <div className="inquiries-content">
-                  <h3>문의 목록</h3>
-                  {inquiries.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                      <p style={{ fontSize: '16px', color: '#666' }}>등록된 문의가 없습니다.</p>
-                    </div>
-                  ) : (
-                    <div className="inquiries-list">
-                      {inquiries.map((inquiry) => (
-                        <div key={inquiry.id} className="inquiry-item">
-                          <div className="inquiry-header">
-                            <div className="inquiry-title-section">
-                              <h4 className="inquiry-title">
-                                {inquiry.title}
-                                {inquiry.isSecret && <span className="secret-badge">🔒 비공개</span>}
-                              </h4>
-                              <span className={`inquiry-status ${inquiry.status?.toLowerCase() || 'pending'}`}>
-                                {inquiry.status === 'ANSWERED' ? '답변완료' : 
-                                 inquiry.status === 'PENDING' ? '답변대기' : 
-                                 inquiry.status === 'CLOSED' ? '종료' : '대기중'}
-                              </span>
-                            </div>
-                            <div className="inquiry-meta">
-                              <span className="inquiry-type">{inquiry.inquiryType || 'PRODUCT'}</span>
-                              <span className="inquiry-date">
-                                {inquiry.createdAt ? new Date(inquiry.createdAt).toLocaleDateString('ko-KR') : '-'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="inquiry-content">
-                            <p>{inquiry.content}</p>
-                          </div>
-                          {inquiry.answerCount > 0 && (
-                            <div className="inquiry-answers">
-                              <span className="answer-count">답변 {inquiry.answerCount}개</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

@@ -751,12 +751,21 @@ const HeadquartersDashboard = () => {
 
         <ResponsiveContainer width="100%" height={400}>
           <BarChart
-            data={lowStockItems.map(item => ({
-              label: `${item.branchName} - ${item.productName}`,
-              item: item.productName,
-              branch: item.branchName,
-              shortage: item.shortage,
-            }))}
+            data={(() => {
+              // 각 막대마다 다른 색상 적용
+              const colors = [
+                "#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6",
+                "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6",
+                "#eab308", "#84cc16", "#a855f7", "#f43f5e", "#0ea5e9"
+              ];
+              return lowStockItems.map((item, index) => ({
+                label: `${item.branchName} - ${item.productName}`,
+                item: item.productName,
+                branch: item.branchName,
+                shortage: item.shortage,
+                color: colors[index % colors.length],
+              }));
+            })()}
             margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
@@ -766,10 +775,17 @@ const HeadquartersDashboard = () => {
               formatter={(value) => `${value}개 부족`}
               labelFormatter={(label) => label}
             />
-            <Bar dataKey="shortage" fill="#ef4444" name="부족량">
-              {lowStockItems.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill="#ef4444" />
-              ))}
+            <Bar dataKey="shortage" name="부족량">
+              {(() => {
+                const colors = [
+                  "#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6",
+                  "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6",
+                  "#eab308", "#84cc16", "#a855f7", "#f43f5e", "#0ea5e9"
+                ];
+                return lowStockItems.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ));
+              })()}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

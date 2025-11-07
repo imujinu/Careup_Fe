@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { customerOrderService } from "../../service/orderService";
-import ProductInquiryModal from "./ProductInquiryModal";
 import "./OrderDetailModal.css";
 
 const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
   const [orderDetail, setOrderDetail] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && order?.orderId) {
@@ -35,27 +32,6 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
     }
   };
 
-  const handleInquiryClick = (orderItem) => {
-    const branchProductId = orderItem.branchProductId || orderItem.branchProduct?.id || orderItem.productId;
-    
-    if (!branchProductId) {
-      alert("상품 정보가 올바르지 않습니다. branchProductId가 필요합니다.");
-      console.error("문의 불가 - 상품 정보:", orderItem);
-      return;
-    }
-    
-    setSelectedProduct({
-      branchProductId: branchProductId,
-      name: orderItem.productName || orderItem.name || "상품명 없음",
-      image: orderItem.imageUrl || orderItem.image || "",
-      price: orderItem.unitPrice || orderItem.price || 0,
-    });
-    setIsInquiryModalOpen(true);
-  };
-
-  const handleInquirySuccess = () => {
-    // 문의 등록 성공 시 추가 처리 (필요시)
-  };
 
   if (!isOpen) return null;
 
@@ -148,11 +124,11 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                   <span className="info-value">{orderDetail.rejectedReason}</span>
                 </div>
               )}
-              {(orderDetail.rejectedBy || orderDetail.rejectedByName) && (
+              {orderDetail.rejectedByName && (
                 <div className="info-row">
                   <span className="info-label">거부자:</span>
                   <span className="info-value">
-                    {orderDetail.rejectedByName || (orderDetail.rejectedBy ? `ID: ${orderDetail.rejectedBy}` : '-')}
+                    {orderDetail.rejectedByName}
                   </span>
                 </div>
               )}
@@ -259,22 +235,6 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                             <div className="order-item-code">상품코드: {item.productCode}</div>
                           )}
                         </div>
-                        <div className="order-item-actions">
-                          <button
-                            className="inquiry-btn"
-                            onClick={() => handleInquiryClick({
-                              ...item,
-                              branchProductId,
-                              productName,
-                              imageUrl,
-                              price: unitPrice,
-                            })}
-                            disabled={!branchProductId}
-                            title={!branchProductId ? "상품 정보가 없어 문의할 수 없습니다." : ""}
-                          >
-                            문의하기
-                          </button>
-                        </div>
                       </div>
                     );
                   })}
@@ -290,19 +250,6 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
           </div>
         </div>
       </div>
-
-      {selectedProduct && (
-        <ProductInquiryModal
-          product={selectedProduct}
-          memberId={currentUser?.memberId}
-          isOpen={isInquiryModalOpen}
-          onClose={() => {
-            setIsInquiryModalOpen(false);
-            setSelectedProduct(null);
-          }}
-          onSuccess={handleInquirySuccess}
-        />
-      )}
     </>
   );
 };
