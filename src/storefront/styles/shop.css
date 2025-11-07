@@ -2523,3 +2523,34 @@ img {
     max-width: 300px;
   }
 }
+
+.item-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.item-option-chip {
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 4px 8px;
+  line-height: 1.2;
+}
+
+.item-branch-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.item-branch-name {
+  font-weight: 500;
+}
+
+.item-branch-stock {
+  color: #6b7280;
+}

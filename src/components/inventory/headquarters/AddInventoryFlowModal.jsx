@@ -316,7 +316,8 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     
     const allSelected = sortedAttributes.every(attr => {
       const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id);
-      const isSelected = !!selectedAttributeValues[typeId];
+      const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name || '';
+      const isSelected = !!selectedAttributeValues[typeId] || (!!typeName && !!selectedAttributeValues[typeName]);
       return isSelected;
     });
 
@@ -326,14 +327,43 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       return;
     }
     
+    const primaryAttribute = sortedAttributes[sortedAttributes.length - 1];
+    const primaryTypeId = primaryAttribute 
+      ? String(primaryAttribute.attributeTypeId || primaryAttribute.attributeType?.id || primaryAttribute.id)
+      : null;
+    const primaryTypeName = primaryAttribute
+      ? primaryAttribute.attributeTypeName || primaryAttribute.attributeType?.name || primaryAttribute.name || ''
+      : '';
+    let selectedPrimaryValue = null;
+    if (primaryTypeId) {
+      if (selectedAttributeValues.hasOwnProperty(primaryTypeId)) {
+        selectedPrimaryValue = selectedAttributeValues[primaryTypeId];
+      } else if (
+        primaryTypeName &&
+        selectedAttributeValues.hasOwnProperty(primaryTypeName)
+      ) {
+        selectedPrimaryValue = selectedAttributeValues[primaryTypeName];
+      }
+    }
     let matchingBP = null;
-    
-      // 속성이 하나인 경우
-      if (sortedAttributes.length === 1) {
+
+    // 우선 순위 속성(가장 마지막 속성)으로 BranchProduct 매칭 시도
+    if (primaryTypeId && selectedPrimaryValue) {
+      matchingBP = productBranchProducts.find(bp => {
+        const bpTypeId = String(bp.attributeTypeId || '');
+        const bpTypeName = bp.attributeTypeName || '';
+        const bpValueId = String(bp.attributeValueId || '');
+        const typeMatches = bpTypeId === primaryTypeId || (bpTypeName && bpTypeName === primaryTypeName);
+        return typeMatches && bpValueId === String(selectedPrimaryValue);
+      });
+    }
+
+    // 속성이 하나인 경우
+    if (!matchingBP && sortedAttributes.length === 1) {
       matchingBP = productBranchProducts.find(bp => {
         return String(bp.attributeValueId) === String(selectedValues[0]);
       });
-    } else {
+    } else if (!matchingBP) {
       // 여러 속성이 있는 경우 - productAttributeValuesData를 사용해서 정확한 조합 찾기
       if (productAttributeValuesData.length > 0) {
         // 선택한 속성 값들을 타입별로 정리
@@ -383,23 +413,29 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
             }
           }
           
-          if (allMatch && attrs.length === sortedAttributes.length) {
+          if (allMatch && matchedProductId === null) {
             matchedProductId = productId;
           }
         });
         
         // 매칭된 productId의 속성 값 중 하나와 일치하는 BranchProduct 찾기
         if (matchedProductId) {
-          // productAttributeValuesData에서 매칭된 productId의 attributeValueId 목록 가져오기
-          const matchedAttrValueIds = productAttributeValuesData
-            .filter(pav => String(pav.productId) === matchedProductId)
-            .map(pav => String(pav.attributeValueId || pav.attributeValue?.id || pav.id));
+        // 매칭된 productId와 동일한 상품을 가진 BranchProduct 찾기
+        matchingBP = productBranchProducts.find(bp => {
+          return String(bp.productId) === matchedProductId;
+        });
+        
+        // branchProduct에 직접 연결된 attributeValueId가 있는 경우 보조 확인
+        if (!matchingBP) {
+          const matchedAttrValueIds = Array.from(new Set(
+            Array.from(selectedAttrMap.values())
+          ));
           
-          // 이 attributeValueId 중 하나와 일치하는 BranchProduct 찾기
           matchingBP = productBranchProducts.find(bp => {
             const bpValueId = String(bp.attributeValueId || '');
             return matchedAttrValueIds.includes(bpValueId);
           });
+        }
         }
       }
       
@@ -476,8 +512,6 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       }
       return bpProductName === selectedProductName;
     });
-
-
     if (productBPs.length === 0) {
       setCategoryAttributes([]);
       return;

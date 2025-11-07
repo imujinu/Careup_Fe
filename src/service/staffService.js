@@ -3,8 +3,7 @@ import axios from '../utils/axiosConfig';
 
 const BASE_URL =
   import.meta.env.VITE_BRANCH_URL ||
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:8080';
+  import.meta.env.VITE_CUSTOMER_API_URL;
 
 // 서버가 직접 정렬 가능한 필드만 허용(가상/조인 필요한 필드는 제외)
 const SERVER_SORTABLE = new Set([

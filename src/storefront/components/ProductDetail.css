@@ -307,101 +307,6 @@
   color: #ff6b35;
 }
 
-/* 추가 혜택 */
-.benefits-section {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-}
-
-.benefits-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 15px 0;
-  color: #333;
-}
-
-.benefit-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.benefit-item:last-child {
-  border-bottom: none;
-}
-
-.benefit-label {
-  font-size: 14px;
-  color: #666;
-  font-weight: 500;
-}
-
-.benefit-text {
-  font-size: 14px;
-  color: #333;
-  text-align: right;
-  flex: 1;
-  margin-left: 20px;
-}
-
-.more-benefits {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 14px;
-  cursor: pointer;
-  margin-top: 10px;
-  text-decoration: underline;
-}
-
-/* 시세 정보 섹션 */
-.price-info-section {
-  background: white;
-  padding: 25px 30px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 30px;
-}
-
-.price-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.price-info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.info-label {
-  font-size: 14px;
-  color: #666;
-}
-
-.info-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-}
-
-.price-change {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.price-change.up {
-  color: #ff4757;
-}
-
-.price-change.down {
-  color: #2ed573;
-}
-
 /* 탭 섹션 */
 .tabs-section {
   background: white;
@@ -438,9 +343,208 @@
   background: #f8f9fa;
 }
 
-/* 후기 탭 */
-.reviews-content {
-  padding: 30px;
+.product-description {
+  margin-bottom: 30px;
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.product-description h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 32px 0;
+  color: #111827;
+  padding: 0;
+  border: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border-radius: 0;
+  border-left: none;
+  box-shadow: none;
+}
+
+.description-icon {
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #d4a574;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.product-description h3::after {
+  display: none;
+}
+
+/* 상품 기본 정보 */
+.product-basic-info {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+}
+
+.description-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #374151;
+  margin-bottom: 28px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  border-left: none;
+  box-shadow: none;
+}
+
+.description-text:empty::before {
+  content: '상품 설명이 없습니다.';
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* 소재 정보 */
+.material-info {
+  margin-bottom: 28px;
+  padding-left: 20px;
+}
+
+.material-item {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.material-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 400;
+  min-width: 60px;
+}
+
+.material-value {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 400;
+}
+
+/* 관리 방법 */
+.care-instructions {
+  margin-bottom: 28px;
+}
+
+.care-instructions h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px 0;
+}
+
+.care-instructions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.care-instructions li {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.7;
+  margin-bottom: 8px;
+  padding-left: 10px;
+  position: relative;
+}
+
+.care-instructions li::before {
+  content: '*';
+  position: absolute;
+  left: 0;
+  color: #6b7280;
+}
+
+/* 색상 안내 */
+.color-notice {
+  margin-bottom: 32px;
+}
+
+.color-notice ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.color-notice li {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.7;
+  margin-bottom: 8px;
+  padding-left: 10px;
+  position: relative;
+}
+
+.color-notice li::before {
+  content: '*';
+  position: absolute;
+  left: 0;
+  color: #6b7280;
+}
+
+.product-detail-image {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 32px;
+  border-radius: 0;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: none;
+  border: none;
+  transition: none;
+}
+
+.product-detail-image:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.product-detail-image img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  max-height: 800px;
 }
 
 .style-reviews h3 {
@@ -587,6 +691,71 @@
   padding: 30px;
 }
 
+.purchase-info {
+  max-width: 900px;
+}
+
+.purchase-info h3 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 32px 0;
+  color: #111827;
+  padding-bottom: 16px;
+  border-bottom: 3px solid #f3f4f6;
+  position: relative;
+}
+
+.purchase-info h3::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.info-section {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border-left: 4px solid #3b82f6;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.info-section:hover {
+  background: #f3f4f6;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.info-section h4 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-section h4::before {
+  content: '✓';
+  color: #3b82f6;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.info-section p {
+  font-size: 15px;
+  color: #4b5563;
+  margin: 10px 0;
+  line-height: 1.7;
+  padding-left: 8px;
+}
+
 .qa-header {
   display: flex;
   justify-content: space-between;
@@ -709,10 +878,6 @@
   }
 
   .purchase-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .price-info-grid {
     grid-template-columns: 1fr;
   }
 

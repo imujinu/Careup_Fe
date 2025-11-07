@@ -311,81 +311,210 @@ const BranchDashboard = ({ branchId }) => {
           margin={[16, 16]}
           containerPadding={[0, 0]}
           compactType="vertical"
-          preventCollision={true}
-          useCSSTransforms={true}
+          preventCollision={false}
+          verticalCompact={true}
+          allowOverlap={false}
         >
-        {/* 매출 현황 카드 */}
-        <div key="sales" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-card">
-            <SalesCard data={transformSalesData(dashboardData.salesSummary)} />
-          </div>
-        </div>
+          {/* 매출 현황 */}
+          <Card key="sales">
+            <CardHeader>
+              <CardTitle>매출 현황</CardTitle>
+              <DragHandle className="drag-handle" title="드래그하여 이동">
+                ⋮⋮
+              </DragHandle>
+            </CardHeader>
+            <KPIBlock>
+              <KPIValue>{formatCurrencyKRW(dashboard.salesSummary?.totalSales || 0)}</KPIValue>
+              <KPIHint>총 매출</KPIHint>
+            </KPIBlock>
+            <MiniChart>
+              <ResponsiveContainer width="100%" height={120}>
+                <LineChart data={last7DaysChart}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide />
+                  <Tooltip formatter={(v) => formatCurrencyKRW(v)} />
+                  <Line type="monotone" dataKey="sales" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </MiniChart>
+          </Card>
 
-        {/* 재고 현황 카드 */}
-        <div key="inventory" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-card">
-            <InventoryCard data={transformInventoryData(dashboardData.inventorySummary)} />
-          </div>
-        </div>
+          {/* 재고 현황 */}
+          <Card key="inventory">
+            <CardHeader>
+              <CardTitle>재고 현황</CardTitle>
+              <DragHandle className="drag-handle" title="드래그하여 이동">
+                ⋮⋮
+              </DragHandle>
+            </CardHeader>
+            <StatsColumn>
+              <StatRow>
+                <StatLabel>총 재고 품목</StatLabel>
+                <StatValue>{dashboard.inventorySummary?.totalProducts ?? 0}개</StatValue>
+              </StatRow>
+              <StatRow>
+                <StatLabel>재고 부족</StatLabel>
+                <StatValue $warn>{dashboard.inventorySummary?.lowStockProducts ?? 0}개</StatValue>
+              </StatRow>
+              <StatRow>
+                <StatLabel>재고 충족률</StatLabel>
+                <StatValue>{(dashboard.inventorySummary?.stockFulfillmentRate ?? 0).toFixed(1)}%</StatValue>
+              </StatRow>
+            </StatsColumn>
+          </Card>
 
-        {/* 직원 현황 카드 */}
-        <div key="employee" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-card">
-            <EmployeeCard data={transformEmployeeData(dashboardData.employeeSummary)} />
-          </div>
-        </div>
+          {/* 직원 현황 */}
+          <Card key="employee">
+            <CardHeader>
+              <CardTitle>직원 현황</CardTitle>
+              <DragHandle className="drag-handle" title="드래그하여 이동">
+                ⋮⋮
+              </DragHandle>
+            </CardHeader>
+            <StatsColumn>
+              <StatRow>
+                <StatLabel>총 직원 수</StatLabel>
+                <StatValue>{dashboard.employeeSummary?.totalEmployees ?? 0}명</StatValue>
+              </StatRow>
+              <StatRow>
+                <StatLabel>출근 인원</StatLabel>
+                <StatValue>{dashboard.employeeSummary?.presentEmployees ?? 0}명</StatValue>
+              </StatRow>
+              <StatRow>
+                <StatLabel>오늘 출근률</StatLabel>
+                <StatValue>{(dashboard.employeeSummary?.todayAttendanceRate ?? 0).toFixed(1)}%</StatValue>
+              </StatRow>
+            </StatsColumn>
+          </Card>
 
-        {/* 주문 현황 카드 */}
-        <div key="order" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-card">
-            <OrderCard data={transformOrderData(dashboardData.orderSummary)} />
-          </div>
-        </div>
+          {/* 주문 현황 */}
+          <Card key="order">
+            <CardHeader>
+              <CardTitle>주문 현황</CardTitle>
+              <DragHandle className="drag-handle" title="드래그하여 이동">
+                ⋮⋮
+              </DragHandle>
+            </CardHeader>
+            <StatsColumn>
+              <StatRow>
+                <StatLabel>총 주문 수</StatLabel>
+                <StatValue>{dashboard.orderSummary?.totalOrders ?? 0}건</StatValue>
+              </StatRow>
+              <MiniDonut>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={orderStatusData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90}>
+                      {orderStatusData.map((_, i) => (
+                        <Cell key={i} fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1"][i % 4]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </MiniDonut>
+            </StatsColumn>
+          </Card>
 
-        {/* 매출 추이 차트 */}
-        <div key="revenue" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-chart">
-            <RevenueChart 
-              data={transformSalesTrendData(dashboardData.salesTrend)} 
-              period={period}
-            />
-          </div>
-        </div>
+          {/* 매출 추이 */}
+          <Card key="salesTrend">
+            <CardHeader>
+              <CardTitle>매출 추이</CardTitle>
+              <HeaderRight>
+                <Subtle>{dashboard.salesTrend?.period || period}</Subtle>
+                <DragHandle className="drag-handle" title="드래그하여 이동">
+                  ⋮⋮
+                </DragHandle>
+              </HeaderRight>
+            </CardHeader>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={salesTrendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" />
+                <YAxis tickFormatter={(v) => `${Math.round(v / 10000)}만`} />
+                <Tooltip formatter={(v) => formatCurrencyKRW(v)} />
+                <Legend />
+                <Line type="monotone" dataKey="sales" stroke="#7c3aed" strokeWidth={2} dot={false} name="매출" />
+              </LineChart>
+            </ResponsiveContainer>
+            <InlineStats>
+              <InlineItem>
+                <InlineLabel>총 매출</InlineLabel>
+                <InlineValue>{formatCurrencyKRW(dashboard.salesTrend?.totalSales || 0)}</InlineValue>
+              </InlineItem>
+              <InlineItem>
+                <InlineLabel>전년 대비</InlineLabel>
+                <InlineValue $positive>{(dashboard.salesTrend?.yearOverYearGrowth ?? 0).toFixed(1)}%</InlineValue>
+              </InlineItem>
+              <InlineItem>
+                <InlineLabel>목표 달성률</InlineLabel>
+                <InlineValue>{(dashboard.salesTrend?.goalAchievementRate ?? 0).toFixed(1)}%</InlineValue>
+              </InlineItem>
+            </InlineStats>
+          </Card>
 
-        {/* 카테고리별 매출 차트 */}
-        <div key="category" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-chart">
-            <InventoryChart data={transformCategorySalesData(dashboardData.categorySales)} />
-          </div>
-        </div>
+          {/* 카테고리별 매출 비중 */}
+          <Card key="categorySales">
+            <CardHeader>
+              <CardTitle>카테고리별 매출 비중</CardTitle>
+              <DragHandle className="drag-handle" title="드래그하여 이동">
+                ⋮⋮
+              </DragHandle>
+            </CardHeader>
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={categorySalesData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100}>
+                  {categorySalesData.map((_, i) => (
+                    <Cell key={i} fill={["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#0ea5e9", "#8b5cf6"][i % 6]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => formatCurrencyKRW(v)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+            <FooterStat>
+              <span>주요 카테고리</span>
+              <strong>{dashboard.categorySales?.topCategory || "-"}</strong>
+            </FooterStat>
+          </Card>
 
-        {/* 출근 현황 차트 */}
-        <div key="attendance" className="dashboard-item-wrapper">
-          <div className="drag-handle">
-            <GripVertical size={16} />
-          </div>
-          <div className="dashboard-chart">
-            <AttendanceChart data={transformAttendanceData(dashboardData.attendanceSummary)} />
-          </div>
-        </div>
+          {/* 주간 출근 현황 */}
+          <Card key="attendance">
+            <CardHeader>
+              <CardTitle>주간 출근 현황</CardTitle>
+              <HeaderRight>
+                <Subtle>이전 주</Subtle>
+                <DragHandle className="drag-handle" title="드래그하여 이동">
+                  ⋮⋮
+                </DragHandle>
+              </HeaderRight>
+            </CardHeader>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={weeklyAttendanceData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="present" name="출근 수" fill="#8b5cf6" />
+              </BarChart>
+            </ResponsiveContainer>
+            <InlineStats>
+              <InlineItem>
+                <InlineLabel>평균 출근률</InlineLabel>
+                <InlineValue>{(dashboard.attendanceSummary?.averageAttendanceRate ?? 0).toFixed(1)}%</InlineValue>
+              </InlineItem>
+              <InlineItem>
+                <InlineLabel>총 근무일</InlineLabel>
+                <InlineValue>{dashboard.attendanceSummary?.totalWorkDays ?? 0}일</InlineValue>
+              </InlineItem>
+              <InlineItem>
+                <InlineLabel>지각</InlineLabel>
+                <InlineValue $warn>{dashboard.attendanceSummary?.lateCount ?? 0}회</InlineValue>
+              </InlineItem>
+            </InlineStats>
+          </Card>
         </GridLayout>
       </div>
     </div>

@@ -18,6 +18,8 @@ jobs:
       run: |
         echo "VITE_CUSTOMER_API_URL=${{ secrets.VITE_CUSTOMER_API_URL }}" >> .env
         echo "VITE_CUSTOMER_AUTH_URL=${{ secrets.VITE_CUSTOMER_AUTH_URL }}" >> .env
+        echo "VITE_AUTH_URL=${{ secrets.VITE_AUTH_URL }}" >> .env
+        echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env
         echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" >> .env
         echo "VITE_KAKAO_CLIENT_ID=${{ secrets.VITE_KAKAO_CLIENT_ID }}" >> .env
         echo "VITE_GOOGLE_REDIRECT_URI=${{ secrets.VITE_GOOGLE_REDIRECT_URI }}" >> .env

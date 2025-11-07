@@ -739,6 +739,45 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     }
   };
 
+  // 속성 타입 삭제 핸들러
+  const handleDeleteAttributeType = async (categoryAttr) => {
+    const typeName = categoryAttr.attributeTypeName || categoryAttr.attributeType?.name || '속성 타입';
+    
+    if (!window.confirm(`'${typeName}' 속성 타입을 삭제하시겠습니까?\n\n주의: 이 속성 타입과 연결된 모든 속성 값도 함께 삭제됩니다.`)) {
+      return;
+    }
+
+    try {
+      const categoryAttributeId = categoryAttr.id || categoryAttr.categoryAttributeId;
+      if (!categoryAttributeId) {
+        alert('속성 타입 ID를 찾을 수 없습니다.');
+        return;
+      }
+
+      await inventoryService.deleteCategoryAttribute(categoryAttributeId);
+      
+      // 선택된 속성 값에서도 제거
+      const typeId = String(categoryAttr.attributeTypeId || categoryAttr.attributeType?.id || categoryAttr.id);
+      setSelectedAttributeValues(prev => {
+        const newState = { ...prev };
+        delete newState[typeId];
+        return newState;
+      });
+
+      // 속성 목록 다시 로드
+      setTimeout(async () => {
+        if (formData.category) {
+          await fetchCategoryAttributes(formData.category);
+        }
+      }, 300);
+
+      alert(`'${typeName}' 속성 타입이 삭제되었습니다.`);
+    } catch (error) {
+      console.error('속성 타입 삭제 실패:', error);
+      alert(error.response?.data?.status_message || '속성 타입 삭제에 실패했습니다.');
+    }
+  };
+
   // 속성 값 추가 핸들러
   const handleAddAttributeValue = async (e) => {
     e.preventDefault();
@@ -856,6 +895,91 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
     if (fileInput) {
       fileInput.value = '';
     }
+  };
+
+  // 상품 설명에 이미지 삽입 핸들러
+  const handleInsertDescriptionImage = async () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // 이미지 파일만 허용
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return;
+      }
+
+      // 파일 크기 제한 (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 파일 크기는 10MB 이하로 제한됩니다.');
+        return;
+      }
+
+      try {
+        // 업로드 시작 알림
+        alert('이미지 업로드 중...');
+        
+        // 이미지 업로드
+        const imageUrl = await inventoryService.uploadDescriptionImage(file);
+        
+        console.log('업로드된 이미지 URL:', imageUrl);
+        
+        if (!imageUrl) {
+          alert('이미지 URL을 받지 못했습니다. 응답을 확인해주세요.');
+          console.error('API 응답:', imageUrl);
+          return;
+        }
+        
+        // textarea 찾기 (여러 방법 시도)
+        let textarea = document.getElementById('addProductDescription');
+        if (!textarea) {
+          textarea = document.querySelector('textarea[placeholder*="상품에 대한 설명"]');
+        }
+        if (!textarea) {
+          // 모든 textarea 중에서 찾기
+          const textareas = document.querySelectorAll('textarea');
+          textarea = Array.from(textareas).find(ta => 
+            ta.placeholder && ta.placeholder.includes('상품에 대한 설명')
+          );
+        }
+        
+        if (textarea) {
+          const start = textarea.selectionStart || 0;
+          const end = textarea.selectionEnd || 0;
+          const text = formData.description || '';
+          const imageTag = `<img src="${imageUrl}" alt="상품 설명 이미지" style="max-width: 100%; height: auto;" />`;
+          const newText = text.substring(0, start) + imageTag + text.substring(end);
+          handleInputChange('description', newText);
+          
+          // 커서 위치 조정
+          setTimeout(() => {
+            textarea.focus();
+            const newPosition = start + imageTag.length;
+            textarea.setSelectionRange(newPosition, newPosition);
+          }, 100);
+          
+          alert('이미지가 삽입되었습니다.');
+        } else {
+          // textarea를 찾을 수 없으면 끝에 추가
+          const imageTag = `<img src="${imageUrl}" alt="상품 설명 이미지" style="max-width: 100%; height: auto;" />`;
+          const currentDescription = formData.description || '';
+          handleInputChange('description', currentDescription + (currentDescription ? '\n' : '') + imageTag);
+          alert('이미지가 설명 끝에 추가되었습니다.');
+        }
+      } catch (error) {
+        console.error('이미지 업로드 실패:', error);
+        console.error('에러 상세:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
+        alert('이미지 업로드에 실패했습니다: ' + (error.response?.data?.status_message || error.response?.data?.message || error.message));
+      }
+    };
+    fileInput.click();
   };
 
   const handleSave = async () => {
@@ -1042,18 +1166,46 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: '12px'
+                  fontSize: '12px',
+                  whiteSpace: 'nowrap'
                 }
               }, '+ 카테고리 추가')
             )
           ),
-          React.createElement(FormGroup, null,
-            React.createElement(Label, null, '상품설명'),
+          React.createElement(FormGroup, { style: { marginTop: '24px' } },
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } },
+              React.createElement(Label, { style: { margin: 0 } }, '상품설명'),
+              React.createElement('button', {
+                type: 'button',
+                onClick: handleInsertDescriptionImage,
+                style: {
+                  padding: '8px 12px',
+                  backgroundColor: '#6b46c1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap'
+                }
+              },
+                React.createElement('span', null, '📷'),
+                React.createElement('span', null, '이미지 삽입')
+              )
+            ),
             React.createElement(TextArea, {
-              placeholder: '상품에 대한 설명을 입력하세요',
+              id: 'addProductDescription',
+              placeholder: '상품에 대한 설명을 입력하세요. 이미지를 삽입하려면 위의 "이미지 삽입" 버튼을 클릭하세요.',
               value: formData.description,
-              onChange: (e) => handleInputChange('description', e.target.value)
-            })
+              onChange: (e) => handleInputChange('description', e.target.value),
+              style: { minHeight: '120px' }
+            }),
+            React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginTop: '4px' } },
+              '💡 이미지를 삽입하면 HTML 형식으로 저장됩니다.'
+            )
           ),
           // 속성 선택 섹션
           React.createElement(FormGroup, null,
@@ -1067,9 +1219,31 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
               const hasSelectedValue = selectedValueId != null;
               
               return React.createElement(AttributeSection, { key: categoryAttr.id || categoryAttr.categoryAttributeId },
-                React.createElement(AttributeTypeTitle, null,
-                  categoryAttr.attributeTypeName || categoryAttr.attributeType?.name,
-                  categoryAttr.isRequired && React.createElement('span', { className: 'required' }, '*')
+                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } },
+                  React.createElement(AttributeTypeTitle, { style: { margin: 0 } },
+                    categoryAttr.attributeTypeName || categoryAttr.attributeType?.name,
+                    categoryAttr.isRequired && React.createElement('span', { className: 'required' }, '*')
+                  ),
+                  React.createElement('button', {
+                    type: 'button',
+                    onClick: () => handleDeleteAttributeType(categoryAttr),
+                    style: {
+                      padding: '4px 8px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    },
+                    title: '속성 타입 삭제'
+                  },
+                    React.createElement('span', null, '🗑️'),
+                    React.createElement('span', null, '삭제')
+                  )
                 ),
                 loadingAttributes ? React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '속성 로딩 중...') :
                 React.createElement(React.Fragment, null,

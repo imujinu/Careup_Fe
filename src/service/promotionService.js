@@ -1,6 +1,6 @@
 import axios from '../utils/axiosConfig';
 
-const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8081';
+const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
 
 /**
  * 프로모션 관리 서비스
@@ -93,6 +93,10 @@ export const promotionService = {
 };
 
 export default promotionService;
+
+
+
+
 
 
 

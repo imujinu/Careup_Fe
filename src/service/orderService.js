@@ -2,7 +2,7 @@ import axios from '../utils/axiosConfig'; // 관리자용 axios (직원 토큰 �
 import customerAxios from '../utils/customerAxios'; // 고객용 axios
 
 // API Gateway를 통해 ordering 서버로 라우팅 (다른 서비스들과 동일)
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BRANCH_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_CUSTOMER_API_URL;
 
 // 관리자용 orderService (관리자/직원 토큰 사용)
 export const orderService = {
@@ -65,9 +65,9 @@ export const orderService = {
   },
 
   // 주문 반려
-  rejectOrder: async (orderId, reason) => {
+  rejectOrder: async (orderId, reason, rejectedBy) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/orders/${orderId}/reject?reason=${encodeURIComponent(reason)}`);
+      const response = await axios.put(`${API_BASE_URL}/api/orders/${orderId}/reject?reason=${encodeURIComponent(reason)}&rejectedBy=${rejectedBy}`);
       return response.data;
     } catch (error) {
       console.error('주문 반려 실패:', error);

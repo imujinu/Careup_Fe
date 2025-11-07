@@ -68,7 +68,15 @@ function ProductInquiryModal({ product, memberId, isOpen, onClose, onSuccess }) 
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <div className="inquiry-product-info">
-          <img src={product.image} alt={product.name} className="product-thumbnail" />
+          <img 
+            src={product.image || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
+            alt={product.name} 
+            className="product-thumbnail"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+            }}
+          />
           <div className="product-details">
             <h4>{product.name}</h4>
             <p className="product-price">{product.promotionPrice ? `${product.promotionPrice.toLocaleString()}원` : `${product.price.toLocaleString()}원`}</p>

@@ -5,6 +5,7 @@ import { mdiMagnify } from '@mdi/js';
 import orderService from '../../service/orderService';
 import authService from '../../service/authService';
 import OrderDetailModal from '../../components/admin/OrderDetailModal';
+import RejectReasonModal from '../../components/admin/RejectReasonModal';
 
 const PageContainer = styled.div`
   width: 100%;
@@ -62,7 +63,7 @@ const Select = styled.select`
 
 const SummaryCards = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 `;
@@ -124,11 +125,15 @@ const StatusBadge = styled.span`
       case 'PENDING':
         return '#fef3c7';
       case 'APPROVED':
+      case 'CONFIRMED':
         return '#dbeafe';
       case 'REJECTED':
         return '#fee2e2';
       case 'COMPLETED':
         return '#d1fae5';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '#f3f4f6';
       default:
         return '#f3f4f6';
     }
@@ -138,11 +143,15 @@ const StatusBadge = styled.span`
       case 'PENDING':
         return '#92400e';
       case 'APPROVED':
+      case 'CONFIRMED':
         return '#1e40af';
       case 'REJECTED':
         return '#991b1b';
       case 'COMPLETED':
         return '#065f46';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '#374151';
       default:
         return '#374151';
     }
@@ -184,11 +193,14 @@ function FranchiseOrderManagement() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [branchId, setBranchId] = useState(null);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [pendingRejectOrderId, setPendingRejectOrderId] = useState(null);
 
   // 상태 한글 변환 함수
   const getStatusText = (status) => {
     if (!status) return status;
-    switch (status.toUpperCase()) {
+    const normalizedStatus = normalizeStatus(status);
+    switch (normalizedStatus) {
       case 'PENDING':
         return '대기중';
       case 'APPROVED':
@@ -202,6 +214,15 @@ function FranchiseOrderManagement() {
       default:
         return status;
     }
+  };
+
+  // 상태 정규화 함수 (CONFIRMED -> APPROVED)
+  const normalizeStatus = (status) => {
+    if (!status) return status;
+    const upperStatus = String(status).toUpperCase();
+    if (upperStatus === 'CONFIRMED') return 'APPROVED';
+    if (upperStatus === 'CANCELED') return 'CANCELLED';
+    return upperStatus;
   };
 
   // 주문 목록 조회 (지점별)
@@ -233,17 +254,26 @@ function FranchiseOrderManagement() {
       }
 
       // 데이터 변환
-      const formattedOrders = ordersData.map((order) => ({
-        id: order.orderId || order.id,
-        memberName: order.memberName || '-',
-        branchId: order.branchId || currentBranchId,
-        totalAmount: order.totalAmount || 0,
-        status: order.orderStatus || order.status || 'PENDING',
-        createdAt: order.createdAt || new Date().toISOString(),
-        orderItems: order.orderItems || [],
-        paymentStatus: order.paymentStatus || null,
-        isPaymentCompleted: order.isPaymentCompleted || false
-      }));
+      const formattedOrders = ordersData.map((order) => {
+        const rawStatus = order.orderStatus || order.status || 'PENDING';
+        const normalizedStatus = normalizeStatus(rawStatus);
+        return {
+          id: order.orderId || order.id,
+          orderId: order.orderId || order.id, // 상세 모달에서 사용하기 위해 추가
+          memberName: order.memberName || '-',
+          branchId: order.branchId || currentBranchId,
+          branchName: order.branchName,
+          totalAmount: order.totalAmount || 0,
+          status: normalizedStatus,
+          createdAt: order.createdAt || new Date().toISOString(),
+          orderItems: order.orderItems || [],
+          paymentStatus: order.paymentStatus || null,
+          isPaymentCompleted: order.isPaymentCompleted || false,
+          rejectedBy: order.rejectedBy,
+          rejectedByName: order.rejectedByName,
+          rejectedAt: order.rejectedAt
+        };
+      });
 
       setOrders(formattedOrders);
     } catch (error) {
@@ -258,22 +288,32 @@ function FranchiseOrderManagement() {
     fetchOrders();
   }, []);
 
-  // 필터링된 주문 목록
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.id.toString().includes(searchTerm);
-    const matchesStatus = !statusFilter || order.status === statusFilter;
+  // 필터링된 주문 목록 (최신순 정렬)
+  const filteredOrders = orders
+    .filter((order) => {
+      const matchesSearch =
+        order.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toString().includes(searchTerm);
+      // 상태 필터 (정규화된 상태와 비교)
+      const normalizedFilterStatus = statusFilter ? normalizeStatus(statusFilter) : null;
+      const matchesStatus = !statusFilter || !normalizedFilterStatus || order.status === normalizedFilterStatus;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // 주문 번호(ID) 기준 최신순 정렬 (내림차순)
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
+      return idB - idA;
+    });
 
-  // 통계 계산
+  // 통계 계산 (정규화된 상태로 필터링)
   const summary = {
     total: orders.length,
-    pending: orders.filter((o) => o.status === 'PENDING').length,
-    approved: orders.filter((o) => o.status === 'APPROVED').length,
-    rejected: orders.filter((o) => o.status === 'REJECTED').length,
+    pending: orders.filter((o) => normalizeStatus(o.status) === 'PENDING').length,
+    approved: orders.filter((o) => normalizeStatus(o.status) === 'APPROVED').length,
+    rejected: orders.filter((o) => normalizeStatus(o.status) === 'REJECTED').length,
+    cancelled: orders.filter((o) => normalizeStatus(o.status) === 'CANCELLED').length,
   };
 
   // 주문 승인
@@ -310,13 +350,37 @@ function FranchiseOrderManagement() {
   const handleReject = async (orderId, reason = null) => {
     let rejectReason = reason;
     if (!rejectReason) {
-      rejectReason = window.prompt('거부 사유를 입력해주세요:');
-      if (!rejectReason) return;
+      // 모달로 거부 사유 입력
+      setPendingRejectOrderId(orderId);
+      setIsRejectModalOpen(true);
+      return;
     }
 
     try {
-      await orderService.rejectOrder(orderId, rejectReason);
+      const userInfo = authService.getCurrentUser();
+      const rejectedBy = userInfo?.id || userInfo?.employeeId || 1;
+      const rejectedByName = userInfo?.name || '-';
+      await orderService.rejectOrder(orderId, rejectReason, rejectedBy);
       alert('주문이 거부되었습니다.');
+      fetchOrders(); // 목록 새로고침
+    } catch (error) {
+      console.error('주문 거부 실패:', error);
+      alert('주문 거부에 실패했습니다.');
+    }
+  };
+
+  // 거부 사유 모달 확인 처리
+  const handleRejectConfirm = async (reason) => {
+    if (!pendingRejectOrderId) return;
+
+    try {
+      const userInfo = authService.getCurrentUser();
+      const rejectedBy = userInfo?.id || userInfo?.employeeId || 1;
+      const rejectedByName = userInfo?.name || '-';
+      await orderService.rejectOrder(pendingRejectOrderId, reason, rejectedBy);
+      alert('주문이 거부되었습니다.');
+      setIsRejectModalOpen(false);
+      setPendingRejectOrderId(null);
       fetchOrders(); // 목록 새로고침
     } catch (error) {
       console.error('주문 거부 실패:', error);
@@ -327,13 +391,49 @@ function FranchiseOrderManagement() {
   // 상세 모달 열기
   const handleOpenDetail = async (order) => {
     try {
-      const orderDetail = await orderService.getOrderDetail(order.id);
-      const detailData = orderDetail.result || orderDetail;
-      setSelectedOrder(detailData);
+      const detailData = await orderService.getOrderDetail(order.id || order.orderId);
+      const detailResult = detailData?.result || detailData;
+      
+      // 리스트 항목과 병합하여 필드 누락 방지
+      setSelectedOrder({
+        id: order.id,
+        orderId: detailResult?.orderId ?? order.orderId ?? order.id,
+        memberName: detailResult?.memberName ?? order.memberName ?? '-',
+        branchId: detailResult?.branchId ?? order.branchId ?? '-',
+        totalAmount: detailResult?.totalAmount ?? order.totalAmount ?? 0,
+        orderStatus: detailResult?.orderStatus ?? order.status,
+        status: (() => {
+          const raw = (detailResult?.status ?? detailResult?.orderStatus ?? order.status);
+          const up = String(raw || 'PENDING').toUpperCase();
+          if (up === 'CONFIRMED') return 'APPROVED';
+          if (up === 'CANCELED') return 'CANCELLED';
+          return up;
+        })(),
+        orderType: detailResult?.orderType ?? order.orderType,
+        createdAt: detailResult?.createdAt ?? order.createdAt,
+        orderItems: detailResult?.orderItems ?? order.orderItems ?? [],
+        paymentStatus: detailResult?.paymentStatus ?? order.paymentStatus ?? null,
+        isPaymentCompleted: detailResult?.isPaymentCompleted ?? order.isPaymentCompleted ?? false,
+        approvedBy: detailResult?.approvedBy ?? order.approvedBy,
+        approvedByName: detailResult?.approvedByName ?? order.approvedByName,
+        branchName: detailResult?.branchName ?? order.branchName,
+        rejectedBy: detailResult?.rejectedBy ?? order.rejectedBy,
+        rejectedByName: detailResult?.rejectedByName ?? order.rejectedByName,
+        rejectedAt: detailResult?.rejectedAt ?? order.rejectedAt,
+        rejectedReason: detailResult?.rejectedReason ?? order.rejectedReason,
+        cancelledReason: detailResult?.cancelledReason ?? detailResult?.cancelReason ?? detailResult?.cancellationReason ?? order.cancelledReason ?? order.cancelReason ?? order.cancellationReason
+      });
       setIsDetailModalOpen(true);
     } catch (error) {
       console.error('주문 상세 조회 실패:', error);
-      setSelectedOrder(order);
+      console.error('에러 상세:', error.response);
+      // 실패해도 기본 정보로 모달 표시
+      setSelectedOrder({
+        ...order,
+        orderId: order.orderId ?? order.id,
+        orderStatus: order.status,
+        orderItems: order.orderItems ?? []
+      });
       setIsDetailModalOpen(true);
     }
   };
@@ -373,6 +473,10 @@ function FranchiseOrderManagement() {
           <SummaryLabel>거부됨</SummaryLabel>
           <SummaryValue>{summary.rejected}</SummaryValue>
         </SummaryCard>
+        <SummaryCard>
+          <SummaryLabel>취소됨</SummaryLabel>
+          <SummaryValue>{summary.cancelled}</SummaryValue>
+        </SummaryCard>
       </SummaryCards>
 
       {/* 검색 및 필터 */}
@@ -389,6 +493,7 @@ function FranchiseOrderManagement() {
           <option value="PENDING">대기중</option>
           <option value="APPROVED">승인됨</option>
           <option value="REJECTED">거부됨</option>
+          <option value="CANCELLED">취소됨</option>
           <option value="COMPLETED">완료</option>
         </Select>
       </SearchFilterContainer>
@@ -434,7 +539,7 @@ function FranchiseOrderManagement() {
                         >
                           승인
                         </ActionButton>
-                        <ActionButton $danger onClick={() => handleReject(order.id)}>
+                        <ActionButton $danger onClick={() => handleReject(order.id, null)}>
                           거부
                         </ActionButton>
                       </>
@@ -459,12 +564,22 @@ function FranchiseOrderManagement() {
             handleApprove(orderId);
             setIsDetailModalOpen(false);
           }}
-          onReject={(orderId, reason) => {
+          onReject={(orderId, reason, rejectedBy, rejectedByName) => {
             handleReject(orderId, reason);
             setIsDetailModalOpen(false);
           }}
         />
       )}
+
+      {/* 거부 사유 입력 모달 */}
+      <RejectReasonModal
+        isOpen={isRejectModalOpen}
+        onClose={() => {
+          setIsRejectModalOpen(false);
+          setPendingRejectOrderId(null);
+        }}
+        onConfirm={handleRejectConfirm}
+      />
     </PageContainer>
   );
 }
