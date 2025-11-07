@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { SKIP_FLAG } from '../utils/axiosConfig';
 import { decodeToken } from '../utils/jwt';
 
 const AUTH_API_URL = import.meta.env.VITE_AUTH_URL;
