@@ -703,12 +703,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 
                 {/* 상품 기본 정보 */}
                 <div className="product-basic-info">
-                  {product?.productId && (
-                    <div className="info-row">
-                      <span className="info-label">품번</span>
-                      <span className="info-value">{product.productId}</span>
-                    </div>
-                  )}
                   {product?.category && (
                     <div className="info-row">
                       <span className="info-label">카테고리</span>
