@@ -5,7 +5,9 @@ import axios from 'axios';
 import { tokenStorage, authService } from '../service/authService';
 
 // ✅ 게이트웨이 baseURL (Vite .env에서 VITE_API_URL 제공 권장)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
 axios.defaults.baseURL = API_BASE_URL;
 
 // 공용 기본값
@@ -15,6 +17,7 @@ axios.defaults.timeout = 30000;
 // ---- 단일 비행 리프레시 상태 ----
 let refreshPromise = null;
 const REFRESH_PATH = '/auth/refresh';
+const LOGOUT_PATH = '/auth/logout';
 export const SKIP_FLAG = '__skipAuthRefresh'; // 개별 요청에서 리프레시 스킵하기 위한 플래그
 
 // ---- Request Interceptor ----
@@ -32,6 +35,14 @@ axios.interceptors.request.use(
           url: config.url,
           tokenPrefix: token.substring(0, 20) + '...',
           tokenLength: token.length,
+        });
+      }
+
+      // 디버깅: 브랜치 서비스 호출 토큰/URL 확인
+      if (config.url && config.url.includes('/branch-service')) {
+        console.debug('[axiosConfig] branch-service call', {
+          url: config.url,
+          hasAuth: !!token,
         });
       }
     } else {
@@ -68,6 +79,14 @@ axios.interceptors.response.use(
 
     // 권한 없음(403)
     if (status === 403) {
+      const url = (originalRequest?.url || '').toString();
+
+      // 지점 내 정보: 403은 호출부에서 폴백 처리하도록 알림 없이 그대로 던짐
+      if (url.includes('/branch-service/branch/my')) {
+        console.warn('[axiosConfig] 403 on /branch/my — caller will handle fallback', error.response?.data);
+        return Promise.reject(error);
+      }
+
       console.error('Access Denied:', error.response?.data);
       alert('접근 권한이 없습니다: ' + (error.response?.data?.status_message || '권한 부족'));
       return Promise.reject(error);
@@ -83,19 +102,25 @@ axios.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // refresh 자체가 401이면 -> 루프 방지: 바로 토큰 제거 & 로그인 이동 (logout 호출 금지)
+    const reqUrl = (originalRequest.url || '').toString();
+    if (reqUrl.includes(REFRESH_PATH)) {
+      try { tokenStorage.clearTokens(); } catch {}
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
+    // 로그아웃 호출이 401이어도 "최선의 시도"로 간주하고 종료(리프레시 금지)
+    if (reqUrl.includes(LOGOUT_PATH)) {
+      try { tokenStorage.clearTokens(); } catch {}
+      return Promise.reject(error);
+    }
+
     // 중복 재시도 방지
     if (originalRequest._retry) {
       return Promise.reject(error);
     }
     originalRequest._retry = true;
-
-    // 리프레시 자체가 401이면 로그아웃
-    const reqUrl = (originalRequest.url || '').toString();
-    if (reqUrl.includes(REFRESH_PATH)) {
-      await authService.logout();
-      window.location.href = '/login';
-      return Promise.reject(error);
-    }
 
     try {
       // 여러 401 동시 발생 시 하나의 refreshPromise 공유
@@ -110,7 +135,7 @@ axios.interceptors.response.use(
       return axios(originalRequest);
     } catch (refreshError) {
       refreshPromise = null;
-      await authService.logout();
+      try { tokenStorage.clearTokens(); } catch {}
       window.location.href = '/login';
       return Promise.reject(refreshError);
     }

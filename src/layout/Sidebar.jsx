@@ -1,6 +1,6 @@
 // src/layout/Sidebar.jsx
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
@@ -18,8 +18,10 @@ import {
   mdiShoppingOutline,
   mdiRobotOutline,
   mdiChartLine,
-  mdiCogOutline,
   mdiLogout,
+  mdiChevronDown,
+  mdiBriefcaseOutline, // ▼ 직급관리 아이콘
+  mdiTune,            // ▼ 타입 관리 아이콘(변경)
 } from '@mdi/js';
 
 const SidebarContainer = styled.aside`
@@ -58,39 +60,46 @@ const SidebarHeader = styled.div`padding: 20px 24px; border-bottom: 1px solid #e
 const Logo = styled.div`width: 32px; height: 32px; background: #6b46c1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; margin-bottom: 8px;`;
 const AppTitle = styled.h2`font-size: 16px; font-weight: 600; color: #1f2937; margin: 0;`;
 
-// ▼ 플라이아웃 전용 요소
-const FlyoutWrapper = styled.li`
-  position: relative;
-  &:hover > div[data-flyout="panel"] {
-    opacity: 1;
-    transform: translateX(0);
-    pointer-events: auto;
-  }
+/* ▼ 아코디언(하위 메뉴)용: 더 부드럽고 약간 느린 전환 */
+const ArrowWrap = styled.button`
+  margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border: 0; background: transparent; cursor: pointer;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  color: inherit;
+  &:hover { color: #6b46c1; }
+  &.open { transform: rotate(180deg); }
 `;
 
-const FlyoutPanel = styled.div`
-  position: absolute;
-  top: 0;
-  left: calc(100% + 8px);
-  min-width: 180px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-  padding: 8px 8px;
-  z-index: 1000;
-  opacity: 0;
-  transform: translateX(-6px);
-  pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease;
+/* 래퍼는 항상 렌더 → max-height/opacity/translateY로 전환 */
+const SubmenuWrap = styled.div`
+  overflow: hidden;
+  max-height: ${(p) => (p.$open ? '260px' : '0')};
+  opacity: ${(p) => (p.$open ? 1 : 0)};
+  transform: translateY(${(p) => (p.$open ? '0' : '-2px')});
+  transition:
+    max-height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 `;
 
-const FlyoutLink = styled(StyledNavLink)`
-  border-right: none;
-  padding: 10px 12px;
-  font-size: 13px;
-  border-radius: 6px;
-  &:hover { background: #f9fafb; }
+const SubmenuList = styled.ul`
+  list-style: none;
+  margin: 0; padding: 0; /* 들여쓰기는 링크에 적용 */
+  background: #f9fafb;
+`;
+
+const SubmenuItem = styled.li``;
+
+/* 하위 탭도 상위 탭과 톤 맞춤 + 연한 보라 하이라이트 */
+const SubmenuLink = styled(StyledNavLink)`
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px 10px 52px;  /* 상위(24px) + 인덴트 28px */
+  font-size: 13px; border-radius: 0; /* 상위와 동일 톤 */
+  border-right: 3px solid transparent;
+  &:hover { background: #f5f3ff; color: #6b46c1; }
+  &.active { color: #6b46c1; background: #f3f4f6; border-right-color: #6b46c1; font-weight: 600; }
 `;
 
 const Mdi = ({ path }) => <Icon path={path} size={0.95} />;
@@ -98,6 +107,8 @@ const Mdi = ({ path }) => <Icon path={path} size={0.95} />;
 function Sidebar({ isVisible, userType, branchId }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
   const rawRole = useAppSelector((s) => s.auth.role);
   const branchName = useAppSelector((s) => s.auth.branchName);
   const role = String(rawRole || '').replace(/^ROLE_/, '').toUpperCase();
@@ -106,8 +117,17 @@ function Sidebar({ isVisible, userType, branchId }) {
 
   const JOB_GRADE_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.jobGrade) || '/settings/job-grades';
   const ATTENDANCE_TEMPLATES_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.attendanceTemplates) || '/attendance/templates';
+  const ATTENDANCE_TYPES_PATH = (MENU_PATH_MAP && MENU_PATH_MAP.attendanceTypes) || '/attendance/types';
 
-  const showJobGradeFlyout = userType === 'headquarters' || canManageStaff;
+  const showJobGradeSubmenu = userType === 'headquarters' || canManageStaff;
+
+  // ▼ 경로에 따라 "초기 1회만" 자동 펼침. 이후에는 사용자가 토글로 제어(경로가 하위여도 접을 수 있음)
+  const [open, setOpen] = useState(() => ({
+    attendance: pathname.startsWith(ATTENDANCE_TEMPLATES_PATH) || pathname.startsWith(ATTENDANCE_TYPES_PATH),
+    staff: pathname.startsWith(JOB_GRADE_PATH),
+  }));
+
+  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const headquartersMenuItems = [
     { id: 'dashboard',     label: '대시보드',     icon: mdiViewDashboardOutline, path: MENU_PATH_MAP.dashboard },
@@ -118,7 +138,6 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'purchaseOrder', label: '발주관리',     icon: mdiCartOutline,          path: MENU_PATH_MAP.purchaseOrder },
     { id: 'order',         label: '주문관리',     icon: mdiShoppingOutline,      path: MENU_PATH_MAP.order },
     { id: 'salesReport',   label: '매출 리포트',  icon: mdiChartLine,            path: MENU_PATH_MAP.salesReport },
-    { id: 'settings',      label: '설정',         icon: mdiCogOutline,           path: MENU_PATH_MAP.settings },
     { id: 'logout',        label: '로그아웃',     icon: mdiLogout,               isButton: true },
   ];
 
@@ -130,9 +149,9 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'order',         label: '주문관리', icon: mdiShoppingOutline,      path: MENU_PATH_MAP.order },
     { id: 'autoOrder',     label: '자동발주', icon: mdiRobotOutline,         path: MENU_PATH_MAP.autoOrder },
     { id: 'attendance',    label: '근태관리', icon: mdiClockOutline,         path: MENU_PATH_MAP.attendance },
-    { id: 'settings',      label: '설정',     icon: mdiCogOutline,           path: MENU_PATH_MAP.settings },
+    { id: 'settings_removed_placeholder', label: '', icon: null, path: '' },
     { id: 'logout',        label: '로그아웃', icon: mdiLogout,               isButton: true },
-  ];
+  ].filter((m) => m.id !== 'settings_removed_placeholder');
 
   const franchiseMenuItems = (() => {
     if (!canManageStaff) return franchiseBase;
@@ -148,9 +167,9 @@ function Sidebar({ isVisible, userType, branchId }) {
     menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder' && m.id !== 'autoOrder');
   }
 
-  const handleLogout = () => {
-    dispatch(logoutUser());
-    navigate('/');
+  const handleLogout = async () => {
+    try { await dispatch(logoutUser()).unwrap(); } catch {}
+    navigate('/login');
   };
 
   return (
@@ -181,26 +200,96 @@ function Sidebar({ isVisible, userType, branchId }) {
               );
             }
 
-            // ✅ 근태관리 플라이아웃: 템플릿 관리(권한 보유자에게만 노출)
+            // ✅ 직원관리: 직급관리 하위 탭(권한 허용 시)
+            if (item.id === 'staff' && (userType === 'headquarters' || canManageStaff)) {
+              const staffOpen = open.staff;
+              return (
+                <MenuItem key={item.id}>
+                  {/* ▼ 하위 탭이 있을 때는 end를 넣어 상위가 부분 경로에서 활성화되지 않도록 */}
+                  <StyledNavLink end to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                    <Mdi path={item.icon} />
+                    {item.label}
+                    <ArrowWrap
+                      aria-label="하위 메뉴 토글"
+                      className={staffOpen ? 'open' : ''}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggle('staff');
+                      }}
+                    >
+                      <Icon path={mdiChevronDown} size={0.9} />
+                    </ArrowWrap>
+                  </StyledNavLink>
+
+                  <SubmenuWrap $open={staffOpen} aria-hidden={!staffOpen}>
+                    <SubmenuList>
+                      <SubmenuItem>
+                        <SubmenuLink
+                          to={JOB_GRADE_PATH}
+                          className={({ isActive }) => (isActive ? 'active' : '')}
+                        >
+                          <Mdi path={mdiBriefcaseOutline} />
+                          직급관리
+                        </SubmenuLink>
+                      </SubmenuItem>
+                    </SubmenuList>
+                  </SubmenuWrap>
+                </MenuItem>
+              );
+            }
+
+            // ✅ 근태관리: 타입 관리 → 템플릿 관리 순서(요청 반영)
             if (item.id === 'attendance') {
+              const attendanceOpen = open.attendance;
               if (canViewTemplates) {
                 return (
-                  <FlyoutWrapper key={item.id}>
-                    <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <MenuItem key={item.id}>
+                    {/* ▼ 하위 탭이 있을 때는 end를 넣어 상위가 부분 경로에서 활성화되지 않도록 */}
+                    <StyledNavLink end to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
                       <Mdi path={item.icon} />
                       {item.label}
+                      <ArrowWrap
+                        aria-label="하위 메뉴 토글"
+                        className={attendanceOpen ? 'open' : ''}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggle('attendance');
+                        }}
+                      >
+                        <Icon path={mdiChevronDown} size={0.9} />
+                      </ArrowWrap>
                     </StyledNavLink>
 
-                    <FlyoutPanel data-flyout="panel" aria-label="근태 확장 메뉴">
-                      <FlyoutLink to={ATTENDANCE_TEMPLATES_PATH} className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <Mdi path={mdiClipboardTextOutline} />
-                        템플릿 관리
-                      </FlyoutLink>
-                    </FlyoutPanel>
-                  </FlyoutWrapper>
+                    <SubmenuWrap $open={attendanceOpen} aria-hidden={!attendanceOpen}>
+                      <SubmenuList>
+                        {/* ▼ 1. 타입 관리 (위로 이동 + 아이콘 변경) */}
+                        <SubmenuItem>
+                          <SubmenuLink
+                            to={ATTENDANCE_TYPES_PATH}
+                            className={({ isActive }) => (isActive ? 'active' : '')}
+                          >
+                            <Mdi path={mdiTune} />
+                            타입 관리
+                          </SubmenuLink>
+                        </SubmenuItem>
+                        {/* ▼ 2. 템플릿 관리 (기존 아이콘 유지) */}
+                        <SubmenuItem>
+                          <SubmenuLink
+                            to={ATTENDANCE_TEMPLATES_PATH}
+                            className={({ isActive }) => (isActive ? 'active' : '')}
+                          >
+                            <Mdi path={mdiClipboardTextOutline} />
+                            템플릿 관리
+                          </SubmenuLink>
+                        </SubmenuItem>
+                      </SubmenuList>
+                    </SubmenuWrap>
+                  </MenuItem>
                 );
               }
-              // 권한 없으면 플라이아웃 없이 기본 링크만
+              // 권한 없으면 하위 메뉴 없이 기본 링크만
               return (
                 <MenuItem key={item.id}>
                   <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
@@ -211,25 +300,7 @@ function Sidebar({ isVisible, userType, branchId }) {
               );
             }
 
-            // 설정 플라이아웃(직급관리)
-            if (item.id === 'settings' && showJobGradeFlyout) {
-              return (
-                <FlyoutWrapper key={item.id}>
-                  <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>
-                    <Mdi path={item.icon} />
-                    {item.label}
-                  </StyledNavLink>
-
-                  <FlyoutPanel data-flyout="panel" aria-label="설정 확장 메뉴">
-                    <FlyoutLink to={JOB_GRADE_PATH} className={({ isActive }) => (isActive ? 'active' : '')}>
-                      <Mdi path={mdiAccountGroupOutline} />
-                      직급관리
-                    </FlyoutLink>
-                  </FlyoutPanel>
-                </FlyoutWrapper>
-              );
-            }
-
+            // 일반 단일 메뉴
             return (
               <MenuItem key={item.id}>
                 <StyledNavLink to={item.path} className={({ isActive }) => (isActive ? 'active' : '')}>

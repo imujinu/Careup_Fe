@@ -17,6 +17,7 @@ import StaffDetail from '../pages/staff/StaffDetail';
 import AttendanceCalendar from '../pages/attendance/AttendanceCalendar';
 import JobGradeManagement from '../pages/settings/JobGradeManagement';
 import AttendanceTemplateManagement from '../pages/attendance/AttendanceTemplateManagement';
+import AttendanceTypeManagement from '../pages/attendance/AttendanceTypeManagement';
 import AttributeTypeManagement from '../pages/settings/AttributeTypeManagement';
 import AttributeValueManagement from '../pages/settings/AttributeValueManagement';
 import CategoryAttributeManagement from '../pages/settings/CategoryAttributeManagement';
@@ -48,6 +49,7 @@ export const headquartersRoutes = [
   { path: 'purchase-order', element: <PurchaseOrderManagement /> },
   { path: 'order', element: <OrderManagement /> },
   { path: 'sales-report', element: <SalesReport /> },
+  { path: 'attendance/types', element: <AttendanceTypeManagement /> },          // 타입 관리
 
   // 설정
   { path: 'settings', element: <div>설정 (준비중)</div> },

@@ -1,6 +1,4 @@
-// src/service/authService.js
-
-import axios from 'axios';
+import axios, { SKIP_FLAG } from '../utils/axiosConfig';
 import { decodeToken } from '../utils/jwt';
 
 const AUTH_API_URL = import.meta.env.VITE_AUTH_URL;
@@ -154,8 +152,7 @@ export const authService = {
     };
 
     // 로그인 요청은 401이어도 리프레시 시도 금지
-    const config = {};
-    config['__skipAuthRefresh'] = true;
+    const config = { [SKIP_FLAG]: true };
 
     const { data } = await axios.post(`${AUTH_API_URL}/auth/login`, payload, config);
 
@@ -195,7 +192,8 @@ export const authService = {
     const rt = tokenStorage.getRefreshToken();
     try {
       if (rt) {
-        await axios.post(`${AUTH_API_URL}/auth/logout`, { refreshToken: rt });
+        // 로그아웃은 항상 리프레시 스킵 (401이어도 재시도/리프레시 금지)
+        await axios.post(`${AUTH_API_URL}/auth/logout`, { refreshToken: rt }, { [SKIP_FLAG]: true });
       }
     } catch (_e) {
       // 이미 폐기되었을 수 있으므로 무시
@@ -208,7 +206,8 @@ export const authService = {
     const rt = tokenStorage.getRefreshToken();
     if (!rt) throw new Error('No refresh token available');
 
-    const { data } = await axios.post(`${AUTH_API_URL}/auth/refresh`, { refreshToken: rt });
+    // 리프레시 요청 자체도 인터셉터에서 건드리지 않도록 스킵
+    const { data } = await axios.post(`${AUTH_API_URL}/auth/refresh`, { refreshToken: rt }, { [SKIP_FLAG]: true });
 
     const box = data?.result ?? data?.data ?? data;
     const newAT = box?.accessToken ?? box?.access_token;
