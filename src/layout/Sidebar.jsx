@@ -148,6 +148,7 @@ function Sidebar({ isVisible, userType, branchId }) {
     { id: 'purchaseOrder', label: '발주관리', icon: mdiCartOutline,          path: MENU_PATH_MAP.purchaseOrder },
     { id: 'order',         label: '주문관리', icon: mdiShoppingOutline,      path: MENU_PATH_MAP.order },
     { id: 'autoOrder',     label: '자동발주', icon: mdiRobotOutline,         path: MENU_PATH_MAP.autoOrder },
+    { id: 'salesReport',   label: '매출 리포트', icon: mdiChartLine,            path: MENU_PATH_MAP.salesReport },
     { id: 'attendance',    label: '근태관리', icon: mdiClockOutline,         path: MENU_PATH_MAP.attendance },
     { id: 'settings_removed_placeholder', label: '', icon: null, path: '' },
     { id: 'logout',        label: '로그아웃', icon: mdiLogout,               isButton: true },
@@ -162,10 +163,11 @@ function Sidebar({ isVisible, userType, branchId }) {
   })();
 
   let menuItems = userType === 'headquarters' ? headquartersMenuItems : franchiseMenuItems;
-  // STAFF는 발주관리/자동발주 메뉴 비노출
+  // STAFF는 발주관리/자동발주/매출 리포트 메뉴 비노출
   if (role === 'STAFF') {
-    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder' && m.id !== 'autoOrder');
+    menuItems = menuItems.filter((m) => m.id !== 'purchaseOrder' && m.id !== 'autoOrder' && m.id !== 'salesReport');
   }
+  // BRANCH_ADMIN, FRANCHISE_OWNER만 매출 리포트 메뉴 노출 (franchiseBase에 이미 포함되어 있음)
 
   const handleLogout = async () => {
     try { await dispatch(logoutUser()).unwrap(); } catch {}

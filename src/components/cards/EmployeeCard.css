@@ -1,0 +1,213 @@
+.employee-card {
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.card-icon {
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  background: linear-gradient(135deg, rgba(139, 127, 230, 0.1) 0%, rgba(168, 230, 207, 0.1) 100%);
+  border-radius: 10px;
+  color: #8B7FE6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #333;
+  flex: 1;
+}
+
+.employee-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-color: rgba(139, 127, 230, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 127, 230, 0.1);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #999;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.2;
+}
+
+.stat-value.primary {
+  color: #8B7FE6;
+  font-size: 1.875rem;
+}
+
+.stat-value.success {
+  color: #10B981;
+}
+
+.stat-value.warning {
+  color: #F59E0B;
+}
+
+.stat-indicator {
+  margin-top: 4px;
+}
+
+.attendance-summary {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #f0f0f0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+}
+
+.attendance-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.attendance-rate {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.rate-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: rotate 2s ease-in-out;
+}
+
+.rate-circle::before {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: white;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.rate-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #8B7FE6;
+  z-index: 2;
+  position: relative;
+}
+
+.rate-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.rate-label {
+  font-size: 0.875rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.rate-detail {
+  font-size: 1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 애니메이션 */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-item {
+  animation: slideInUp 0.5s ease-out;
+}
+
+.stat-item:nth-child(1) { animation-delay: 0.1s; }
+.stat-item:nth-child(2) { animation-delay: 0.2s; }
+.stat-item:nth-child(3) { animation-delay: 0.3s; }
+
+/* 호버 효과 */
+.employee-card:hover .rate-circle {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+

@@ -488,12 +488,25 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
   const [useExistingType, setUseExistingType] = useState(false);
   const [selectedExistingTypeId, setSelectedExistingTypeId] = useState('');
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
   useEffect(() => {
     if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
       fetchCategories();
       // 모달 열릴 때 상태 초기화
       setSelectedAttributeValues({});
       setCategoryAttributes([]);
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
     }
   }, [isOpen]);
 

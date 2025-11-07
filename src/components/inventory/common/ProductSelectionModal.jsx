@@ -186,10 +186,23 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
   const [categoryList, setCategoryList] = useState([]); // 카테고리 목록
   const [loading, setLoading] = useState(false);
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
   useEffect(() => {
     if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
       fetchProducts();
       fetchCategories();
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
     }
   }, [isOpen]);
 
@@ -388,7 +401,7 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
 
   if (!isOpen) return null;
 
-  return React.createElement(ModalOverlay, { onClick: handleClose },
+  return React.createElement(ModalOverlay, null,
     React.createElement(ModalContainer, { onClick: (e) => e.stopPropagation() },
       React.createElement(ModalHeader, null,
         React.createElement(ModalTitle, null, '상품 선택'),

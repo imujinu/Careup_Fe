@@ -509,12 +509,27 @@ function EditInventoryModal({ isOpen, onClose, item, onSave }) {
     }
   };
 
-  // 모달이 열릴 때마다 상품 정보와 재고 정보 로드
+  // 모달이 열릴 때 뒷단 스크롤 방지
   useEffect(() => {
     if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
       fetchCategories();
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
     }
-    
+  }, [isOpen]);
+
+  // 모달이 열릴 때마다 상품 정보와 재고 정보 로드
+  useEffect(() => {
     if (item && isOpen && item.product?.id) {
       const productId = item.product.id;
       

@@ -289,6 +289,21 @@ function LoyalCustomerModal({ branchId, onClose }) {
   const [showMemberSearch, setShowMemberSearch] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   // 회원 검색 모달 열기
   const handleOpenMemberSearch = () => {
     setShowMemberSearch(true);
@@ -346,7 +361,7 @@ function LoyalCustomerModal({ branchId, onClose }) {
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay>
       <ModalContent onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <ModalTitle>단골고객 등록</ModalTitle>
@@ -461,6 +476,21 @@ function MemberSearchModal({ branchId, onSelect, onClose }) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   // 주문 내역을 통해 회원 검색
   const searchMembers = async () => {
     if (!searchTerm.trim()) {
@@ -536,7 +566,7 @@ function MemberSearchModal({ branchId, onSelect, onClose }) {
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay>
       <ModalContent 
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '600px' }}
@@ -604,6 +634,21 @@ function LoyalCustomerEditModal({ customer, branchId, onClose }) {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // 모달이 열릴 때 뒷단 스크롤 방지
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -626,7 +671,7 @@ function LoyalCustomerEditModal({ customer, branchId, onClose }) {
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay>
       <ModalContent onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <ModalTitle>단골고객 수정</ModalTitle>

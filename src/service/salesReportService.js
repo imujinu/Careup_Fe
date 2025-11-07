@@ -255,4 +255,79 @@ export const salesReportService = {
     );
     return response.data.result; // SalesForecastResponseDto
   },
+
+  // ========== Branch/Franchise Owner 전용 엑셀 다운로드 ==========
+
+  // 매출 통계 엑셀 다운로드
+  exportBranchSalesStatistics: async (
+    branchId,
+    startDate,
+    endDate,
+    periodType = "DAY"
+  ) => {
+    const params = new URLSearchParams({
+      branchId: branchId.toString(),
+      startDate,
+      endDate,
+      periodType,
+    });
+
+    const url = `${EXCEL_API_BASE_URL}/sales/excel/statistics?${params.toString()}`;
+    const fileName = `매출통계_${branchId}_${startDate}_${endDate}.xlsx`;
+
+    await downloadExcelFile(url, fileName);
+  },
+
+  // 상품별 매출 엑셀 다운로드
+  exportBranchProductSales: async (
+    branchId,
+    startDate,
+    endDate,
+    sortType = "HIGH_SALES"
+  ) => {
+    const params = new URLSearchParams({
+      branchId: branchId.toString(),
+      startDate,
+      endDate,
+      sortType,
+    });
+
+    const url = `${EXCEL_API_BASE_URL}/sales/excel/products?${params.toString()}`;
+    const fileName = `상품별매출_${branchId}_${startDate}_${endDate}.xlsx`;
+
+    await downloadExcelFile(url, fileName);
+  },
+
+  // 인근 지역 가맹점 비교 엑셀 다운로드
+  exportNeighborhoodComparison: async (
+    branchId,
+    startDate,
+    endDate,
+    radiusKm = 10.0
+  ) => {
+    const params = new URLSearchParams({
+      branchId: branchId.toString(),
+      startDate,
+      endDate,
+      radiusKm: radiusKm.toString(),
+    });
+
+    const url = `${EXCEL_API_BASE_URL}/sales/excel/comparison?${params.toString()}`;
+    const fileName = `인근지역비교_${branchId}_${startDate}_${endDate}.xlsx`;
+
+    await downloadExcelFile(url, fileName);
+  },
+
+  // 예상 매출액 엑셀 다운로드 (Branch/Franchise Owner)
+  exportBranchSalesForecast: async (branchId, targetDate) => {
+    const params = new URLSearchParams({
+      branchId: branchId.toString(),
+      targetDate,
+    });
+
+    const url = `${EXCEL_API_BASE_URL}/sales/excel/forecast?${params.toString()}`;
+    const fileName = `예상매출액_${branchId}_${targetDate}.xlsx`;
+
+    await downloadExcelFile(url, fileName);
+  },
 };

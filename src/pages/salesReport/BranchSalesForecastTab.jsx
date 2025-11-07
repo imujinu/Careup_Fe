@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { fetchBranchSalesForecastForBranch } from "../../stores/slices/salesReportSlice";
+import { salesReportService } from "../../service/salesReportService";
 import { useToast } from "../../components/common/Toast";
 
 const Card = styled.div`
@@ -177,11 +178,23 @@ const BranchSalesForecastTab = React.forwardRef(({ branchId }, ref) => {
 
   useImperativeHandle(ref, () => ({
     exportExcel: async () => {
-      toast.addToast({
-        type: "info",
-        title: "준비중",
-        message: "엑셀 다운로드 기능은 준비중입니다.",
-      });
+      try {
+        await salesReportService.exportBranchSalesForecast(
+          branchId,
+          targetDate
+        );
+        toast.addToast({
+          type: "success",
+          title: "다운로드 완료",
+          message: "예상 매출액 엑셀 파일이 다운로드되었습니다.",
+        });
+      } catch (error) {
+        toast.addToast({
+          type: "error",
+          title: "다운로드 실패",
+          message: error.message || "엑셀 파일 다운로드에 실패했습니다.",
+        });
+      }
     },
   }));
 
