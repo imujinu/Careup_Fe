@@ -1,7 +1,7 @@
 import axios from 'axios';
 import customerAxios from '../utils/customerAxios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_CUSTOMER_API_URL;
 
 // 쇼핑몰 전용 axios 인스턴스 (직원용 인터셉터 없음)
 const shopApi = axios.create({
