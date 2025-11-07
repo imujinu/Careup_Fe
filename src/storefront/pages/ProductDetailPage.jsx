@@ -125,11 +125,62 @@ function ProductDetailPage() {
           branchesByAttributeType[attributeTypeName].values[valueKey].branches.push(branch);
         });
         
-        // 속성 그룹을 배열로 변환
-        const attributeGroups = Object.values(branchesByAttributeType).map(typeGroup => ({
-          attributeTypeName: typeGroup.attributeTypeName,
-          values: Object.values(typeGroup.values)
-        }));
+        // 2단 옵션 조합 구성 (상품이 조합 단위로 나뉜 경우)
+        // 각 상품의 attributeValues에서 타입별 값을 추출해 조합 맵 생성
+        const optionTypeOrder = [];
+        const comboMap = new Map(); // key: `${opt1Id}-${opt2Id}` -> variant info
+        sameNameProducts.forEach(p => {
+          const attrs = Array.isArray(p.attributeValues) ? p.attributeValues : [];
+          // 타입 순서 수집(최대 2개)
+          attrs.forEach(a => {
+            const tName = a.attributeTypeName;
+            if (tName && !optionTypeOrder.includes(tName)) optionTypeOrder.push(tName);
+          });
+        });
+        // 최대 2개로 제한
+        const type1 = optionTypeOrder[0];
+        const type2 = optionTypeOrder[1];
+
+        sameNameProducts.forEach(p => {
+          const attrs = Array.isArray(p.attributeValues) ? p.attributeValues : [];
+          const t1 = attrs.find(a => a.attributeTypeName === type1);
+          const t2 = attrs.find(a => a.attributeTypeName === type2);
+          const opt1Id = t1?.attributeValueId || null;
+          const opt2Id = t2?.attributeValueId || null;
+          if (opt1Id) {
+            const key = `${opt1Id}-${opt2Id || 'na'}`;
+            if (!comboMap.has(key)) {
+              comboMap.set(key, {
+                opt1Id,
+                opt1Name: t1?.displayName,
+                opt2Id,
+                opt2Name: t2?.displayName,
+                productId: p.productId,
+                imageUrl: p.imageUrl,
+                branches: p.availableBranches || []
+              });
+            }
+          }
+        });
+
+        // 옵션 타입/값 목록 구성 (활성화 여부는 렌더단에서 조합으로 판단)
+        const attributeGroups = [];
+        if (type1) {
+          const valuesMap = new Map();
+          comboMap.forEach(v => {
+            const id = v.opt1Id; const name = v.opt1Name;
+            if (id && !valuesMap.has(id)) valuesMap.set(id, { attributeValueId: id, attributeValueName: name, branches: [] });
+          });
+          attributeGroups.push({ attributeTypeName: type1, values: Array.from(valuesMap.values()) });
+        }
+        if (type2) {
+          const valuesMap = new Map();
+          comboMap.forEach(v => {
+            const id = v.opt2Id; const name = v.opt2Name;
+            if (id && !valuesMap.has(id)) valuesMap.set(id, { attributeValueId: id, attributeValueName: name, branches: [] });
+          });
+          attributeGroups.push({ attributeTypeName: type2, values: Array.from(valuesMap.values()) });
+        }
         
         // 가격 범위 계산 (모든 상품의 최소/최대 가격)
         const allMinPrices = sameNameProducts.map(p => p.minPrice || 0).filter(p => p > 0);
@@ -171,7 +222,9 @@ function ProductDetailPage() {
           attributeGroups: attributeGroups.length > 0 ? attributeGroups : null,
           // 같은 이름의 모든 상품 ID 목록
           productIds: sameNameProducts.map(p => p.productId),
-          variants: sameNameProducts
+          variants: sameNameProducts,
+          optionTypes: [type1, type2].filter(Boolean),
+          optionCombos: Array.from(comboMap.values())
         };
 
         setProduct(mappedProduct);

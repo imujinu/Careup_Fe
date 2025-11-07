@@ -6,37 +6,65 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [isInCart, setIsInCart] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [selectedAttributeValueId, setSelectedAttributeValueId] = useState(null);
+  // 속성 선택 맵: { [attributeTypeName]: attributeValueId }
+  const [selectedAttributes, setSelectedAttributes] = useState({});
   const [currentProductImage, setCurrentProductImage] = useState(product?.image || null);
 
   // product가 변경될 때 기본 이미지 설정
   useEffect(() => {
-    if (product?.image && !selectedAttributeValueId) {
+    if (product?.image && Object.keys(selectedAttributes).length === 0) {
       setCurrentProductImage(product.image);
     }
   }, [product?.image]);
 
   // 선택된 속성에 해당하는 이미지 가져오기
   useEffect(() => {
-    if (selectedAttributeValueId && product?.attributeGroups) {
-      // 모든 속성 그룹에서 선택된 속성 값 찾기
-      for (const attrGroup of product.attributeGroups) {
-        if (attrGroup.values) {
-          const selectedValue = attrGroup.values.find(
-            v => v.attributeValueId === selectedAttributeValueId
-          );
-          if (selectedValue && selectedValue.imageUrl) {
-            setCurrentProductImage(selectedValue.imageUrl);
-            return;
+    if (Object.keys(selectedAttributes).length > 0 && product?.attributeGroups) {
+      // 선택된 속성 중 가장 최근에 선택된 속성의 이미지 사용
+      // 또는 첫 번째 선택된 속성의 이미지 사용
+      const selectedKeys = Object.keys(selectedAttributes);
+      if (selectedKeys.length > 0) {
+        // 마지막으로 선택된 속성 타입의 이미지 사용
+        const lastSelectedType = selectedKeys[selectedKeys.length - 1];
+        const lastSelectedValueId = selectedAttributes[lastSelectedType];
+        
+        for (const attrGroup of product.attributeGroups) {
+          if (attrGroup.attributeTypeName === lastSelectedType && attrGroup.values) {
+            const selectedValue = attrGroup.values.find(
+              v => v.attributeValueId === lastSelectedValueId
+            );
+            if (selectedValue && selectedValue.imageUrl) {
+              setCurrentProductImage(selectedValue.imageUrl);
+              return;
+            }
           }
         }
       }
     }
     // 속성이 선택되지 않았거나 이미지를 찾을 수 없으면 기본 이미지 사용
-    if (!selectedAttributeValueId) {
+    if (Object.keys(selectedAttributes).length === 0) {
       setCurrentProductImage(product?.image || null);
     }
-  }, [selectedAttributeValueId, product?.attributeGroups, product?.image]);
+  }, [selectedAttributes, product?.attributeGroups, product?.image]);
+
+  // 옵션 선택에 따라 지점 자동 선택(재고 있는 첫 지점)
+  useEffect(() => {
+    if (!product?.availableBranches) return;
+    const keys = Object.keys(selectedAttributes);
+    let candidates = product.availableBranches;
+    // 두 옵션이 모두 선택된 조합 우선
+    if (Array.isArray(product.optionCombos) && product.optionTypes && selectedAttributes[product.optionTypes[0]] && product.optionTypes[1] && selectedAttributes[product.optionTypes[1]]) {
+      const combo = product.optionCombos.find(c => String(c.opt1Id) === String(selectedAttributes[product.optionTypes[0]]) && String(c.opt2Id) === String(selectedAttributes[product.optionTypes[1]]));
+      candidates = combo?.branches || [];
+    } else if (keys.length === 1) {
+      // 단일 옵션 선택 시 해당 옵션에 맞는 브랜치
+      const type = keys[0];
+      const val = selectedAttributes[type];
+      candidates = product.availableBranches.filter(b => b.attributeTypeName === type && String(b.attributeValueId) === String(val));
+    }
+    const firstInStock = candidates.find(b => (b.stockQuantity || 0) > 0) || candidates[0];
+    if (firstInStock?.branchId) setSelectedBranchId(firstInStock.branchId);
+  }, [selectedAttributes, product?.availableBranches, product?.optionCombos, product?.optionTypes]);
 
   // 이미지 배열 처리 - images 배열이 있으면 사용, 없으면 image를 배열로 변환
   const productImages = currentProductImage 
@@ -191,33 +219,84 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               </p>
             </div>
 
-            {/* 속성 선택 (색상, 사이즈 등) */}
+            {/* 속성 선택 (색상, 사이즈 등) - 옵션1 → 옵션2 단계 */}
             {product?.attributeGroups && product.attributeGroups.length > 0 && (
               product.attributeGroups.map((attrGroup, idx) => {
                 if (!attrGroup.attributeTypeName || !attrGroup.values || attrGroup.values.length === 0) return null;
                 
+                const attributeTypeName = attrGroup.attributeTypeName;
+                const selectedValueId = selectedAttributes[attributeTypeName];
+                
+                const isSecondLevel = idx === 1; // 옵션2
+                const firstType = product.attributeGroups?.[0]?.attributeTypeName;
+                const firstSelected = firstType ? selectedAttributes[firstType] : undefined;
+                
                 return (
                   <div key={idx} className="option-section">
-                    <label className="option-label">{attrGroup.attributeTypeName}</label>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <label className="option-label">{attributeTypeName}</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', opacity: isSecondLevel && !firstSelected ? 0.6 : 1 }}>
                       {attrGroup.values.map((valueGroup, valueIdx) => {
                         // 각 속성 값의 첫 번째 브랜치를 확인하여 재고 확인
                         const firstBranch = valueGroup.branches && valueGroup.branches.length > 0 ? valueGroup.branches[0] : null;
-                        const hasStock = firstBranch ? firstBranch.stockQuantity > 0 : false;
-                        const isSelected = selectedAttributeValueId === valueGroup.attributeValueId;
+                        let hasStock = firstBranch ? firstBranch.stockQuantity > 0 : true;
+                        const isSelected = selectedValueId === valueGroup.attributeValueId;
+                        
+                        // 옵션2는 옵션1이 선택된 조합이 존재하는지로 활성/비활성 판단
+                        if (isSecondLevel) {
+                          if (!firstSelected) {
+                            hasStock = false; // 옵션1 선택 전에는 비활성화 표시
+                          } else if (Array.isArray(product.optionCombos)) {
+                            const exists = product.optionCombos.some(c => (
+                              String(c.opt1Id) === String(firstSelected) && String(c.opt2Id) === String(valueGroup.attributeValueId)
+                            ));
+                            hasStock = exists;
+                          }
+                        }
                         
                         return (
                           <button
-                            key={valueIdx}
+                            key={`${attributeTypeName}-${valueGroup.attributeValueId}`}
                             type="button"
                             onClick={() => {
-                              setSelectedAttributeValueId(valueGroup.attributeValueId);
-                              // 속성 선택 시 해당 속성의 첫 번째 지점을 기본 선택
-                              if (firstBranch && firstBranch.branchId) {
-                                setSelectedBranchId(firstBranch.branchId);
+                              // 최대 2개까지만 선택 가능 (이미 2개 선택되어 있고, 현재 타입이 선택되지 않은 경우)
+                              const currentSelectedCount = Object.keys(selectedAttributes).length;
+                              const isCurrentTypeSelected = selectedAttributes[attributeTypeName] !== undefined;
+                              
+                              if (currentSelectedCount >= 2 && !isCurrentTypeSelected) {
+                                // 이미 2개 선택되어 있고 현재 타입이 선택되지 않았으면 선택 불가
+                                return;
                               }
+                              
+                              // 속성 선택/해제
+                              setSelectedAttributes(prev => {
+                                const newAttributes = { ...prev };
+                                if (isSelected) {
+                                  // 이미 선택된 경우 해제
+                                  delete newAttributes[attributeTypeName];
+                                } else {
+                                  // 선택
+                                  newAttributes[attributeTypeName] = valueGroup.attributeValueId;
+                                }
+                                return newAttributes;
+                              });
+                              
+                              // 선택 조합의 브랜치로 기본 선택
+                              if (!isSelected) {
+                                let candidateBranches = [];
+                                if (product.optionCombos && Object.keys(selectedAttributes).length > 0) {
+                                  const t1 = product.optionTypes?.[0];
+                                  const t2 = product.optionTypes?.[1];
+                                  const chosen1 = selectedAttributes[t1];
+                                  const chosen2 = attributeTypeName === t2 ? valueGroup.attributeValueId : selectedAttributes[t2];
+                                  const combo = product.optionCombos.find(c => String(c.opt1Id) === String(chosen1) && String(c.opt2Id) === String(chosen2));
+                                  candidateBranches = combo?.branches || [];
+                                }
+                                const b = candidateBranches[0] || firstBranch;
+                                if (b?.branchId) setSelectedBranchId(b.branchId);
+                              }
+                              
                               // 속성 선택 시 해당 상품의 이미지로 변경
-                              if (valueGroup.imageUrl) {
+                              if (!isSelected && valueGroup.imageUrl) {
                                 setCurrentProductImage(valueGroup.imageUrl);
                                 setSelectedImageIndex(0); // 이미지 인덱스 초기화
                               }
@@ -256,16 +335,41 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   onChange={(e) => setSelectedBranchId(e.target.value)}
                 >
                   <option value="">구매할 지점을 선택하세요</option>
-                  {product.availableBranches
-                    .filter(branch => {
-                      // 속성이 선택된 경우 해당 속성의 지점만 표시
-                      if (selectedAttributeValueId) {
-                        return branch.attributeValueId === selectedAttributeValueId;
+                  {Array.from(
+                    new Map(
+                      product.availableBranches
+                        .filter(branch => {
+                      // 선택된 모든 속성과 일치하는 브랜치만 표시
+                      const selectedKeys = Object.keys(selectedAttributes);
+                      // 두 옵션이 모두 선택되면 조합 브랜치만 사용
+                      if (Array.isArray(product.optionCombos) && product.optionTypes && selectedAttributes[product.optionTypes[0]] && product.optionTypes[1] && selectedAttributes[product.optionTypes[1]]) {
+                        const combo = product.optionCombos.find(c => String(c.opt1Id) === String(selectedAttributes[product.optionTypes[0]]) && String(c.opt2Id) === String(selectedAttributes[product.optionTypes[1]]));
+                        const comboKeys = new Set((combo?.branches || []).map(b => `${b.branchId}-${b.attributeValueId || 'no-attr'}`));
+                        const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
+                        return comboKeys.has(key);
                       }
-                      return true;
-                    })
+                      if (selectedKeys.length === 0) {
+                        return true; // 속성이 선택되지 않았으면 모든 브랜치 표시
+                      }
+                      
+                      // 브랜치가 가진 속성이 선택된 속성과 일치하는지 확인
+                      // 브랜치는 하나의 속성만 가지므로, 해당 속성 타입이 선택되어 있고 값이 일치하면 표시
+                      if (branch.attributeTypeName && branch.attributeValueId) {
+                        const selectedValueId = selectedAttributes[branch.attributeTypeName];
+                        return selectedValueId === branch.attributeValueId;
+                      }
+                      
+                      return false;
+                        })
+                        // 고유 키로 중복 제거 (동일 지점-속성 조합)
+                        .map(b => {
+                          const uniqKey = `${b.branchId}-${b.attributeValueId || 'no-attr'}`;
+                          return [uniqKey, b];
+                        })
+                    ).values()
+                  )
                     .map(branch => (
-                      <option key={branch.branchId} value={branch.branchId}>
+                      <option key={`${branch.branchId}-${branch.attributeValueId || 'no-attr'}`} value={branch.branchId}>
                         {branch.branchName} {branch.attributeValueName ? `(${branch.attributeTypeName}: ${branch.attributeValueName})` : ''} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
                       </option>
                     ))}

@@ -35,7 +35,19 @@ export const customerProductService = {
       return response.data;
     } catch (error) {
       // 조회 기록 실패해도 상품 상세는 표시되도록 에러를 무시
-      console.error('❌ 상품 조회 기록 실패:', error);
+      // 백엔드 API가 아직 준비되지 않았거나 500 에러인 경우 조용히 무시
+      const status = error?.response?.status;
+      if (status === 500 || status === 404) {
+        // 백엔드 API가 아직 구현되지 않은 경우 조용히 무시
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ 상품 조회 기록 API가 아직 준비되지 않았습니다.');
+        }
+      } else {
+        // 다른 에러는 개발 환경에서만 로깅
+        if (import.meta.env.DEV) {
+          console.error('❌ 상품 조회 기록 실패:', error);
+        }
+      }
       return null;
     }
   },

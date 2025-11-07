@@ -342,22 +342,38 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
           productIdGroups.get(productId).push(pav);
         });
         
-        // 모든 선택한 속성이 일치하는 productId 찾기
+        // 마지막 속성(옵션2)의 선택된 값 ID 가져오기
+        const lastAttr = sortedAttributes[sortedAttributes.length - 1];
+        const lastTypeId = String(lastAttr.attributeTypeId || lastAttr.attributeType?.id || lastAttr.id);
+        const lastTypeName = lastAttr.attributeTypeName || lastAttr.attributeType?.name || lastAttr.name;
+        const lastSelectedValueId = selectedAttributeValues[lastTypeId] || selectedAttributeValues[lastTypeName];
+        
+        // 모든 선택한 속성이 정확히 일치하는 productId 찾기
+        // 마지막 속성(옵션2) 값 ID와 일치하는 productId를 우선적으로 찾음
         let matchedProductId = null;
         productIdGroups.forEach((attrs, productId) => {
+          // 속성 개수가 정확히 일치해야 함
+          if (attrs.length !== sortedAttributes.length) {
+            return;
+          }
+          
           let allMatch = true;
           
-          // 각 선택한 속성이 이 productId의 속성에 포함되어 있는지 확인
-          for (const [attrKey, selectedValueId] of selectedAttrMap.entries()) {
+          // 각 선택한 속성이 이 productId의 속성에 정확히 일치하는지 확인
+          // 타입 ID만 확인 (타입 이름은 건너뛰기)
+          for (const attr of sortedAttributes) {
+            const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id);
+            const selectedValueId = selectedAttrMap.get(typeId);
+            
+            if (!selectedValueId) {
+              continue; // 선택되지 않은 속성은 건너뛰기
+            }
+            
             const hasMatchingAttr = attrs.some(pav => {
               const pavTypeId = String(pav.attributeTypeId || pav.attributeType?.id || '');
-              const pavTypeName = String(pav.attributeTypeName || pav.attributeType?.name || '');
               const pavValueId = String(pav.attributeValueId || pav.attributeValue?.id || pav.id || '');
               
-              const typeMatches = pavTypeId === attrKey || pavTypeName === attrKey;
-              const valueMatches = pavValueId === selectedValueId;
-              
-              return typeMatches && valueMatches;
+              return pavTypeId === typeId && pavValueId === selectedValueId;
             });
             
             if (!hasMatchingAttr) {
@@ -366,33 +382,49 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
             }
           }
           
-          if (allMatch && attrs.length === sortedAttributes.length) {
-            matchedProductId = productId;
+          // 모든 속성이 일치하고, 마지막 속성(옵션2) 값 ID도 일치하는 productId 찾기
+          if (allMatch && lastSelectedValueId) {
+            const hasLastAttrMatch = attrs.some(pav => {
+              const pavTypeId = String(pav.attributeTypeId || pav.attributeType?.id || '');
+              const pavValueId = String(pav.attributeValueId || pav.attributeValue?.id || pav.id || '');
+              
+              return pavTypeId === lastTypeId && pavValueId === String(lastSelectedValueId);
+            });
+            
+            if (hasLastAttrMatch) {
+              matchedProductId = productId;
+              return; // 마지막 속성 값과 일치하는 productId 찾으면 종료
+            }
           }
         });
         
-        // 매칭된 productId의 속성 값 중 하나와 일치하는 BranchProduct 찾기
-        if (matchedProductId) {
-          // productAttributeValuesData에서 매칭된 productId의 attributeValueId 목록 가져오기
-          const matchedAttrValueIds = productAttributeValuesData
-            .filter(pav => String(pav.productId) === matchedProductId)
-            .map(pav => String(pav.attributeValueId || pav.attributeValue?.id || pav.id));
-          
-          // 이 attributeValueId 중 하나와 일치하는 BranchProduct 찾기
+        // 매칭된 productId의 마지막 속성(옵션2) 값 ID와 일치하는 BranchProduct 찾기
+        if (matchedProductId && lastSelectedValueId) {
+          // BranchProduct의 attributeValueId가 마지막 속성(옵션2) 값 ID와 일치하는지 확인
+          // 또한 BranchProduct의 attributeTypeId도 마지막 속성 타입 ID와 일치해야 함
           matchingBP = productBranchProducts.find(bp => {
             const bpValueId = String(bp.attributeValueId || '');
-            return matchedAttrValueIds.includes(bpValueId);
+            const bpTypeId = String(bp.attributeTypeId || '');
+            return bpValueId === String(lastSelectedValueId) && bpTypeId === lastTypeId;
           });
         }
       }
       
       // productAttributeValuesData를 사용한 매칭 실패 시, 기존 방식으로 폴백
       if (!matchingBP) {
-        matchingBP = productBranchProducts.find(bp => {
-          return selectedValues.some(selectedValue => 
-            String(bp.attributeValueId) === String(selectedValue)
-          );
-        });
+        // 마지막 속성(옵션2)의 선택된 값 ID로 매칭 시도
+        const lastAttr = sortedAttributes[sortedAttributes.length - 1];
+        const lastTypeId = String(lastAttr.attributeTypeId || lastAttr.attributeType?.id || lastAttr.id);
+        const lastTypeName = lastAttr.attributeTypeName || lastAttr.attributeType?.name || lastAttr.name;
+        const lastSelectedValueId = selectedAttributeValues[lastTypeId] || selectedAttributeValues[lastTypeName];
+        
+        if (lastSelectedValueId) {
+          matchingBP = productBranchProducts.find(bp => {
+            const bpValueId = String(bp.attributeValueId || '');
+            const bpTypeId = String(bp.attributeTypeId || '');
+            return bpValueId === String(lastSelectedValueId) && bpTypeId === lastTypeId;
+          });
+        }
       }
     }
 
@@ -409,7 +441,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
     }
-  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes]);
+  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes, productAttributeValuesData, selectedProduct]);
 
   // 상품 선택 시 카테고리 속성 조회
   useEffect(() => {
