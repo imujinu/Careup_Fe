@@ -1,8 +1,8 @@
 import axios from "../utils/axiosConfig";
 import { branchService } from "./branchService";
 
-const BRANCH_API_BASE_URL = import.meta.env.VITE_BRANCH_URL || "http://localhost:8080";
-const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL || "http://localhost:8081";
+const BRANCH_API_BASE_URL = import.meta.env.VITE_BRANCH_URL;
+const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
 
 export const dashboardService = {
   // 전체 지점 수 조회
