@@ -1,7 +1,17 @@
 // src/service/attendanceTemplateService.js
 import axios from '../utils/axiosConfig';
 
-const BASE = '/branch-service/attendance-template';
+const BASE_URL = (() => {
+  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
+  if (explicit) return explicit;
+  const api = (
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : '')
+  ).replace(/\/$/, '');
+  return `${api}/branch-service`;
+})();
+
+const BASE = `${BASE_URL}/attendance-template`;
 
 function unwrap(res) {
   const ct = (res?.headers?.['content-type'] || '').toLowerCase();
