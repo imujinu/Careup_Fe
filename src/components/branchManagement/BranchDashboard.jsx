@@ -178,9 +178,30 @@ function BranchDashboard({ branchId }) {
     }));
   }, [dashboard]);
 
+  // 주문 상태를 한국어로 변환하는 함수
+  const translateOrderStatus = (status) => {
+    if (!status) return status;
+    const s = String(status).toUpperCase();
+    switch (s) {
+      case 'PENDING':
+        return '대기중';
+      case 'CONFIRMED':
+        return '승인됨';
+      case 'CANCELLED':
+      case 'CANCELED':
+        return '취소됨';
+      case 'REJECTED':
+        return '거부됨';
+      case 'COMPLETED':
+        return '완료';
+      default:
+        return status;
+    }
+  };
+
   const orderStatusData = useMemo(() => {
     const dist = dashboard?.orderSummary?.orderStatusDistribution || {};
-    return Object.keys(dist).map((k) => ({ name: k, value: dist[k] }));
+    return Object.keys(dist).map((k) => ({ name: translateOrderStatus(k), value: dist[k] }));
   }, [dashboard]);
 
   const salesTrendData = useMemo(() => {
@@ -488,19 +509,20 @@ function BranchDashboard({ branchId }) {
                 <StatLabel>총 주문 수</StatLabel>
                 <StatValue>{dashboard.orderSummary?.totalOrders ?? 0}건</StatValue>
               </StatRow>
-              <MiniDonut>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={orderStatusData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90}>
-                      {orderStatusData.map((_, i) => (
-                        <Cell key={i} fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1"][i % 4]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </MiniDonut>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={orderStatusData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" name="주문 수">
+                    {orderStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1"][index % 4]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </StatsColumn>
           </Card>
 

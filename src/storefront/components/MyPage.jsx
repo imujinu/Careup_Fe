@@ -1,31 +1,68 @@
 import React, { useState, useEffect } from "react";
 import "./MyPage.css";
 import { cartService } from "../../service/cartService";
-import { productInquiryService } from "../../service/productInquiryService";
 import customerAxios from "../../utils/customerAxios";
 import OrderDetailModal from "./OrderDetailModal";
+import { useShopAuth } from "../hooks/useShopAuth";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
-  const [activeTab, setActiveTab] = useState(initialTab);
+const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }) => {
+  const { currentUser: hookCurrentUser, isLoggedIn } = useShopAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // prop으로 전달된 currentUser가 있으면 우선 사용, 없으면 hook에서 가져옴
+  const currentUser = propCurrentUser || hookCurrentUser;
+  
+  // URL 파라미터에서 탭 가져오기 (문의 목록 탭은 제거됨)
+  const tabFromUrl = searchParams.get('tab');
+  const resolvedInitialTab = (tabFromUrl && tabFromUrl !== 'inquiries') ? tabFromUrl : initialTab;
+  
+  const [activeTab, setActiveTab] = useState(resolvedInitialTab);
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isOrderDetailModalOpen, setIsOrderDetailModalOpen] = useState(false);
 
+  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.memberId) {
+      navigate('/shop/login');
+    }
+  }, [isLoggedIn, currentUser?.memberId, navigate]);
+
   // initialTab이 변경되면 activeTab 업데이트
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
+    if (resolvedInitialTab) {
+      setActiveTab(resolvedInitialTab);
     }
-  }, [initialTab]);
+  }, [resolvedInitialTab]);
+
+  // URL 파라미터와 동기화 (문의 목록 탭은 제거됨)
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'inquiries') {
+      // 문의 목록 탭이 선택되면 프로필 탭으로 리다이렉트
+      navigate('/shop/mypage?tab=profile', { replace: true });
+      setActiveTab('profile');
+    } else if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams, navigate, activeTab]);
+
+  // 탭 변경 시 URL 업데이트
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate(`/shop/mypage?tab=${tab}`, { replace: true });
+  };
 
   // 마이페이지 정보 로드
   useEffect(() => {
     const loadMyPageData = async () => {
-      if (!currentUser?.memberId) {
+      const memberId = currentUser?.memberId;
+      if (!memberId) {
         setLoading(false);
         return;
       }
@@ -38,17 +75,8 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
         setProfile(profileRes?.data?.result);
         
         // 주문 내역
-        const ordersRes = await cartService.getOrdersByMember(currentUser.memberId);
+        const ordersRes = await cartService.getOrdersByMember(memberId);
         setOrders(ordersRes?.data || ordersRes || []);
-        
-        // 문의 목록
-        try {
-          const inquiriesRes = await productInquiryService.getMyInquiries(currentUser.memberId);
-          setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
-        } catch (inquiryErr) {
-          console.error('문의 목록 조회 실패:', inquiryErr);
-          setInquiries([]);
-        }
       } catch (err) {
         console.error('마이페이지 데이터 로드 실패:', err);
         setError('정보를 불러오는데 실패했습니다.');
@@ -58,23 +86,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
     };
 
     loadMyPageData();
-  }, [currentUser]);
-
-  // 탭 변경 시 문의 목록 다시 로드
-  useEffect(() => {
-    if (activeTab === "inquiries" && currentUser?.memberId) {
-      const loadInquiries = async () => {
-        try {
-          const inquiriesRes = await productInquiryService.getMyInquiries(currentUser.memberId);
-          setInquiries(Array.isArray(inquiriesRes) ? inquiriesRes : []);
-        } catch (err) {
-          console.error('문의 목록 조회 실패:', err);
-          setInquiries([]);
-        }
-      };
-      loadInquiries();
-    }
-  }, [activeTab, currentUser?.memberId]);
+  }, [currentUser?.memberId]); // memberId만 의존성으로 사용
 
   const handleOrderDetailClick = (order) => {
     setSelectedOrder(order);
@@ -94,7 +106,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
   return (
     <div className="mypage">
       <div className="container">
-        <button className="back-btn" onClick={onBack}>
+        <button className="back-btn" onClick={onBack || (() => navigate('/shop'))}>
           ← 홈으로
         </button>
 
@@ -111,7 +123,7 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                       className={`nav-item ${
                         activeTab === "profile" ? "active" : ""
                       }`}
-                      onClick={() => setActiveTab("profile")}
+                      onClick={() => handleTabChange("profile")}
                     >
                       프로필 관리
                     </button>
@@ -121,19 +133,9 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                       className={`nav-item ${
                         activeTab === "purchase" ? "active" : ""
                       }`}
-                      onClick={() => setActiveTab("purchase")}
+                      onClick={() => handleTabChange("purchase")}
                     >
                       구매 내역
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className={`nav-item ${
-                        activeTab === "inquiries" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveTab("inquiries")}
-                    >
-                      문의 목록
                     </button>
                   </li>
                 </ul>
@@ -199,7 +201,12 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                         <p>구매 내역이 없습니다.</p>
                       </div>
                     ) : (
-                      orders.map((order) => (
+                      [...orders].sort((a, b) => {
+                        // 주문번호 기준 최신순 정렬 (내림차순)
+                        const idA = parseInt(a.orderId || a.id) || 0;
+                        const idB = parseInt(b.orderId || b.id) || 0;
+                        return idB - idA;
+                      }).map((order) => (
                         <div key={order.orderId || order.id} className="purchase-item">
                           <div className="purchase-info">
                             <div className="purchase-name">주문번호: {order.orderId || order.id}</div>
@@ -208,8 +215,9 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                               {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ko-KR') : '-'}
                             </div>
                             <div className={`purchase-status ${order.orderStatus?.toLowerCase() || 'pending'}`}>
-                              {order.orderStatus === 'CONFIRMED' ? '구매완료' : 
+                              {order.orderStatus === 'CONFIRMED' || order.orderStatus === 'APPROVED' ? '구매완료' : 
                                order.orderStatus === 'PENDING' ? '주문대기' :
+                               order.orderStatus === 'REJECTED' ? '거부됨' :
                                order.orderStatus === 'CANCELLED' ? '취소됨' : order.orderStatus || '대기중'}
                             </div>
                           </div>
@@ -225,51 +233,6 @@ const MyPage = ({ onBack, currentUser, initialTab = "profile" }) => {
                       ))
                     )}
                   </div>
-                </div>
-              )}
-
-              {activeTab === "inquiries" && (
-                <div className="inquiries-content">
-                  <h3>문의 목록</h3>
-                  {inquiries.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                      <p style={{ fontSize: '16px', color: '#666' }}>등록된 문의가 없습니다.</p>
-                    </div>
-                  ) : (
-                    <div className="inquiries-list">
-                      {inquiries.map((inquiry) => (
-                        <div key={inquiry.id} className="inquiry-item">
-                          <div className="inquiry-header">
-                            <div className="inquiry-title-section">
-                              <h4 className="inquiry-title">
-                                {inquiry.title}
-                                {inquiry.isSecret && <span className="secret-badge">🔒 비공개</span>}
-                              </h4>
-                              <span className={`inquiry-status ${inquiry.status?.toLowerCase() || 'pending'}`}>
-                                {inquiry.status === 'ANSWERED' ? '답변완료' : 
-                                 inquiry.status === 'PENDING' ? '답변대기' : 
-                                 inquiry.status === 'CLOSED' ? '종료' : '대기중'}
-                              </span>
-                            </div>
-                            <div className="inquiry-meta">
-                              <span className="inquiry-type">{inquiry.inquiryType || 'PRODUCT'}</span>
-                              <span className="inquiry-date">
-                                {inquiry.createdAt ? new Date(inquiry.createdAt).toLocaleDateString('ko-KR') : '-'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="inquiry-content">
-                            <p>{inquiry.content}</p>
-                          </div>
-                          {inquiry.answerCount > 0 && (
-                            <div className="inquiry-answers">
-                              <span className="answer-count">답변 {inquiry.answerCount}개</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

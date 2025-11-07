@@ -103,14 +103,14 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
         price: Number(product.price || 0),
         minPrice: Number(product.price || 0),
         maxPrice: Number(product.price || 0),
-        image: product.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+        image: product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
         imageAlt: product.productName || "상품 이미지",
         category: product.categoryName || "미분류",
         description: product.description || "상품에 대한 자세한 설명이 없습니다.",
         specifications: [
           { name: "카테고리", value: product.categoryName || "정보 없음" },
         ],
-        images: [product.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"],
+        images: [product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"],
         availableBranches: [],
         availableBranchCount: 0,
       };
@@ -128,7 +128,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
         price: Number(product.price || 0),
         minPrice: Number(product.price || 0),
         maxPrice: Number(product.price || 0),
-        image: product.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+        image: product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
         imageAlt: product.productName || "상품 이미지",
         category: product.categoryName || "미분류",
         description: product.description || "상품에 대한 자세한 설명이 없습니다.",
@@ -197,11 +197,11 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
             <div className="rank-badge">{i + 1}</div>
             <div className="rank-img">
               <img 
-                src={product.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80"} 
+                src={product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
                 alt={product.productName || product.name}
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                  e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                 }}
               />
             </div>

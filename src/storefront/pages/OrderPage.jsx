@@ -157,7 +157,14 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
           {items.map(item => (
             <div key={item.branchProductId} className="order-item">
               <div className="item-image">
-                <img src={item.imageUrl || 'https://via.placeholder.com/80'} alt={item.productName} />
+                <img 
+                  src={item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
+                  alt={item.productName}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+                  }}
+                />
               </div>
               <div className="item-info">
                 <h4 className="item-name">{item.productName}</h4>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 
-const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, products, searchQuery, categories, activeTab: externalActiveTab, onTabChange, currentPage, setCurrentPage, totalPages }) => {
+const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, products, searchQuery, categories, activeTab: externalActiveTab, onTabChange, currentPage, setCurrentPage, totalPages, loadingProducts }) => {
   const [activeTab, setActiveTab] = useState(externalActiveTab || "전체");
   const [sort, setSort] = useState("인기순");
   const [viewMode, setViewMode] = useState("grid"); // grid | list
@@ -17,6 +17,11 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
   const tabs = ["전체", ...(categories ? categories.map(c => c.name) : [])];
 
   const filteredProducts = useMemo(() => {
+    // 로딩 중이고 products가 비어있으면 이전 필터링 결과 유지 (깜빡임 방지)
+    if (loadingProducts && products.length === 0) {
+      return [];
+    }
+    
     let productList = products;
     
     // 검색어 필터링
@@ -30,14 +35,10 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
     
     // 카테고리 필터링
     if (activeTab && activeTab !== "전체") {
-      console.log('🔍 카테고리 필터링:', activeTab);
-      console.log('📦 상품 카테고리 목록:', [...new Set(productList.map(p => p.category))]);
       productList = productList.filter((p) => {
         const match = p.category === activeTab || p.category?.toLowerCase() === activeTab?.toLowerCase();
-        console.log(`${p.name} - category: "${p.category}" === activeTab: "${activeTab}" => ${match}`);
         return match;
       });
-      console.log('✅ 필터링된 상품:', productList.length, '개');
     }
 
     // 가격 범위 필터링
@@ -47,7 +48,7 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
     });
     
     return productList;
-  }, [activeTab, searchQuery, products, priceRange]);
+  }, [activeTab, searchQuery, products, priceRange, loadingProducts]);
 
   const sortedProducts = useMemo(() => {
     let list = [...filteredProducts];
@@ -128,8 +129,18 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
         </div>
       </div>
 
-      <div className="grid">
-        {sortedProducts.map((p) => (
+      <div className="grid" style={{ position: 'relative' }}>
+        <div style={{ 
+          opacity: loadingProducts && products.length > 0 ? 0.5 : 1,
+          transition: 'opacity 0.2s ease',
+          pointerEvents: loadingProducts && products.length > 0 ? 'none' : 'auto',
+          width: '100%',
+          gridColumn: "1 / -1",
+          display: 'grid',
+          gridTemplateColumns: 'inherit',
+          gap: 'inherit'
+        }}>
+          {sortedProducts.map((p) => (
           <article className="card" key={p.id}>
             <button
               className={`fav-btn${favorites.has(p.id) ? " active" : ""}`}
@@ -161,7 +172,7 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
                 alt={p.imageAlt}
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80";
+                  e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                 }}
                 style={{
                   width: "100%",
@@ -177,18 +188,27 @@ const ProductsPage = ({ favorites, onToggleFavorite, onOpenDetail, onAddToCart, 
               <div className="brand">{p.brand}</div>
               <div className="name">{p.name}</div>
               <div className="price">{p.price.toLocaleString()}원</div>
-              <button 
-                className="add-to-cart-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToCart(p);
-                }}
-              >
-                장바구니 담기
-              </button>
             </div>
           </article>
         ))}
+        </div>
+        {loadingProducts && products.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(255, 255, 255, 0.9)',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            color: "#6b7280",
+            fontSize: '14px',
+            zIndex: 10
+          }}>
+            🔄 업데이트 중...
+          </div>
+        )}
       </div>
 
       {totalPages > 1 && (

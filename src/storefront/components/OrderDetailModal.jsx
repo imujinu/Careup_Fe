@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { customerOrderService } from "../../service/orderService";
-import ProductInquiryModal from "./ProductInquiryModal";
 import "./OrderDetailModal.css";
 
 const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
   const [orderDetail, setOrderDetail] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && order?.orderId) {
@@ -35,27 +32,6 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
     }
   };
 
-  const handleInquiryClick = (orderItem) => {
-    const branchProductId = orderItem.branchProductId || orderItem.branchProduct?.id || orderItem.productId;
-    
-    if (!branchProductId) {
-      alert("상품 정보가 올바르지 않습니다. branchProductId가 필요합니다.");
-      console.error("문의 불가 - 상품 정보:", orderItem);
-      return;
-    }
-    
-    setSelectedProduct({
-      branchProductId: branchProductId,
-      name: orderItem.productName || orderItem.name || "상품명 없음",
-      image: orderItem.imageUrl || orderItem.image || "",
-      price: orderItem.unitPrice || orderItem.price || 0,
-    });
-    setIsInquiryModalOpen(true);
-  };
-
-  const handleInquirySuccess = () => {
-    // 문의 등록 성공 시 추가 처리 (필요시)
-  };
 
   if (!isOpen) return null;
 
@@ -92,10 +68,12 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
   console.log("표시할 주문 상품:", orderItems);
 
   const statusText =
-    orderDetail.orderStatus === "CONFIRMED"
+    orderDetail.orderStatus === "CONFIRMED" || orderDetail.orderStatus === "APPROVED"
       ? "구매완료"
       : orderDetail.orderStatus === "PENDING"
       ? "주문대기"
+      : orderDetail.orderStatus === "REJECTED"
+      ? "거부됨"
       : orderDetail.orderStatus === "CANCELLED"
       ? "취소됨"
       : orderDetail.orderStatus || "대기중";
@@ -134,8 +112,38 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
               )}
               {orderDetail.branchId && (
                 <div className="info-row">
-                  <span className="info-label">지점 ID:</span>
-                  <span className="info-value">{orderDetail.branchId}</span>
+                  <span className="info-label">지점:</span>
+                  <span className="info-value">
+                    {orderDetail.branchName || orderDetail.branch?.name || `지점 ${orderDetail.branchId}`}
+                  </span>
+                </div>
+              )}
+              {orderDetail.rejectedReason && (
+                <div className="info-row">
+                  <span className="info-label">거부 사유:</span>
+                  <span className="info-value">{orderDetail.rejectedReason}</span>
+                </div>
+              )}
+              {orderDetail.rejectedByName && (
+                <div className="info-row">
+                  <span className="info-label">거부자:</span>
+                  <span className="info-value">
+                    {orderDetail.rejectedByName}
+                  </span>
+                </div>
+              )}
+              {orderDetail.rejectedAt && (
+                <div className="info-row">
+                  <span className="info-label">거부 시간:</span>
+                  <span className="info-value">
+                    {new Date(orderDetail.rejectedAt).toLocaleString('ko-KR')}
+                  </span>
+                </div>
+              )}
+              {(orderDetail.cancelledReason || orderDetail.cancelReason || orderDetail.cancellationReason) && (
+                <div className="info-row">
+                  <span className="info-label">취소 사유:</span>
+                  <span className="info-value">{orderDetail.cancelledReason || orderDetail.cancelReason || orderDetail.cancellationReason}</span>
                 </div>
               )}
               <div className="info-row">
@@ -153,7 +161,11 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
               {orderDetail.orderType && (
                 <div className="info-row">
                   <span className="info-label">주문 유형:</span>
-                  <span className="info-value">{orderDetail.orderType}</span>
+                  <span className="info-value">
+                    {orderDetail.orderType === 'ONLINE' ? '온라인 주문' :
+                     orderDetail.orderType === 'OFFLINE' ? '매장 주문' :
+                     orderDetail.orderType}
+                  </span>
                 </div>
               )}
             </div>
@@ -184,8 +196,8 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                               src={imageUrl}
                               alt={productName}
                               onError={(e) => {
-                                e.currentTarget.src = "/vite.svg";
-                                e.currentTarget.onerror = null; // 무한 루프 방지
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
                               }}
                             />
                           ) : (
@@ -199,7 +211,14 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                               color: '#999',
                               fontSize: '12px'
                             }}>
-                              이미지 없음
+                              <img 
+                                src="https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png" 
+                                alt="기본 이미지"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
                             </div>
                           )}
                         </div>
@@ -216,22 +235,6 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                             <div className="order-item-code">상품코드: {item.productCode}</div>
                           )}
                         </div>
-                        <div className="order-item-actions">
-                          <button
-                            className="inquiry-btn"
-                            onClick={() => handleInquiryClick({
-                              ...item,
-                              branchProductId,
-                              productName,
-                              imageUrl,
-                              price: unitPrice,
-                            })}
-                            disabled={!branchProductId}
-                            title={!branchProductId ? "상품 정보가 없어 문의할 수 없습니다." : ""}
-                          >
-                            문의하기
-                          </button>
-                        </div>
                       </div>
                     );
                   })}
@@ -247,19 +250,6 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
           </div>
         </div>
       </div>
-
-      {selectedProduct && (
-        <ProductInquiryModal
-          product={selectedProduct}
-          memberId={currentUser?.memberId}
-          isOpen={isInquiryModalOpen}
-          onClose={() => {
-            setIsInquiryModalOpen(false);
-            setSelectedProduct(null);
-          }}
-          onSuccess={handleInquirySuccess}
-        />
-      )}
     </>
   );
 };

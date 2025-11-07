@@ -8,11 +8,10 @@ import { toggleAlerts, closeAlerts } from "../stores/slices/alertsSlice";
 import { tokenStorage } from "../service/authService";
 import { useNavigate } from "react-router-dom";
 
-//상환바보
 const HeaderContainer = styled.header`
   position: fixed;
   top: 0;
-  left: ${(props) => (props.sidebarVisible ? "240px" : "0")};
+  left: ${(props) => (props.$sidebarVisible ? "240px" : "0")};
   right: 0;
   height: 80px;
   background: #ffffff;
@@ -216,7 +215,7 @@ function Header({ onToggleSidebar, sidebarVisible }) {
 
   return React.createElement(
     HeaderContainer,
-    { sidebarVisible },
+    { $sidebarVisible: sidebarVisible },
     React.createElement(
       SidebarToggle,
       { onClick: onToggleSidebar, "aria-label": "사이드바 열기/닫기" },

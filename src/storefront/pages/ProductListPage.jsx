@@ -42,8 +42,10 @@ const ProductListPage = () => {
       const raw = res?.data?.data ?? res?.data ?? [];
       console.log('📦 원본 데이터:', raw);
       
-      const mapped = (Array.isArray(raw) ? raw : []).map((item) => ({
-        id: item.branchProductId ?? item.productId ?? Math.random(),
+      const mapped = (Array.isArray(raw) ? raw : [])
+        .filter((item) => item.branchProductId != null || item.productId != null) // ID가 없는 항목 제외
+        .map((item) => ({
+        id: item.branchProductId ?? item.productId, // ID가 있는 경우만 사용
         productId: item.productId,
         branchProductId: item.branchProductId,
         branchId: item.branchId,
@@ -52,7 +54,7 @@ const ProductListPage = () => {
         promotionPrice: item.promotionPrice ? Number(item.promotionPrice) : null,
         discountRate: item.discountRate ? Number(item.discountRate) : null,
         imageAlt: item.productName || "상품 이미지",
-        image: item.imageUrl || "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+        image: item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
         category: item.categoryName || item.category || "미분류",
         stock: Number(item.stockQuantity || 0),
         safetyStock: Number(item.safetyStock || 0),
@@ -89,7 +91,7 @@ const ProductListPage = () => {
             price: 15000,
             promotionPrice: 12000,
             discountRate: 20,
-            image: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+            image: "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
             imageAlt: "테스트 상품 1",
             category: "의류",
             stock: 10,
@@ -111,7 +113,7 @@ const ProductListPage = () => {
             price: 25000,
             promotionPrice: null,
             discountRate: null,
-            image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
+            image: "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
             imageAlt: "테스트 상품 2",
             category: "신발",
             stock: 0,
@@ -133,7 +135,7 @@ const ProductListPage = () => {
             price: 30000,
             promotionPrice: 24000,
             discountRate: 20,
-            image: "https://images.unsplash.com/photo-1605296867304-46d5465a13f1?auto=format&fit=crop&w=900&q=80",
+            image: "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
             imageAlt: "테스트 상품 3",
             category: "액세서리",
             stock: 2,
@@ -456,26 +458,6 @@ const ProductListPage = () => {
                     </span>
                   )}
                 </div>
-
-                {/* 장바구니 버튼 */}
-                <button
-                  onClick={() => handleAddToCart(product)}
-                  disabled={product.isOutOfStock}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: product.isOutOfStock ? '#ccc' : '#111',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    cursor: product.isOutOfStock ? 'not-allowed' : 'pointer',
-                    opacity: product.isOutOfStock ? 0.6 : 1,
-                  }}
-                >
-                  {product.isOutOfStock ? '품절' : '장바구니 담기'}
-                </button>
               </div>
             </div>
           ))}
