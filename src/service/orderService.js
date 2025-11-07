@@ -65,9 +65,9 @@ export const orderService = {
   },
 
   // 주문 반려
-  rejectOrder: async (orderId, reason) => {
+  rejectOrder: async (orderId, reason, rejectedBy) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/orders/${orderId}/reject?reason=${encodeURIComponent(reason)}`);
+      const response = await axios.put(`${API_BASE_URL}/api/orders/${orderId}/reject?reason=${encodeURIComponent(reason)}&rejectedBy=${rejectedBy}`);
       return response.data;
     } catch (error) {
       console.error('주문 반려 실패:', error);

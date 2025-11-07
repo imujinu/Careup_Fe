@@ -520,14 +520,14 @@
 
 .attendance-header {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1.2fr 1.2fr 1.5fr 1.5fr;
   background: #f8fafc;
   border-bottom: 2px solid #e2e8f0;
 }
 
 .attendance-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1.2fr 1.2fr 1.5fr 1.5fr;
   border-bottom: 1px solid #f1f5f9;
   transition: background-color 0.2s;
 }
@@ -541,7 +541,7 @@
 }
 
 .attendance-cell {
-  padding: 10px 8px;
+  padding: 10px 4px;
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -569,11 +569,11 @@
 @media (max-width: 480px) {
   .attendance-header,
   .attendance-row {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.8fr;
+    grid-template-columns: 1.2fr 1.2fr 1.2fr 1.5fr 1.5fr;
   }
 
   .attendance-cell {
-    padding: 6px 4px;
+    padding: 6px 2px;
     font-size: 9px;
   }
 

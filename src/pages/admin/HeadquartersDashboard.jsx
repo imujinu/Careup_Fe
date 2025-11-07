@@ -23,7 +23,6 @@ import {
   mdiTrendingUp,
   mdiGift,
   mdiTrophy,
-  mdiCrown,
   mdiAlertCircle,
 } from "@mdi/js";
 import dashboardService from "../../service/dashboardService";
@@ -283,19 +282,6 @@ const CategoryData = [
   { name: "볶음밥 시리즈", value: 4.7, color: "#059669" },
 ];
 
-const InventoryData = [
-  { branch: "천호점", item: "브라질산 닭고기", shortage: 240 },
-  { branch: "사당점", item: "브라질산 닭고기", shortage: 210 },
-  { branch: "신촌점", item: "브라질산 닭고기", shortage: 190 },
-  { branch: "잠실점", item: "브라질산 닭고기", shortage: 185 },
-  { branch: "판교점", item: "브라질산 닭고기", shortage: 170 },
-  { branch: "강남점", item: "국내산 소고기", shortage: 160 },
-  { branch: "분당정자점", item: "국내산 소고기", shortage: 145 },
-  { branch: "부산서면점", item: "국내산 소고기", shortage: 135 },
-  { branch: "역삼점", item: "스팸", shortage: 100 },
-  { branch: "수원인계점", item: "계란", shortage: 85 },
-];
-
 const NotificationsData = [
   {
     id: 3,
@@ -330,10 +316,17 @@ const HeadquartersDashboard = () => {
     branchGrowthRate: 12.5,
     employeeGrowthRate: 8.2,
     salesGrowthRate: 23.1,
-    annualGrowthRate: 18.2,
+    annualSales: 288000000, // 원 단위 (2억 8,800만원)
   });
   const [loading, setLoading] = useState(true);
   const [salesData, setSalesData] = useState(null);
+  const [popularProduct, setPopularProduct] = useState(null);
+  const [unpopularProduct, setUnpopularProduct] = useState(null);
+  const [topBranch, setTopBranch] = useState(null);
+  const [lowBranch, setLowBranch] = useState(null);
+  const [categorySales, setCategorySales] = useState(null);
+  const [branchSalesSummary, setBranchSalesSummary] = useState(null);
+  const [lowStockItems, setLowStockItems] = useState([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -352,6 +345,41 @@ const HeadquartersDashboard = () => {
       const sales = await dashboardService.getSalesStatistics(salesPeriod);
       console.log("Sales Data:", sales);
       setSalesData(sales);
+
+      // 인기 상품 조회 (매출이 가장 높은 상품)
+      const popular = await dashboardService.getPopularProducts();
+      console.log("Popular Product:", popular);
+      setPopularProduct(popular);
+
+      // 비인기 상품 조회 (매출이 가장 낮은 상품)
+      const unpopular = await dashboardService.getUnpopularProducts();
+      console.log("Unpopular Product:", unpopular);
+      setUnpopularProduct(unpopular);
+
+      // 우수 지점 조회
+      const top = await dashboardService.getTopBranch();
+      console.log("Top Branch:", top);
+      setTopBranch(top);
+
+      // 저조 지점 조회
+      const low = await dashboardService.getLowSalesBranch();
+      console.log("Low Branch:", low);
+      setLowBranch(low);
+
+      // 카테고리별 매출 비중 조회
+      const categories = await dashboardService.getSalesByCategory(categoryPeriod);
+      console.log("Category Sales:", categories);
+      setCategorySales(categories);
+
+      // 지점별 매출 집계 조회
+      const branchSummary = await dashboardService.getBranchSalesSummary(salesPeriod);
+      console.log("Branch Sales Summary:", branchSummary);
+      setBranchSalesSummary(branchSummary);
+
+      // 재고 부족 현황 조회
+      const lowStock = await dashboardService.getLowStockStatus();
+      console.log("Low Stock Items:", lowStock);
+      setLowStockItems(lowStock);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -365,6 +393,9 @@ const HeadquartersDashboard = () => {
         try {
           const sales = await dashboardService.getSalesStatistics(salesPeriod);
           setSalesData(sales);
+
+          const branchSummary = await dashboardService.getBranchSalesSummary(salesPeriod);
+          setBranchSalesSummary(branchSummary);
         } catch (error) {
           console.error("Failed to load sales data:", error);
         }
@@ -372,6 +403,20 @@ const HeadquartersDashboard = () => {
       loadSalesData();
     }
   }, [salesPeriod]);
+
+  useEffect(() => {
+    if (categoryPeriod) {
+      const loadCategorySales = async () => {
+        try {
+          const categories = await dashboardService.getSalesByCategory(categoryPeriod);
+          setCategorySales(categories);
+        } catch (error) {
+          console.error("Failed to load category sales:", error);
+        }
+      };
+      loadCategorySales();
+    }
+  }, [categoryPeriod]);
 
   // 원 → 만원 → 억 자동 변환 포맷팅 함수
   const formatCurrency = (value) => {
@@ -410,21 +455,41 @@ const HeadquartersDashboard = () => {
     return value;
   };
 
-  // 매출 데이터를 차트 형식으로 변환
+  // 매출 데이터를 차트 형식으로 변환 (지점별 매출 비교용)
   const getChartData = () => {
-    if (!salesData || !salesData.statistics) {
-      return WeeklyData;
+    if (!branchSalesSummary || !branchSalesSummary.branches) {
+      return [];
     }
 
-    return salesData.statistics.map((item) => {
-      const date = item.period || item.date;
-      const day = date ? new Date(date).toLocaleDateString('ko-KR', { weekday: 'short' }).replace('.', '') : '';
-      return {
-        day: day || date,
-        actual: item.totalSales ? item.totalSales / 1000 : 0,
-        target: 3.0, // 목표 매출은 하드코딩
-      };
-    });
+    // 상위 10개 지점만 표시 (너무 많으면 차트가 복잡해짐)
+    const topBranches = branchSalesSummary.branches.slice(0, 10);
+    
+    // 각 지점마다 다른 색상 적용
+    const colors = [
+      "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+      "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6"
+    ];
+    
+    return topBranches.map((branch, index) => ({
+      name: branch.branchName?.length > 6 ? branch.branchName.substring(0, 6) + '...' : branch.branchName,
+      매출: branch.totalSales ? Math.round(branch.totalSales / 1000) : 0, // 천원 단위
+      color: colors[index % colors.length],
+    }));
+  };
+
+  // 카테고리별 매출 데이터 변환
+  const getCategoryChartData = () => {
+    if (!categorySales || !categorySales.categories) {
+      return CategoryData;
+    }
+
+    const colors = ["#3b82f6", "#f97316", "#eab308", "#10b981", "#8b5cf6", "#06b6d4", "#ef4444", "#059669"];
+    
+    return categorySales.categories.map((item, index) => ({
+      name: item.categoryName,
+      value: Number(item.percentage.toFixed(1)),
+      color: colors[index % colors.length],
+    }));
   };
 
   if (loading) {
@@ -436,12 +501,12 @@ const HeadquartersDashboard = () => {
   }
 
   const chartData = getChartData();
+  const categoryChartData = getCategoryChartData();
 
   return (
     <DashboardContainer>
       <DashboardHeader>
         <Title>한솥도시락 대시보드에 오신 것을 환영합니다.</Title>
-        <EditButton>편집</EditButton>
       </DashboardHeader>
 
       {/* KPI Cards */}
@@ -452,9 +517,6 @@ const HeadquartersDashboard = () => {
           </KPIIcon>
           <KPILabel>총 지점 수</KPILabel>
           <KPIValue>{kpiData.totalBranches}</KPIValue>
-          <KPIChange $positive>
-            +{kpiData.branchGrowthRate}% 전월 대비
-          </KPIChange>
         </KPICard>
 
         <KPICard>
@@ -463,7 +525,6 @@ const HeadquartersDashboard = () => {
           </KPIIcon>
           <KPILabel>총 직원 수</KPILabel>
           <KPIValue>{kpiData.totalEmployees.toLocaleString()}</KPIValue>
-          <KPIChange $positive>+{kpiData.employeeGrowthRate}% 전월 대비</KPIChange>
         </KPICard>
 
         <KPICard>
@@ -472,16 +533,18 @@ const HeadquartersDashboard = () => {
           </KPIIcon>
           <KPILabel>평균 월간 매출</KPILabel>
           <KPIValue>{formatCurrency(kpiData.avgMonthlySales)}</KPIValue>
-          <KPIChange $positive>+{kpiData.salesGrowthRate}% 전월 대비</KPIChange>
+          <KPIChange $positive={kpiData.salesGrowthRate >= 0}>
+            {kpiData.salesGrowthRate >= 0 ? '+' : ''}{kpiData.salesGrowthRate}% 전월 대비
+          </KPIChange>
         </KPICard>
 
         <KPICard>
           <KPIIcon $bgColor="#fef3c7">
             <Icon path={mdiTrendingUp} size={1.5} color="#f59e0b" />
           </KPIIcon>
-          <KPILabel>연간 성장률</KPILabel>
-          <KPIValue>{kpiData.annualGrowthRate}%</KPIValue>
-          <KPIChange $positive>전년 동월 대비 +4.3% 전월 대비</KPIChange>
+          <KPILabel>연간 매출</KPILabel>
+          <KPIValue>{formatCurrency(kpiData.annualSales)}</KPIValue>
+          <KPIChange $positive>전년 동월 대비</KPIChange>
         </KPICard>
       </KPIGrid>
 
@@ -492,9 +555,24 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiGift} size={1.5} color="#6b46c1" />
           </KPIIcon>
           <KPILabel>월간 인기 상품</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>빅치킨마요</KPIValue>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {popularProduct?.productName || "빅치킨마요"}
+          </KPIValue>
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            전국 지점
+            {`${formatCurrency(popularProduct?.totalSales || 0)} (월간)`}
+          </KPILabel>
+        </HighlightCard>
+
+        <HighlightCard>
+          <KPIIcon $bgColor="#fee2e2">
+            <Icon path={mdiAlertCircle} size={1.5} color="#ef4444" />
+          </KPIIcon>
+          <KPILabel>월간 비인기 상품</KPILabel>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {unpopularProduct?.productName || "상품명"}
+          </KPIValue>
+          <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
+            {`${formatCurrency(unpopularProduct?.totalSales || 0)} (월간)`}
           </KPILabel>
         </HighlightCard>
 
@@ -503,21 +581,17 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiTrophy} size={1.5} color="#f59e0b" />
           </KPIIcon>
           <KPILabel>이달의 우수 지점</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>동작 1점</KPIValue>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {topBranch?.branchName || "-"}
+          </KPIValue>
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            김상환
+            {topBranch?.ownerName || "-"}
           </KPILabel>
-        </HighlightCard>
-
-        <HighlightCard>
-          <KPIIcon $bgColor="#fce7f3">
-            <Icon path={mdiCrown} size={1.5} color="#ec4899" />
-          </KPIIcon>
-          <KPILabel>이달의 판매왕</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>김상환</KPIValue>
-          <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            동작 1점
-          </KPILabel>
+          {topBranch && topBranch.averageSales !== undefined && topBranch.differenceFromAverage !== undefined && (
+            <KPILabel style={{ fontSize: "11px", marginTop: "4px", color: "#10b981" }}>
+              평균 대비 {topBranch.differenceFromAverage >= 0 ? '+' : ''}{formatCurrency(topBranch.differenceFromAverage)}
+            </KPILabel>
+          )}
         </HighlightCard>
 
         <HighlightCard $warning>
@@ -525,10 +599,17 @@ const HeadquartersDashboard = () => {
             <Icon path={mdiAlertCircle} size={1.5} color="#ef4444" />
           </KPIIcon>
           <KPILabel>매출 저조 지점</KPILabel>
-          <KPIValue style={{ fontSize: "20px" }}>고양삼송점</KPIValue>
+          <KPIValue style={{ fontSize: "20px" }}>
+            {lowBranch?.branchName || "-"}
+          </KPIValue>
           <KPILabel style={{ fontSize: "12px", marginTop: "8px" }}>
-            임성후
+            {lowBranch?.ownerName || "-"}
           </KPILabel>
+          {lowBranch && lowBranch.averageSales !== undefined && lowBranch.differenceFromAverage !== undefined && (
+            <KPILabel style={{ fontSize: "11px", marginTop: "4px", color: "#ef4444" }}>
+              평균 대비 {lowBranch.differenceFromAverage >= 0 ? '+' : ''}{formatCurrency(lowBranch.differenceFromAverage)}
+            </KPILabel>
+          )}
         </HighlightCard>
       </HighlightsGrid>
 
@@ -537,10 +618,9 @@ const HeadquartersDashboard = () => {
         <ChartCard>
           <ChartHeader>
             <div>
-              <ChartTitle>매출 현황</ChartTitle>
+              <ChartTitle>지점별 매출 비교</ChartTitle>
               <ChartSubtitle>전국 지점</ChartSubtitle>
             </div>
-            <MoreLink>더보기</MoreLink>
           </ChartHeader>
 
           <TabContainer>
@@ -558,30 +638,37 @@ const HeadquartersDashboard = () => {
             </Tab>
           </TabContainer>
 
+          <div style={{ marginBottom: "10px", fontSize: "12px", color: "#6b7280" }}>
+            {(() => {
+              const endDate = new Date();
+              const startDate = new Date();
+              if (salesPeriod === "WEEK") {
+                startDate.setDate(endDate.getDate() - 7);
+              } else if (salesPeriod === "MONTH") {
+                startDate.setMonth(endDate.getMonth() - 1);
+              } else if (salesPeriod === "YEAR") {
+                startDate.setFullYear(endDate.getFullYear() - 1);
+              }
+              return `${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`;
+            })()}
+          </div>
+
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
+              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
               <YAxis />
-              <Tooltip />
+              <Tooltip 
+                formatter={(value) => `${value.toLocaleString()}천원`}
+                labelFormatter={(label) => `지점: ${label}`}
+              />
               <Legend />
-              <Line
-                type="monotone"
-                dataKey="actual"
-                stroke="#10b981"
-                strokeWidth={2}
-                name="실제 매출"
-                unit="k"
-              />
-              <Line
-                type="monotone"
-                dataKey="target"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                name="목표 매출"
-                unit="k"
-              />
-            </LineChart>
+              <Bar dataKey="매출">
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
@@ -591,7 +678,6 @@ const HeadquartersDashboard = () => {
               <ChartTitle>카테고리별 매출 비중</ChartTitle>
               <ChartSubtitle>전국 지점</ChartSubtitle>
             </div>
-            <MoreLink>더보기</MoreLink>
           </ChartHeader>
 
           <TabContainer>
@@ -616,13 +702,24 @@ const HeadquartersDashboard = () => {
           </TabContainer>
 
           <div style={{ marginBottom: "10px", fontSize: "12px", color: "#6b7280" }}>
-            2025.09.22 ~ 2025.09.22
+            {(() => {
+              const endDate = new Date();
+              const startDate = new Date();
+              if (categoryPeriod === "WEEK") {
+                startDate.setDate(endDate.getDate() - 7);
+              } else if (categoryPeriod === "MONTH") {
+                startDate.setMonth(endDate.getMonth() - 1);
+              } else if (categoryPeriod === "YEAR") {
+                startDate.setFullYear(endDate.getFullYear() - 1);
+              }
+              return `${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`;
+            })()}
           </div>
 
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={CategoryData}
+                data={categoryChartData}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -632,11 +729,11 @@ const HeadquartersDashboard = () => {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {CategoryData.map((entry, index) => (
+                {categoryChartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(value) => `${value}%`} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -650,62 +747,56 @@ const HeadquartersDashboard = () => {
             <ChartTitle>재고 부족 현황</ChartTitle>
             <ChartSubtitle>전국 지점</ChartSubtitle>
           </div>
-          <MoreLink>더보기</MoreLink>
         </ChartHeader>
 
         <ResponsiveContainer width="100%" height={400}>
           <BarChart
-            data={InventoryData}
-            layout="vertical"
-            margin={{ top: 20, right: 30, left: 100, bottom: 20 }}
+            data={(() => {
+              // 각 막대마다 다른 색상 적용
+              const colors = [
+                "#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6",
+                "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6",
+                "#eab308", "#84cc16", "#a855f7", "#f43f5e", "#0ea5e9"
+              ];
+              return lowStockItems.map((item, index) => ({
+                label: `${item.branchName} - ${item.productName}`,
+                item: item.productName,
+                branch: item.branchName,
+                shortage: item.shortage,
+                color: colors[index % colors.length],
+              }));
+            })()}
+            margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
-            <YAxis dataKey="branch" type="category" width={80} />
-            <Tooltip />
-            <Bar dataKey="shortage" fill="#ef4444" />
+            <XAxis dataKey="label" type="category" angle={-45} textAnchor="end" interval={0} height={70} tick={{ fontSize: 11 }} />
+            <YAxis type="number" />
+            <Tooltip 
+              formatter={(value) => `${value}개 부족`}
+              labelFormatter={(label) => label}
+            />
+            <Bar dataKey="shortage" name="부족량">
+              {(() => {
+                const colors = [
+                  "#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6",
+                  "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6",
+                  "#eab308", "#84cc16", "#a855f7", "#f43f5e", "#0ea5e9"
+                ];
+                return lowStockItems.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ));
+              })()}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
+        {lowStockItems.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            재고 부족 상품이 없습니다.
+          </div>
+        )}
       </InventoryCard>
 
-      {/* Notifications */}
-      <NotificationsCard>
-        <ChartHeader>
-          <div>
-            <ChartTitle>공지사항</ChartTitle>
-            <ChartSubtitle>전국 지점</ChartSubtitle>
-          </div>
-          <MoreLink>더보기</MoreLink>
-        </ChartHeader>
-
-        <Table>
-          <thead>
-            <tr>
-              <TableHeader>ID</TableHeader>
-              <TableHeader>제목</TableHeader>
-              <TableHeader>작성자</TableHeader>
-              <TableHeader>작성일시</TableHeader>
-              <TableHeader>수정일시</TableHeader>
-              <TableHeader>조치</TableHeader>
-            </tr>
-          </thead>
-          <tbody>
-            {NotificationsData.map((notification) => (
-              <tr key={notification.id}>
-                <TableCell>{notification.id}</TableCell>
-                <TableCell>{notification.title}</TableCell>
-                <TableCell>{notification.author}</TableCell>
-                <TableCell>{notification.createdAt}</TableCell>
-                <TableCell>{notification.modifiedAt}</TableCell>
-                <TableCell>
-                  <ActionButton>수정</ActionButton>
-                  <ActionButton $danger>삭제</ActionButton>
-                </TableCell>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </NotificationsCard>
+      {/* Notifications removed as requested */}
     </DashboardContainer>
   );
 };

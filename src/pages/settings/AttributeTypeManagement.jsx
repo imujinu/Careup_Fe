@@ -565,7 +565,11 @@ export default function AttributeTypeManagement() {
                         <Icon path={mdiPencil} size={0.8} />
                         수정
                       </ActionBtn>
-                      <ActionBtn className="delete" onClick={() => handleDelete(type)}>
+                      <ActionBtn 
+                        className="delete" 
+                        onClick={() => handleDelete(type)}
+                        type="button"
+                      >
                         <Icon path={mdiDelete} size={0.8} />
                         삭제
                       </ActionBtn>
