@@ -7,7 +7,7 @@ import { splitForCalendar } from '../utils/calendarSplit';
 const BASE_URL = (() => {
   const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
   if (explicit) return explicit;
-  const api = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+  const api = (import.meta.env.VITE_API_URL).replace(/\/$/, '');
   return `${api}/branch-service`;
 })();
 

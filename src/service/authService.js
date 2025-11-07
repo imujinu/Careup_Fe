@@ -1,14 +1,7 @@
 import axios from 'axios';
 import { decodeToken } from '../utils/jwt';
 
-// 주의: axiosConfig가 authService를 import 하므로 여기서 axiosConfig를 import하지 말 것(순환 참조 방지)
-const AUTH_API_URL =
-  import.meta.env.VITE_AUTH_URL ||
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
-
-// axios 인터셉터에서 참조하는 키와 동일한 문자열을 로컬 정의(순환참조 방지)
-const SKIP_FLAG = '__skipAuthRefresh';
+const AUTH_API_URL = import.meta.env.VITE_CUSTOMER_AUTH_URL;
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem('accessToken'),

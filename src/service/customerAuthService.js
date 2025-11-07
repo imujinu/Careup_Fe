@@ -4,7 +4,7 @@ import axios from 'axios';
 import customerAxios from '../utils/customerAxios';
 import { decodeToken } from '../utils/jwt';
 
-const CUSTOMER_API_BASE = import.meta.env.VITE_CUSTOMER_API_URL || 'http://localhost:8080';
+const CUSTOMER_API_BASE = import.meta.env.VITE_CUSTOMER_API_URL;
 
 // 고객 토큰/유저 저장소
 export const customerTokenStorage = {
