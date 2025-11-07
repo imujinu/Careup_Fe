@@ -3,8 +3,7 @@ import axios from '../utils/axiosConfig';
 
 const BASE_URL =
   import.meta.env.VITE_BRANCH_URL ||
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:8080';
+  import.meta.env.VITE_API_URL;
 
 const sanitizeSort = (sort) => {
   if (!sort) return null;
