@@ -5,6 +5,7 @@ import AttendanceTab from "./tabs/AttendanceTab";
 import InventoryTab from "./tabs/InventoryTab";
 import OrderTab from "./tabs/OrderTab";
 import SalesTab from "./tabs/SalesTab";
+import DocumentTab from "./tabs/DocumentTab";
 
 const ChatBot = ({ onClose }) => {
   const [messages, setMessages] = useState([
@@ -736,7 +737,7 @@ const ChatBot = ({ onClose }) => {
   // 금일 근무 현황을 표 형태로 표시하는 함수
   const formatTodayAttendanceTable = (employees) => {
     if (!employees || employees.length === 0) {
-      return "관련 정보가 존재하지 않습니다.\n다른 항목을 입력하시거나 다른 날짜를 입력해주세요.";
+      return "금일 근무 현황이 존재하지 않습니다.\n스케줄을 등록하시거나 다른 날짜를 입력해주세요.";
     }
 
     return {
@@ -958,6 +959,7 @@ const ChatBot = ({ onClose }) => {
     { id: "inventory", label: "재고", icon: "📦" },
     { id: "order", label: "발주", icon: "📋" },
     { id: "sales", label: "매출", icon: "💰" },
+    { id: "document", label: "문서", icon: "📄" },
     { id: "reset", label: "채팅 초기화", icon: "🔄" },
   ];
 
@@ -1209,6 +1211,27 @@ const ChatBot = ({ onClose }) => {
         id: Date.now() + 1,
         type: "bot",
         content: "근태 수정이 필요한 직원 이름을 입력해주세요.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    // 인건비 계산 처리
+    if (tabType === "인건비계산") {
+      const result = await sendChatbotRequest(
+        "인건비 계산",
+        "인건비를 계산하고 있습니다..."
+      );
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: result?.error 
+          ? `오류가 발생했습니다: ${result.error}`
+          : result?.data?.result?.body || result?.result?.body || result?.body
+            ? "인건비 계산이 완료되었습니다."
+            : "인건비 계산 결과를 불러오지 못했습니다.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMessage]);
@@ -1640,6 +1663,79 @@ const ChatBot = ({ onClose }) => {
     }, 1000);
   };
 
+  // 문서 탭 클릭 핸들러
+  const handleDocumentTab = async (tabType) => {
+    // 채팅 내용 유지 - 초기화하지 않음
+    setActiveTab(null);
+
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: `문서 ${tabType}`,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    // 문서 관련 API 요청
+    if (tabType === "문서조회") {
+      const result = await sendChatbotRequest(
+        "문서 조회",
+        "문서 정보를 조회하고 있습니다..."
+      );
+
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: body || "문서 데이터를 불러오지 못했습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    if (tabType === "문서등록") {
+      const result = await sendChatbotRequest(
+        "문서 등록",
+        "문서 등록을 처리하고 있습니다..."
+      );
+
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: body || "문서 등록이 완료되었습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+
+    if (tabType === "문서수정") {
+      const result = await sendChatbotRequest(
+        "문서 수정",
+        "문서 수정을 처리하고 있습니다..."
+      );
+
+      const body =
+        result?.data?.result?.body || result?.result?.body || result?.body;
+
+      const botMessage = {
+        id: Date.now() + 1,
+        type: "bot",
+        content: body || "문서 수정이 완료되었습니다.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      return;
+    }
+  };
+
   // 매출 탭 클릭 핸들러
   const handleSalesTab = async (tabType) => {
     // 채팅 내용 유지 - 초기화하지 않음
@@ -1913,11 +2009,42 @@ const ChatBot = ({ onClose }) => {
       if (result.error) {
         botContent = `오류가 발생했습니다: ${result.error}`;
       } else {
-        // API 응답을 그대로 표시
-        botContent =
+        // API 응답에서 body 추출
+        const responseBody =
           result?.data?.result?.body ||
           result?.result?.body ||
-          JSON.stringify(result, null, 2);
+          result?.body;
+
+        // intent 확인하여 탭 설정
+        if (responseBody && typeof responseBody === "object") {
+          const intent = responseBody.intent;
+          
+          if (intent) {
+            // intent에 따라 탭 설정
+            switch (intent) {
+              case "ATTENDANCE":
+                setActiveTab("attendance");
+                break;
+              case "SALES":
+                setActiveTab("sales");
+                break;
+              case "STOCK":
+                setActiveTab("inventory");
+                break;
+              case "ORDER":
+                setActiveTab("order");
+                break;
+              case "DOCUMENT":
+                setActiveTab("document");
+                break;
+              default:
+                setActiveTab(null);
+            }
+          }
+        }
+
+        // API 응답을 그대로 표시
+        botContent = responseBody || JSON.stringify(result, null, 2);
       }
 
       const botMessage = {
@@ -2868,11 +2995,11 @@ const ChatBot = ({ onClose }) => {
                             <div className="attendance-row">
                               <div className="attendance-cell">
                                 최고{" "}
-                                {message.content.data.highestCostHour ?? "-"}시
+                                {message.content.data.summary.highestCostHour ?? "-"}시
                               </div>
                               <div className="attendance-cell">
                                 {Number(
-                                  message.content.data.highestCostRatio || 0
+                                  message.content.data.summary.highestCostRatio || 0
                                 ).toFixed(1)}
                                 %
                               </div>
@@ -2880,11 +3007,11 @@ const ChatBot = ({ onClose }) => {
                             <div className="attendance-row">
                               <div className="attendance-cell">
                                 최저{" "}
-                                {message.content.data.lowestCostHour ?? "-"}시
+                                {message.content.data.summary.lowestCostHour ?? "-"}시
                               </div>
                               <div className="attendance-cell">
                                 {Number(
-                                  message.content.data.lowestCostRatio || 0
+                                  message.content.data.summary.lowestCostRatio || 0
                                 ).toFixed(1)}
                                 %
                               </div>
@@ -2895,16 +3022,16 @@ const ChatBot = ({ onClose }) => {
                             >
                               평균 인건비율:{" "}
                               {Number(
-                                message.content.data.avgCostRatioChange || 0
+                                message.content.data.summary.avgCostRatioChange || 0
                               ).toFixed(1)}
                               %
                             </div>
-                            {message.content.data.message && (
+                            {message.content.data.summary.message && (
                               <div
                                 className="summary-note"
                                 style={{ marginTop: 6 }}
                               >
-                                {message.content.data.message}
+                                {message.content.data.summary.message}
                               </div>
                             )}
                           </>
@@ -3149,6 +3276,9 @@ const ChatBot = ({ onClose }) => {
           )}
           {activeTab === "order" && <OrderTab onTabClick={handleOrderTab} />}
           {activeTab === "sales" && <SalesTab onTabClick={handleSalesTab} />}
+          {activeTab === "document" && (
+            <DocumentTab onTabClick={handleDocumentTab} />
+          )}
           {/* 로딩 표시 */}
           {isLoading && (
             <div className="loading-message">
