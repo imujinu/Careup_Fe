@@ -20,6 +20,12 @@ const REFRESH_PATH = '/auth/refresh';
 const LOGOUT_PATH = '/auth/logout';
 export const SKIP_FLAG = '__skipAuthRefresh'; // 개별 요청에서 리프레시 스킵하기 위한 플래그
 
+// ✅ 로그인 경로 헬퍼(모바일 분기)
+const goLogin = () => {
+  const isMobile = typeof window !== 'undefined' && window.location.pathname.startsWith('/m');
+  window.location.replace(isMobile ? '/m/login' : '/login');
+};
+
 // ---- Request Interceptor ----
 axios.interceptors.request.use(
   (config) => {
@@ -102,11 +108,18 @@ axios.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // ✅ RT가 없으면 리프레시 시도 금지 → 즉시 로그인 이동
+    if (!tokenStorage.getRefreshToken()) {
+      try { tokenStorage.clearTokens(); } catch {}
+      goLogin();
+      return Promise.reject(error);
+    }
+
     // refresh 자체가 401이면 -> 루프 방지: 바로 토큰 제거 & 로그인 이동 (logout 호출 금지)
     const reqUrl = (originalRequest.url || '').toString();
     if (reqUrl.includes(REFRESH_PATH)) {
       try { tokenStorage.clearTokens(); } catch {}
-      window.location.href = '/login';
+      goLogin();
       return Promise.reject(error);
     }
 
@@ -136,7 +149,7 @@ axios.interceptors.response.use(
     } catch (refreshError) {
       refreshPromise = null;
       try { tokenStorage.clearTokens(); } catch {}
-      window.location.href = '/login';
+      goLogin();
       return Promise.reject(refreshError);
     }
   }
