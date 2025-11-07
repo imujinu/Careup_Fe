@@ -55,12 +55,10 @@ const fmtAMPM = (isoLike) => {
   h = h % 12 || 12;
   return `${String(h).padStart(2, '0')}:${m}${ampm}`;
 };
-
-/** LocalDateTime 안전 전송용(오프셋/밀리초 제거) */
 const localIsoNoZ = () => {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 19); // yyyy-MM-ddTHH:mm:ss
+  return local.toISOString().slice(0, 19);
 };
 
 /* ===== 이벤트별 시각 추출 ===== */
@@ -305,7 +303,7 @@ export const fetchWeekSummary = async (baseDate = new Date()) => {
   return { days, totalMinutes };
 };
 
-/** 👉 “주간 지표”를 한 번에 계산해 반환 */
+/** 👉 “주간 지표” */
 export const fetchWeekMetrics = async (baseDate = new Date()) => {
   const summary = await fetchWeekSummary(baseDate);
   const totalMinutes = Number(summary?.totalMinutes || 0);
@@ -381,6 +379,26 @@ export const fetchTodayStatus = async () => {
   let category = '';
   let leaveTypeName = '';
   let missedCheckout = false;
+  let geofenceRequired = null;
+
+  let raw = {
+    clockInAt: null,
+    actualClockIn: null,
+    actualStartAt: null,
+    clockOutAt: null,
+    actualClockOut: null,
+    actualEndAt: null,
+    registeredClockIn: null,
+    registeredStartAt: null,
+    registeredClockOut: null,
+    registeredEndAt: null,
+    startAt: null,
+    endAt: null,
+    breakStartAt: null,
+    breakEndAt: null,
+    registeredBreakStart: null,
+    registeredBreakEnd: null,
+  };
 
   const timesFor = (obj) => {
     const s = obj?.actualClockIn || obj?.clockInAt || obj?.actualStartAt || obj?.registeredClockIn || obj?.registeredStartAt || obj?.startAt || null;
@@ -400,6 +418,11 @@ export const fetchTodayStatus = async () => {
       try {
         const detail = await getScheduleDetail(sid);
 
+        geofenceRequired =
+          !!(detail?.workType?.geofenceRequired
+            ?? detail?.workTypeGeofenceRequired
+            ?? detail?.geofenceRequired);
+
         const plannedStart =
           detail?.registeredClockIn || detail?.registeredStartAt || detail?.startAt ||
           primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
@@ -409,6 +432,25 @@ export const fetchTodayStatus = async () => {
 
         const aIn  = detail?.actualClockIn || detail?.clockInAt || detail?.actualStartAt || null;
         const aOut = detail?.actualClockOut || detail?.clockOutAt || detail?.actualEndAt || null;
+
+        raw.clockInAt = detail?.clockInAt ?? null;
+        raw.actualClockIn = detail?.actualClockIn ?? null;
+        raw.actualStartAt = detail?.actualStartAt ?? null;
+        raw.clockOutAt = detail?.clockOutAt ?? null;
+        raw.actualClockOut = detail?.actualClockOut ?? null;
+        raw.actualEndAt = detail?.actualEndAt ?? null;
+
+        raw.registeredClockIn = detail?.registeredClockIn ?? null;
+        raw.registeredStartAt = detail?.registeredStartAt ?? null;
+        raw.registeredClockOut = detail?.registeredClockOut ?? null;
+        raw.registeredEndAt = detail?.registeredEndAt ?? null;
+        raw.startAt = detail?.startAt ?? null;
+        raw.endAt = detail?.endAt ?? null;
+
+        raw.breakStartAt = detail?.breakStartAt ?? detail?.actualBreakStartAt ?? null;
+        raw.breakEndAt   = detail?.breakEndAt   ?? detail?.actualBreakEndAt   ?? null;
+        raw.registeredBreakStart = detail?.registeredBreakStart ?? null;
+        raw.registeredBreakEnd   = detail?.registeredBreakEnd   ?? null;
 
         if (aIn) inText = fmtAMPM(aIn);
         if (aOut) outText = fmtAMPM(aOut);
@@ -421,7 +463,7 @@ export const fetchTodayStatus = async () => {
         if (category === 'LEAVE') {
           ruleStatus = 'LEAVE';
         } else if (aIn && !aOut) {
-          ruleStatus = 'CLOCKED_IN';
+          ruleStatus = raw.breakStartAt && !raw.breakEndAt ? 'ON_BREAK' : 'CLOCKED_IN';
         } else if (!aIn) {
           if (plannedEnd && today.getTime() > toTime(plannedEnd)) {
             ruleStatus = 'ABSENT';
@@ -447,12 +489,36 @@ export const fetchTodayStatus = async () => {
         const aIn = primary.actualClockIn || primary.clockInAt || primary.actualStartAt || null;
         const aOut= primary.actualClockOut || primary.clockOutAt || primary.actualEndAt || null;
 
+        geofenceRequired =
+          !!(primary?.workType?.geofenceRequired
+            ?? primary?.workTypeGeofenceRequired
+            ?? primary?.geofenceRequired);
+
+        raw.clockInAt = primary?.clockInAt ?? null;
+        raw.actualClockIn = primary?.actualClockIn ?? null;
+        raw.actualStartAt = primary?.actualStartAt ?? null;
+        raw.clockOutAt = primary?.clockOutAt ?? null;
+        raw.actualClockOut = primary?.actualClockOut ?? null;
+        raw.actualEndAt = primary?.actualEndAt ?? null;
+
+        raw.registeredClockIn = primary?.registeredClockIn ?? null;
+        raw.registeredStartAt = primary?.registeredStartAt ?? null;
+        raw.registeredClockOut = primary?.registeredClockOut ?? null;
+        raw.registeredEndAt = primary?.registeredEndAt ?? null;
+        raw.startAt = primary?.startAt ?? null;
+        raw.endAt = primary?.endAt ?? null;
+
+        raw.breakStartAt = primary?.breakStartAt ?? primary?.actualBreakStartAt ?? null;
+        raw.breakEndAt   = primary?.breakEndAt   ?? primary?.actualBreakEndAt   ?? null;
+        raw.registeredBreakStart = primary?.registeredBreakStart ?? null;
+        raw.registeredBreakEnd   = primary?.registeredBreakEnd   ?? null;
+
         if (isLeavePiece(primary)) {
           status = 'LEAVE';
           category = 'LEAVE';
           leaveTypeName = primary?.leaveTypeName || '';
         } else if (aIn && !aOut) {
-          status = 'CLOCKED_IN';
+          status = raw.breakStartAt && !raw.breakEndAt ? 'ON_BREAK' : 'CLOCKED_IN';
         } else if (!aIn) {
           if (plannedEnd && today.getTime() > toTime(plannedEnd)) {
             status = 'ABSENT';
@@ -471,12 +537,36 @@ export const fetchTodayStatus = async () => {
       const aIn = primary.actualClockIn || primary.clockInAt || primary.actualStartAt || null;
       const aOut= primary.actualClockOut || primary.clockOutAt || primary.actualEndAt || null;
 
+      geofenceRequired =
+        !!(primary?.workType?.geofenceRequired
+          ?? primary?.workTypeGeofenceRequired
+          ?? primary?.geofenceRequired);
+
+      raw.clockInAt = primary?.clockInAt ?? null;
+      raw.actualClockIn = primary?.actualClockIn ?? null;
+      raw.actualStartAt = primary?.actualStartAt ?? null;
+      raw.clockOutAt = primary?.clockOutAt ?? null;
+      raw.actualClockOut = primary?.actualClockOut ?? null;
+      raw.actualEndAt = primary?.actualEndAt ?? null;
+
+      raw.registeredClockIn = primary?.registeredClockIn ?? null;
+      raw.registeredStartAt = primary?.registeredStartAt ?? null;
+      raw.registeredClockOut = primary?.registeredClockOut ?? null;
+      raw.registeredEndAt = primary?.registeredEndAt ?? null;
+      raw.startAt = primary?.startAt ?? null;
+      raw.endAt = primary?.endAt ?? null;
+
+      raw.breakStartAt = primary?.breakStartAt ?? primary?.actualBreakStartAt ?? null;
+      raw.breakEndAt   = primary?.breakEndAt   ?? primary?.actualBreakEndAt   ?? null;
+      raw.registeredBreakStart = primary?.registeredBreakStart ?? null;
+      raw.registeredBreakEnd   = primary?.registeredBreakEnd   ?? null;
+
       if (isLeavePiece(primary)) {
         status = 'LEAVE';
         category = 'LEAVE';
         leaveTypeName = primary?.leaveTypeName || '';
       } else if (aIn && !aOut) {
-        status = 'CLOCKED_IN';
+        status = raw.breakStartAt && !raw.breakEndAt ? 'ON_BREAK' : 'CLOCKED_IN';
       } else if (!aIn) {
         if (plannedEnd && today.getTime() > toTime(plannedEnd)) {
           status = 'ABSENT';
@@ -502,6 +592,24 @@ export const fetchTodayStatus = async () => {
     leaveTypeName,
     missedCheckout,
     scheduleId,
+    geofenceRequired,
+
+    clockInAt: raw.clockInAt,
+    actualClockIn: raw.actualClockIn,
+    actualStartAt: raw.actualStartAt,
+    clockOutAt: raw.clockOutAt,
+    actualClockOut: raw.actualClockOut,
+    actualEndAt: raw.actualEndAt,
+    registeredClockIn: raw.registeredClockIn,
+    registeredStartAt: raw.registeredStartAt,
+    registeredClockOut: raw.registeredClockOut,
+    registeredEndAt: raw.registeredEndAt,
+    startAt: raw.startAt,
+    endAt: raw.endAt,
+    breakStartAt: raw.breakStartAt,
+    breakEndAt: raw.breakEndAt,
+    registeredBreakStart: raw.registeredBreakStart,
+    registeredBreakEnd: raw.registeredBreakEnd,
   };
 
   todayObj.canClockIn = allowClockIn(todayObj);
@@ -527,50 +635,70 @@ const allowClockOut = (obj) => {
   const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
   if (leave || obj.off) return false;
   if (obj.canClockOut != null) return !!obj.canClockOut;
+
+  const brStart = obj?.breakStartAt || obj?.registeredBreakStart;
+  const brEnd   = obj?.breakEndAt   || obj?.registeredBreakEnd;
+  if (st === 'ON_BREAK' || (brStart && !brEnd)) return false;
+
   const anyIn = hasIn(obj);
   const anyOut = hasOut(obj);
-  if (st === 'CLOCKED_IN' || st === 'ON_BREAK') return true;
+  if (st === 'CLOCKED_IN') return true;
   if (anyIn && !anyOut) return true;
   if (st === 'MISSED_CHECKOUT') return true;
   return false;
 };
 
-/* ===== 출근/퇴근: 표준 페이로드 + 폴백 경로 ===== */
+/* 휴게 버튼 */
+export const allowBreakStartClient = (obj) => {
+  if (!obj) return false;
+  const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
+  const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
+  if (leave || obj.off) return false;
+  if (st === 'CLOCKED_IN') return true;
+  return hasIn(obj) && !hasOut(obj) && st !== 'ON_BREAK';
+};
+export const allowBreakEndClient = (obj) => {
+  if (!obj) return false;
+  const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
+  const leave = String(obj.category || obj.scheduleType || '').toUpperCase() === 'LEAVE' || st === 'LEAVE';
+  if (leave || obj.off) return false;
+  if (st === 'ON_BREAK') return true;
+  const brStart = obj?.breakStartAt || obj?.registeredBreakStart;
+  const brEnd   = obj?.breakEndAt   || obj?.registeredBreakEnd;
+  return !!brStart && !brEnd && hasIn(obj) && !hasOut(obj);
+};
+
+/* ===== 출근/퇴근/휴게 ===== */
 const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const postJson = (url, data = {}) =>
   axios.post(url, data, {
     headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemp() },
   }).then(r => r?.data);
 
-// 콜론 등 접미사가 딸려온 scheduleId를 경로에서는 숫자부만 사용
 const normalizeId = (v) => String(v ?? '').split(':')[0];
-
-// 레거시 폴백 시도 여부
 const shouldTryNext = (status) => [400, 404, 405, 415].includes(Number(status));
 
-/** ✅ 서버 DTO(AttendanceActionRequest)에 맞춘 페이로드 */
 const buildActionPayload = (_scheduleId, geo) => {
   const lat = Number.isFinite(geo?.lat) ? geo.lat : undefined;
   const lng = Number.isFinite(geo?.lng) ? geo.lng
-           : Number.isFinite(geo?.lon) ? geo.lon : undefined; // lon이 들어와도 lng로 맞춰 전송
-  const at  = (typeof geo?.at === 'string' && geo.at) ? geo.at : undefined;
+           : Number.isFinite(geo?.lon) ? geo.lon : undefined;
+  const at  = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
   const accuracyMeters = Number.isFinite(geo?.accuracyMeters) ? geo.accuracyMeters : undefined;
 
   const payload = { lat, lng, at, accuracyMeters };
   return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
 };
 
-/** ✅ 출근 (신규 경로 우선, 레거시 폴백 지원) */
 export const clockIn = async (scheduleId, geo) => {
   const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
   if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
   const id = normalizeId(id0);
-  const body = buildActionPayload(id, geo ?? { at: localIsoNoZ() });
+  const body = buildActionPayload(id, geo);
 
   const candidates = [
-    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-in`,       // 신규
-    `${BASE_URL}/attendance/clock-in?scheduleId=${encodeURIComponent(id)}`, // 레거시(qs)
-    `${BASE_URL}/attendance/clock-in`,                                      // 레거시(body)
+    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-in`,
+    `${BASE_URL}/attendance/clock-in?scheduleId=${encodeURIComponent(id)}`,
+    `${BASE_URL}/attendance/clock-in`,
   ];
 
   let lastErr;
@@ -585,17 +713,16 @@ export const clockIn = async (scheduleId, geo) => {
   throw lastErr || new Error('출근 처리 실패');
 };
 
-/** ✅ 퇴근 (신규 경로 우선, 레거시 폴백 지원) */
 export const clockOut = async (scheduleId, geo) => {
   const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
   if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
   const id = normalizeId(id0);
-  const body = buildActionPayload(id, geo ?? { at: localIsoNoZ() });
+  const body = buildActionPayload(id, geo);
 
   const candidates = [
-    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-out`,      // 신규
-    `${BASE_URL}/attendance/clock-out?scheduleId=${encodeURIComponent(id)}`, // 레거시(qs)
-    `${BASE_URL}/attendance/clock-out`,                                     // 레거시(body)
+    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-out`,
+    `${BASE_URL}/attendance/clock-out?scheduleId=${encodeURIComponent(id)}`,
+    `${BASE_URL}/attendance/clock-out`,
   ];
 
   let lastErr;
@@ -608,4 +735,52 @@ export const clockOut = async (scheduleId, geo) => {
     }
   }
   throw lastErr || new Error('퇴근 처리 실패');
+};
+
+export const breakStart = async (scheduleId, geo) => {
+  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+  if (!id0) throw new Error('오늘 스케줄이 없습니다.');
+  const id = normalizeId(id0);
+  const body = buildActionPayload(id, geo);
+
+  const candidates = [
+    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/break-start`,
+    `${BASE_URL}/attendance/break-start?scheduleId=${encodeURIComponent(id)}`,
+    `${BASE_URL}/attendance/break-start`,
+  ];
+
+  let lastErr;
+  for (const url of candidates) {
+    try { return await postJson(url, body); }
+    catch (e) {
+      lastErr = e;
+      const st = e?.response?.status;
+      if (!shouldTryNext(st)) break;
+    }
+  }
+  throw lastErr || new Error('휴게 시작 처리 실패');
+};
+
+export const breakEnd = async (scheduleId, geo) => {
+  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+  if (!id0) throw new Error('오늘 스케줄이 없습니다.');
+  const id = normalizeId(id0);
+  const body = buildActionPayload(id, geo);
+
+  const candidates = [
+    `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/break-end`,
+    `${BASE_URL}/attendance/break-end?scheduleId=${encodeURIComponent(id)}`,
+    `${BASE_URL}/attendance/break-end`,
+  ];
+
+  let lastErr;
+  for (const url of candidates) {
+    try { return await postJson(url, body); }
+    catch (e) {
+      lastErr = e;
+      const st = e?.response?.status;
+      if (!shouldTryNext(st)) break;
+    }
+  }
+  throw lastErr || new Error('휴게 종료 처리 실패');
 };
