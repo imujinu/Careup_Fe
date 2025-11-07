@@ -2,7 +2,7 @@
 // 근무 템플릿(프리셋) CRUD + 브로드캐스트 유틸 (백엔드 스펙 정합)
 import axios from '../utils/axiosConfig';
 
-const BASE = '/branch-service/attendance-template';
+const BASE = '/attendance-template';
 
 // 공통 래퍼 파싱 (CommonResponseDto 호환) + JSON 가드
 function unwrap(res) {
