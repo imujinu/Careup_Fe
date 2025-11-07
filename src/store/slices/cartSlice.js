@@ -9,27 +9,29 @@ const cartSlice = createSlice({
   },
   reducers: {
     addToCart: (state, action) => {
-      const { 
-        productId, 
-        branchProductId, 
-        branchId, 
-        productName, 
-        price, 
-        quantity = 1, 
+      const {
+        productId,
+        branchProductId,
+        branchId,
+        productName,
+        price,
+        quantity = 1,
         imageUrl,
-        attributeName,
-        attributeValue,
-        selectedAttributes,
-        selectedOptionInfo
+        options = [],
+        branchName,
+        stockQuantity,
+        attributeTypeName,
+        attributeValueId,
+        attributeValueName
       } = action.payload;
       
       // 다른 지점의 상품인지 확인
-      if (state.branchId && state.branchId !== branchId) {
+      if (state.branchId && branchId && state.branchId !== branchId) {
         throw new Error('다른 지점의 상품은 담을 수 없습니다. 지점을 변경하면 장바구니가 비워집니다.');
       }
       
       // 첫 상품이거나 같은 지점 상품
-      if (!state.branchId) {
+      if (!state.branchId && branchId) {
         state.branchId = branchId;
       }
       
@@ -59,6 +61,14 @@ const cartSlice = createSlice({
       
       if (existingItem) {
         existingItem.quantity += quantity;
+        if (options && options.length > 0) {
+          existingItem.options = options;
+        }
+        if (branchName) existingItem.branchName = branchName;
+        if (typeof stockQuantity === 'number') existingItem.stockQuantity = stockQuantity;
+        if (attributeTypeName) existingItem.attributeTypeName = attributeTypeName;
+        if (attributeValueId) existingItem.attributeValueId = attributeValueId;
+        if (attributeValueName) existingItem.attributeValueName = attributeValueName;
       } else {
         state.items.push({
           productId,
@@ -68,10 +78,12 @@ const cartSlice = createSlice({
           price,
           quantity,
           imageUrl,
-          attributeName: attributeName || null,
-          attributeValue: attributeValue || null,
-          selectedAttributes: selectedAttributes || {},
-          selectedOptionInfo: selectedOptionInfo || {}
+          options,
+          branchName,
+          stockQuantity,
+          attributeTypeName,
+          attributeValueId,
+          attributeValueName,
         });
       }
       

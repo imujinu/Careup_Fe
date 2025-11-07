@@ -20,82 +20,85 @@ export function useShopCart() {
     }
 
     try {
-      let resolvedBranchProductId = product.branchProductId || product.id;
-      let resolvedBranchId = product.selectedBranchId || null;
+      const getBranchKey = (branch) => {
+        if (!branch) return '';
+        if (branch.branchProductId != null) return String(branch.branchProductId);
+        const branchIdPart = branch.branchId != null ? branch.branchId : 'no-branch';
+        const attrPart = branch.attributeValueId != null ? branch.attributeValueId : (branch.attributeValueName || 'no-attr');
+        return `${branchIdPart}-${attrPart}`;
+      };
 
+      let resolvedBranchProductId = product.selectedBranchProductId || product.branchProductId || product.id;
+      let resolvedBranchId = product.selectedBranchId ?? null;
+      const selectedOptions = Array.isArray(product.selectedOptions) ? product.selectedOptions : [];
+
+      let selectedBranch = null;
       if (product.availableBranches && product.availableBranches.length > 0) {
-        if (product.selectedBranchId != null) {
-          const selectedBranch = product.availableBranches.find(
+        if (product.selectedBranchProductId != null) {
+          selectedBranch = product.availableBranches.find(
+            (b) => String(b.branchProductId) === String(product.selectedBranchProductId)
+          );
+        }
+        if (!selectedBranch && product.selectedBranchKey) {
+          selectedBranch = product.availableBranches.find(
+            (b) => getBranchKey(b) === product.selectedBranchKey
+          );
+        }
+        if (!selectedBranch && product.selectedBranchId != null) {
+          selectedBranch = product.availableBranches.find(
             (b) => String(b.branchId) === String(product.selectedBranchId)
           );
-          if (selectedBranch) {
-            resolvedBranchProductId = selectedBranch.branchProductId || resolvedBranchProductId;
-            resolvedBranchId = selectedBranch.branchId;
-          }
+        }
+
+        if (selectedBranch) {
+          resolvedBranchProductId = selectedBranch.branchProductId || resolvedBranchProductId;
+          resolvedBranchId = selectedBranch.branchId;
         } else {
           const firstBranch = product.availableBranches[0];
           if (firstBranch) {
             resolvedBranchProductId = firstBranch.branchProductId || resolvedBranchProductId;
             resolvedBranchId = firstBranch.branchId;
+            selectedBranch = firstBranch;
           }
         }
       }
-
-      // 선택된 옵션 정보 추출
-      let attributeName = null;
-      let attributeValue = null;
-      
-      if (product.selectedOptionInfo && Object.keys(product.selectedOptionInfo).length > 0) {
-        // 첫 번째 옵션 정보 사용 (또는 모든 옵션을 조합)
-        const optionKeys = Object.keys(product.selectedOptionInfo);
-        if (optionKeys.length > 0) {
-          const firstOption = product.selectedOptionInfo[optionKeys[0]];
-          attributeName = firstOption.attributeTypeName || null;
-          attributeValue = firstOption.attributeValueName || null;
-          
-          // 여러 옵션이 있는 경우 조합 (예: "Hot, Large")
-          if (optionKeys.length > 1) {
-            const optionValues = optionKeys.map(key => 
-              product.selectedOptionInfo[key].attributeValueName
-            ).filter(Boolean);
-            attributeValue = optionValues.join(', ');
-          }
-        }
-      }
-
-      const cartData = {
-        memberId: currentUser.memberId,
-        branchProductId: resolvedBranchProductId,
-        quantity: 1,
-        attributeName: attributeName,
-        attributeValue: attributeValue
-      };
-
-      await cartService.addToCart(cartData);
 
       let resolvedPrice = product?.minPrice || product?.price || 0;
-      if (product.availableBranches && product.availableBranches.length > 0) {
-        const selected = product.selectedBranchId != null
-          ? product.availableBranches.find((b) => String(b.branchId) === String(product.selectedBranchId))
-          : product.availableBranches[0];
-        if (selected && selected.price) {
-          resolvedPrice = Number(selected.price);
+      if (selectedBranch && selectedBranch.price) {
+        resolvedPrice = Number(selectedBranch.price);
+      } else if (product.availableBranches && product.availableBranches.length > 0) {
+        const fallbackBranch = product.availableBranches[0];
+        if (fallbackBranch?.price) {
+          resolvedPrice = Number(fallbackBranch.price);
         }
       }
 
       dispatch(addToCart({
         productId: product.productId,
         branchProductId: resolvedBranchProductId,
-        branchId: resolvedBranchId || 1,
+        branchId: resolvedBranchId || selectedBranch?.branchId || product.branchId || 1,
         productName: product.name,
         price: resolvedPrice,
         quantity: 1,
         imageUrl: product.image,
-        attributeName: attributeName,
-        attributeValue: attributeValue,
-        selectedAttributes: product.selectedAttributes || {},
-        selectedOptionInfo: product.selectedOptionInfo || {}
+        options: selectedOptions,
+        branchName: selectedBranch?.branchName,
+        stockQuantity: selectedBranch?.stockQuantity,
+        attributeTypeName: selectedBranch?.attributeTypeName,
+        attributeValueId: selectedBranch?.attributeValueId,
+        attributeValueName: selectedBranch?.attributeValueName
       }));
+
+      const cartData = {
+        memberId: currentUser.memberId,
+        branchProductId: resolvedBranchProductId,
+        quantity: 1,
+        attributeName: selectedOptions[0]?.label || null,
+        attributeValue: selectedOptions[0]?.value || null
+      };
+
+      await cartService.addToCart(cartData);
+
 
       alert(`${product.name}이(가) 장바구니에 추가되었습니다.`);
     } catch (error) {

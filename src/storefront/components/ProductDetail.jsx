@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import "./ProductDetail.css";
 
 const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
   const [activeTab, setActiveTab] = useState("reviews");
+  const cartItems = useSelector(state => state.cart?.items || []);
   const [isInCart, setIsInCart] = useState(false);
-  const [selectedBranchId, setSelectedBranchId] = useState(null);
+  const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   // 속성 선택 맵: { [attributeTypeName]: attributeValueId }
   const [selectedAttributes, setSelectedAttributes] = useState({});
   const [currentProductImage, setCurrentProductImage] = useState(product?.image || null);
+
+  useEffect(() => {
+    if (!product?.productId) {
+      setIsInCart(false);
+      return;
+    }
+    const exists = cartItems.some(item => String(item.productId) === String(product.productId));
+    setIsInCart(exists);
+  }, [cartItems, product?.productId]);
 
   // product가 변경될 때 기본 이미지 설정
   useEffect(() => {
@@ -47,6 +58,14 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
     }
   }, [selectedAttributes, product?.attributeGroups, product?.image]);
 
+  const getBranchKey = (branch) => {
+    if (!branch) return '';
+    if (branch.branchProductId != null) return String(branch.branchProductId);
+    const branchIdPart = branch.branchId != null ? branch.branchId : 'no-branch';
+    const attrPart = branch.attributeValueId != null ? branch.attributeValueId : (branch.attributeValueName || 'no-attr');
+    return `${branchIdPart}-${attrPart}`;
+  };
+
   // 옵션 선택에 따라 지점 자동 선택(재고 있는 첫 지점)
   useEffect(() => {
     if (!product?.availableBranches) return;
@@ -77,7 +96,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       });
       // 중복 제거
       const uniqueBranches = Array.from(
-        new Map(allBranches.map(b => [`${b.branchId}-${b.attributeValueId || 'no-attr'}`, b])).values()
+        new Map(allBranches.map(b => [getBranchKey(b), b])).values()
       );
       candidates = uniqueBranches;
     }
@@ -113,11 +132,11 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
     }
     
     const firstInStock = candidates.find(b => (b.stockQuantity || 0) > 0) || candidates[0];
-    if (firstInStock?.branchId) {
-      setSelectedBranchId(firstInStock.branchId);
+    if (firstInStock) {
+      setSelectedBranch(firstInStock);
     } else if (candidates.length === 0) {
       // 선택 가능한 지점이 없으면 선택 해제
-      setSelectedBranchId(null);
+      setSelectedBranch(null);
     }
   }, [selectedAttributes, product?.availableBranches, product?.optionCombos, product?.optionTypes]);
 
@@ -129,6 +148,22 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       : (product?.image ? [product.image] : []));
 
   const currentImage = productImages[selectedImageIndex] || productImages[0] || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+
+  const buildSelectedOptions = () => {
+    if (!product?.attributeGroups || !selectedAttributes) return [];
+    const options = [];
+    product.attributeGroups.forEach(group => {
+      const typeName = group.attributeTypeName;
+      if (!typeName) return;
+      const selectedValueId = selectedAttributes[typeName];
+      if (!selectedValueId) return;
+      const valueObj = group.values?.find(v => String(v.attributeValueId) === String(selectedValueId));
+      const label = typeName;
+      const value = valueObj?.attributeValueName || valueObj?.displayName || valueObj?.name || selectedValueId;
+      options.push({ label, value });
+    });
+    return options;
+  };
 
   const handleAddToCart = () => {
     // 옵션1+옵션2 조합 검증 (2단 옵션이 있는 경우)
@@ -157,15 +192,15 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
         }
         
         // 선택된 지점이 해당 조합의 지점인지 확인
-        if (selectedBranchId) {
+        if (resolvedSelectedBranch) {
           const isValidBranch = combo.branches.some(b => 
-            String(b.branchId) === String(selectedBranchId)
+            getBranchKey(b) === getBranchKey(resolvedSelectedBranch)
           );
           if (!isValidBranch) {
             // 조합에 맞는 첫 번째 지점으로 자동 선택
             const firstBranch = combo.branches.find(b => (b.stockQuantity || 0) > 0) || combo.branches[0];
             if (firstBranch) {
-              setSelectedBranchId(firstBranch.branchId);
+              setSelectedBranch(firstBranch);
               alert(`선택하신 옵션 조합에 맞는 지점(${firstBranch.branchName})으로 변경되었습니다.`);
             }
           }
@@ -173,20 +208,21 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
           // 지점이 선택되지 않았으면 조합에 맞는 첫 번째 지점 자동 선택
           const firstBranch = combo.branches.find(b => (b.stockQuantity || 0) > 0) || combo.branches[0];
           if (firstBranch) {
-            setSelectedBranchId(firstBranch.branchId);
+            setSelectedBranch(firstBranch);
           }
         }
       }
     }
     
     // 지점 선택 확인 (옵션이 없는 경우에도 지점이 필요할 수 있음)
-    if (product?.availableBranches && product.availableBranches.length > 0 && !selectedBranchId) {
+    if (product?.availableBranches && product.availableBranches.length > 0 && !resolvedSelectedBranch) {
       alert('구매 지점을 선택해주세요.');
       return;
     }
     
     setIsInCart(true);
     if (onAddToCart) {
+<<<<<<< HEAD
       // 선택된 옵션 정보 추출
       const selectedOptionInfo = {};
       if (product?.attributeGroups && Object.keys(selectedAttributes).length > 0) {
@@ -213,6 +249,16 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
         selectedBranchId: selectedBranchId,
         selectedAttributes: selectedAttributes,
         selectedOptionInfo: selectedOptionInfo
+=======
+      const branchData = resolvedSelectedBranch;
+      const selectedOptions = buildSelectedOptions();
+      const productWithBranch = {
+        ...product,
+        selectedBranchId: branchData?.branchId,
+        selectedBranchProductId: branchData?.branchProductId,
+        selectedBranchKey: getBranchKey(branchData),
+        selectedOptions
+>>>>>>> origin/fix/ui-product
       };
       onAddToCart(productWithBranch);
     }
@@ -235,12 +281,13 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
     
     // 지점이 여러 개인 경우 반드시 선택해야 함
     if (product?.availableBranches && product.availableBranches.length > 0) {
-      if (!selectedBranchId) {
+      if (!resolvedSelectedBranch) {
         alert('구매 지점을 선택해주세요.');
         return;
       }
     }
 
+<<<<<<< HEAD
     // 선택된 옵션 정보 추출
     const selectedOptionInfo = {};
     if (product?.attributeGroups && Object.keys(selectedAttributes).length > 0) {
@@ -267,12 +314,26 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       selectedBranchId: selectedBranchId,
       selectedAttributes: selectedAttributes,
       selectedOptionInfo: selectedOptionInfo
+=======
+    const branchData = resolvedSelectedBranch;
+    const selectedOptions = buildSelectedOptions();
+    const productWithBranch = {
+      ...product,
+      selectedBranchId: branchData?.branchId,
+      selectedBranchProductId: branchData?.branchProductId,
+      selectedBranchKey: getBranchKey(branchData),
+      selectedOptions
+>>>>>>> origin/fix/ui-product
     };
 
     if (onBuy) {
       onBuy(productWithBranch);
     }
   };
+
+  const resolvedSelectedBranch = selectedBranch && product?.availableBranches
+    ? product.availableBranches.find(b => getBranchKey(b) === getBranchKey(selectedBranch)) || selectedBranch
+    : selectedBranch;
 
   return (
     <div className="product-detail">
@@ -354,11 +415,10 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               <div className="instant-price">
                 <span className="price-label">즉시 구매가</span>
                 <span className="price-value">
-                  {selectedBranchId && product?.availableBranches
+                  {resolvedSelectedBranch && product?.availableBranches
                     ? (() => {
-                        const selectedBranch = product.availableBranches.find(b => String(b.branchId) === String(selectedBranchId));
-                        return selectedBranch?.price
-                          ? `₩${selectedBranch.price.toLocaleString()}`
+                        return resolvedSelectedBranch?.price
+                          ? `₩${resolvedSelectedBranch.price.toLocaleString()}`
                           : '지점을 선택하세요';
                       })()
                     : product?.maxPrice
@@ -373,7 +433,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                     : '가격 문의'}
                 </span>
                 <div className="price-note" style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
-                  {selectedBranchId 
+                  {resolvedSelectedBranch 
                     ? '선택하신 지점의 판매가입니다.' 
                     : '지점을 선택하면 정확한 판매가를 확인할 수 있습니다.'}
                 </div>
@@ -445,8 +505,25 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                                 return newAttributes;
                               });
                               
+<<<<<<< HEAD
                               // 선택 조합의 브랜치로 기본 선택 (useEffect에서 처리하므로 여기서는 간단히 처리)
                               // 실제 브랜치 선택은 useEffect에서 selectedAttributes 변경을 감지하여 처리됨
+=======
+                              // 선택 조합의 브랜치로 기본 선택
+                              if (!isSelected) {
+                                let candidateBranches = [];
+                                if (product.optionCombos && Object.keys(selectedAttributes).length > 0) {
+                                  const t1 = product.optionTypes?.[0];
+                                  const t2 = product.optionTypes?.[1];
+                                  const chosen1 = selectedAttributes[t1];
+                                  const chosen2 = attributeTypeName === t2 ? valueGroup.attributeValueId : selectedAttributes[t2];
+                                  const combo = product.optionCombos.find(c => String(c.opt1Id) === String(chosen1) && String(c.opt2Id) === String(chosen2));
+                                  candidateBranches = combo?.branches || [];
+                                }
+                                const b = candidateBranches[0] || firstBranch;
+                                if (b) setSelectedBranch(b);
+                              }
+>>>>>>> origin/fix/ui-product
                               
                               // 속성 선택 시 해당 상품의 이미지로 변경
                               if (!isSelected && valueGroup.imageUrl) {
@@ -484,8 +561,11 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 <label className="option-label">구매 지점</label>
                 <select
                   className="size-select branch-select"
-                  value={selectedBranchId || ''}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  value={resolvedSelectedBranch ? getBranchKey(resolvedSelectedBranch) : ''}
+                  onChange={(e) => {
+                    const branch = product.availableBranches.find(b => getBranchKey(b) === e.target.value);
+                    setSelectedBranch(branch || null);
+                  }}
                 >
                   <option value="">구매할 지점을 선택하세요</option>
                   {Array.from(
@@ -506,9 +586,8 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                           String(c.opt2Id) === String(opt2Selected)
                         );
                         if (combo && combo.branches) {
-                          const comboKeys = new Set(combo.branches.map(b => `${b.branchId}-${b.attributeValueId || 'no-attr'}`));
-                          const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
-                          return comboKeys.has(key);
+                          const comboKeys = new Set(combo.branches.map(b => getBranchKey(b)));
+                          return comboKeys.has(getBranchKey(branch));
                         }
                         return false;
                       }
@@ -528,12 +607,11 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                           matchingCombos.forEach(combo => {
                             if (combo.branches) {
                               combo.branches.forEach(b => {
-                                allBranchKeys.add(`${b.branchId}-${b.attributeValueId || 'no-attr'}`);
+                                allBranchKeys.add(getBranchKey(b));
                               });
                             }
                           });
-                          const key = `${branch.branchId}-${branch.attributeValueId || 'no-attr'}`;
-                          return allBranchKeys.has(key);
+                          return allBranchKeys.has(getBranchKey(branch));
                         }
                       }
                       
@@ -582,7 +660,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                     ).values()
                   )
                     .map(branch => (
-                      <option key={`${branch.branchId}-${branch.attributeValueId || 'no-attr'}`} value={branch.branchId}>
+                      <option key={getBranchKey(branch)} value={getBranchKey(branch)}>
                         {branch.branchName} {branch.attributeValueName ? `(${branch.attributeTypeName}: ${branch.attributeValueName})` : ''} (재고: {branch.stockQuantity}개, 가격: {branch.price?.toLocaleString()}원)
                       </option>
                     ))}
@@ -592,12 +670,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
 
             {/* 상품 정보 */}
             <div className="product-specs">
-              {product?.category && (
-                <div className="spec-item">
-                  <span className="spec-label">카테고리</span>
-                  <span className="spec-value">{product.category.categoryName || product.category}</span>
-                </div>
-              )}
               {product?.supplyPrice && (
                 <div className="spec-item">
                   <span className="spec-label">공급가</span>
@@ -616,11 +688,10 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
             <div className="purchase-buttons">
               <button className="buy-btn" onClick={handleBuy}>
                 <div className="btn-price">
-                  {selectedBranchId && product?.availableBranches
+                  {resolvedSelectedBranch && product?.availableBranches
                     ? (() => {
-                        const selectedBranch = product.availableBranches.find(b => String(b.branchId) === String(selectedBranchId));
-                        return selectedBranch?.price
-                          ? `₩${selectedBranch.price.toLocaleString()}`
+                        return resolvedSelectedBranch?.price
+                          ? `₩${resolvedSelectedBranch.price.toLocaleString()}`
                           : '구매하기';
                       })()
                     : product?.maxPrice
@@ -641,11 +712,10 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                 onClick={handleAddToCart}
               >
                 <div className="btn-price">
-                  {selectedBranchId && product?.availableBranches
+                  {resolvedSelectedBranch && product?.availableBranches
                     ? (() => {
-                        const selectedBranch = product.availableBranches.find(b => String(b.branchId) === String(selectedBranchId));
-                        return selectedBranch?.price
-                          ? `${selectedBranch.price.toLocaleString()}원`
+                        return resolvedSelectedBranch?.price
+                          ? `${resolvedSelectedBranch.price.toLocaleString()}원`
                           : '가격보기';
                       })()
                     : product?.maxPrice
@@ -665,66 +735,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
               </button>
             </div>
 
-            {/* 추가 혜택 */}
-            <div className="benefits-section">
-              <h3>추가 혜택</h3>
-              <div className="benefit-item">
-                <span className="benefit-label">포인트</span>
-                <span className="benefit-text">계좌 간편결제 시 1% 적립</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-label">결제</span>
-                <span className="benefit-text">
-                  크림카드 최대 20만원 상당 혜택 외 7건
-                </span>
-              </div>
-              <button className="more-benefits">더보기</button>
-            </div>
-          </div>
-        </div>
-
-        {/* 상품 정보 섹션 */}
-        <div className="price-info-section">
-          <div className="price-info-grid">
-            <div className="price-info-item">
-              <span className="info-label">판매가격</span>
-              <span className="info-value">
-                {selectedBranchId && product?.availableBranches
-                  ? (() => {
-                      const selectedBranch = product.availableBranches.find(b => String(b.branchId) === String(selectedBranchId));
-                      return selectedBranch?.price
-                        ? `₩${selectedBranch.price.toLocaleString()}`
-                        : product?.maxPrice
-                        ? `₩${product.maxPrice.toLocaleString()}`
-                        : '가격 문의';
-                    })()
-                  : product?.maxPrice
-                  ? `₩${product.maxPrice.toLocaleString()}`
-                  : (product?.availableBranches && product.availableBranches.length > 0)
-                  ? (() => {
-                      const max = product.availableBranches
-                        .map(b => Number(b?.price || 0))
-                        .reduce((acc, v) => (v > acc ? v : acc), 0);
-                      return max > 0 ? `₩${max.toLocaleString()}` : '가격 문의';
-                    })()
-                  : '가격 문의'}
-              </span>
-            </div>
-            <div className="price-info-item">
-              <span className="info-label">상품ID</span>
-              <span className="info-value">{product?.productId || '-'}</span>
-            </div>
-            <div className="price-info-item">
-              <span className="info-label">카테고리</span>
-              <span className="info-value">{product?.category?.categoryName || product?.category || '-'}</span>
-            </div>
-            <div className="price-info-item">
-              <span className="info-label">재고상태</span>
-              <span className="info-value">
-                {product?.status === 'ACTIVE' ? '판매중' : 
-                 product?.status === 'INACTIVE' ? '판매중지' : '-'}
-              </span>
-            </div>
           </div>
         </div>
 

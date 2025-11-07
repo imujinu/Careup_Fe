@@ -307,101 +307,6 @@
   color: #ff6b35;
 }
 
-/* 추가 혜택 */
-.benefits-section {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-}
-
-.benefits-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 15px 0;
-  color: #333;
-}
-
-.benefit-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.benefit-item:last-child {
-  border-bottom: none;
-}
-
-.benefit-label {
-  font-size: 14px;
-  color: #666;
-  font-weight: 500;
-}
-
-.benefit-text {
-  font-size: 14px;
-  color: #333;
-  text-align: right;
-  flex: 1;
-  margin-left: 20px;
-}
-
-.more-benefits {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 14px;
-  cursor: pointer;
-  margin-top: 10px;
-  text-decoration: underline;
-}
-
-/* 시세 정보 섹션 */
-.price-info-section {
-  background: white;
-  padding: 25px 30px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 30px;
-}
-
-.price-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.price-info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.info-label {
-  font-size: 14px;
-  color: #666;
-}
-
-.info-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-}
-
-.price-change {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.price-change.up {
-  color: #ff4757;
-}
-
-.price-change.down {
-  color: #2ed573;
-}
-
 /* 탭 섹션 */
 .tabs-section {
   background: white;
@@ -973,10 +878,6 @@
   }
 
   .purchase-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .price-info-grid {
     grid-template-columns: 1fr;
   }
 

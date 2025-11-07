@@ -251,18 +251,29 @@ function ProductDetailPage() {
       return;
     }
 
-    let selectedBranchId = product.selectedBranchId;
-    if (!selectedBranchId) {
-      alert('구매 지점을 선택해주세요.');
-      return;
+    const getBranchKey = (branch) => {
+      if (!branch) return '';
+      if (branch.branchProductId != null) return String(branch.branchProductId);
+      const branchIdPart = branch.branchId != null ? branch.branchId : 'no-branch';
+      const attrPart = branch.attributeValueId != null ? branch.attributeValueId : (branch.attributeValueName || 'no-attr');
+      return `${branchIdPart}-${attrPart}`;
+    };
+
+    const branches = product.availableBranches || [];
+
+    let selectedBranch = null;
+    if (product.selectedBranchProductId != null) {
+      selectedBranch = branches.find(b => String(b.branchProductId) === String(product.selectedBranchProductId));
+    }
+    if (!selectedBranch && product.selectedBranchKey) {
+      selectedBranch = branches.find(b => getBranchKey(b) === product.selectedBranchKey);
+    }
+    if (!selectedBranch && product.selectedBranchId != null) {
+      selectedBranch = branches.find(b => String(b.branchId) === String(product.selectedBranchId));
     }
 
-    const selectedBranch = product.availableBranches?.find(
-      (b) => String(b.branchId) === String(selectedBranchId)
-    );
-
     if (!selectedBranch) {
-      alert('선택한 지점 정보를 찾을 수 없습니다.');
+      alert('구매 지점을 선택해주세요.');
       return;
     }
 
