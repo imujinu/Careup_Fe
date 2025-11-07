@@ -222,34 +222,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
     
     setIsInCart(true);
     if (onAddToCart) {
-<<<<<<< HEAD
-      // 선택된 옵션 정보 추출
-      const selectedOptionInfo = {};
-      if (product?.attributeGroups && Object.keys(selectedAttributes).length > 0) {
-        product.attributeGroups.forEach(attrGroup => {
-          const attributeTypeName = attrGroup.attributeTypeName;
-          const selectedValueId = selectedAttributes[attributeTypeName];
-          if (selectedValueId) {
-            const valueGroup = attrGroup.values?.find(v => 
-              String(v.attributeValueId) === String(selectedValueId)
-            );
-            if (valueGroup) {
-              selectedOptionInfo[attributeTypeName] = {
-                attributeTypeName: attributeTypeName,
-                attributeValueId: selectedValueId,
-                attributeValueName: valueGroup.attributeValueName
-              };
-            }
-          }
-        });
-      }
-      
-      const productWithBranch = {
-        ...product,
-        selectedBranchId: selectedBranchId,
-        selectedAttributes: selectedAttributes,
-        selectedOptionInfo: selectedOptionInfo
-=======
       const branchData = resolvedSelectedBranch;
       const selectedOptions = buildSelectedOptions();
       const productWithBranch = {
@@ -258,7 +230,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
         selectedBranchProductId: branchData?.branchProductId,
         selectedBranchKey: getBranchKey(branchData),
         selectedOptions
->>>>>>> origin/fix/ui-product
       };
       onAddToCart(productWithBranch);
     }
@@ -287,34 +258,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       }
     }
 
-<<<<<<< HEAD
-    // 선택된 옵션 정보 추출
-    const selectedOptionInfo = {};
-    if (product?.attributeGroups && Object.keys(selectedAttributes).length > 0) {
-      product.attributeGroups.forEach(attrGroup => {
-        const attributeTypeName = attrGroup.attributeTypeName;
-        const selectedValueId = selectedAttributes[attributeTypeName];
-        if (selectedValueId) {
-          const valueGroup = attrGroup.values?.find(v => 
-            String(v.attributeValueId) === String(selectedValueId)
-          );
-          if (valueGroup) {
-            selectedOptionInfo[attributeTypeName] = {
-              attributeTypeName: attributeTypeName,
-              attributeValueId: selectedValueId,
-              attributeValueName: valueGroup.attributeValueName
-            };
-          }
-        }
-      });
-    }
-
-    const productWithBranch = {
-      ...product,
-      selectedBranchId: selectedBranchId,
-      selectedAttributes: selectedAttributes,
-      selectedOptionInfo: selectedOptionInfo
-=======
     const branchData = resolvedSelectedBranch;
     const selectedOptions = buildSelectedOptions();
     const productWithBranch = {
@@ -323,7 +266,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
       selectedBranchProductId: branchData?.branchProductId,
       selectedBranchKey: getBranchKey(branchData),
       selectedOptions
->>>>>>> origin/fix/ui-product
     };
 
     if (onBuy) {
@@ -505,10 +447,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                                 return newAttributes;
                               });
                               
-<<<<<<< HEAD
-                              // 선택 조합의 브랜치로 기본 선택 (useEffect에서 처리하므로 여기서는 간단히 처리)
-                              // 실제 브랜치 선택은 useEffect에서 selectedAttributes 변경을 감지하여 처리됨
-=======
                               // 선택 조합의 브랜치로 기본 선택
                               if (!isSelected) {
                                 let candidateBranches = [];
@@ -523,7 +461,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                                 const b = candidateBranches[0] || firstBranch;
                                 if (b) setSelectedBranch(b);
                               }
->>>>>>> origin/fix/ui-product
                               
                               // 속성 선택 시 해당 상품의 이미지로 변경
                               if (!isSelected && valueGroup.imageUrl) {
