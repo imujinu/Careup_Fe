@@ -477,24 +477,51 @@ function InventoryManagement() {
           const productAttributes = productAttributesMap.get(productId) || [];
           
           // 속성 정보를 배열로 변환 (최대 2개)
-          const attributes = [];
-          
-          // displayOrder 순으로 정렬
-          const sortedAttrs = [...productAttributes].sort((a, b) => {
-            const aOrder = a.displayOrder || 0;
-            const bOrder = b.displayOrder || 0;
-            return aOrder - bOrder;
+        const attributes = [];
+
+        // 백엔드에서 내려준 실제 속성 정보 우선 반영
+        if (item.attributeTypeName && item.attributeValueName) {
+          attributes.push({
+            attributeTypeId: item.attributeTypeId || null,
+            attributeTypeName: item.attributeTypeName,
+            attributeValueId: item.attributeValueId || null,
+            attributeValueName: item.attributeValueName
           });
+        }
+        
+        // displayOrder 순으로 정렬
+        const sortedAttrs = [...productAttributes].sort((a, b) => {
+          const aOrder = a.displayOrder || 0;
+          const bOrder = b.displayOrder || 0;
+          return aOrder - bOrder;
+        });
+        
+        // 최대 2개까지 속성 추가하되, 이미 추가된 값은 제외
+        for (const attr of sortedAttrs) {
+          if (attributes.length >= 2) {
+            break;
+          }
           
-          // 최대 2개까지 속성 추가
-          sortedAttrs.slice(0, 2).forEach(attr => {
+          const typeName = attr.attributeTypeName || attr.attributeType?.name;
+          const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName;
+          
+          if (!typeName || !valueName) {
+            continue;
+          }
+
+          const isDuplicate = attributes.some(existing => 
+            existing.attributeTypeName === typeName && existing.attributeValueName === valueName
+          );
+
+          if (!isDuplicate) {
             attributes.push({
               attributeTypeId: attr.attributeTypeId || attr.attributeType?.id,
-              attributeTypeName: attr.attributeTypeName || attr.attributeType?.name,
+              attributeTypeName: typeName,
               attributeValueId: attr.attributeValueId || attr.attributeValue?.id || attr.id,
-              attributeValueName: attr.attributeValueName || attr.attributeValue?.name || attr.displayName
+              attributeValueName: valueName
             });
-          });
+          }
+        }
           
           return {
             ...item,
@@ -879,7 +906,7 @@ function InventoryManagement() {
       const branchProductId = selectedItem?.branchProductId || selectedItem?.id;
       
       // 상품 정보 수정 (이름, 카테고리, 이미지 등)
-      if (productId && (formData.productName || formData.category || formData.imageFile || formData.removeImage || formData.minPrice !== undefined || formData.maxPrice !== undefined || formData.unitPrice !== undefined)) {
+      if (productId && (formData.productName || formData.category || formData.imageFile || formData.removeImage || formData.minPrice !== undefined || formData.maxPrice !== undefined || formData.unitPrice !== undefined || formData.description !== undefined)) {
         try {
           // 기존 상품 정보 가져오기
           const productResponse = await inventoryService.getProduct(productId);
@@ -892,7 +919,7 @@ function InventoryManagement() {
           // 상품 수정 API 호출
           await inventoryService.updateProduct(productId, {
             name: formData.productName || existingProduct.name,
-            description: existingProduct.description || '',
+            description: formData.description !== undefined ? formData.description : (existingProduct.description || ''),
             categoryId: formData.category || existingProduct.categoryId || existingProduct.category?.categoryId,
             minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
             maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),
@@ -934,7 +961,7 @@ function InventoryManagement() {
             
             await inventoryService.updateProduct(productId, {
               name: existingProduct.name,
-              description: existingProduct.description || '',
+              description: formData.description !== undefined ? formData.description : (existingProduct.description || ''),
               categoryId: formData.category || existingProduct.categoryId || existingProduct.category?.categoryId,
               minPrice: formData.minPrice !== undefined ? formData.minPrice : (existingProduct.minPrice || 0),
               maxPrice: formData.maxPrice !== undefined ? formData.maxPrice : (existingProduct.maxPrice || 0),

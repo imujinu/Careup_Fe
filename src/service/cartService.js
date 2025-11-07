@@ -1,7 +1,7 @@
 import axios from 'axios';
 import customerAxios from '../utils/customerAxios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_CUSTOMER_API_URL;
 
 // 쇼핑몰 전용 axios 인스턴스 (직원용 인터셉터 없음)
 const shopApi = axios.create({
@@ -167,10 +167,14 @@ export const cartService = {
     }
   },
 
-  // 주문 취소
-  cancelOrder: async (orderId) => {
+  // 주문 취소 (고객만 가능, 사유는 선택사항)
+  cancelOrder: async (orderId, reason = null) => {
     try {
-      const response = await customerAxios.delete(`/api/orders/${orderId}`);
+      const params = {};
+      if (reason) {
+        params.reason = reason;
+      }
+      const response = await customerAxios.delete(`/api/orders/${orderId}`, { params });
       return response.data;
     } catch (error) {
       console.error('주문 취소 실패:', error);
