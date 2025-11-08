@@ -5,12 +5,13 @@ import axios from '../utils/axiosConfig';
 
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
+  const withBranch = (u) => (u.endsWith('/branch-service') ? u : `${u}/branch-service`);
   const explicit = trim(import.meta.env.VITE_BRANCH_URL);
-  if (explicit) return explicit; // e.g. https://server.careup.store/branch-service
+  if (explicit) return withBranch(explicit);
   const api =
     trim(import.meta.env.VITE_API_URL) ||
     (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
-  return `${api}/branch-service`;
+  return withBranch(api);
 })();
 
 const unwrap = (res) => {
