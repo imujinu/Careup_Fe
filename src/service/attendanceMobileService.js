@@ -1,18 +1,14 @@
-// =========================================
-// src/service/attendanceMobileService.js
-// =========================================
 // 모바일 출퇴근/휴게 전용 서비스 (전체 교체본)
-// - 기존 로직/함수/시그니처 보존
 // - 지점 지오펜스 로드 + 반경 내 검증(필요 시)
 // - 기록 API는 POST 우선(405/404/415 등일 때만 다음 후보 시도)
-// - 오늘 상태/주간 요약/메트릭 계산 로직 그대로 유지
+// - 오늘 상태/주간 요약/메트릭 계산 + 워크타입 기반 지오펜스 필수 여부 강제 일치
 
 import axios from '../utils/axiosConfig';
 import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
 
-// ▼ 새 지오펜스 서비스로 위임(과거 호환 유지 목적)
+// ▼ 지오펜스 서비스
 import {
   fetchMyBranchGeofence as fetchBranchGeoNew,
   isBranchGeofenceConfigured as isBranchGeoConfigured,
@@ -33,6 +29,9 @@ const BASE_URL = (() => {
 const DOW_KR = ['일','월','화','수','목','금','토'];
 const LATE_THRESHOLD_MIN = 1;
 
+/* =========================
+ * 공통 날짜/시간 유틸
+ * ========================= */
 const toYMD = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
   const y = dt.getFullYear();
@@ -194,6 +193,70 @@ const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fal
 
   return { ok: true, geo: coord, distance: dist, radius, required: true };
 };
+/* ========================= */
+
+/* =========================
+ * 지오펜스 필수 여부 판단(강화)
+ * - 다양한 필드명/문자값 지원
+ * - 명시 정보 없고 지점 펜스가 설정돼 있으면 '필수'로 보수적 판단
+ * ========================= */
+const truth = (v) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v > 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toUpperCase();
+    if (['Y','YES','TRUE','REQUIRED','MANDATORY','NEEDED','ALWAYS','REQUIRE','ON','ENABLED'].includes(s)) return true;
+    if (['N','NO','FALSE','NONE','OPTIONAL','DISABLED','OFF'].includes(s)) return false;
+  }
+  return null;
+};
+const parseMode = (v) => {
+  if (v == null) return null;
+  const s = String(v).trim().toUpperCase();
+  if (['REQUIRED','MANDATORY','ALWAYS'].includes(s)) return true;
+  if (['NONE','OPTIONAL','DISABLED','OFF'].includes(s)) return false;
+  return null;
+};
+const anyOf = (...vals) => {
+  for (const v of vals) {
+    const t = truth(v);
+    if (t !== null) return t;
+    const p = parseMode(v);
+    if (p !== null) return p;
+  }
+  return null;
+};
+async function resolveFenceRequired(detail, primary) {
+  let v = anyOf(
+    // schedule-level
+    detail?.geofenceRequired,
+    detail?.requireGeofence,
+    detail?.requiresGeofence,
+    detail?.geoFenceRequired,
+    detail?.geofenceValidation,
+    detail?.geofenceMode,
+
+    // workType-level
+    detail?.workType?.geofenceRequired,
+    detail?.workType?.requireGeofence,
+    detail?.workType?.requiresGeofence,
+    detail?.workType?.geoFenceRequired,
+    detail?.workType?.geofenceValidation,
+    detail?.workType?.geofenceMode,
+
+    // primary fallback
+    primary?.geofenceRequired,
+    primary?.requireGeofence,
+    primary?.workType?.geofenceRequired,
+    primary?.workTypeGeofenceRequired
+  );
+
+  if (v !== null) return !!v;
+
+  // 명시 정보가 없으면: 지점 펜스가 설정되어 있다면 '필수'로 보수적 판단
+  const fence = await fetchBranchGeoNew().catch(() => null);
+  return !!(fence && isBranchGeoConfigured(fence));
+}
 /* ========================= */
 
 const summarizeWeekFromEvents = (events, anchorDate) => {
@@ -509,13 +572,8 @@ export const fetchTodayStatus = async () => {
       try {
         const detail = await getScheduleDetail(sid);
 
-        geofenceRequired = !!(
-          detail?.workType?.geofenceRequired ??
-          detail?.workType?.requiresGeofence ??
-          detail?.workTypeGeofenceRequired ??
-          detail?.requiresGeofence ??
-          detail?.geofenceRequired
-        );
+        // === 지오펜스 필수 여부(강화 판단) ===
+        geofenceRequired = await resolveFenceRequired(detail, primary);
 
         const plannedStart =
           detail?.registeredClockIn || detail?.registeredStartAt || detail?.startAt ||
@@ -578,15 +636,13 @@ export const fetchTodayStatus = async () => {
 
         missedCheckout = detail?.missedCheckout === true;
       } catch {
+        // 상세 조회 실패 시, primary 기준으로 보수적 계산 + 펜스 필수 여부 재판단
+        geofenceRequired = await resolveFenceRequired(null, primary);
+
         const plannedStart = primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
         const plannedEnd   = primary.registeredClockOut || primary.registeredEndAt   || primary.endAt   || null;
         const aIn = primary.actualClockIn || primary.clockInAt || primary.actualStartAt || null;
         const aOut= primary.actualClockOut || primary.clockOutAt || primary.actualEndAt || null;
-
-        geofenceRequired =
-          !!(primary?.workType?.geofenceRequired
-            ?? primary?.workTypeGeofenceRequired
-            ?? primary?.geofenceRequired);
 
         raw.clockInAt = primary?.clockInAt ?? null;
         raw.actualClockIn = primary?.actualClockIn ?? null;
@@ -626,15 +682,13 @@ export const fetchTodayStatus = async () => {
         }
       }
     } else {
+      // scheduleId 없음(이상치) → primary 기준
+      geofenceRequired = await resolveFenceRequired(null, primary);
+
       const plannedStart = primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
       const plannedEnd   = primary.registeredClockOut || primary.registeredEndAt   || primary.endAt   || null;
       const aIn = primary.actualClockIn || primary.clockInAt || primary.actualStartAt || null;
       const aOut= primary.actualClockOut || primary.clockOutAt || primary.actualEndAt || null;
-
-      geofenceRequired =
-        !!(primary?.workType?.geofenceRequired
-          ?? primary?.workTypeGeofenceRequired
-          ?? primary?.geofenceRequired);
 
       raw.clockInAt = primary?.clockInAt ?? null;
       raw.actualClockIn = primary?.actualClockIn ?? null;
@@ -686,7 +740,7 @@ export const fetchTodayStatus = async () => {
     leaveTypeName,
     missedCheckout,
     scheduleId,
-    geofenceRequired,
+    geofenceRequired: !!geofenceRequired,
 
     clockInAt: raw.clockInAt,
     actualClockIn: raw.actualClockIn,
@@ -787,6 +841,7 @@ const buildActionPayload = (_scheduleId, geo) => {
   const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
   const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
 
+  // scheduleId는 경로/쿼리로 전달. 바디는 DTO 필드만.
   return Object.fromEntries(Object.entries({
     lat,
     lng,
@@ -797,7 +852,6 @@ const buildActionPayload = (_scheduleId, geo) => {
 
 /* =========================
  * 액션(출근/퇴근/휴게) — 지오펜스 필요 시 프론트 검증 + POST 우선
- * opts: { slackMeters?: number, fallbackFence?: { lat,lng,radius } }
  * ========================= */
 export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   const today = await fetchTodayStatus();
