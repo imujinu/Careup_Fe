@@ -342,21 +342,21 @@ function getEventVariant(ev, now = new Date()) {
   // 2) 계획/기록 기반 휴리스틱 (지각·미퇴근 등)
   const plannedStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
   const plannedEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
-  const actIn  = ev?.actualClockIn || ev?.actualStartAt || null;
-  const actOut = ev?.actualClockOut || ev?.actualEndAt || null;
+  const actIn  = ev?.actualClockIn || ev?.clockInAt  || ev?.actualStartAt || null;
+  const actOut = ev?.actualClockOut || ev?.clockOutAt || ev?.actualEndAt  || null;
 
   const nowMs   = now.getTime();
   const pStartMs= plannedStart ? new Date(plannedStart).getTime() : null;
   const pEndMs  = plannedEnd   ? new Date(plannedEnd).getTime()   : null;
   const aInMs   = actIn        ? new Date(actIn).getTime()        : null;
+  const isTail  = ev?.isOvernight && ev?.part === 'TAIL';
 
   // 계획 종료 지남 + 미출근 → 결근
   if (pEndMs != null && aInMs == null && nowMs > pEndMs) return 'red';
 
   // 지각(기록/무기록 모두)
-  const LATE_THRESHOLD_MIN = 1;
   const lateFromAct = (aInMs != null && pStartMs != null && aInMs >= pStartMs + LATE_THRESHOLD_MIN*60*1000);
-  const lateNoClock = (aInMs == null && pStartMs != null && nowMs >= pStartMs + LATE_THRESHOLD_MIN*60*1000 && !actOut);
+  const lateNoClock = (!isTail) && (aInMs == null && pStartMs != null && nowMs >= pStartMs + LATE_THRESHOLD_MIN*60*1000 && !actOut);
   if (lateFromAct || lateNoClock) return 'orange';
 
   // 진행 중/완료
@@ -396,8 +396,8 @@ function labelParts(ev, variant) {
 
   const planStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
   const planEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
-  const actStart  = ev?.actualClockIn || ev?.actualStartAt || null;
-  const actEnd    = ev?.actualClockOut || ev?.actualEndAt || null;
+  const actStart  = ev?.actualClockIn || ev?.clockInAt  || ev?.actualStartAt || null;
+  const actEnd    = ev?.actualClockOut || ev?.clockOutAt || ev?.actualEndAt  || null;
 
   let baseStart = planStart;
   let baseEnd   = planEnd;
@@ -437,6 +437,7 @@ const dateKeyOf = (ev) =>
   (ev?.registeredDate && toYMD(ev.registeredDate)) ||
   (ev?.startAt && toYMD(ev.startAt)) ||
   (ev?.registeredClockIn && toYMD(ev.registeredClockIn)) ||
+  (ev?.clockInAt && toYMD(ev.clockInAt)) ||
   (ev?.actualClockIn && toYMD(ev.actualClockIn)) ||
   '';
 
@@ -456,7 +457,7 @@ const cellStartMs = (ev) => {
   }
   const s =
     ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt ||
-    ev?.actualClockIn     || ev?.actualStartAt     || null;
+    ev?.actualClockIn     || ev?.clockInAt         || ev?.actualStartAt || null;
   return s ? new Date(s).getTime() : 0;
 };
 
@@ -1119,14 +1120,18 @@ export default function AttendanceCalendar() {
                       title={tooltip}
                       onClick={() => onOpenDetail(sid, { cellDate: eff.cellDate, part: eff.part })}
                     >
-                      <EventCloseBtn
-                        title="스케줄 계획 삭제"
-                        onClick={(e) => { e.stopPropagation(); onAskDeleteSchedule(eff); }}
-                        aria-label="스케줄 계획 삭제"
-                      >
-                        <Icon path={mdiClose} size={0.65} />
-                      </EventCloseBtn>
-
+                      {isManager && (
+                        <EventCloseBtn
+                          title="스케줄 계획 삭제"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAskDeleteSchedule(eff);
+                          }}
+                          aria-label="스케줄 계획 삭제"
+                        >
+                          <Icon path={mdiClose} size={0.65} />
+                        </EventCloseBtn>
+                      )}
                       <EventTitle>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primary}</span>
                         {leave && !!leaveLabel && <TypeChip>{leaveLabel}</TypeChip>}
