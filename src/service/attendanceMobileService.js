@@ -1,3 +1,6 @@
+// =========================================
+// src/service/attendanceMobileService.js
+// =========================================
 // 모바일 출퇴근/휴게 전용 서비스 (전체 교체본)
 // - 기존 로직/함수/시그니처 보존
 // - 지점 지오펜스 로드 + 반경 내 검증(필요 시)
@@ -784,7 +787,6 @@ const buildActionPayload = (_scheduleId, geo) => {
   const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
   const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
 
-  // 경로/쿼리로 scheduleId 전달. 바디는 오직 DTO 필드만.
   return Object.fromEntries(Object.entries({
     lat,
     lng,
