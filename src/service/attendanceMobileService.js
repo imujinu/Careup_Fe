@@ -4,14 +4,19 @@ import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
 
+/* ===== 안정형 BASE_URL (중복/누락 자동 방지) ===== */
 const BASE_URL = (() => {
-  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
-  if (explicit) return explicit;
-  const api = (
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const withBranch = (u) => (u.endsWith('/branch-service') ? u : `${u}/branch-service`);
+
+  const explicit = trim(import.meta.env.VITE_BRANCH_URL);
+  if (explicit) return withBranch(explicit);
+
+  const api = trim(
     import.meta.env.VITE_API_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
-  ).replace(/\/$/, '');
-  return `${api}/branch-service`;
+      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
+  );
+  return withBranch(api);
 })();
 
 const DOW_KR = ['일','월','화','수','목','금','토'];
@@ -792,4 +797,59 @@ export const breakEnd = async (scheduleId, geo) => {
     }
   }
   throw lastErr || new Error('휴게 종료 처리 실패');
+};
+
+/* ===== 지점 지오펜스 조회 유틸 (모바일 홈에서 사용) ===== */
+const unwrap = (res) => {
+  const d = res?.data;
+  if (d && typeof d === 'object' && 'result' in d) return d.result;
+  return d;
+};
+const tryGet = async (url) => {
+  try {
+    const r = await axios.get(url);
+    return unwrap(r);
+  } catch (e) {
+    const st = e?.response?.status;
+    if ([404, 405].includes(Number(st))) return null;
+    throw e;
+  }
+};
+
+/** 내 지점 지오펜스 설정 조회(여러 경로 폴백) */
+export const fetchMyBranchGeofence = async () => {
+  const candidates = [
+    `${BASE_URL}/branch/my/geofence`,
+    `${BASE_URL}/branch/geofence/my`,
+    `${BASE_URL}/branch/my-branch/geofence`,
+    `${BASE_URL}/branch/geofence?scope=me`,
+  ];
+  let raw = null;
+  for (const u of candidates) {
+    raw = await tryGet(u);
+    if (raw) break;
+  }
+  if (!raw) return { lat: null, lng: null, radiusMeters: 0, enabled: false };
+
+  const lat =
+    raw?.lat ?? raw?.latitude ?? raw?.centerLat ?? raw?.branchLat ?? null;
+  const lng =
+    raw?.lng ?? raw?.lon ?? raw?.longitude ?? raw?.centerLng ?? raw?.centerLon ?? raw?.branchLng ?? null;
+  const radius =
+    raw?.radiusMeters ?? raw?.radius ?? raw?.distanceMeters ?? raw?.radiusMeter ?? 0;
+  const enabled =
+    raw?.enabled ?? raw?.geofenceEnabled ?? raw?.isEnabled ?? (raw?.ynEnabled === 'Y') ??
+    (Number(radius) > 0 && Number.isFinite(lat) && Number.isFinite(lng));
+
+  return {
+    lat: Number.isFinite(lat) ? Number(lat) : null,
+    lng: Number.isFinite(lng) ? Number(lng) : null,
+    radiusMeters: Number(radius) || 0,
+    enabled: !!enabled,
+  };
+};
+
+export const isBranchGeofenceConfigured = async () => {
+  const g = await fetchMyBranchGeofence();
+  return !!(g?.enabled && g.radiusMeters > 0 && Number.isFinite(g.lat) && Number.isFinite(g.lng));
 };
