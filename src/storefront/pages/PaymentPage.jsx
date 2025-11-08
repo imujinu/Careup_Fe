@@ -60,13 +60,33 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
   // 주문 생성 시간 확인 및 저장
   useEffect(() => {
     if (actualOrderData?.orderId && !orderCreatedAt) {
+      // orderData에 createdAt이 있으면 우선 사용 (더 빠름)
+      if (actualOrderData?.createdAt) {
+        // UTC 시간을 로컬 시간으로 정확히 변환
+        const utcDate = new Date(actualOrderData.createdAt);
+        setOrderCreatedAt(utcDate.getTime());
+        console.log('📅 orderData에서 createdAt 사용:', {
+          utc: actualOrderData.createdAt,
+          local: utcDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+          timestamp: utcDate.getTime()
+        });
+        return;
+      }
+      
       // 주문 상세 조회하여 생성 시간 확인
       cartService.getOrderDetail(actualOrderData.orderId)
         .then(response => {
           const order = response?.data || response;
           const createdAt = order.createdAt || order.created_at;
           if (createdAt) {
-            setOrderCreatedAt(new Date(createdAt).getTime());
+            // UTC 시간을 로컬 시간으로 정확히 변환
+            const utcDate = new Date(createdAt);
+            setOrderCreatedAt(utcDate.getTime());
+            console.log('📅 주문 상세에서 createdAt 사용:', {
+              utc: createdAt,
+              local: utcDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+              timestamp: utcDate.getTime()
+            });
           }
         })
         .catch(error => {
@@ -75,7 +95,7 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
           setOrderCreatedAt(Date.now());
         });
     }
-  }, [actualOrderData?.orderId, orderCreatedAt]);
+  }, [actualOrderData?.orderId, actualOrderData?.createdAt, orderCreatedAt]);
 
   // 남은 시간 계산 및 표시
   useEffect(() => {
@@ -132,7 +152,14 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
         
         // 주문 생성 시간 업데이트 (처음 한 번만)
         if (!orderCreatedAt && order.createdAt) {
-          setOrderCreatedAt(new Date(order.createdAt).getTime());
+          // UTC 시간을 로컬 시간으로 정확히 변환
+          const utcDate = new Date(order.createdAt);
+          setOrderCreatedAt(utcDate.getTime());
+          console.log('📅 주문 상태 확인에서 createdAt 업데이트:', {
+            utc: order.createdAt,
+            local: utcDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+            timestamp: utcDate.getTime()
+          });
         }
         
         // 주문이 취소된 경우

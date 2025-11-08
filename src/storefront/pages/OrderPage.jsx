@@ -89,7 +89,8 @@ const OrderPage = ({ onBack, onProceedToPayment, currentUser, orderData }) => {
           deliveryType,
           postcode,
           address,
-          addressDetail
+          addressDetail,
+          createdAt: created?.createdAt || new Date().toISOString() // UTC 시간 포함
         });
       }
       

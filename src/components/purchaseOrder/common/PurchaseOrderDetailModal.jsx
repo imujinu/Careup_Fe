@@ -593,7 +593,9 @@ function PurchaseOrderDetailModal({ isOpen, onClose, item }) {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '-';
-      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+      // UTC로 저장된 날짜를 한국 시간(KST)으로 변환하여 표시
+      const kstDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+      return `${kstDate.getFullYear()}.${String(kstDate.getMonth() + 1).padStart(2, '0')}.${String(kstDate.getDate()).padStart(2, '0')}`;
     } catch (e) {
       return '-';
     }

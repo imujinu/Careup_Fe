@@ -510,7 +510,12 @@ function OrderManagement() {
                   <TableCell>
                     <StatusBadge $status={order.status}>{getStatusText(order.status)}</StatusBadge>
                   </TableCell>
-                  <TableCell>{new Date(order.createdAt).toLocaleString('ko-KR')}</TableCell>
+                  <TableCell>
+                    {order.createdAt 
+                      ? new Date(order.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+                      : '-'
+                    }
+                  </TableCell>
                   <TableCell>
                     <ActionButton onClick={() => handleOpenDetail(order)}>상세</ActionButton>
                     {order.status === 'PENDING' && isBranchOfficeOrder(order) && (

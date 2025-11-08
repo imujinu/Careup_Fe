@@ -295,7 +295,8 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
         items,
         branchId: selectedBranchId,
         selectedBranches,
-        availableBranches
+        availableBranches,
+        createdAt: created?.createdAt || new Date().toISOString() // UTC 시간 포함
       };
 
       if (onProceedToOrder) {
