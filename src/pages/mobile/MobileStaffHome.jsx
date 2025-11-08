@@ -30,8 +30,7 @@ import { useToast } from '../../components/common/Toast';
 import { useAppSelector } from '../../stores/hooks';
 import { tokenStorage, authService } from '../../service/authService';
 import { MobileScheduleDetailModal } from '../../components/mobile/MobileScheduleDetailModal';
-import { fetchMyBranchGeofence, isBranchGeofenceConfigured } from '../../service/branchGeolocationService';
-
+import { fetchMyBranchGeofence } from '../../service/branchGeolocationService'; // ★ 단일 소스
 import { useGeofence } from '../../hooks/useGeofence';
 import { formatMeters } from '../../utils/geo';
 
@@ -111,7 +110,7 @@ const TitleRow = styled.div`
 `;
 const WeekViewport = styled.div`
   overflow-x: auto; overflow-y: hidden;
-  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch; overscroll-beavior-x: contain;
   padding-bottom: 2px; scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
@@ -422,14 +421,10 @@ function allowClockOutLocal(today) {
   if (st === 'MISSED_CHECKOUT') return true;
   return false;
 }
-function allowBreakStartLocal(today) {
-  return allowBreakStartClient(today);
-}
-function allowBreakEndLocal(today) {
-  return allowBreakEndClient(today);
-}
+function allowBreakStartLocal(today) { return allowBreakStartClient(today); }
+function allowBreakEndLocal(today)   { return allowBreakEndClient(today); }
 
-/* 라벨/동작 결정: 퇴근 의도 상태면 라벨은 유지하되 비활성화 가능 */
+/* 라벨/동작 결정 */
 function decideAction(today, loading) {
   const st = pickStatus(today);
   const inNow = hasIn(today) && !hasOut(today);
@@ -465,18 +460,9 @@ function isDayEmptyForModal(o) {
 }
 
 /* 게이지 유틸 */
-function minutesToPct(mins, targetHours) {
-  return pctOf(Number(mins || 0), Number(targetHours || 1));
-}
-function weeklyGaugeColor(totalMinutes) {
-  const hours = Number(totalMinutes || 0) / 60;
-  return (hours < 30 || hours > 40) ? '#f59e0b' : '#10b981';
-}
-function avgGaugeColor(avgMinutesPerDay) {
-  const hours = Number(avgMinutesPerDay || 0) / 60;
-  if (hours >= 7 && hours <= 8) return '#10b981';
-  return '#f59e0b';
-}
+function minutesToPct(mins, targetHours) { return pctOf(Number(mins || 0), Number(targetHours || 1)); }
+function weeklyGaugeColor(totalMinutes) { const h = Number(totalMinutes || 0) / 60; return (h < 30 || h > 40) ? '#f59e0b' : '#10b981'; }
+function avgGaugeColor(avgMinutesPerDay) { const h = Number(avgMinutesPerDay || 0) / 60; return (h >= 7 && h <= 8) ? '#10b981' : '#f59e0b'; }
 
 /* 이니셜 */
 function initials(name = '') {
@@ -584,7 +570,8 @@ export default function MobileStaffHome() {
       setMetrics(met || null);
       setBranchGeoApi(geo || null);
     } catch {
-      addToast('근무 데이터를 불러오지 못했습니다.', { color: 'error' });
+      // 사용자에게 노이즈를 줄이기 위해 메시지 단순화
+      // 상세 원인은 서버 로그에서 확인
       setToday(null);
       setWeekDays([]);
       setMetrics(null);
@@ -592,7 +579,7 @@ export default function MobileStaffHome() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, hydrateWeekDaysWithServer]);
+  }, [hydrateWeekDaysWithServer]);
 
   useEffect(() => { loadAll(weekAnchor); }, [loadAll, weekAnchor]);
 
@@ -611,7 +598,7 @@ export default function MobileStaffHome() {
   const branchGeo = useMemo(() => {
     const apiLat = Number(branchGeoApi?.lat);
     const apiLng = Number(branchGeoApi?.lng);
-    const apiRad = Number(branchGeoApi?.radius);
+    const apiRad = Number(branchGeoApi?.radius ?? branchGeoApi?.radiusMeters);
 
     const tLat = Number(pick(safeToday, ['branchLat', 'branchLatitude', 'latitude']));
     const tLng = Number(pick(safeToday, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon']));
@@ -636,14 +623,17 @@ export default function MobileStaffHome() {
       acceptStaleMs: 180000,
     });
 
-  const branchReady = isBranchGeofenceConfigured(branchGeo);
+  const branchReady = !!(Number.isFinite(branchGeo?.lat) &&
+                        Number.isFinite(branchGeo?.lng) &&
+                        Number.isFinite(branchGeo?.radius) &&
+                        branchGeo.radius > 0);
   const geoReady = !!(coords?.lat && coords?.lng);
   const geoBlocked = permission === 'denied';
   const geoTimedOut = !!timedOut && !geoBlocked;
 
   const requireGeo = safeToday?.geofenceRequired === true;
 
-  /* ★ 수정: 지오펜스 필수 + 지점 미설정 시 비활성화 */
+  /* 지오펜스 필수 + 지점 미설정/권한거부/반경 밖 → 비활성화 */
   const geoDisabled = requireGeo
     ? (!branchReady || geoBlocked || (!geoTimedOut && (!geoReady || !inside)))
     : false;
@@ -654,7 +644,6 @@ export default function MobileStaffHome() {
   const canBreakStart = allowBreakStartLocal(safeToday) && !geoDisabled && !loading;
   const canBreakEnd   = allowBreakEndLocal(safeToday)   && !geoDisabled && !loading;
 
-  /* 휴게 미종료 판단: ON_BREAK 상태이거나 시작만 있고 종료 없으면 true */
   const hasOpenBreak = useMemo(() => {
     const st = pickStatus(safeToday);
     const brStart = pick(safeToday, ['breakStartAt','registeredBreakStart']);
@@ -664,15 +653,12 @@ export default function MobileStaffHome() {
 
   const doClockOut = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { return; }
     try {
       await clockOut(sid, coords);
-      addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      const msg = e?.response?.data?.message || '퇴근 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
-      if (String(msg).includes('시각을 직접 지정')) {
+      if (String(e?.response?.data?.message || '').includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
       }
@@ -680,26 +666,26 @@ export default function MobileStaffHome() {
   };
   const doClockIn = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { return; }
+    if (safeToday?.geofenceRequired && !(Number.isFinite(coords?.lat) || Number.isFinite(coords?.latitude))) {
+      return;
+    }
     try {
       await clockIn(sid, coords);
-      addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
-    } catch (e) {
-      addToast(e?.response?.data?.message || '출근 처리에 실패했습니다.', { color:'error' });
-    }
+    } catch {}
   };
   const doBreakStart = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { return; }
+    if (safeToday?.geofenceRequired && !(Number.isFinite(coords?.lat) || Number.isFinite(coords?.latitude))) {
+      return;
+    }
     try {
       await breakStart(sid, coords);
-      addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      const msg = e?.response?.data?.message || '휴게 시작 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
-      if (String(msg).includes('시각을 직접 지정')) {
+      if (String(e?.response?.data?.message || '').includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
       }
@@ -707,15 +693,15 @@ export default function MobileStaffHome() {
   };
   const doBreakEnd = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { return; }
+    if (safeToday?.geofenceRequired && !(Number.isFinite(coords?.lat) || Number.isFinite(coords?.latitude))) {
+      return;
+    }
     try {
       await breakEnd(sid, coords);
-      addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      const msg = e?.response?.data?.message || '휴게 종료 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
-      if (String(msg).includes('시각을 직접 지정')) {
+      if (String(e?.response?.data?.message || '').includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
       }
@@ -724,10 +710,7 @@ export default function MobileStaffHome() {
 
   const actionOnClick = next.onClickName === 'out'
     ? async () => {
-        if (hasOpenBreak) {
-          addToast('휴게를 종료하신 후 퇴근할 수 있습니다.', { color: 'warning' });
-          return;
-        }
+        if (hasOpenBreak) return;
         await doClockOut();
       }
     : doClockIn;
@@ -755,7 +738,6 @@ export default function MobileStaffHome() {
     try { await authService?.logout?.(); } catch {}
     try { tokenStorage?.clear?.(); } catch {}
     try { localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); } catch {}
-    /* ★ 수정: 절대경로 상대 리다이렉트로 단순화 */
     window.location.assign('/m/login');
   };
 
@@ -769,14 +751,13 @@ export default function MobileStaffHome() {
     if (!requireGeo) return '위치 인증이 필요하지 않습니다';
     if (!branchReady) return '지점 위치 정보 없음';
     if (geoBlocked) return '위치 권한이 거부되었습니다';
-    if (geoTimedOut) return '위치 확인이 지연됩니다(타임아웃) · 새로고침 또는 위치 서비스 확인';
+    if (geoTimedOut) return '위치 확인이 지연됩니다(타임아웃)';
     if (!geoReady) return '현재 위치 확인중…';
     return inside
       ? `현재 지점까지 ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`
       : `반경 밖입니다: ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`;
   }, [requireGeo, branchReady, geoBlocked, geoTimedOut, geoReady, inside, distance, branchGeo]);
 
-  /* ★ 수정: 지점 미설정인 경우 OK 아님(경고 스타일) */
   const geoOk = requireGeo
     ? (branchReady ? ((geoReady && inside && !geoBlocked) || geoTimedOut) : false)
     : true;
@@ -859,7 +840,7 @@ export default function MobileStaffHome() {
               <SingleBtnRow>
                 <ActionBtn
                   $variant={next.variant}
-                  onClick={actionOnClick}
+                  onClick={next.onClickName === 'out' ? doClockOut : doClockIn}
                   disabled={finalDisabled}
                   aria-disabled={finalDisabled}
                 >

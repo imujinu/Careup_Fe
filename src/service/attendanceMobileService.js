@@ -3,6 +3,7 @@ import axios from '../utils/axiosConfig';
 import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
+import * as geoSvc from './branchGeolocationService'; // ★ 단일 소스 통일
 
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
@@ -113,20 +114,11 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
       .flatMap(splitForCalendar)
       .filter((p) => {
         const keySource =
-          p.cellDate ||
-          p.date ||
-          p.startAt ||
-          p.registeredClockIn ||
-          p.actualClockIn ||
-          p.clockInAt ||
-          p.registeredStartAt ||
-          p.actualStartAt ||
-          p.endAt ||
-          p.clockOutAt ||
-          p.actualClockOut ||
-          p.registeredClockOut ||
-          p.registeredEndAt ||
-          p.actualEndAt;
+          p.cellDate || p.date ||
+          p.startAt || p.registeredClockIn || p.actualClockIn || p.clockInAt ||
+          p.registeredStartAt || p.actualStartAt ||
+          p.endAt || p.clockOutAt || p.actualClockOut ||
+          p.registeredClockOut || p.registeredEndAt || p.actualEndAt;
         return keySource && toYMD(keySource) === ymd;
       });
 
@@ -341,20 +333,11 @@ export const fetchTodayStatus = async () => {
   const list = await fetchScheduleCalendar({ from: ymd, to: ymd, employeeId });
   const pieces = (Array.isArray(list) ? list : []).flatMap(splitForCalendar).filter((p) => {
     const keySource =
-      p.cellDate ||
-      p.date ||
-      p.startAt ||
-      p.registeredClockIn ||
-      p.actualClockIn ||
-      p.clockInAt ||
-      p.registeredStartAt ||
-      p.actualStartAt ||
-      p.endAt ||
-      p.clockOutAt ||
-      p.actualClockOut ||
-      p.registeredClockOut ||
-      p.registeredEndAt ||
-      p.actualEndAt;
+      p.cellDate || p.date ||
+      p.startAt || p.registeredClockIn || p.actualClockIn || p.clockInAt ||
+      p.registeredStartAt || p.actualStartAt ||
+      p.endAt || p.clockOutAt || p.actualClockOut ||
+      p.registeredClockOut || p.registeredEndAt || p.actualEndAt;
     return keySource && toYMD(keySource) === ymd;
   });
 
@@ -413,10 +396,13 @@ export const fetchTodayStatus = async () => {
       try {
         const detail = await getScheduleDetail(sid);
 
-        geofenceRequired =
-          !!(detail?.workType?.geofenceRequired
-            ?? detail?.workTypeGeofenceRequired
-            ?? detail?.geofenceRequired);
+        geofenceRequired = !!(
+          detail?.workType?.geofenceRequired ??
+          detail?.workType?.requiresGeofence ??
+          detail?.workTypeGeofenceRequired ??
+          detail?.requiresGeofence ??
+          detail?.geofenceRequired
+        );
 
         const plannedStart =
           detail?.registeredClockIn || detail?.registeredStartAt || detail?.startAt ||
@@ -677,14 +663,16 @@ const normalizeId = (v) => String(v ?? '').split(':')[0];
 const shouldTryNext = (status) => [404, 405, 415].includes(Number(status));
 
 const buildActionPayload = (_scheduleId, geo) => {
-  const lat = Number.isFinite(geo?.lat) ? geo.lat : undefined;
-  const lng = Number.isFinite(geo?.lng) ? geo.lng
-           : Number.isFinite(geo?.lon) ? geo.lon : undefined;
-  const at  = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
-  const accuracyMeters = Number.isFinite(geo?.accuracyMeters) ? geo.accuracyMeters : undefined;
-
+  const pickNum = (...cands) => {
+    for (const v of cands) if (Number.isFinite(v)) return v;
+    return undefined;
+  };
+  const lat = pickNum(geo?.lat, geo?.latitude);
+  const lng = pickNum(geo?.lng, geo?.lon, geo?.longitude);
+  const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
+  const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
   const payload = { lat, lng, at, accuracyMeters };
-  return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+  return Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined));
 };
 
 export const clockIn = async (scheduleId, geo) => {
@@ -783,55 +771,6 @@ export const breakEnd = async (scheduleId, geo) => {
   throw lastErr || new Error('휴게 종료 처리 실패');
 };
 
-const unwrap = (res) => {
-  const d = res?.data;
-  if (d && typeof d === 'object' && 'result' in d) return d.result;
-  return d;
-};
-const tryGet = async (url) => {
-  try {
-    const r = await axios.get(url);
-    return unwrap(r);
-  } catch (e) {
-    const st = e?.response?.status;
-    if ([404, 405].includes(Number(st))) return null;
-    throw e;
-  }
-};
-
-export const fetchMyBranchGeofence = async () => {
-  const candidates = [
-    `${BASE_URL}/branch/my/geofence`,
-    `${BASE_URL}/branch/geofence/my`,
-    `${BASE_URL}/branch/my-branch/geofence`,
-    `${BASE_URL}/branch/geofence?scope=me`,
-  ];
-  let raw = null;
-  for (const u of candidates) {
-    raw = await tryGet(u);
-    if (raw) break;
-  }
-  if (!raw) return { lat: null, lng: null, radiusMeters: 0, enabled: false };
-
-  const lat =
-    raw?.lat ?? raw?.latitude ?? raw?.centerLat ?? raw?.branchLat ?? null;
-  const lng =
-    raw?.lng ?? raw?.lon ?? raw?.longitude ?? raw?.centerLng ?? raw?.centerLon ?? raw?.branchLng ?? null;
-  const radius =
-    raw?.radiusMeters ?? raw?.radius ?? raw?.distanceMeters ?? raw?.radiusMeter ?? 0;
-  const enabled =
-    raw?.enabled ?? raw?.geofenceEnabled ?? raw?.isEnabled ?? (raw?.ynEnabled === 'Y') ??
-    (Number(radius) > 0 && Number.isFinite(lat) && Number.isFinite(lng));
-
-  return {
-    lat: Number.isFinite(lat) ? Number(lat) : null,
-    lng: Number.isFinite(lng) ? Number(lng) : null,
-    radiusMeters: Number(radius) || 0,
-    enabled: !!enabled,
-  };
-};
-
-export const isBranchGeofenceConfigured = async () => {
-  const g = await fetchMyBranchGeofence();
-  return !!(g?.enabled && g.radiusMeters > 0 && Number.isFinite(g.lat) && Number.isFinite(g.lng));
-};
+/* ---- 지오펜스 함수는 단일 소스(geoSvc) 래핑 재수출: 기존 import 호환 ---- */
+export const fetchMyBranchGeofence = geoSvc.fetchMyBranchGeofence;
+export const isBranchGeofenceConfigured = geoSvc.isBranchGeofenceConfigured;
