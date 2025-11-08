@@ -284,19 +284,34 @@ const fmtHMlocal = (isoLike) => {
   const mm = String(t.getMinutes()).padStart(2, '0');
   return `${hh}:${mm}`;
 };
-const toBool = (v) => v === true || v === 'true' || v === 1 || v === '1';
+const toBool = (v) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (s === 'y' || s === 'yes' || s === 'true' || s === '1' || s === 't') return true;
+    if (s === 'n' || s === 'no' || s === 'false' || s === '0' || s === 'f') return false;
+  }
+  return false;
+};
 const resolveGeofenceRequired = (o) => {
   if (!o) return false;
   const cands = [
     o.geofenceRequired,
+    o.geofenceRequiredYn,
     o.workTypeGeofenceRequired,
+    o.workTypeGeofenceRequiredYn,
     o.gpsRequired,
     o.gpsApply,
     o.requireGeofence,
     o.workType?.geofenceRequired,
+    o.workType?.geofenceRequiredYn,
     o.type?.geofenceRequired,
+    o.type?.geofenceRequiredYn,
   ];
-  for (const v of cands) if (v !== undefined && v !== null && v !== '') return toBool(v);
+  for (const v of cands) {
+    if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
+  }
   return false;
 };
 const toTimeMs = (v) => (v instanceof Date ? v.getTime() : (v ? new Date(v).getTime() : NaN));
