@@ -1,4 +1,3 @@
-// src/pages/mobile/MobileStaffHome.jsx
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import careUpLogo from '../../assets/logos/care-up_logo.svg';
