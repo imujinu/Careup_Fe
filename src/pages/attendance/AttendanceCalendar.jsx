@@ -764,7 +764,8 @@ export default function AttendanceCalendar() {
     return (filteredEvents || []).flatMap(splitForCalendar);
   }, [filteredEvents]);
 
-  const pairStatusById = useMemo(() => {
+  // ▼ 쌍(HEAD/TAIL) 가시 상태(variant) 동기화: 현재 시각 기준으로 두 조각 중 더 강한 색을 채택
+  const pairVariantById = useMemo(() => {
     const groups = {};
     for (const ev of displayEvents || []) {
       if (!(ev?.isOvernight && (ev?.part === 'HEAD' || ev?.part === 'TAIL'))) continue;
@@ -773,16 +774,17 @@ export default function AttendanceCalendar() {
       if (!groups[nid]) groups[nid] = [];
       groups[nid].push(ev);
     }
+    const VAR_PRI = { red: 100, orange: 80, green: 50, blue: 10, purple: 5 };
     const out = {};
     Object.entries(groups).forEach(([nid, list]) => {
-      let chosen = null;
+      let chosenVar = null;
       let best = -1;
       for (const ev of list) {
-        const st = String(ev?.attendanceStatus || ev?.status || '').toUpperCase();
-        const pri = STATUS_PRIORITY[st] ?? -1;
-        if (pri > best) { best = pri; chosen = st; }
+        const v = getEventVariant(ev, new Date());
+        const pri = VAR_PRI[v] ?? -1;
+        if (pri > best) { best = pri; chosenVar = v; }
       }
-      if (chosen) out[nid] = chosen;
+      if (chosenVar) out[nid] = chosenVar;
     });
     return out;
   }, [displayEvents]);
@@ -911,24 +913,22 @@ export default function AttendanceCalendar() {
   const onAskDeleteSchedule = useCallback((ev) => {
     const eff = withOverride(ev);
     const nid = normalizeIdLocal(resolveId(eff));
-    const pairSt = (eff?.isOvernight && (eff?.part === 'HEAD' || eff?.part === 'TAIL'))
-      ? pairStatusById[nid]
+    const pairVar = (eff?.isOvernight && (eff?.part === 'HEAD' || eff?.part === 'TAIL'))
+      ? pairVariantById[nid]
       : null;
-    const effUnified = pairSt ? { ...eff, attendanceStatus: pairSt, status: pairSt } : eff;
+    const effUnified = eff;
 
     const sid = normalizeIdLocal(resolveId(effUnified));
     const ymd = dateKeyOf(effUnified);
 
-    const variant = pairSt
-      ? (STATUS_TO_VARIANT[pairSt] || 'blue')
-      : getEventVariant(effUnified, new Date());
+    const variant = pairVar || getEventVariant(effUnified, new Date());
 
     const { primary, subtitle, leave, leaveLabel } = labelParts(effUnified, variant);
     const title = leave && leaveLabel ? `${primary} [${leaveLabel}]` : primary;
 
     setDeleteTarget({ id: sid, ymd, title, subtitle });
     setDeleteAskOpen(true);
-  }, [withOverride, pairStatusById]);
+  }, [withOverride, pairVariantById]);
 
   const onDoDeleteSchedule = useCallback(async () => {
     if (!deleteTarget?.id) return;
@@ -1129,14 +1129,12 @@ export default function AttendanceCalendar() {
                   const eff = withOverride(ev);
 
                   const nid = normalizeIdLocal(resolveId(eff));
-                  const pairSt = (eff?.isOvernight && (eff?.part === 'HEAD' || eff?.part === 'TAIL'))
-                    ? pairStatusById[nid]
+                  const pairVar = (eff?.isOvernight && (eff?.part === 'HEAD' || eff?.part === 'TAIL'))
+                    ? pairVariantById[nid]
                     : null;
-                  const effUnified = pairSt ? { ...eff, attendanceStatus: pairSt, status: pairSt } : eff;
+                  const effUnified = eff;
 
-                  const variant = pairSt
-                    ? (STATUS_TO_VARIANT[pairSt] || 'blue')
-                    : getEventVariant(effUnified, new Date());
+                  const variant = pairVar || getEventVariant(effUnified, new Date());
 
                   const { primary, subtitle, leave, leaveLabel } = labelParts(effUnified, variant);
 
