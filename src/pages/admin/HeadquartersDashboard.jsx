@@ -506,7 +506,7 @@ const HeadquartersDashboard = () => {
   return (
     <DashboardContainer>
       <DashboardHeader>
-        <Title>한솥도시락 대시보드에 오신 것을 환영합니다.</Title>
+        <Title>Shark 대시보드에 오신 것을 환영합니다.</Title>
       </DashboardHeader>
 
       {/* KPI Cards */}
