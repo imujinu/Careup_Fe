@@ -1,13 +1,12 @@
-// src/service/branchGeolocationService.js
 import axios from '../utils/axiosConfig';
 
 const BASE_URL = (() => {
-  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
-  if (explicit) return explicit;
-  const api = (
-    import.meta.env.VITE_API_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
-  ).replace(/\/$/, '');
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const explicit = trim(import.meta.env.VITE_BRANCH_URL);
+  if (explicit) return explicit; // e.g. https://server.careup.store/branch-service
+  const api =
+    trim(import.meta.env.VITE_API_URL) ||
+    (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
   return `${api}/branch-service`;
 })();
 
@@ -150,14 +149,26 @@ export class ForbiddenError extends Error {
 
 export async function fetchMyBranchGeofence() {
   try {
-    // ★ 단일화: 서버가 제공하는 "내 지점" 상세에서 좌표/반경을 추출한다.
+    // 1차: /branch/my
     const res = await axios.get(`${BASE_URL}/branch/my`);
     const dto = unwrap(res) || {};
-    return mapBranchGeo(dto);
+    const mapped = mapBranchGeo(dto);
+    if (isBranchGeofenceConfigured(mapped)) return mapped;
+    // 좌표 미포함이면 후속 폴백 시도
   } catch (e) {
     const status = e?.response?.status;
     if (status === 403) throw new ForbiddenError(e?.response?.data?.status_message || '권한이 없습니다.');
-    throw e;
+    // 404/405/500 등은 폴백 시도
+  }
+  try {
+    // 2차 폴백: /branch/my/geofence (과거/다른 버전 호환)
+    const res2 = await axios.get(`${BASE_URL}/branch/my/geofence`);
+    const dto2 = unwrap(res2) || {};
+    return mapBranchGeo(dto2);
+  } catch (e2) {
+    const status2 = e2?.response?.status;
+    if (status2 === 403) throw new ForbiddenError(e2?.response?.data?.status_message || '권한이 없습니다.');
+    throw e2;
   }
 }
 

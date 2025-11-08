@@ -1,5 +1,4 @@
-// src/App.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -135,40 +134,28 @@ function SSEConnectionManager() {
   useEffect(() => {
     // 인증된 상태일 때 알림 목록 조회 및 SSE 연결
     if (isAuthenticated) {
-      // 새로고침마다 기존 연결을 끊고 다시 연결
       const initializeConnection = async () => {
-        // 1. 기존 SSE 연결 해제
         await sseService.disconnect();
-        // 2. 알림 목록 조회
         store.dispatch(fetchNotificationList());
-        // 3. SSE 재연결 (connect 내부에서도 기존 연결을 끊지만 명시적으로 disconnect 후 연결)
         sseService.connect();
       };
-
-      // 로그인 성공 시 또는 새로고침 시마다 실행
-      // 새로고침 시 컴포넌트가 재마운트되므로 항상 실행됨
       initializeConnection();
     } else if (!isAuthenticated && prevAuthenticated.current) {
-      // 로그아웃 시 SSE 해제
       sseService.disconnect();
     }
-    
+
     prevAuthenticated.current = isAuthenticated;
-    
-    // 컴포넌트 언마운트 시 cleanup
+
     return () => {
       if (isAuthenticated) {
-        // 언마운트 시에는 disconnect만 (새로고침으로 재마운트될 때 다시 연결됨)
         sseService.disconnect();
       }
     };
   }, [isAuthenticated]);
 
   useEffect(() => {
-    // 페이지를 나갈 때 SSE 해제
     const handleBeforeUnload = () => {
       if (isAuthenticated) {
-        // beforeunload에서는 동기 방식으로 요청 전송
         sseService.disconnectSync();
       }
     };
@@ -177,7 +164,6 @@ function SSEConnectionManager() {
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      // 컴포넌트 언마운트 시에도 SSE 해제 (로그아웃 상태일 수도 있지만 안전하게)
       if (isAuthenticated) {
         sseService.disconnect();
       }
@@ -189,7 +175,7 @@ function SSEConnectionManager() {
 
 export default function App() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, userType } = useAppSelector((state) => state.auth);
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { isOpen: showChatBot } = useAppSelector((state) => state.chatbot);
 
   // 챗봇 표시 여부 확인: role이 BRANCH_ADMIN, FRANCHISE_OWNER, STAFF 중 하나일 때만 표시
@@ -250,14 +236,18 @@ export default function App() {
           {/* 중요: /auth/find-id 는 보호 라우트보다 먼저 리다이렉트 처리 */}
           <Route path="/auth/find-id" element={<Navigate to="/customer/find-id" replace />} />
 
+          {/* === 직원 근태용 모바일 섹션 (⭐ catch-all보다 위에 둔다) === */}
+          <Route path="/m/login" element={<MobileLogin />} />
+          <Route path="/m" element={<MobileStaffHome />} />
+          <Route path="/m/find-id" element={<MobileFindEmployeeId />} />
+          <Route path="/m/password/forgot" element={<MobilePasswordResetRequest />} />
+
           {/* 직원 포털: 인증 필요 */}
           <Route element={<ProtectedRoute />}>
-            {/* 동적 라우트 전체 */}
             {allPaths.map((path) => (
               <Route key={path} path={path} element={getRouteElement(path)} />
             ))}
-
-            {/* ★ 마이페이지: StaffCreate 재사용 (헤더에서 /my로 이동) */}
+            {/* ★ 마이페이지: StaffCreate 재사용 */}
             <Route path="/my" element={<StaffCreate />} />
           </Route>
 
@@ -280,12 +270,6 @@ export default function App() {
           {/* 루트/기타 → 쇼핑 홈 */}
           <Route path="/" element={<Navigate to="/shop" replace />} />
           <Route path="*" element={<Navigate to="/shop" replace />} />
-
-          {/* 직원 근태용 모바일 로그인 */}
-          <Route path="/m/login" element={<MobileLogin />} />
-          <Route path="/m" element={<MobileStaffHome />} />
-          <Route path="/m/find-id" element={<MobileFindEmployeeId />} />
-          <Route path="/m/password/forgot" element={<MobilePasswordResetRequest />} />
         </Routes>
 
         {/* 챗봇 */}
@@ -296,7 +280,6 @@ export default function App() {
             onClick={() => {
               const { isOpen: isChatbotOpen } = store.getState().chatbot;
               if (!isChatbotOpen) {
-                // 챗봇을 열 때 알림창 닫기
                 dispatch(closeAlerts());
               }
               dispatch(toggleChatbot());
