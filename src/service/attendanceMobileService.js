@@ -113,7 +113,7 @@ const minutesOverlapOnDay = (as, ae, ymd) => {
 };
 
 /* =========================
- * 지오펜스 계산/검증(신규 추가, import 변경 없음)
+ * 지오펜스 계산/검증
  * ========================= */
 const haversineMeters = (lat1, lng1, lat2, lng2) => {
   const R = 6371000;
@@ -146,24 +146,39 @@ const getCurrentCoords = (opts = { enableHighAccuracy: true, timeout: 15000, max
     );
   });
 
-const ensureFenceOk = async (geofenceRequired, geo, slackMeters = 0) => {
+const isValidFence = (f) =>
+  f && Number.isFinite(Number(f.lat)) && Number.isFinite(Number(f.lng)) && Number.isFinite(Number(f.radius)) && Number(f.radius) > 0;
+
+const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fallbackFence: null }) => {
+  const cfg = typeof opts === 'number' ? { slackMeters: opts } : (opts || {});
+  const slack = Number(cfg.slackMeters || 0);
+
   if (!geofenceRequired) {
     return { ok: true, geo: geo ?? null, distance: null, radius: null, required: false };
   }
 
-  const raw = await fetchBranchGeoNew();
+  let raw = await fetchBranchGeoNew().catch(() => null);
+
   if (!raw || !isBranchGeoConfigured(raw)) {
-    throw new Error('지점 지오펜스가 설정되어 있지 않습니다.');
+    if (isValidFence(cfg.fallbackFence || {})) {
+      raw = {
+        lat: Number(cfg.fallbackFence.lat),
+        lng: Number(cfg.fallbackFence.lng),
+        radius: Number(cfg.fallbackFence.radius),
+      };
+    } else {
+      throw new Error('지점 지오펜스가 설정되어 있지 않습니다.');
+    }
   }
 
   const fenceLat = Number(raw.lat ?? raw.latitude ?? NaN);
   const fenceLng = Number(raw.lng ?? raw.longitude ?? raw.lon ?? NaN);
   const radius =
-    Number(raw.radius ?? raw.radiusMeters ?? 0) + Number(Number(slackMeters || 0).toFixed(0));
+    Number(raw.radius ?? raw.radiusMeters ?? 0) + Number(slack.toFixed(0));
 
   if (!Number.isFinite(fenceLat) || !Number.isFinite(fenceLng) || !(radius > 0)) {
     throw new Error('지점 지오펜스 데이터가 올바르지 않습니다.');
-    }
+  }
 
   const coord = geo ?? (await getCurrentCoords());
   if (!coord || !Number.isFinite(coord.lat) || !Number.isFinite(coord.lng)) {
@@ -724,6 +739,7 @@ const allowClockOut = (obj) => {
   return false;
 };
 
+// 클라이언트 휴게 허용 로직(프론트 기준)
 export const allowBreakStartClient = (obj) => {
   if (!obj) return false;
   const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
@@ -746,18 +762,19 @@ export const allowBreakEndClient = (obj) => {
 const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const postJson = (url, data = {}) => {
   const key = idemp();
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
   if (import.meta.env.VITE_IDEMPOTENCY_HEADER === 'true') {
     headers['X-Idempotency-Key'] = key;
   }
   return axios
-    .post(url, { ...data, idempotencyKey: key }, { headers })
+    .post(url, data, { headers })
     .then((r) => (r?.data?.result ?? r?.data ?? null));
 };
 
 const normalizeId = (v) => String(v ?? '').split(':')[0];
 const shouldTryNext = (status) => [404, 405, 415].includes(Number(status));
 
+// 서버 DTO(AttendanceActionRequest)와 정확히 일치하는 바디 구성
 const buildActionPayload = (_scheduleId, geo) => {
   const pickNum = (...cands) => {
     for (const v of cands) if (Number.isFinite(v)) return v;
@@ -767,12 +784,19 @@ const buildActionPayload = (_scheduleId, geo) => {
   const lng = pickNum(geo?.lng, geo?.lon, geo?.longitude);
   const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
   const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
-  const payload = { lat, lng, at, accuracyMeters };
-  return Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined));
+
+  // 경로/쿼리로 scheduleId 전달. 바디는 오직 DTO 필드만.
+  return Object.fromEntries(Object.entries({
+    lat,
+    lng,
+    accuracyMeters,
+    at,
+  }).filter(([,v]) => v !== undefined));
 };
 
 /* =========================
  * 액션(출근/퇴근/휴게) — 지오펜스 필요 시 프론트 검증 + POST 우선
+ * opts: { slackMeters?: number, fallbackFence?: { lat,lng,radius } }
  * ========================= */
 export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   const today = await fetchTodayStatus();
@@ -780,7 +804,7 @@ export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
   const id = normalizeId(id0);
 
-  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts.slackMeters);
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
   const body = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
@@ -807,7 +831,7 @@ export const clockOut = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
   const id = normalizeId(id0);
 
-  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts.slackMeters);
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
   const body = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
@@ -834,7 +858,7 @@ export const breakStart = async (scheduleId, geo, opts = { slackMeters: 0 }) => 
   if (!id0) throw new Error('오늘 스케줄이 없습니다.');
   const id = normalizeId(id0);
 
-  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts.slackMeters);
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
   const body = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
@@ -861,7 +885,7 @@ export const breakEnd = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   if (!id0) throw new Error('오늘 스케줄이 없습니다.');
   const id = normalizeId(id0);
 
-  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts.slackMeters);
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
   const body = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
@@ -883,23 +907,7 @@ export const breakEnd = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
 };
 /* ========================= */
 
-const unwrap = (res) => {
-  const d = res?.data;
-  if (d && typeof d === 'object' && 'result' in d) return d.result;
-  return d;
-};
-const tryGet = async (url) => {
-  try {
-    const r = await axios.get(url);
-    return unwrap(r);
-  } catch (e) {
-    const st = e?.response?.status;
-    if ([404, 405].includes(Number(st))) return null;
-    throw e;
-  }
-};
-
-// ▼▼▼ 여기부터 '과거 호환' 래퍼: 더 이상 잘못된 엔드포인트로 호출하지 않음 ▼▼▼
+// 과거 호환 래퍼
 export const fetchMyBranchGeofence = async () => {
   const raw = await fetchBranchGeoNew().catch(() => null);
   if (!raw) return { lat: null, lng: null, radiusMeters: 0, radius: 0, enabled: false };
@@ -926,7 +934,6 @@ export const isBranchGeofenceConfigured = async () => {
   const g = await fetchBranchGeoNew().catch(() => null);
   return isBranchGeoConfigured(g || null);
 };
-// ▲▲▲ 래퍼 끝 ▲▲▲
 
 export default {
   fetchWeekSummary,

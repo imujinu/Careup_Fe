@@ -31,14 +31,13 @@ import { useAppSelector } from '../../stores/hooks';
 import { tokenStorage, authService } from '../../service/authService';
 import { MobileScheduleDetailModal } from '../../components/mobile/MobileScheduleDetailModal';
 
-// ★ 지오펜스는 전용 서비스만 사용(과거 충돌 방지)
+// 지오펜스는 전용 서비스 사용
 import { fetchMyBranchGeofence } from '../../service/branchGeolocationService';
 
 import { useGeofence } from '../../hooks/useGeofence';
 import { formatMeters } from '../../utils/geo';
 
 const LATE_THRESHOLD_MIN = 1;
-// 환경변수로 지오펜스 여유 반경 조정 (기본 0m)
 const GEOFENCE_SLACK = Number(import.meta.env.VITE_GEOFENCE_SLACK_METERS ?? 0);
 
 const Screen = styled.div`
@@ -206,8 +205,7 @@ const DayBox = styled.button`
 
 const BarWrap = styled.div`margin-top: 14px;`;
 const BarRail = styled.div`
-  position: relative;
-  height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden;
+  position: relative; height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden;
 `;
 const BarFill = styled.div`
   height: 100%;
@@ -605,7 +603,7 @@ export default function MobileStaffHome() {
     if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     setLoading(true);
     try {
-      await clockOut(sid, coords, { slackMeters: GEOFENCE_SLACK });
+      await clockOut(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
       addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -628,7 +626,7 @@ export default function MobileStaffHome() {
     }
     setLoading(true);
     try {
-      await clockIn(sid, coords, { slackMeters: GEOFENCE_SLACK });
+      await clockIn(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
       addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -646,7 +644,7 @@ export default function MobileStaffHome() {
     }
     setLoading(true);
     try {
-      await breakStart(sid, coords, { slackMeters: GEOFENCE_SLACK });
+      await breakStart(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
       addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -669,7 +667,7 @@ export default function MobileStaffHome() {
     }
     setLoading(true);
     try {
-      await breakEnd(sid, coords, { slackMeters: GEOFENCE_SLACK });
+      await breakEnd(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
       addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -684,7 +682,6 @@ export default function MobileStaffHome() {
     }
   };
 
-  // 단일 콜백 사용(ESLint: no-unused-vars 방지 + onClick 중복 제거)
   const actionOnClick = next.onClickName === 'out'
     ? async () => {
         if (hasOpenBreak) {
