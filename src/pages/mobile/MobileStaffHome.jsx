@@ -280,28 +280,55 @@ const toBool = (v) => {
   return false;
 };
 
+// 기존 resolveGeofenceRequired 함수 전체 교체
 const resolveGeofenceRequired = (o) => {
-   if (!o) return false;
-   // WorkType/스케줄 명시 신호만 허용
-   const cands = [
-     o.geofenceRequired,
-     o.geofenceRequiredYn,
-     o.requireGeofence,
-     o.workTypeGeofenceRequired,
-     o.workTypeGeofenceRequiredYn,
-     o.workType?.geofenceRequired,
-     o.workType?.geofenceRequiredYn,
-     o.type?.geofenceRequired,
-     o.type?.geofenceRequiredYn,
-     o.workType?.gpsRequired,
-     o.workType?.gpsApply,
-     o.gpsRequired,
-     o.gpsApply,
-   ];
-   for (const v of cands) {
-     if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
-   }
-   return false;
+  if (!o) return false;
+
+  // 1) WorkType 플래그 최우선 + true 우선(OR)
+  const workTypeSignals = [
+    o.workType?.geofenceRequired,
+    o.workType?.geofenceRequiredYn,
+    o.workTypeGeofenceRequired,
+    o.workTypeGeofenceRequiredYn,
+    // 백엔드에서 geoFenceRequired(대문자 F)로 내려오는 변형도 허용
+    o.workType?.geoFenceRequired,
+    o.workType?.geoFenceRequiredYn,
+    o.workType?.requireGeofence,
+    o.workType?.requiresGeofence,
+  ].filter((v) => v !== undefined && v !== null && String(v) !== '');
+
+  // workType에서 단 하나라도 true면 무조건 필요
+  if (workTypeSignals.some((v) => {
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    return s === 'y' || s === 'yes' || s === 'true' || s === '1' || s === 't';
+  })) return true;
+
+  // workType에 명시가 있었는데 모두 false/비활성이라면 필요 없음
+  if (workTypeSignals.length > 0) return false;
+
+  // 2) 스케줄/기타 신호(보조 판단, 여기는 true면 필요, 없으면 기본 false)
+  const schedSignals = [
+    o.geofenceRequired,
+    o.geofenceRequiredYn,
+    o.requireGeofence,
+    o.geofenceMode,
+    o.gpsRequired,
+    o.gpsApply,
+    o.type?.geofenceRequired,
+    o.type?.geofenceRequiredYn,
+    // 변형 케이스
+    o.geoFenceRequired,
+    o.geoFenceRequiredYn,
+  ].filter((v) => v !== undefined && v !== null && String(v) !== '');
+
+  if (schedSignals.some((v) => {
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    return s === 'y' || s === 'yes' || s === 'true' || s === '1' || s === 't' || s === 'required' || s === 'mandatory' || s === 'always' || s === 'on' || s === 'enabled';
+  })) return true;
+
+  return false;
 };
 
 const toTimeMs = (v) => (v instanceof Date ? v.getTime() : (v ? new Date(v).getTime() : NaN));
