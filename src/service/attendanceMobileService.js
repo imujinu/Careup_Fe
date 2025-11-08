@@ -198,7 +198,7 @@ const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fal
 /* =========================
  * 지오펜스 필수 여부 판단(강화)
  * - 다양한 필드명/문자값 지원
- * - 명시 정보 없고 지점 펜스가 설정돼 있으면 '필수'로 보수적 판단
+ * - 명시 정보 없고 지점 펜스가 있어도 "근무타입 플래그"만 따른다
  * ========================= */
 const truth = (v) => {
   if (typeof v === 'boolean') return v;
@@ -226,11 +226,11 @@ const anyOf = (...vals) => {
   }
   return null;
 };
+
 /* =========================
  * 지오펜스 필수 여부 판단 — "근무타입 플래그만 따른다"
  * ========================= */
 async function resolveFenceRequired(detail, primary) {
-  // 1) 스케줄에 연결된 근무타입에서만 1차 판정
   const candsWorkType = [
     detail?.workType?.geofenceRequired,
     detail?.workTypeGeofenceRequired,
@@ -249,7 +249,6 @@ async function resolveFenceRequired(detail, primary) {
     if (t !== null) return t; // true/false 명시일 때만 채택
   }
 
-  // 2) (선택) 스케줄 개체에 geofenceRequired가 '명시'돼 있으면 보조로 허용
   const candsSchedule = [
     detail?.geofenceRequired,
     detail?.requireGeofence,
@@ -263,8 +262,7 @@ async function resolveFenceRequired(detail, primary) {
     if (t !== null) return t;
   }
 
-  // 3) 기본값: 필요 없음(프리패스). 지점 펜스 존재 여부로 강제하지 않음.
-  return false;
+  return false; // 기본값: 필요 없음
 }
 /* ========================= */
 
@@ -645,7 +643,6 @@ export const fetchTodayStatus = async () => {
 
         missedCheckout = detail?.missedCheckout === true;
       } catch {
-        // 상세 조회 실패 시, primary 기준으로 보수적 계산 + 펜스 필수 여부 재판단
         geofenceRequired = await resolveFenceRequired(null, primary);
 
         const plannedStart = primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
@@ -691,7 +688,6 @@ export const fetchTodayStatus = async () => {
         }
       }
     } else {
-      // scheduleId 없음(이상치) → primary 기준
       geofenceRequired = await resolveFenceRequired(null, primary);
 
       const plannedStart = primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
@@ -837,12 +833,14 @@ const postJson = (url, data = {}) => {
 };
 
 const normalizeId = (v) => String(v ?? '').split(':')[0];
+
+// ――― 재시도 판단(보수적): 메시지 없으면 400도 재시도
 const shouldTryNext = (status, message) => {
   const s = Number(status);
   if ([404, 405, 415].includes(s)) return true;
-  // 바디/파라미터 누락·형식 오류성 400은 다음 후보를 시도
   if (s === 400) {
     const msg = String(message || '').toLowerCase();
+    if (!msg) return true;
     return (
       msg.includes('required request body') ||
       msg.includes('missing') ||
@@ -865,7 +863,6 @@ const buildActionPayload = (_scheduleId, geo) => {
   const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
   const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
 
-  // 서버 호환: lat/lng + latitude/longitude, accuracyMeters + accuracy, at + actionAt + clientAt
   const payload = {
     lat, lng,
     latitude: lat, longitude: lng,
@@ -875,10 +872,15 @@ const buildActionPayload = (_scheduleId, geo) => {
     actionAt: at,
     clientAt: at,
   };
-
-  // 값이 undefined 인 키는 제거
   return Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined));
 };
+
+// URL 형태에 따라 scheduleId를 바디에 포함(마지막 후보 /attendance/* 전용)
+const needsScheduleInBody = (urlPath) =>
+  /\/attendance\/(clock-in|clock-out|break-start|break-end)$/.test(urlPath);
+
+const payloadForUrl = (url, baseBody, scheduleId) =>
+  needsScheduleInBody(url) ? { ...baseBody, scheduleId } : baseBody;
 
 /* =========================
  * 액션(출근/퇴근/휴게) — 지오펜스 필요 시 프론트 검증 + POST 우선
@@ -890,7 +892,7 @@ export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   const id = normalizeId(id0);
 
   const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
-  const body = buildActionPayload(id, verifiedGeo);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-in`,
@@ -900,6 +902,7 @@ export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
 
   let lastErr;
   for (const url of candidates) {
+    const body = payloadForUrl(url, baseBody, id);
     try {
       return await postJson(url, body);
     } catch (e) {
@@ -919,7 +922,7 @@ export const clockOut = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   const id = normalizeId(id0);
 
   const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
-  const body = buildActionPayload(id, verifiedGeo);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-out`,
@@ -929,11 +932,14 @@ export const clockOut = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try { 
+      return await postJson(url, body); 
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('퇴근 처리 실패');
@@ -946,7 +952,7 @@ export const breakStart = async (scheduleId, geo, opts = { slackMeters: 0 }) => 
   const id = normalizeId(id0);
 
   const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
-  const body = buildActionPayload(id, verifiedGeo);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/break-start`,
@@ -956,11 +962,14 @@ export const breakStart = async (scheduleId, geo, opts = { slackMeters: 0 }) => 
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try { 
+      return await postJson(url, body); 
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('휴게 시작 처리 실패');
@@ -973,7 +982,7 @@ export const breakEnd = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   const id = normalizeId(id0);
 
   const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
-  const body = buildActionPayload(id, verifiedGeo);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/break-end`,
@@ -983,11 +992,14 @@ export const breakEnd = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try { 
+      return await postJson(url, body); 
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('휴게 종료 처리 실패');
