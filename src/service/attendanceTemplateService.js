@@ -1,15 +1,17 @@
+// 근무 템플릿(프리셋) CRUD — CORS(PATCH 차단) 우회: POST → PUT → PATCH 폴백 + 페이지 언랩 가드
 import axios from '../utils/axiosConfig';
 
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
   const explicit = trim(import.meta.env.VITE_BRANCH_URL);
-  if (explicit) return explicit;
+  if (explicit) return explicit; // e.g. https://server.careup.store/branch-service
   const api =
     trim(import.meta.env.VITE_API_URL) ||
     (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
   return `${api}/branch-service`;
 })();
 
+/** 공통 언랩 (+ JSON 가드) */
 function unwrap(res) {
   const ct = (res?.headers?.['content-type'] || '').toLowerCase();
   const d = res?.data;
@@ -45,10 +47,11 @@ async function safeDelete(urlDelete, urlPostDelete) {
   }
 }
 
+/** 페이지 정규화 */
 function normalizePage(body) {
   if (!body) return { content: [], totalPages: 0, totalElements: 0, size: 0, number: 0 };
   if (Array.isArray(body)) return { content: body, totalPages: 1, totalElements: body.length, size: body.length, number: 0 };
-  const page = body?.page || body;
+  const page = body?.page || body; // CommonResponseDto 래퍼/직접 반환 모두 수용
   const content = page?.content ?? [];
   const totalPages = page?.totalPages ?? 0;
   const totalElements = page?.totalElements ?? content.length ?? 0;
@@ -70,8 +73,10 @@ export async function createAttendanceTemplate(payload) {
 export async function updateAttendanceTemplate(id, payload) {
   const pathId = encodeURIComponent(String(id));
   try {
+    // 우선 POST로 업데이트 (CORS 안전)
     return await safeUpdate(`${BASE_URL}/attendance-template/update/${pathId}`, payload);
   } catch (e) {
+    // 보조: /update (body에 id 포함) 변형 엔드포인트 대응
     if (isMethodIssue(st(e))) {
       return safeUpdate(`${BASE_URL}/attendance-template/update`, { id, ...payload });
     }
@@ -85,12 +90,15 @@ export async function deleteAttendanceTemplate(id) {
     `${BASE_URL}/attendance-template/delete/${pathId}`
   );
 }
-export async function moveTemplateOrder(id, direction, step = 1) {
+
+/* ===== (선택) 순서 이동 지원 — 서버가 지원할 때만 사용 ===== */
+export async function moveTemplateOrder(id, direction /* 'UP' | 'DOWN' */, step = 1) {
   const pathId = encodeURIComponent(String(id));
   const body = { direction, step };
   try {
     return await safeUpdate(`${BASE_URL}/attendance-template/${pathId}/move-order`, body);
   } catch (e) {
+    // 대안: /attendance-template/move-order (id 포함)
     if (isMethodIssue(st(e))) {
       return safeUpdate(`${BASE_URL}/attendance-template/move-order`, { id, ...body });
     }
@@ -99,7 +107,7 @@ export async function moveTemplateOrder(id, direction, step = 1) {
 }
 
 /* =========================
- * Broadcast utils
+ * Broadcast utils (UI가 기대하는 시그니처 추가)
  * ========================= */
 export const TEMPLATE_CHANGED_EVENT = 'attendance-template:changed';
 
@@ -108,21 +116,19 @@ export function broadcastAttendanceTemplateChanged(detail) {
     window.dispatchEvent(new CustomEvent(TEMPLATE_CHANGED_EVENT, { detail: detail ?? null }));
   }
 }
-
 export function addAttendanceTemplateChangedListener(handler) {
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
   const h = (e) => handler?.(e?.detail);
   window.addEventListener(TEMPLATE_CHANGED_EVENT, h);
   return () => window.removeEventListener(TEMPLATE_CHANGED_EVENT, h);
 }
-
 export function removeAttendanceTemplateChangedListener(handler) {
   if (typeof window === 'undefined' || typeof window.removeEventListener !== 'function') return;
   window.removeEventListener(TEMPLATE_CHANGED_EVENT, handler);
 }
 
 /* =========================
- * Compatibility aliases
+ * Compatibility aliases (기존 import 호환)
  * ========================= */
 export async function fetchAttendanceTemplates(opts) {
   return listAttendanceTemplates(opts);
@@ -132,19 +138,29 @@ export const createTemplate = createAttendanceTemplate;
 export const updateTemplate = updateAttendanceTemplate;
 export const deleteTemplate = deleteAttendanceTemplate;
 
+/* =========================
+ * default export (누락없이 집약)
+ * ========================= */
 export default {
+  // CRUD
   listAttendanceTemplates,
   createAttendanceTemplate,
   updateAttendanceTemplate,
   deleteAttendanceTemplate,
   moveTemplateOrder,
-  TEMPLATE_CHANGED_EVENT,
-  broadcastAttendanceTemplateChanged,
-  addAttendanceTemplateChangedListener,
-  removeAttendanceTemplateChangedListener,
-  fetchAttendanceTemplates,
+
+  // 호환 별칭
   listTemplates,
   createTemplate,
   updateTemplate,
   deleteTemplate,
+
+  // 브로드캐스트 유틸
+  TEMPLATE_CHANGED_EVENT,
+  broadcastAttendanceTemplateChanged,
+  addAttendanceTemplateChangedListener,
+  removeAttendanceTemplateChangedListener,
+
+  // 컬렉션 로더 호환
+  fetchAttendanceTemplates,
 };
