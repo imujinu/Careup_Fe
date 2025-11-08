@@ -6,10 +6,12 @@ const TableContainer = styled.div`
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  overflow-x: auto;
 `;
 
 const Table = styled.table`
   width: 100%;
+  min-width: 1100px;
   border-collapse: collapse;
 `;
 
@@ -59,13 +61,23 @@ const TableCell = styled.td`
   text-align: ${props => props.$center ? 'center' : 'left'};
   max-width: ${props => {
     if (props.$productName) return '200px';
-    if (props.$branch) return '120px';
-    if (props.$remark) return '200px';
+    if (props.$branch) return '140px';
+    if (props.$remark) return '260px';
     return 'none';
   }};
-  overflow: ${props => (props.$productName || props.$branch || props.$remark) ? 'hidden' : 'visible'};
-  text-overflow: ${props => (props.$productName || props.$branch || props.$remark) ? 'ellipsis' : 'clip'};
-  white-space: ${props => (props.$productName || props.$branch || props.$remark) ? 'nowrap' : 'normal'};
+  overflow: ${props => {
+    if (props.$remark) return 'visible';
+    if (props.$productName || props.$branch) return 'hidden';
+    return 'visible';
+  }};
+  text-overflow: ${props => (props.$productName || props.$branch) ? 'ellipsis' : 'clip'};
+  white-space: ${props => {
+    if (props.$remark) return 'normal';
+    if (props.$productName || props.$branch) return 'nowrap';
+    return 'normal';
+  }};
+  word-break: ${props => props.$remark ? 'break-word' : 'normal'};
+  line-height: 1.5;
 `;
 
 const StatusBadge = styled.span`
