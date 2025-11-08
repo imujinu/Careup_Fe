@@ -1,4 +1,3 @@
-// src/pages/attendance/AttendanceTypeManagement.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
@@ -42,7 +41,7 @@ const TABS = { WORK: 'WORK', LEAVE: 'LEAVE' };
 
 export default function AttendanceTypeManagement() {
   const { addToast } = useToast();
-  const { role: rawRole } = useAppSelector((s) => s.auth);
+  const { role: rawRole } = useAppSelector((s) => s?.auth ?? {});
   const role = useMemo(() => (rawRole || '').replace(/^ROLE_/, '').toUpperCase(), [rawRole]);
 
   const canView = useMemo(() => ['HQ_ADMIN', 'BRANCH_ADMIN', 'FRANCHISE_OWNER'].includes(role), [role]);
@@ -107,8 +106,8 @@ export default function AttendanceTypeManagement() {
     } catch (e) {
       const status = e?.response?.status;
       const msg403 = e?.response?.data?.status_message || '근무 타입 조회 권한이 없습니다.';
-      if (status === 403) addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
-      else addToast({ type: 'error', title: '오류', message: '근무 타입을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
+      if (status === 403) addToast(msg403, { color: 'warning' });
+      else addToast('근무 타입을 불러오는 중 문제가 발생했습니다.', { color: 'error' });
       setWorkItems([]);
       setWorkTotalPages(0);
     } finally {
@@ -134,8 +133,8 @@ export default function AttendanceTypeManagement() {
     } catch (e) {
       const status = e?.response?.status;
       const msg403 = e?.response?.data?.status_message || '휴가 타입 조회 권한이 없습니다.';
-      if (status === 403) addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
-      else addToast({ type: 'error', title: '오류', message: '휴가 타입을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
+      if (status === 403) addToast(msg403, { color: 'warning' });
+      else addToast('휴가 타입을 불러오는 중 문제가 발생했습니다.', { color: 'error' });
       setLeaveItems([]);
       setLeaveTotalPages(0);
     } finally {
@@ -198,7 +197,7 @@ export default function AttendanceTypeManagement() {
         : { name: form.name?.trim(), paid: !!form.flag };
 
     if (!payload.name) {
-      addToast({ type: 'warning', title: '안내', message: '이름을 입력해 주세요.', duration: 2200 });
+      addToast('이름을 입력해 주세요.', { color: 'warning' });
       nameInputRef.current?.focus();
       return;
     }
@@ -207,21 +206,21 @@ export default function AttendanceTypeManagement() {
       if (editing?.id) {
         if (tab === TABS.WORK) {
           await updateWorkType(editing.id, payload);
-          addToast({ type: 'success', title: '완료', message: '근무 타입이 수정되었습니다.', duration: 2200 });
+          addToast('근무 타입이 수정되었습니다.', { color: 'success' });
           fetchWorkList();
         } else {
           await updateLeaveType(editing.id, payload);
-          addToast({ type: 'success', title: '완료', message: '휴가 타입이 수정되었습니다.', duration: 2200 });
+          addToast('휴가 타입이 수정되었습니다.', { color: 'success' });
           fetchLeaveList();
         }
       } else {
         if (tab === TABS.WORK) {
           await createWorkType(payload);
-          addToast({ type: 'success', title: '완료', message: '근무 타입이 등록되었습니다.', duration: 2200 });
+          addToast('근무 타입이 등록되었습니다.', { color: 'success' });
           fetchWorkList();
         } else {
           await createLeaveType(payload);
-          addToast({ type: 'success', title: '완료', message: '휴가 타입이 등록되었습니다.', duration: 2200 });
+          addToast('휴가 타입이 등록되었습니다.', { color: 'success' });
           fetchLeaveList();
         }
       }
@@ -237,7 +236,7 @@ export default function AttendanceTypeManagement() {
           : tab === TABS.WORK
           ? '근무 타입 등록 중 오류가 발생했습니다.'
           : '휴가 타입 등록 중 오류가 발생했습니다.');
-      addToast({ type: 'error', title: '오류', message: msg, duration: 3200 });
+      addToast(msg, { color: 'error' });
     }
   };
 
@@ -248,12 +247,12 @@ export default function AttendanceTypeManagement() {
     try {
       if (tab === TABS.WORK) {
         await deleteWorkType(row.id);
-        addToast({ type: 'success', title: '완료', message: '삭제되었습니다.', duration: 2200 });
+        addToast('삭제되었습니다.', { color: 'success' });
         if (filteredWork.length === 1 && workPage > 0) setWorkPage((p) => p - 1);
         fetchWorkList();
       } else {
         await deleteLeaveType(row.id);
-        addToast({ type: 'success', title: '완료', message: '삭제되었습니다.', duration: 2200 });
+        addToast('삭제되었습니다.', { color: 'success' });
         if (filteredLeave.length === 1 && leavePage > 0) setLeavePage((p) => p - 1);
         fetchLeaveList();
       }
@@ -262,7 +261,7 @@ export default function AttendanceTypeManagement() {
         err?.response?.data?.status_message ||
         err?.response?.data?.message ||
         '삭제 중 오류가 발생했습니다.';
-      addToast({ type: 'error', title: '오류', message: msg, duration: 3200 });
+      addToast(msg, { color: 'error' });
     }
   };
 
