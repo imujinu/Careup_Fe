@@ -837,7 +837,22 @@ const postJson = (url, data = {}) => {
 };
 
 const normalizeId = (v) => String(v ?? '').split(':')[0];
-const shouldTryNext = (status) => [404, 405, 415].includes(Number(status));
+const shouldTryNext = (status, message) => {
+  const s = Number(status);
+  if ([404, 405, 415].includes(s)) return true;
+  // 바디/파라미터 누락·형식 오류성 400은 다음 후보를 시도
+  if (s === 400) {
+    const msg = String(message || '').toLowerCase();
+    return (
+      msg.includes('required request body') ||
+      msg.includes('missing') ||
+      msg.includes('parameter') ||
+      msg.includes('cannot deserialize') ||
+      msg.includes('failed to read')
+    );
+  }
+  return false;
+};
 
 // 서버 DTO(AttendanceActionRequest)와 정확히 일치하는 바디 구성
 const buildActionPayload = (_scheduleId, geo) => {
@@ -850,13 +865,19 @@ const buildActionPayload = (_scheduleId, geo) => {
   const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
   const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
 
-  // scheduleId는 경로/쿼리로 전달. 바디는 DTO 필드만.
-  return Object.fromEntries(Object.entries({
-    lat,
-    lng,
+  // 서버 호환: lat/lng + latitude/longitude, accuracyMeters + accuracy, at + actionAt + clientAt
+  const payload = {
+    lat, lng,
+    latitude: lat, longitude: lng,
     accuracyMeters,
+    accuracy: accuracyMeters,
     at,
-  }).filter(([,v]) => v !== undefined));
+    actionAt: at,
+    clientAt: at,
+  };
+
+  // 값이 undefined 인 키는 제거
+  return Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined));
 };
 
 /* =========================
@@ -879,11 +900,13 @@ export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    try {
+      return await postJson(url, body);
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('출근 처리 실패');
