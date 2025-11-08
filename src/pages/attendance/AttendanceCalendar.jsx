@@ -27,7 +27,6 @@ import { ScheduleDetailModal } from '../../components/attendance/ScheduleDetailM
 const MAX_VISIBLE_MONTH = 3;
 const MAX_VISIBLE_WEEK = 10;
 
-/* ===== 스타일 ===== */
 const Page = styled.div`padding: 28px;`;
 const Row = styled.div`display: flex; align-items: center; justify-content: space-between; gap: 12px;`;
 const TitleBox = styled.div`display: flex; align-items: center; gap: 12px;`;
@@ -61,7 +60,6 @@ const Filters = styled.div`
   margin: 14px 0;
 `;
 
-/* 선택 / 입력 공통 */
 const SelectWrap = styled.div`
   position: relative; width: 100%;
   & > svg {
@@ -84,7 +82,6 @@ const Input = styled.input`
   &:focus { border-color: #6d28d9; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15); }
 `;
 
-/* 우측 끝 기간 묶음 */
 const RightCluster = styled.div`
   grid-column: span ${(p) => p.$span || 6};
   display: flex; align-items: center; justify-content: flex-end; gap: 8px;
@@ -92,7 +89,6 @@ const RightCluster = styled.div`
 `;
 const RangeTilde = styled.span`color: #9ca3af; font-size: 12px; user-select: none;`;
 
-/* 캘린더 */
 const CalendarWrap = styled.div`
   border: 1px solid #d1d5db;
   border-radius: 14px;
@@ -120,7 +116,6 @@ const Cell = styled.div`
   &:nth-child(7n) { border-right: 0; }
 `;
 
-/* 날짜 헤더 */
 const DateHeadRow = styled.div`
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 6px;
@@ -142,10 +137,9 @@ const BadgeHolidayCircle = styled.span`
   background: #ef4444; color: #fff; border: 1px solid #dc2626;
 `;
 
-/* 이벤트(상태 색상 지원) */
 const Event = styled.div`
   position: relative;
-  padding: 6px 28px 6px 8px; /* X 버튼 공간 확보 */
+  padding: 6px 28px 6px 8px;
   border-radius: 8px; margin-bottom: 6px; border: 1px solid;
   cursor: pointer;
   background: ${(p) => (
@@ -194,7 +188,6 @@ const MoreBtn = styled.button`
   &:focus, &:active { outline: none; box-shadow: none; }
 `;
 
-/* 이벤트 카드: 삭제(X) 버튼 */
 const EventCloseBtn = styled.button`
   position: absolute; top: 4px; right: 4px;
   width: 20px; height: 20px; border-radius: 6px;
@@ -204,7 +197,6 @@ const EventCloseBtn = styled.button`
   &:hover { opacity: 1; background: rgba(0,0,0,0.06); }
 `;
 
-/* 공용 모달 */
 const ModalOverlay = styled.div`
   position: fixed; inset: 0; z-index: 1000;
   background: rgba(17,24,39,0.5);
@@ -242,7 +234,6 @@ const Danger = styled.button`
   &:disabled { opacity: .6; cursor: not-allowed; }
 `;
 
-/* 네비게이션 라벨 */
 const LabelBox = styled.div`margin-left: 8px; font-weight: 700; font-size: 16px;`;
 const LabelButton = styled.button`
   border: none; background: transparent; padding: 4px 8px; margin: -4px -8px;
@@ -250,7 +241,6 @@ const LabelButton = styled.button`
   &:hover { background: #f3f4f6; }
 `;
 
-/* ===== 유틸 ===== */
 const toYMD = (date) => {
   if (date instanceof Date) {
     const y = date.getFullYear();
@@ -320,64 +310,75 @@ const fmtKDate = (ymd) => {
   return `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${DOW[dt.getDay()]})`;
 };
 
-/* ===== 상태/색상 판정 ===== */
-/** 모달과 동일 임계값(분) */
+const STATUS_TO_VARIANT = {
+  ABSENT: 'red',
+  MISSED_CHECKOUT: 'orange',
+  EARLY_LEAVE: 'orange',
+  OVERTIME: 'orange',
+  LATE: 'orange',
+  CLOCKED_OUT: 'green',
+  ON_BREAK: 'green',
+  CLOCKED_IN: 'green',
+  PLANNED: 'blue',
+  LEAVE: 'purple',
+};
+
+const STATUS_PRIORITY = {
+  ABSENT: 100,
+  MISSED_CHECKOUT: 90,
+  EARLY_LEAVE: 80,
+  OVERTIME: 70,
+  LATE: 60,
+  CLOCKED_OUT: 50,
+  ON_BREAK: 45,
+  CLOCKED_IN: 40,
+  PLANNED: 10,
+  LEAVE: 5,
+};
+
 const LATE_THRESHOLD_MIN = 1;
 
 function getEventVariant(ev, now = new Date()) {
-  // 0) 휴가
   if (isLeaveEvent(ev)) return 'purple';
-
-  // 1) 상태 코드 우선 처리
   const status = String(ev?.status || ev?.attendanceStatus || '').toUpperCase();
   if (status === 'ABSENT') return 'red';
   if (status === 'MISSED_CHECKOUT' || ev?.missedCheckout === true) return 'orange';
   if (status === 'EARLY_LEAVE') return 'orange';
-  if (status === 'OVERTIME') return 'orange';      // ✅ 초과근무를 주황으로 고정
+  if (status === 'OVERTIME') return 'orange';
   if (status === 'CLOCKED_OUT') return 'green';
-  if (status === 'CLOCKED_IN' || status === 'ON_BREAK') {
-    // 진행 중은 아래 휴리스틱과 일치하므로 그대로 두어도 무방
-  }
 
-  // 2) 계획/기록 기반 휴리스틱 (지각·미퇴근 등)
   const plannedStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
   const plannedEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
-  const actIn  = ev?.actualClockIn || ev?.actualStartAt || null;
-  const actOut = ev?.actualClockOut || ev?.actualEndAt || null;
+  const actIn  = ev?.actualClockIn || ev?.clockInAt  || ev?.actualStartAt || null;
+  const actOut = ev?.actualClockOut || ev?.clockOutAt || ev?.actualEndAt  || null;
 
   const nowMs   = now.getTime();
   const pStartMs= plannedStart ? new Date(plannedStart).getTime() : null;
   const pEndMs  = plannedEnd   ? new Date(plannedEnd).getTime()   : null;
   const aInMs   = actIn        ? new Date(actIn).getTime()        : null;
+  const isTail  = ev?.isOvernight && ev?.part === 'TAIL';
 
-  // 계획 종료 지남 + 미출근 → 결근
   if (pEndMs != null && aInMs == null && nowMs > pEndMs) return 'red';
 
-  // 지각(기록/무기록 모두)
-  const LATE_THRESHOLD_MIN = 1;
   const lateFromAct = (aInMs != null && pStartMs != null && aInMs >= pStartMs + LATE_THRESHOLD_MIN*60*1000);
-  const lateNoClock = (aInMs == null && pStartMs != null && nowMs >= pStartMs + LATE_THRESHOLD_MIN*60*1000 && !actOut);
+  const lateNoClock = (!isTail) && (aInMs == null && pStartMs != null && nowMs >= pStartMs + LATE_THRESHOLD_MIN*60*1000 && !actOut);
   if (lateFromAct || lateNoClock) return 'orange';
 
-  // 진행 중/완료
   if (actIn && !actOut) {
-    if (plannedEnd && now > new Date(plannedEnd)) return 'orange'; // 미퇴근
+    if (plannedEnd && now > new Date(plannedEnd)) return 'orange';
     return 'green';
   }
   if (actOut) return 'green';
 
-  // 계획 기준
   if (plannedStart) {
     if (now < new Date(plannedStart)) return 'blue';
     if (plannedEnd && now > new Date(plannedEnd)) return 'red';
     return 'blue';
   }
 
-  // 기본값
   return 'blue';
 }
 
-/* ===== 라벨 구성 ===== */
 const pickLeaveLabel = (ev, isLeave) => {
   const first = (ev?.leaveTypeName || ev?.leaveTypeCode || '').toString().trim();
   if (first) return first;
@@ -396,8 +397,8 @@ function labelParts(ev, variant) {
 
   const planStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
   const planEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
-  const actStart  = ev?.actualClockIn || ev?.actualStartAt || null;
-  const actEnd    = ev?.actualClockOut || ev?.actualEndAt || null;
+  const actStart  = ev?.actualClockIn || ev?.clockInAt  || ev?.actualStartAt || null;
+  const actEnd    = ev?.actualClockOut || ev?.clockOutAt || ev?.actualEndAt  || null;
 
   let baseStart = planStart;
   let baseEnd   = planEnd;
@@ -411,7 +412,6 @@ function labelParts(ev, variant) {
 
   let range = '';
   if (leave) {
-    // ✅ 휴가(보라색) 카드일 때 항상 '종일' 표시
     range = '종일';
   } else if (ev?.isOvernight && ev?.part) {
     if (ev.part === 'HEAD') {
@@ -430,37 +430,34 @@ function labelParts(ev, variant) {
   return { primary, subtitle, leave, leaveLabel };
 }
 
-/* ===== 보강: 날짜/아이디 해석기 ===== */
 const dateKeyOf = (ev) =>
   ev?.cellDate ||
   (ev?.date && toYMD(ev.date)) ||
   (ev?.registeredDate && toYMD(ev.registeredDate)) ||
   (ev?.startAt && toYMD(ev.startAt)) ||
   (ev?.registeredClockIn && toYMD(ev.registeredClockIn)) ||
+  (ev?.clockInAt && toYMD(ev.clockInAt)) ||
   (ev?.actualClockIn && toYMD(ev.actualClockIn)) ||
   '';
 
 const resolveId = (ev) =>
   ev?.scheduleId ?? ev?.id ?? ev?.scheduleSeq ?? ev?.seq ?? null;
 
-/* 이 파일 로컬 정규화 */
 const normalizeIdLocal = (val) => {
   const s = String(val ?? '');
   return s.includes(':') ? s.split(':')[0] : s;
 };
 
-/* ===== 정렬 기준: "해당 셀"에서의 시작시각 ===== */
 const cellStartMs = (ev) => {
   if (ev?.isOvernight && ev?.part === 'TAIL' && ev?.cellDate) {
     return new Date(`${ev.cellDate}T00:00:00`).getTime();
   }
   const s =
     ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt ||
-    ev?.actualClockIn     || ev?.actualStartAt     || null;
+    ev?.actualClockIn     || ev?.clockInAt         || ev?.actualStartAt || null;
   return s ? new Date(s).getTime() : 0;
 };
 
-/* ===== 실제 기록 존재 판단(상세 응답 기반) ===== */
 const hasActualFromDetail = (d) => {
   if (!d) return false;
   return Boolean(
@@ -470,11 +467,7 @@ const hasActualFromDetail = (d) => {
   );
 };
 
-/* ===== 컴포넌트 ===== */
 export default function AttendanceCalendar() {
-  // ... (중략 없이 아래 코드 그대로 유지 – 기존 내용 동일)
-  // ※ 본 파일의 나머지 로직은 변경 없습니다. 상태/라벨 표시는 보강된 getEventVariant가 반영됩니다.
-
   const dispatch = useAppDispatch();
   const { addToast } = useToast();
 
@@ -771,6 +764,31 @@ export default function AttendanceCalendar() {
     return (filteredEvents || []).flatMap(splitForCalendar);
   }, [filteredEvents]);
 
+  // ▼ 쌍(HEAD/TAIL) 가시 상태(variant) 동기화: 현재 시각 기준으로 두 조각 중 더 강한 색을 채택
+  const pairVariantById = useMemo(() => {
+    const groups = {};
+    for (const ev of displayEvents || []) {
+      if (!(ev?.isOvernight && (ev?.part === 'HEAD' || ev?.part === 'TAIL'))) continue;
+      const nid = normalizeIdLocal(resolveId(ev));
+      if (!nid) continue;
+      if (!groups[nid]) groups[nid] = [];
+      groups[nid].push(ev);
+    }
+    const VAR_PRI = { red: 100, orange: 80, green: 50, blue: 10, purple: 5 };
+    const out = {};
+    Object.entries(groups).forEach(([nid, list]) => {
+      let chosenVar = null;
+      let best = -1;
+      for (const ev of list) {
+        const v = getEventVariant(ev, new Date());
+        const pri = VAR_PRI[v] ?? -1;
+        if (pri > best) { best = pri; chosenVar = v; }
+      }
+      if (chosenVar) out[nid] = chosenVar;
+    });
+    return out;
+  }, [displayEvents]);
+
   const mapByDate = useMemo(() => {
     const map = {};
     (displayEvents || []).forEach((ev) => {
@@ -894,15 +912,23 @@ export default function AttendanceCalendar() {
 
   const onAskDeleteSchedule = useCallback((ev) => {
     const eff = withOverride(ev);
-    const sid = normalizeIdLocal(resolveId(eff));
-    const ymd = dateKeyOf(eff);
-    const variant = getEventVariant(eff, new Date());
-    const { primary, subtitle, leave, leaveLabel } = labelParts(eff, variant);
+    const nid = normalizeIdLocal(resolveId(eff));
+    const pairVar = (eff?.isOvernight && (eff?.part === 'HEAD' || eff?.part === 'TAIL'))
+      ? pairVariantById[nid]
+      : null;
+    const effUnified = eff;
+
+    const sid = normalizeIdLocal(resolveId(effUnified));
+    const ymd = dateKeyOf(effUnified);
+
+    const variant = pairVar || getEventVariant(effUnified, new Date());
+
+    const { primary, subtitle, leave, leaveLabel } = labelParts(effUnified, variant);
     const title = leave && leaveLabel ? `${primary} [${leaveLabel}]` : primary;
 
     setDeleteTarget({ id: sid, ymd, title, subtitle });
     setDeleteAskOpen(true);
-  }, [withOverride]);
+  }, [withOverride, pairVariantById]);
 
   const onDoDeleteSchedule = useCallback(async () => {
     if (!deleteTarget?.id) return;
@@ -943,10 +969,6 @@ export default function AttendanceCalendar() {
 
   return (
     <Page>
-      {/* 이하 렌더링/모달/상세 열기/삭제 로직 기존 그대로 */}
-      {/* ... 파일 끝까지 기존 코드와 동일 (생략 없이 위 원본과 동일) */}
-      {/* ▼▼▼ 원본 전체 출력 요구로 생략 없이 유지합니다. ▼▼▼ */}
-
       <Row style={{ marginBottom: 12 }}>
         <TitleBox>
           <Title>근무일정</Title>
@@ -1105,11 +1127,19 @@ export default function AttendanceCalendar() {
 
                 {visible.map((ev) => {
                   const eff = withOverride(ev);
-                  const variant = getEventVariant(eff, new Date());
-                  const { primary, subtitle, leave, leaveLabel } = labelParts(eff, variant);
 
-                  const sid = resolveId(eff);
-                  const key = eff.uiKey || `${ymd}-${sid ?? Math.random()}`;
+                  const nid = normalizeIdLocal(resolveId(eff));
+                  const pairVar = (eff?.isOvernight && (eff?.part === 'HEAD' || eff?.part === 'TAIL'))
+                    ? pairVariantById[nid]
+                    : null;
+                  const effUnified = eff;
+
+                  const variant = pairVar || getEventVariant(effUnified, new Date());
+
+                  const { primary, subtitle, leave, leaveLabel } = labelParts(effUnified, variant);
+
+                  const sid = resolveId(effUnified);
+                  const key = effUnified.uiKey || `${ymd}-${sid ?? Math.random()}`;
                   const tooltip = [primary, leave && leaveLabel ? leaveLabel : '', subtitle].filter(Boolean).join('\n');
 
                   return (
@@ -1117,16 +1147,20 @@ export default function AttendanceCalendar() {
                       key={key}
                       $variant={variant}
                       title={tooltip}
-                      onClick={() => onOpenDetail(sid, { cellDate: eff.cellDate, part: eff.part })}
+                      onClick={() => onOpenDetail(sid, { cellDate: effUnified.cellDate, part: effUnified.part })}
                     >
-                      <EventCloseBtn
-                        title="스케줄 계획 삭제"
-                        onClick={(e) => { e.stopPropagation(); onAskDeleteSchedule(eff); }}
-                        aria-label="스케줄 계획 삭제"
-                      >
-                        <Icon path={mdiClose} size={0.65} />
-                      </EventCloseBtn>
-
+                      {isManager && (
+                        <EventCloseBtn
+                          title="스케줄 계획 삭제"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAskDeleteSchedule(effUnified);
+                          }}
+                          aria-label="스케줄 계획 삭제"
+                        >
+                          <Icon path={mdiClose} size={0.65} />
+                        </EventCloseBtn>
+                      )}
                       <EventTitle>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primary}</span>
                         {leave && !!leaveLabel && <TypeChip>{leaveLabel}</TypeChip>}

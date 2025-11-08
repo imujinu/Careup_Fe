@@ -284,6 +284,36 @@ const fmtHMlocal = (isoLike) => {
   const mm = String(t.getMinutes()).padStart(2, '0');
   return `${hh}:${mm}`;
 };
+const toBool = (v) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (s === 'y' || s === 'yes' || s === 'true' || s === '1' || s === 't') return true;
+    if (s === 'n' || s === 'no' || s === 'false' || s === '0' || s === 'f') return false;
+  }
+  return false;
+};
+const resolveGeofenceRequired = (o) => {
+  if (!o) return false;
+  const cands = [
+    o.geofenceRequired,
+    o.geofenceRequiredYn,
+    o.workTypeGeofenceRequired,
+    o.workTypeGeofenceRequiredYn,
+    o.gpsRequired,
+    o.gpsApply,
+    o.requireGeofence,
+    o.workType?.geofenceRequired,
+    o.workType?.geofenceRequiredYn,
+    o.type?.geofenceRequired,
+    o.type?.geofenceRequiredYn,
+  ];
+  for (const v of cands) {
+    if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
+  }
+  return false;
+};
 const toTimeMs = (v) => (v instanceof Date ? v.getTime() : (v ? new Date(v).getTime() : NaN));
 const toYMDlocal = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
@@ -577,7 +607,7 @@ export default function MobileStaffHome() {
   const geoReady = !!(coords?.lat && coords?.lng);
   const geoBlocked = permission === 'denied';
 
-  const requireGeo = safeToday?.geofenceRequired === true;
+  const requireGeo = resolveGeofenceRequired(safeToday);
 
   // 🔒 변경 포인트: 지오펜스 필수면 '반경 내임'이 확정되기 전까지 버튼 비활성화
   const geoDisabled = requireGeo ? (!branchReady || geoBlocked || !geoReady || !inside) : false;
@@ -600,7 +630,11 @@ export default function MobileStaffHome() {
     if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     setLoading(true);
     try {
-      await clockOut(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
+      await clockOut(
+        sid,
+        requireGeo ? coords : null,
+        { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
+      );
       addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -623,7 +657,11 @@ export default function MobileStaffHome() {
     }
     setLoading(true);
     try {
-      await clockIn(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
+      await clockIn(
+        sid,
+        requireGeo ? coords : null,
+        { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
+      );
       addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -642,7 +680,11 @@ export default function MobileStaffHome() {
     }
     setLoading(true);
     try {
-      await breakStart(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
+      await breakStart(
+        sid,
+        requireGeo ? coords : null,
+        { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
+      );
       addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -665,7 +707,11 @@ export default function MobileStaffHome() {
     }
     setLoading(true);
     try {
-      await breakEnd(sid, coords, { slackMeters: GEOFENCE_SLACK, fallbackFence: branchReady ? branchGeo : null });
+      await breakEnd(
+        sid,
+        requireGeo ? coords : null,
+        { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
+      );
       addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -723,17 +769,16 @@ export default function MobileStaffHome() {
   };
 
   const geoMsg = useMemo(() => {
-    if (safeToday?.geofenceRequired !== true) return '위치 인증이 필요하지 않습니다';
+    if (!requireGeo) return '위치 인증이 필요하지 않습니다';
     if (!branchReady) return '지점 위치 정보 없음';
     if (geoBlocked) return '위치 권한이 거부되었습니다';
     if (!geoReady) return '현재 위치 확인중…';
     return inside
       ? `현재 지점까지 ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`
       : `반경 밖입니다: ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`;
-  }, [safeToday?.geofenceRequired, branchReady, geoBlocked, geoReady, inside, distance, branchGeo]);
+  }, [requireGeo, branchReady, geoBlocked, geoReady, inside, distance, branchGeo]);
 
-  // 🔒 지오펜스 필수면 '반경 내부 + 좌표 확보 + 권한 OK' 모두 만족 시에만 OK
-  const geoOk = safeToday?.geofenceRequired === true
+  const geoOk = requireGeo
     ? (branchReady && geoReady && inside && !geoBlocked)
     : true;
 
