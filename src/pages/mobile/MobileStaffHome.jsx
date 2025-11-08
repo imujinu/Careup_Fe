@@ -576,13 +576,11 @@ export default function MobileStaffHome() {
   const branchReady = !!(Number.isFinite(branchGeo?.lat) && Number.isFinite(branchGeo?.lng) && Number.isFinite(branchGeo?.radius) && branchGeo.radius > 0);
   const geoReady = !!(coords?.lat && coords?.lng);
   const geoBlocked = permission === 'denied';
-  const geoTimedOut = !!timedOut && !geoBlocked;
 
   const requireGeo = safeToday?.geofenceRequired === true;
 
-  const geoDisabled = requireGeo
-    ? (!branchReady || geoBlocked || (!geoTimedOut && (!geoReady || !inside)))
-    : false;
+  // 🔒 변경 포인트: 지오펜스 필수면 '반경 내임'이 확정되기 전까지 버튼 비활성화
+  const geoDisabled = requireGeo ? (!branchReady || geoBlocked || !geoReady || !inside) : false;
 
   const next = decideAction(safeToday, loading);
   const finalDisabled = next.disabled || geoDisabled;
@@ -606,7 +604,7 @@ export default function MobileStaffHome() {
       addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      const msg = e?.response?.data?.message || '퇴근 처리에 실패했습니다.';
+      const msg = e?.response?.data?.message || e?.response?.data?.status_message || '퇴근 처리에 실패했습니다.';
       addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
@@ -619,8 +617,8 @@ export default function MobileStaffHome() {
   const doClockIn = async () => {
     const sid = safeToday?.scheduleId;
     if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
-    if (safeToday?.geofenceRequired && !(Number.isFinite(coords?.lat) || Number.isFinite(coords?.latitude))) {
-      addToast('현재 위치를 확인 중입니다. 잠시 후 다시 시도해주세요.', { color:'warning' });
+    if (requireGeo && !geoReady) {
+      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -629,7 +627,8 @@ export default function MobileStaffHome() {
       addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      addToast(e?.response?.data?.message || '출근 처리에 실패했습니다.', { color:'error' });
+      const msg = e?.response?.data?.message || e?.response?.data?.status_message || '출근 처리에 실패했습니다.';
+      addToast(msg, { color:'error' });
     } finally {
       setLoading(false);
     }
@@ -637,8 +636,8 @@ export default function MobileStaffHome() {
   const doBreakStart = async () => {
     const sid = safeToday?.scheduleId;
     if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
-    if (safeToday?.geofenceRequired && !(Number.isFinite(coords?.lat) || Number.isFinite(coords?.latitude))) {
-      addToast('현재 위치를 확인 중입니다. 잠시 후 다시 시도해주세요.', { color:'warning' });
+    if (requireGeo && !geoReady) {
+      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -647,7 +646,7 @@ export default function MobileStaffHome() {
       addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      const msg = e?.response?.data?.message || '휴게 시작 처리에 실패했습니다.';
+      const msg = e?.response?.data?.message || e?.response?.data?.status_message || '휴게 시작 처리에 실패했습니다.';
       addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
@@ -660,8 +659,8 @@ export default function MobileStaffHome() {
   const doBreakEnd = async () => {
     const sid = safeToday?.scheduleId;
     if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
-    if (safeToday?.geofenceRequired && !(Number.isFinite(coords?.lat) || Number.isFinite(coords?.latitude))) {
-      addToast('현재 위치를 확인 중입니다. 잠시 후 다시 시도해주세요.', { color:'warning' });
+    if (requireGeo && !geoReady) {
+      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -670,7 +669,7 @@ export default function MobileStaffHome() {
       addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
-      const msg = e?.response?.data?.message || '휴게 종료 처리에 실패했습니다.';
+      const msg = e?.response?.data?.message || e?.response?.data?.status_message || '휴게 종료 처리에 실패했습니다.';
       addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
@@ -727,15 +726,15 @@ export default function MobileStaffHome() {
     if (safeToday?.geofenceRequired !== true) return '위치 인증이 필요하지 않습니다';
     if (!branchReady) return '지점 위치 정보 없음';
     if (geoBlocked) return '위치 권한이 거부되었습니다';
-    if (geoTimedOut) return '위치 확인이 지연됩니다(타임아웃) · 새로고침 또는 위치 서비스 확인';
     if (!geoReady) return '현재 위치 확인중…';
     return inside
       ? `현재 지점까지 ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`
       : `반경 밖입니다: ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`;
-  }, [safeToday?.geofenceRequired, branchReady, geoBlocked, geoTimedOut, geoReady, inside, distance, branchGeo]);
+  }, [safeToday?.geofenceRequired, branchReady, geoBlocked, geoReady, inside, distance, branchGeo]);
 
+  // 🔒 지오펜스 필수면 '반경 내부 + 좌표 확보 + 권한 OK' 모두 만족 시에만 OK
   const geoOk = safeToday?.geofenceRequired === true
-    ? (branchReady ? ((geoReady && inside && !geoBlocked) || geoTimedOut) : false)
+    ? (branchReady && geoReady && inside && !geoBlocked)
     : true;
 
   return (

@@ -1,3 +1,6 @@
+// =========================================
+// src/service/branchGeolocationService.js
+// =========================================
 import axios from '../utils/axiosConfig';
 
 const BASE_URL = (() => {
@@ -113,7 +116,6 @@ export const isBranchGeofenceConfigured = (g) => {
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 
-// sign은 제곱되어 상관없지만 가독성을 위해 lon2 - lon1로 맞춤
 export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   if ([lat1, lon1, lat2, lon2].some((v) => !isFiniteNumber(v))) return NaN;
   const R = 6371000;
@@ -148,7 +150,6 @@ export class ForbiddenError extends Error {
 
 export async function fetchMyBranchGeofence() {
   try {
-    // 1차: /branch/my
     const res = await axios.get(`${BASE_URL}/branch/my`);
     const dto = unwrap(res) || {};
     const mapped = mapBranchGeo(dto);
@@ -158,7 +159,6 @@ export async function fetchMyBranchGeofence() {
     if (status === 403) throw new ForbiddenError(e?.response?.data?.status_message || '권한이 없습니다.');
   }
   try {
-    // 2차: /branch/my/geofence (레거시 호환)
     const res2 = await axios.get(`${BASE_URL}/branch/my/geofence`);
     const dto2 = unwrap(res2) || {};
     return mapBranchGeo(dto2);
