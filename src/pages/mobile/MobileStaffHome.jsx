@@ -38,6 +38,8 @@ import { useGeofence } from '../../hooks/useGeofence';
 import { formatMeters } from '../../utils/geo';
 
 const LATE_THRESHOLD_MIN = 1;
+// 환경변수로 지오펜스 여유 반경 조정 (기본 0m)
+const GEOFENCE_SLACK = Number(import.meta.env.VITE_GEOFENCE_SLACK_METERS ?? 0);
 
 const Screen = styled.div`
   min-height: 100vh;
@@ -601,8 +603,9 @@ export default function MobileStaffHome() {
   const doClockOut = async () => {
     const sid = safeToday?.scheduleId;
     if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    setLoading(true);
     try {
-      await clockOut(sid, coords);
+      await clockOut(sid, coords, { slackMeters: GEOFENCE_SLACK });
       addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -612,6 +615,8 @@ export default function MobileStaffHome() {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
       }
+    } finally {
+      setLoading(false);
     }
   };
   const doClockIn = async () => {
@@ -621,12 +626,15 @@ export default function MobileStaffHome() {
       addToast('현재 위치를 확인 중입니다. 잠시 후 다시 시도해주세요.', { color:'warning' });
       return;
     }
+    setLoading(true);
     try {
-      await clockIn(sid, coords);
+      await clockIn(sid, coords, { slackMeters: GEOFENCE_SLACK });
       addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       addToast(e?.response?.data?.message || '출근 처리에 실패했습니다.', { color:'error' });
+    } finally {
+      setLoading(false);
     }
   };
   const doBreakStart = async () => {
@@ -636,8 +644,9 @@ export default function MobileStaffHome() {
       addToast('현재 위치를 확인 중입니다. 잠시 후 다시 시도해주세요.', { color:'warning' });
       return;
     }
+    setLoading(true);
     try {
-      await breakStart(sid, coords);
+      await breakStart(sid, coords, { slackMeters: GEOFENCE_SLACK });
       addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -647,6 +656,8 @@ export default function MobileStaffHome() {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
       }
+    } finally {
+      setLoading(false);
     }
   };
   const doBreakEnd = async () => {
@@ -656,8 +667,9 @@ export default function MobileStaffHome() {
       addToast('현재 위치를 확인 중입니다. 잠시 후 다시 시도해주세요.', { color:'warning' });
       return;
     }
+    setLoading(true);
     try {
-      await breakEnd(sid, coords);
+      await breakEnd(sid, coords, { slackMeters: GEOFENCE_SLACK });
       addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
@@ -667,9 +679,12 @@ export default function MobileStaffHome() {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
+  // 단일 콜백 사용(ESLint: no-unused-vars 방지 + onClick 중복 제거)
   const actionOnClick = next.onClickName === 'out'
     ? async () => {
         if (hasOpenBreak) {
@@ -805,13 +820,7 @@ export default function MobileStaffHome() {
               <SingleBtnRow>
                 <ActionBtn
                   $variant={next.variant}
-                  onClick={next.onClickName === 'out' ? async () => {
-                    if (hasOpenBreak) {
-                      addToast('휴게를 종료하신 후 퇴근할 수 있습니다.', { color: 'warning' });
-                      return;
-                    }
-                    await doClockOut();
-                  } : doClockIn}
+                  onClick={actionOnClick}
                   disabled={finalDisabled}
                   aria-disabled={finalDisabled}
                 >

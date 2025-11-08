@@ -1,4 +1,3 @@
-// src/hooks/useGeofence.js
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const toRad = (d) => (d * Math.PI) / 180;
@@ -36,7 +35,7 @@ async function getOnce(options) {
  *    - autoStart (default true)
  *    - inflateByAccuracy (default true)
  *    - timeoutMs (default 15000)
- *    - acceptStaleMs (default 180000) // 캐시 허용
+ *    - acceptStaleMs (default 180000)
  */
 export function useGeofence(branchGeo, opts = {}) {
   const {
@@ -116,7 +115,7 @@ export function useGeofence(branchGeo, opts = {}) {
     setStale(false);
 
     try {
-      // 1) 빠른 캐시 / 저정밀 먼저 (최대 acceptStaleMs)
+      // 1) 빠른 캐시 / 저정밀 먼저
       const cached = await getOnce({
         enableHighAccuracy: false,
         timeout: Math.min(8000, timeoutMs),
@@ -137,7 +136,7 @@ export function useGeofence(branchGeo, opts = {}) {
         compute(cached);
       }
 
-      // 2) 고정밀 시도 (실패해도 cached가 있으면 그 상태 유지)
+      // 2) 고정밀 시도
       const precise = await getOnce({
         enableHighAccuracy: true,
         timeout: timeoutMs,
@@ -153,7 +152,6 @@ export function useGeofence(branchGeo, opts = {}) {
     } catch (e) {
       setError(e);
       if (e?.code === 3) setTimedOut(true); // TIMEOUT
-      // cached가 아예 없으면 inside=false 그대로
     } finally {
       if (!geoRef.current.cancel) setLoading(false);
     }

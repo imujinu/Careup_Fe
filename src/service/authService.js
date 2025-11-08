@@ -1,7 +1,15 @@
 import axios, { SKIP_FLAG } from '../utils/axiosConfig';
 import { decodeToken } from '../utils/jwt';
 
-const AUTH_API_URL = import.meta.env.VITE_AUTH_URL;
+const AUTH_API_URL = (() => {
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const explicit = trim(import.meta.env.VITE_AUTH_URL);
+  if (explicit) return explicit; // e.g. https://server.careup.store
+  const api =
+    trim(import.meta.env.VITE_API_URL) ||
+    (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
+  return api; // /auth/* 는 게이트웨이 루트에 매핑되어 있다고 가정
+})();
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem('accessToken'),
@@ -110,7 +118,6 @@ const normalizeFromResponse = (box = {}) => {
     box.picture ??
     box.avatarUrl ?? box.avatar_url ?? box.avatar ?? '';
 
-  // ★ 직급(title) 수용
   const title =
     box.title ??
     box.jobGradeName ?? box.job_grade_name ??
@@ -125,7 +132,7 @@ const normalizeFromResponse = (box = {}) => {
     branchId: box.branchId ?? null,
     branchName: box.branchName ?? undefined,
     name,
-    title,                // ★ 추가
+    title,
     email: box.email ?? undefined,
     profileImageUrl,
   };
@@ -136,7 +143,7 @@ const unwrapLoginResult = (data) => {
   return {
     accessToken: box?.accessToken ?? box?.access_token ?? box?.token,
     refreshToken: box?.refreshToken ?? box?.refresh_token,
-    payload: box, // ★ 최상위 필드 그대로 전달
+    payload: box,
     statusMessage: data?.status_message ?? data?.message,
     statusCode: data?.status_code ?? data?.status,
     errorCode: data?.error_code,
@@ -167,14 +174,12 @@ export const authService = {
     const fromJwt = getUserInfoFromToken(r.accessToken) || {};
     const fromResp = normalizeFromResponse(r.payload || {});
 
-    // 이름/사진/직급은 응답값을 우선으로, 없으면 JWT
     const userInfo = {
       ...fromJwt,
       ...fromResp,
       name: fromResp.name || fromJwt.name || '',
-      title: fromResp.title || fromJwt.title || '',            // ★ 직급
+      title: fromResp.title || fromJwt.title || '',
       profileImageUrl: fromResp.profileImageUrl || fromJwt.profileImageUrl || '',
-      // userType/branchType 재평가
       userType: isHQAdmin({ ...fromJwt, ...fromResp }) ? 'headquarters' : 'franchise',
     };
 
@@ -187,7 +192,6 @@ export const authService = {
     };
   },
 
-  // 서버 RT 폐기 포함 로그아웃
   logout: async () => {
     const rt = tokenStorage.getRefreshToken();
     try {
@@ -206,7 +210,6 @@ export const authService = {
     const rt = tokenStorage.getRefreshToken();
     if (!rt) throw new Error('No refresh token available');
 
-    // 리프레시 요청 자체도 인터셉터에서 건드리지 않도록 스킵
     const { data } = await axios.post(`${AUTH_API_URL}/auth/refresh`, { refreshToken: rt }, { [SKIP_FLAG]: true });
 
     const box = data?.result ?? data?.data ?? data;
@@ -226,7 +229,7 @@ export const authService = {
       ...fromJwt,
       ...fromResp,
       name: prev.name || fromResp.name || fromJwt.name || '',
-      title: prev.title || fromResp.title || fromJwt.title || '',                 // ★ 직급 유지
+      title: prev.title || fromResp.title || fromJwt.title || '',
       branchName: prev.branchName || fromResp.branchName || fromJwt.branchName || undefined,
       profileImageUrl: prev.profileImageUrl || fromResp.profileImageUrl || fromJwt.profileImageUrl || '',
       userType: isHQAdmin({ ...prev, ...fromJwt, ...fromResp }) ? 'headquarters' : 'franchise',

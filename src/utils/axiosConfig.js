@@ -1,16 +1,13 @@
-// src/utils/axiosConfig.js
 // 직원용 axios 전역 설정
-
 import axios from 'axios';
 import { tokenStorage, authService } from '../service/authService';
 
 // ✅ 게이트웨이 baseURL (Vite .env에서 VITE_API_URL 제공 권장)
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
+  (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '') ||
   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
-axios.defaults.baseURL = API_BASE_URL;
 
-// 공용 기본값
+axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.timeout = 30000;
 
