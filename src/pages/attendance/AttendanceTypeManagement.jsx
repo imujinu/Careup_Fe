@@ -25,73 +25,51 @@ import {
   deleteLeaveType,
 } from '../../service/attendanceTypeService';
 
-// 공통 상수(테이블 표준 준수)
 const ROW_H = 57;
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 100];
 
-const COL_WIDTH_WORK = {
-  id: 90,
-  name: 280,
-  flag: 160, // 지오펜스 필요
-  _actions: 220,
-};
+const COL_WIDTH_WORK = { id: 90, name: 280, flag: 160, _actions: 220 };
 const TABLE_MIN_WIDTH_WORK =
   COL_WIDTH_WORK.id + COL_WIDTH_WORK.name + COL_WIDTH_WORK.flag + COL_WIDTH_WORK._actions;
 
-const COL_WIDTH_LEAVE = {
-  id: 90,
-  name: 280,
-  flag: 120, // 유급
-  _actions: 220,
-};
+const COL_WIDTH_LEAVE = { id: 90, name: 280, flag: 120, _actions: 220 };
 const TABLE_MIN_WIDTH_LEAVE =
   COL_WIDTH_LEAVE.id + COL_WIDTH_LEAVE.name + COL_WIDTH_LEAVE.flag + COL_WIDTH_LEAVE._actions;
 
 const Mdi = ({ path, size = 0.95, ...props }) => <Icon path={path} size={size} aria-hidden {...props} />;
 
-// 탭 유형
-const TABS = {
-  WORK: 'WORK',
-  LEAVE: 'LEAVE',
-};
+const TABS = { WORK: 'WORK', LEAVE: 'LEAVE' };
 
 export default function AttendanceTypeManagement() {
   const { addToast } = useToast();
   const { role: rawRole } = useAppSelector((s) => s.auth);
   const role = useMemo(() => (rawRole || '').replace(/^ROLE_/, '').toUpperCase(), [rawRole]);
 
-  // ✅ 정책 반영: 조회는 HQ/지점관리자/가맹오너, 수정/삭제는 HQ만
   const canView = useMemo(() => ['HQ_ADMIN', 'BRANCH_ADMIN', 'FRANCHISE_OWNER'].includes(role), [role]);
   const canManage = role === 'HQ_ADMIN';
 
-  // 탭
   const [tab, setTab] = useState(TABS.WORK);
 
-  // 공통 UI 상태
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
 
-  // 정렬(서버는 name 정렬만 사용)
   const [sort, setSort] = useState({ field: 'name', dir: 'asc' });
 
-  // WorkType 상태
   const [workLoading, setWorkLoading] = useState(false);
   const [workItems, setWorkItems] = useState([]);
   const [workPage, setWorkPage] = useState(0);
   const [workPageSize, setWorkPageSize] = useState(20);
   const [workTotalPages, setWorkTotalPages] = useState(0);
 
-  // LeaveType 상태
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveItems, setLeaveItems] = useState([]);
   const [leavePage, setLeavePage] = useState(0);
   const [leavePageSize, setLeavePageSize] = useState(20);
   const [leaveTotalPages, setLeaveTotalPages] = useState(0);
 
-  // 모달 및 폼 상태
   const [openModal, setOpenModal] = useState(false);
-  const [editing, setEditing] = useState(null); // null=create
-  const [form, setForm] = useState({ name: '', flag: false }); // flag: geofenceRequired | paid
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', flag: false });
   const nameInputRef = useRef(null);
 
   const toggleSort = (field) => {
@@ -111,7 +89,6 @@ export default function AttendanceTypeManagement() {
     </HeadSort>
   );
 
-  /** ====== 서버 통신 ====== */
   const fetchWorkList = useCallback(async () => {
     if (!canView) return;
     setWorkLoading(true);
@@ -130,11 +107,8 @@ export default function AttendanceTypeManagement() {
     } catch (e) {
       const status = e?.response?.status;
       const msg403 = e?.response?.data?.status_message || '근무 타입 조회 권한이 없습니다.';
-      if (status === 403) {
-        addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
-      } else {
-        addToast({ type: 'error', title: '오류', message: '근무 타입을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
-      }
+      if (status === 403) addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
+      else addToast({ type: 'error', title: '오류', message: '근무 타입을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
       setWorkItems([]);
       setWorkTotalPages(0);
     } finally {
@@ -160,11 +134,8 @@ export default function AttendanceTypeManagement() {
     } catch (e) {
       const status = e?.response?.status;
       const msg403 = e?.response?.data?.status_message || '휴가 타입 조회 권한이 없습니다.';
-      if (status === 403) {
-        addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
-      } else {
-        addToast({ type: 'error', title: '오류', message: '휴가 타입을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
-      }
+      if (status === 403) addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
+      else addToast({ type: 'error', title: '오류', message: '휴가 타입을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
       setLeaveItems([]);
       setLeaveTotalPages(0);
     } finally {
@@ -172,7 +143,6 @@ export default function AttendanceTypeManagement() {
     }
   }, [canView, leavePage, leavePageSize, sort.field, sort.dir, addToast]);
 
-  // 탭/페이지/정렬 변경 시 목록 로딩
   useEffect(() => {
     if (tab === TABS.WORK) fetchWorkList();
   }, [tab, fetchWorkList]);
@@ -181,7 +151,6 @@ export default function AttendanceTypeManagement() {
     if (tab === TABS.LEAVE) fetchLeaveList();
   }, [tab, fetchLeaveList]);
 
-  // 검색
   const submitSearch = (e) => {
     if (e) e.preventDefault();
     setSearch(searchDraft.trim());
@@ -189,7 +158,6 @@ export default function AttendanceTypeManagement() {
     else setLeavePage(0);
   };
 
-  // 프론트단 필터링(서버 검색은 미제공 → name 부분검색)
   const filteredWork = useMemo(() => {
     if (!search) return workItems;
     const q = search.toLowerCase();
@@ -202,7 +170,6 @@ export default function AttendanceTypeManagement() {
     return (leaveItems || []).filter((r) => String(r.name || '').toLowerCase().includes(q));
   }, [leaveItems, search]);
 
-  // 모달 열기/닫기/폼
   const openCreate = () => {
     setEditing(null);
     setForm({ name: '', flag: false });
@@ -211,7 +178,6 @@ export default function AttendanceTypeManagement() {
   };
   const openEdit = (row) => {
     setEditing(row);
-    // work: geofenceRequired / leave: paid
     setForm({ name: row.name || '', flag: !!(tab === TABS.WORK ? row.geofenceRequired : row.paid) });
     setOpenModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 0);
@@ -222,7 +188,6 @@ export default function AttendanceTypeManagement() {
     setForm({ name: '', flag: false });
   };
 
-  // 저장/수정
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!canManage) return;
@@ -301,7 +266,6 @@ export default function AttendanceTypeManagement() {
     }
   };
 
-  // 페이지네이션 번호(공통 로직)
   const pageItems = useCallback((page, totalPages) => {
     const tp = Math.max(0, totalPages);
     const last = Math.max(0, tp - 1);
@@ -326,7 +290,6 @@ export default function AttendanceTypeManagement() {
     return <div style={{ padding: 24 }}>타입 관리에 접근 권한이 없습니다.</div>;
   }
 
-  // 현재 탭 기준 데이터/상태 선택
   const isWork = tab === TABS.WORK;
   const loading = isWork ? workLoading : leaveLoading;
   const list = isWork ? filteredWork : filteredLeave;
@@ -342,18 +305,10 @@ export default function AttendanceTypeManagement() {
         <div>
           <Title>근무/휴가 타입 관리</Title>
           <Tabs>
-            <TabButton
-              className={isWork ? 'active' : ''}
-              onClick={() => setTab(TABS.WORK)}
-              type="button"
-            >
+            <TabButton className={isWork ? 'active' : ''} onClick={() => setTab(TABS.WORK)} type="button">
               근무 타입
             </TabButton>
-            <TabButton
-              className={!isWork ? 'active' : ''}
-              onClick={() => setTab(TABS.LEAVE)}
-              type="button"
-            >
+            <TabButton className={!isWork ? 'active' : ''} onClick={() => setTab(TABS.LEAVE)} type="button">
               휴가 타입
             </TabButton>
           </Tabs>
@@ -390,7 +345,6 @@ export default function AttendanceTypeManagement() {
         </HeaderActions>
       </Header>
 
-      {/* 표 */}
       <TableWrap>
         <table style={{ minWidth: `${isWork ? TABLE_MIN_WIDTH_WORK : TABLE_MIN_WIDTH_LEAVE}px` }}>
           <colgroup>
@@ -459,7 +413,6 @@ export default function AttendanceTypeManagement() {
         </table>
       </TableWrap>
 
-      {/* 페이지네이션 */}
       <PaginationBar>
         <Pager>
           <button
@@ -513,7 +466,6 @@ export default function AttendanceTypeManagement() {
         </Pager>
       </PaginationBar>
 
-      {/* 모달 */}
       {openModal && (
         <ModalBackdrop onClick={closeModal}>
           <Modal onClick={(e) => e.stopPropagation()}>
@@ -565,7 +517,6 @@ export default function AttendanceTypeManagement() {
   );
 }
 
-/* ===== 스타일 (테이블 표준 준수) ===== */
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -603,7 +554,6 @@ const TabButton = styled.button`
     color: #fff;
   }
 `;
-
 const HeaderActions = styled.div`
   display: flex;
   gap: 8px;
@@ -656,21 +606,18 @@ const IconBtn = styled.button`
   border: 0; background: transparent; color: #6b7280; cursor: pointer;
   &:hover { color: #4b5563; }
 `;
-
 const TableWrap = styled.div`
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
   overflow-x: auto;
   width: 100%;
-
   table {
     border-collapse: separate;
     border-spacing: 0;
     table-layout: fixed;
     width: 100%;
   }
-
   thead th {
     position: relative;
     font-size: 14px;
@@ -687,7 +634,6 @@ const TableWrap = styled.div`
     vertical-align: middle;
   }
   th.sortable { cursor: pointer; user-select: none; }
-
   tbody td {
     padding: 0 12px;
     border-bottom: 1px solid #f1f5f9;
@@ -702,7 +648,6 @@ const TableWrap = styled.div`
     height: ${ROW_H}px;
   }
   tbody tr:hover { background: #fafafa; }
-
   .empty {
     color: #6b7280;
     text-align: center;
@@ -711,7 +656,6 @@ const TableWrap = styled.div`
     vertical-align: middle;
   }
 `;
-
 const HeadGroup = styled.div`
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -736,7 +680,6 @@ const HeadSort = styled.span`
   justify-content: center;
   opacity: ${(p) => (p.$active ? 1 : 0.35)};
 `;
-
 const Actions = styled.div`
   display: inline-flex;
   align-items: center;
@@ -759,7 +702,6 @@ const TextBtn = styled.button`
   &:hover { background: ${(p) => (p.$danger ? '#fff1f2' : '#f9fafb')}; }
   &:disabled { opacity: 0.45; cursor: not-allowed; background: #f3f4f6; border-color: #e5e7eb; color: #9ca3af; }
 `;
-
 const PaginationBar = styled.div`
   margin-top: 12px;
   display: grid;
@@ -781,7 +723,6 @@ const Pager = styled.div`
   }
   .page.active { background: #8b5cf6; border-color: #8b5cf6; color: #fff; }
 `;
-
 const ModalBackdrop = styled.div`
   position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 50;
 `;
