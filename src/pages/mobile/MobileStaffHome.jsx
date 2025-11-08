@@ -29,10 +29,7 @@ import { useToast } from '../../components/common/Toast';
 import { useAppSelector } from '../../stores/hooks';
 import { tokenStorage, authService } from '../../service/authService';
 import { MobileScheduleDetailModal } from '../../components/mobile/MobileScheduleDetailModal';
-
-// 지오펜스는 전용 서비스 사용
 import { fetchMyBranchGeofence } from '../../service/branchGeolocationService';
-
 import { useGeofence } from '../../hooks/useGeofence';
 import { formatMeters } from '../../utils/geo';
 
@@ -54,7 +51,6 @@ const Container = styled.div`
   max-width: 560px;
   margin: 0 auto;
 `;
-
 const TopRow = styled.div`
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 8px;
@@ -72,7 +68,6 @@ const LogoutBtn = styled.button`
   backdrop-filter: blur(4px);
   &:hover { background: rgba(255,255,255,.26); }
 `;
-
 const UserRow = styled.div`
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 8px 0 12px;
 `;
@@ -90,7 +85,6 @@ const UserMeta = styled.div`
   strong { font-size: clamp(14px, 3.8vw, 16px); font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   small { font-size: 12px; color: rgba(255,255,255,.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 `;
-
 const Wrap = styled.div`
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
 `;
@@ -101,7 +95,6 @@ const CardTitle = styled.h2`
   font-size: 15px; font-weight: 900; color: #111827; display: flex; align-items: center; gap: 8px; margin: 2px 0 12px;
   svg { opacity: .9; }
 `;
-
 const TitleRow = styled.div`
   display: grid; grid-template-columns: 1fr auto; align-items: center;
 `;
@@ -121,7 +114,6 @@ const WeekNavBtn = styled.button`
   width: 28px; height: 28px; padding: 0;
   border: none; background: transparent; color: #374151; cursor: pointer;
 `;
-
 const TodayRow = styled.div`display: grid; gap: 12px;`;
 const ScheduleLine = styled.div`
   display: flex; align-items: center; gap: 12px;
@@ -135,7 +127,6 @@ const StatusBadge = styled.span`
   font-weight: 700; border: 1px solid ${(p)=>p.$bd}; color: ${(p)=>p.$fg}; background: ${(p)=>p.$bg};
 `;
 const SingleBtnRow = styled.div`display:grid; grid-template-columns: 1fr;`;
-
 const ActionBtn = styled.button`
   height: 44px; width: 100%;
   border: 1px solid transparent;
@@ -156,7 +147,6 @@ const ActionBtn = styled.button`
     transform: none;
   }
 `;
-
 const BreakBtnRow = styled.div`
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;
 `;
@@ -178,13 +168,11 @@ const BreakBtn = styled.button`
     cursor: not-allowed;
   }
 `;
-
 const WeekStrip = styled.div`
   display: grid; grid-auto-flow: column; gap: 10px;
   grid-auto-columns: clamp(90px, 24vw, 110px);
   width: max-content;
 `;
-
 const DayBox = styled.button`
   border-radius: 12px;
   padding: 12px 12px;
@@ -201,7 +189,6 @@ const DayBox = styled.button`
   &:active { transform: none; }
   &:focus { outline: none; }
 `;
-
 const BarWrap = styled.div`margin-top: 14px;`;
 const BarRail = styled.div`
   position: relative; height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden;
@@ -225,7 +212,6 @@ const MarkerLabel = styled.div`
   transform: translate(-50%, 4px);
 `;
 const BarMeta = styled.div`display:flex; justify-content: space-between; font-size: 12px; color:#374151; margin-top: 18px;`;
-
 const GeoRow = styled.div`
   display: grid;
   grid-template-columns: 1fr auto;
@@ -248,7 +234,6 @@ const stylesByVariant = {
   purple: { bg:'#f5f3ff', bd:'#ddd6fe', fg:'#6d28d9' },
   gray:   { bg:'#f3f4f6', bd:'#e5e7eb', fg:'#374151' },
 };
-
 const STATUS_LABEL = {
   PLANNED: '근무예정',
   CLOCKED_IN: '근무중',
@@ -294,6 +279,7 @@ const toBool = (v) => {
   }
   return false;
 };
+
 const resolveGeofenceRequired = (o) => {
   if (!o) return false;
   const cands = [
@@ -314,6 +300,7 @@ const resolveGeofenceRequired = (o) => {
   }
   return false;
 };
+
 const toTimeMs = (v) => (v instanceof Date ? v.getTime() : (v ? new Date(v).getTime() : NaN));
 const toYMDlocal = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
@@ -375,13 +362,11 @@ function heuristicVariant(o, now = new Date()) {
   if (aOut) return 'green';
   return 'blue';
 }
-
 function colorVariant(obj, now = new Date()) {
   const st = pickStatusText(obj);
   if (st) return stableVariantFromStatus(st, obj);
   return heuristicVariant(obj, now);
 }
-
 const statusText = (o) => {
   if (!o) return '근무예정';
   if (o.off === true) return '일정 없음';
@@ -389,7 +374,6 @@ const statusText = (o) => {
   if (st === 'LEAVE') return o?.leaveTypeName || '휴가';
   return STATUS_LABEL[st] || (st ? st : '근무예정');
 };
-
 const getInText = (o) => norm(pick(o, [
   'in',
   'clockInAt','actualClockIn','actualStartAt',
@@ -402,7 +386,6 @@ const getOutText = (o) => norm(pick(o, [
   'end','plannedOut','scheduledOut','expectedOut','endAt','workEndAt',
   'registeredClockOut','registeredEndAt',
 ])) || '-';
-
 const pickStatus = (o) => pickStatusText(o);
 const hasIn = (o) => !!actualInOf(o);
 const hasOut = (o) => !!actualOutOf(o);
@@ -436,26 +419,74 @@ function decideAction(today, loading) {
   const preferOut = st === 'CLOCKED_IN' || st === 'ON_BREAK' || st === 'MISSED_CHECKOUT' || inNow;
   const canIn = allowClockInLocal(today);
   const canOut = allowClockOutLocal(today);
-
   if (preferOut) {
     return { label: '퇴근하기', icon: mdiLogoutVariant, variant: 'out', onClickName: 'out', disabled: loading || !canOut };
   }
   return { label: '출근하기', icon: mdiChevronRight, onClickName: 'in', disabled: loading || !canIn };
 }
 
+/* today 보강: 스케줄 상세에서 geofenceRequired와 지점 좌표/반경을 today에 병합 */
+function enrichTodayWithDetail(today, detail) {
+  if (!today || !detail) return today;
+  const flagCand = [
+    detail?.workType?.geofenceRequired,
+    detail?.workType?.geofenceRequiredYn,
+    detail?.geofenceRequired,
+    detail?.geofenceRequiredYn,
+    detail?.gpsRequired,
+    detail?.gpsApply,
+    detail?.type?.geofenceRequired,
+    detail?.type?.geofenceRequiredYn,
+  ];
+  let flag;
+  for (const v of flagCand) {
+    if (v !== undefined && v !== null && String(v) !== '') { flag = toBool(v); break; }
+  }
+
+  const latCand = [
+    detail?.branchLat, detail?.branchLatitude, detail?.latitude,
+    detail?.branch?.lat, detail?.branch?.latitude,
+    detail?.location?.lat, detail?.location?.latitude,
+  ];
+  const lngCand = [
+    detail?.branchLng, detail?.branchLong, detail?.branchLongitude, detail?.longitude, detail?.lon,
+    detail?.branch?.lng, detail?.branch?.long, detail?.branch?.longitude,
+    detail?.location?.lng, detail?.location?.long, detail?.location?.longitude,
+  ];
+  const radCand = [
+    detail?.geofenceRadius, detail?.geofenceRadiusMeters, detail?.branchRadiusMeters,
+    detail?.branch?.geofenceRadius, detail?.branch?.geofenceRadiusMeters,
+    detail?.location?.radius, detail?.location?.radiusMeters,
+  ];
+
+  const lat = Number(latCand.find((x) => Number.isFinite(Number(x))));
+  const lng = Number(lngCand.find((x) => Number.isFinite(Number(x))));
+  const radius = Number(radCand.find((x) => Number.isFinite(Number(x))));
+
+  const merged = { ...today };
+  if (flag !== undefined) {
+    merged.geofenceRequired = flag;
+    merged.workTypeGeofenceRequired = flag;
+    merged.workType = { ...(today.workType || {}), geofenceRequired: flag };
+  }
+  if (!Number.isFinite(Number(merged.branchLat)) && Number.isFinite(lat)) merged.branchLat = lat;
+  if (!Number.isFinite(Number(merged.branchLng)) && Number.isFinite(lng)) merged.branchLng = lng;
+  if (!Number.isFinite(Number(merged.geofenceRadius)) && Number.isFinite(radius)) merged.geofenceRadius = radius;
+
+  return merged;
+}
+
 function isDayEmptyForModal(o) {
   if (!o) return true;
-  if (isOff(o)) return true;
+  if (o.off === true) return true;
   const st = pickStatus(o);
   if (st) return false;
   const hasAnyTime = (getInText(o) !== '-') || (getOutText(o) !== '-');
   return !hasAnyTime;
 }
-
 function minutesToPct(mins, targetHours) { return pctOf(Number(mins || 0), Number(targetHours || 1)); }
 function weeklyGaugeColor(totalMinutes)   { const h = Number(totalMinutes || 0)/60; return (h < 30 || h > 40) ? '#f59e0b' : '#10b981'; }
 function avgGaugeColor(avgMinutesPerDay)  { const h = Number(avgMinutesPerDay || 0)/60; return (h >= 7 && h <= 8) ? '#10b981' : '#f59e0b'; }
-
 function initials(name = '') {
   const s = String(name).trim();
   const parts = s ? s.split(/\s+/) : [];
@@ -543,11 +574,20 @@ export default function MobileStaffHome() {
   const loadAll = useCallback(async (anchorDate) => {
     setLoading(true);
     try {
-      const [t, met, geo] = await Promise.all([
+      const [tRaw, met, geo] = await Promise.all([
         fetchTodayStatus(),
         fetchWeekMetrics(anchorDate),
         fetchMyBranchGeofence().catch(() => null),
       ]);
+
+      let t = tRaw || null;
+
+      if (t?.scheduleId) {
+        try {
+          const det = await getScheduleDetail(t.scheduleId);
+          t = enrichTodayWithDetail(t, det);
+        } catch {}
+      }
 
       const hydratedDays = await hydrateWeekDaysWithServer(met?.days || []);
 
@@ -600,7 +640,7 @@ export default function MobileStaffHome() {
     return { lat, lng, radius };
   }, [branchGeoApi, safeToday, authUserSafe]);
 
-  const { permission, coords, distance, inside, loading: geoLoading, refresh, timedOut } =
+  const { permission, coords, distance, inside, loading: geoLoading, refresh } =
     useGeofence(branchGeo, { autoStart: true, inflateByAccuracy: true, timeoutMs: 15000, acceptStaleMs: 180000 });
 
   const branchReady = !!(Number.isFinite(branchGeo?.lat) && Number.isFinite(branchGeo?.lng) && Number.isFinite(branchGeo?.radius) && branchGeo.radius > 0);
@@ -609,7 +649,6 @@ export default function MobileStaffHome() {
 
   const requireGeo = resolveGeofenceRequired(safeToday);
 
-  // 🔒 변경 포인트: 지오펜스 필수면 '반경 내임'이 확정되기 전까지 버튼 비활성화
   const geoDisabled = requireGeo ? (!branchReady || geoBlocked || !geoReady || !inside) : false;
 
   const next = decideAction(safeToday, loading);
@@ -627,7 +666,7 @@ export default function MobileStaffHome() {
 
   const doClockOut = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     setLoading(true);
     try {
       await clockOut(
@@ -635,11 +674,11 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      addToast('퇴근 처리되었습니다.', { color:'success' });
+      useToast().addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '퇴근 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
+      useToast().addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
@@ -650,9 +689,9 @@ export default function MobileStaffHome() {
   };
   const doClockIn = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     if (requireGeo && !geoReady) {
-      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
+      useToast().addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color: 'warning' });
       return;
     }
     setLoading(true);
@@ -662,20 +701,20 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      addToast('출근 처리되었습니다.', { color:'success' });
+      useToast().addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '출근 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
+      useToast().addToast(msg, { color:'error' });
     } finally {
       setLoading(false);
     }
   };
   const doBreakStart = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     if (requireGeo && !geoReady) {
-      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
+      useToast().addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -685,11 +724,11 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      addToast('휴게 시작되었습니다.', { color:'success' });
+      useToast().addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '휴게 시작 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
+      useToast().addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
@@ -700,9 +739,9 @@ export default function MobileStaffHome() {
   };
   const doBreakEnd = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     if (requireGeo && !geoReady) {
-      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
+      useToast().addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -712,11 +751,11 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      addToast('휴게 종료되었습니다.', { color:'success' });
+      useToast().addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '휴게 종료 처리에 실패했습니다.';
-      addToast(msg, { color:'error' });
+      useToast().addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
@@ -729,7 +768,7 @@ export default function MobileStaffHome() {
   const actionOnClick = next.onClickName === 'out'
     ? async () => {
         if (hasOpenBreak) {
-          addToast('휴게를 종료하신 후 퇴근할 수 있습니다.', { color: 'warning' });
+          useToast().addToast('휴게를 종료하신 후 퇴근할 수 있습니다.', { color: 'warning' });
           return;
         }
         await doClockOut();
@@ -750,8 +789,8 @@ export default function MobileStaffHome() {
   const avgColor = avgGaugeColor(avgPerDayMinutes);
   const avgMarkerPct = (dailyAvgMarkerHours / dailyAvgMaxHours) * 100;
 
-  const totalHoursText = `${Math.floor(totalMinutes / 60)}시간 ${totalMinutes % 60}분`;
   const avgHoursText = `${Math.floor(avgPerDayMinutes / 60)}시간 ${String(Math.round(avgPerDayMinutes % 60)).padStart(2,'0')}분`;
+  const totalHoursText = `${Math.floor(totalMinutes / 60)}시간 ${totalMinutes % 60}분`;
 
   const days = Array.isArray(weekDays) ? weekDays.filter(Boolean) : [];
 
@@ -905,7 +944,7 @@ export default function MobileStaffHome() {
 
             <WeekViewport role="region" aria-label="이번 주 근무 날짜 목록">
               <WeekStrip>
-                {days.map((d, i) => {
+                {(Array.isArray(weekDays) ? weekDays : []).map((d, i) => {
                   const variant = colorVariant(d, new Date());
                   const style = stylesByVariant[variant] || stylesByVariant.blue;
 
@@ -957,8 +996,8 @@ export default function MobileStaffHome() {
             <BarWrap>
               <BarRail>
                 <BarFill $pct={avgPct} $color={avgColor} />
-                <BarMarker $leftPct={avgMarkerPct} />
-                <MarkerLabel $leftPct={avgMarkerPct}>{String(dailyAvgMarkerHours)}</MarkerLabel>
+                <BarMarker $leftPct={dailyAvgMarkerHours / dailyAvgMaxHours * 100} />
+                <MarkerLabel $leftPct={dailyAvgMarkerHours / dailyAvgMaxHours * 100}>{String(dailyAvgMarkerHours)}</MarkerLabel>
               </BarRail>
               <BarMeta>
                 <span>{avgHoursText}</span>
