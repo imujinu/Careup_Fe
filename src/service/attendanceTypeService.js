@@ -1,18 +1,16 @@
 // src/service/attendanceTypeService.js
 import axios from '../utils/axiosConfig';
 
-/** 브랜치 서비스 루트 계산 (기존 유지) */
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
   const explicit = trim(import.meta.env.VITE_BRANCH_URL);
-  if (explicit) return explicit; // e.g. https://server.careup.store/branch-service
+  if (explicit) return explicit;
   const api =
     trim(import.meta.env.VITE_API_URL) ||
     (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
   return `${api}/branch-service`;
 })();
 
-/** 공통 언랩 */
 const unwrap = (res) => {
   const d = res?.data;
   if (d && typeof d === 'object') {
@@ -22,12 +20,10 @@ const unwrap = (res) => {
   return d ?? null;
 };
 
-/** 상태코드/네트워크 헬퍼 */
 const codeOf = (e) => Number(e?.response?.status || 0);
 const shouldTryNext = (e) => {
   const c = codeOf(e);
-  // 🔧 404/405/415 뿐 아니라, 5xx(서버 매핑/바인딩 오류)도 다음 후보 시도
-  return [0, 404, 405, 415, 500, 501, 502, 503].includes(c); // 🆕
+  return [0, 404, 405, 415, 500, 501, 502, 503].includes(c);
 };
 
 async function httpTry(cfg) {
@@ -39,7 +35,6 @@ async function httpTry(cfg) {
   return axios(c);
 }
 
-/** 🆕 여러 조합을 순차 시도하고, 성공하면 언랩 반환 */
 async function callAny(variants = []) {
   let lastErr;
   for (const v of variants) {
@@ -48,40 +43,34 @@ async function callAny(variants = []) {
       return unwrap(res);
     } catch (e) {
       lastErr = e;
-      if (!shouldTryNext(e)) throw e; // 🔧 치명적(400/401/403 등)이면 즉시 중단
-      // 다음 후보 계속 시도
+      if (!shouldTryNext(e)) throw e;
     }
   }
   throw lastErr;
 }
 
-/* =========================
- * Work Type (근무 종류)
- * ========================= */
-
 export async function listWorkTypes({ page = 0, size = 20, sort = 'name,asc', keyword } = {}) {
-  // 🔧 다양한 리스트 엔드포인트 폴백
   const params = { page, size, sort, keyword };
-  return callAny([
-    { method: 'get', url: `${BASE_URL}/work-type/list`, data: { params } },         // 표준
-    { method: 'get', url: `${BASE_URL}/work-type`, data: { params } },              // REST 스타일
-    { method: 'get', url: `${BASE_URL}/work-type/all`, data: { params } },          // 변형
-  ].map((v) => (v.method === 'get' ? { ...v, data: undefined, params } : v))); // axios get은 params 사용
+  return callAny(
+    [
+      { method: 'get', url: `${BASE_URL}/work-type/list` },
+      { method: 'get', url: `${BASE_URL}/work-type` },
+      { method: 'get', url: `${BASE_URL}/work-type/all` },
+    ].map((v) => ({ ...v, params }))
+  );
 }
 
 export async function createWorkType(payload) {
-  // 🔧 메서드/경로 전천후 시도
   return callAny([
-    { method: 'post', url: `${BASE_URL}/work-type/create`, data: payload }, // 기존
-    { method: 'post', url: `${BASE_URL}/work-type`, data: payload },        // REST
-    { method: 'put',  url: `${BASE_URL}/work-type`, data: payload },        // 변형
+    { method: 'post', url: `${BASE_URL}/work-type/create`, data: payload },
+    { method: 'post', url: `${BASE_URL}/work-type`, data: payload },
+    { method: 'put',  url: `${BASE_URL}/work-type`, data: payload },
   ]);
 }
 
 export async function updateWorkType(id, payload) {
   const pid = encodeURIComponent(String(id));
   const body = { id, ...payload };
-  // 🔧 PUT → PATCH → POST, 경로 {id} /update/{id} /update 바디 아이디 포함까지 전부 시도
   return callAny([
     { method: 'put',   url: `${BASE_URL}/work-type/${pid}`, data: payload },
     { method: 'patch', url: `${BASE_URL}/work-type/${pid}`, data: payload },
@@ -96,7 +85,6 @@ export async function updateWorkType(id, payload) {
 
 export async function deleteWorkType(id) {
   const pid = encodeURIComponent(String(id));
-  // 🔧 DELETE 우선, 이후 변형들 시도
   return callAny([
     { method: 'delete', url: `${BASE_URL}/work-type/${pid}` },
     { method: 'delete', url: `${BASE_URL}/work-type/delete/${pid}` },
@@ -105,17 +93,15 @@ export async function deleteWorkType(id) {
   ]);
 }
 
-/* =========================
- * Leave Type (휴가 종류)
- * ========================= */
-
 export async function listLeaveTypes({ page = 0, size = 20, sort = 'name,asc', keyword } = {}) {
   const params = { page, size, sort, keyword };
-  return callAny([
-    { method: 'get', url: `${BASE_URL}/leave-type/list`, data: { params } },
-    { method: 'get', url: `${BASE_URL}/leave-type`, data: { params } },
-    { method: 'get', url: `${BASE_URL}/leave-type/all`, data: { params } },
-  ].map((v) => (v.method === 'get' ? { ...v, data: undefined, params } : v)));
+  return callAny(
+    [
+      { method: 'get', url: `${BASE_URL}/leave-type/list` },
+      { method: 'get', url: `${BASE_URL}/leave-type` },
+      { method: 'get', url: `${BASE_URL}/leave-type/all` },
+    ].map((v) => ({ ...v, params }))
+  );
 }
 
 export async function createLeaveType(payload) {
@@ -151,6 +137,17 @@ export async function deleteLeaveType(id) {
   ]);
 }
 
+/* ↓↓↓ 추가: 워크타입 단건 조회 (geofenceRequired 확보용) ↓↓↓ */
+export async function getWorkType(id) {
+  const pid = encodeURIComponent(String(id));
+  return callAny([
+    { method: 'get', url: `${BASE_URL}/work-type/${pid}` },
+    { method: 'get', url: `${BASE_URL}/work-type/detail/${pid}` },
+    { method: 'get', url: `${BASE_URL}/work-type`, params: { id } },
+    { method: 'post', url: `${BASE_URL}/work-type/detail`, data: { id } },
+  ]);
+}
+
 export default {
   listWorkTypes,
   createWorkType,
@@ -160,4 +157,5 @@ export default {
   createLeaveType,
   updateLeaveType,
   deleteLeaveType,
+  getWorkType,
 };

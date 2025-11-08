@@ -1,18 +1,13 @@
-// 모바일 출퇴근/휴게 전용 서비스 (전체 교체본)
-// - 지점 지오펜스 로드 + 반경 내 검증(필요 시)
-// - 기록 API는 POST 우선(405/404/415 등일 때만 다음 후보 시도)
-// - 오늘 상태/주간 요약/메트릭 계산 + 워크타입 기반 지오펜스 필수 여부 강제 일치
-
+// src/service/attendanceMobileService.js
 import axios from '../utils/axiosConfig';
 import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
-
-// ▼ 지오펜스 서비스
 import {
   fetchMyBranchGeofence as fetchBranchGeoNew,
   isBranchGeofenceConfigured as isBranchGeoConfigured,
 } from './branchGeolocationService';
+import { getWorkType } from './attendanceTypeService';
 
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
@@ -29,9 +24,6 @@ const BASE_URL = (() => {
 const DOW_KR = ['일','월','화','수','목','금','토'];
 const LATE_THRESHOLD_MIN = 1;
 
-/* =========================
- * 공통 날짜/시간 유틸
- * ========================= */
 const toYMD = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
   const y = dt.getFullYear();
@@ -113,9 +105,6 @@ const minutesOverlapOnDay = (as, ae, ymd) => {
   return Math.max(0, Math.round(overlap / 60000));
 };
 
-/* =========================
- * 지오펜스 계산/검증
- * ========================= */
 const haversineMeters = (lat1, lng1, lat2, lng2) => {
   const R = 6371000;
   const toRad = (d) => (d * Math.PI) / 180;
@@ -155,7 +144,6 @@ const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fal
   const slack = Number(cfg.slackMeters || 0);
 
   if (!geofenceRequired) {
-    // 필수 아님: 좌표가 없으면 "가능하면" 1회 측정 시도(실패해도 막지 않음)
     let coord = geo ?? null;
     if (!coord) {
       try { coord = await getCurrentCoords({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }); } catch {}
@@ -194,23 +182,16 @@ const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fal
   const dist = haversineMeters(coord.lat, coord.lng, fenceLat, fenceLng);
   if (dist > radius) {
     throw new Error(`지점 반경 밖입니다. 현재 거리: ${Math.round(dist)}m`);
-  }
-
+    }
   return { ok: true, geo: coord, distance: dist, radius, required: true };
 };
-/* ========================= */
 
-/* =========================
- * 지오펜스 필수 여부 판단(강화)
- * - 다양한 필드명/문자값 + gpsRequired/gpsApply 지원
- * - 명시 정보 없으면 false
- * ========================= */
 const truth = (v) => {
   if (typeof v === 'boolean') return v;
   if (typeof v === 'number') return v > 0;
   if (typeof v === 'string') {
     const s = v.trim().toUpperCase();
-    if (['Y','YES','TRUE','REQUIRED','MANDATORY','NEEDED','ALWAYS','REQUIRE','ON','ENABLED'].includes(s)) return true;
+    if (['Y','YES','TRUE','REQUIRED','MANDATORY','ALWAYS','REQUIRE','ON','ENABLED'].includes(s)) return true;
     if (['N','NO','FALSE','NONE','OPTIONAL','DISABLED','OFF'].includes(s)) return false;
   }
   return null;
@@ -232,12 +213,8 @@ const anyOf = (...vals) => {
   return null;
 };
 
-/* =========================
- * 지오펜스 필수 여부 판단 — "근무타입 플래그 우선"
- * gpsRequired / gpsApply도 인식
- * ========================= */
+/* 강화: workTypeId 기반 서버 조회로 geofenceRequired 확정 */
 async function resolveFenceRequired(detail, primary) {
-  // 1) WorkType 신호가 최우선
   const candsWorkType = [
     detail?.workType?.geofenceRequired,
     detail?.workTypeGeofenceRequired,
@@ -255,12 +232,9 @@ async function resolveFenceRequired(detail, primary) {
     primary?.workType?.gpsRequired,
     primary?.workType?.gpsApply,
   ];
-  for (const v of candsWorkType) {
-    const t = truth(v);
-    if (t !== null) return t;
-  }
+  let t = anyOf(...candsWorkType);
+  if (t !== null) return t;
 
-  // 2) 스케줄 자체 신호(보조)
   const candsSchedule = [
     detail?.geofenceRequired,
     detail?.requireGeofence,
@@ -274,14 +248,35 @@ async function resolveFenceRequired(detail, primary) {
     primary?.gpsRequired,
     primary?.gpsApply,
   ];
-  for (const v of candsSchedule) {
-    const t = truth(v);
-    if (t !== null) return t;
+  t = anyOf(...candsSchedule);
+  if (t !== null) return t;
+
+  const workTypeId =
+    detail?.workTypeId ||
+    detail?.workType?.id ||
+    detail?.workTypeSeq ||
+    primary?.workTypeId ||
+    primary?.workType?.id ||
+    primary?.workTypeSeq ||
+    null;
+
+  if (workTypeId != null) {
+    try {
+      const wt = await getWorkType(workTypeId);
+      const t2 = anyOf(
+        wt?.geofenceRequired,
+        wt?.requireGeofence,
+        wt?.requiresGeofence,
+        wt?.geoFenceRequired,
+        wt?.gpsRequired,
+        wt?.gpsApply
+      );
+      if (t2 !== null) return t2;
+    } catch {}
   }
 
-  return false; // 기본값
+  return false;
 }
-/* ========================= */
 
 const summarizeWeekFromEvents = (events, anchorDate) => {
   const todayYMD = toYMD(new Date());
@@ -596,7 +591,6 @@ export const fetchTodayStatus = async () => {
       try {
         const detail = await getScheduleDetail(sid);
 
-        // === 지오펜스 필수 여부(강화 판단) ===
         geofenceRequired = await resolveFenceRequired(detail, primary);
 
         const plannedStart =
@@ -817,7 +811,6 @@ const allowClockOut = (obj) => {
   return false;
 };
 
-// 클라이언트 휴게 허용 로직(프론트 기준)
 export const allowBreakStartClient = (obj) => {
   if (!obj) return false;
   const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
@@ -851,13 +844,11 @@ const postJson = (url, data = {}) => {
 
 const normalizeId = (v) => String(v ?? '').split(':')[0];
 
-// ――― 재시도 판단(보수적): 메시지 없으면 400도 재시도
-const shouldTryNext = (status/*, message*/) => {
+const shouldTryNext = (status) => {
    const s = Number(status);
    return [400, 404, 405, 415].includes(s);
 };
 
-// 서버 DTO(AttendanceActionRequest)와 정확히 일치하는 바디 구성
 const buildActionPayload = (_scheduleId, geo) => {
   const pickNum = (...cands) => {
     for (const v of cands) if (Number.isFinite(v)) return v;
@@ -880,7 +871,6 @@ const buildActionPayload = (_scheduleId, geo) => {
   return Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined));
 };
 
-// URL 형태에 따라 scheduleId를 바디에 포함(마지막 후보 /attendance/* 전용)
 const needsScheduleInBody = (urlPath) =>
   /\/attendance\/(clock-in|clock-out|break-start|break-end)$/.test(urlPath);
 
@@ -889,9 +879,6 @@ const payloadForUrl = (url, baseBody, scheduleId) => {
   return body;
 };
 
-/* =========================
- * 액션(출근/퇴근/휴게) — 지오펜스 필요 시 프론트 검증 + POST 우선
- * ========================= */
 export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   const today = await fetchTodayStatus();
   const id0 = scheduleId ?? today?.scheduleId;
@@ -1011,9 +998,7 @@ export const breakEnd = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
   }
   throw lastErr || new Error('휴게 종료 처리 실패');
 };
-/* ========================= */
 
-// 과거 호환 래퍼
 export const fetchMyBranchGeofence = async () => {
   const raw = await fetchBranchGeoNew().catch(() => null);
   if (!raw) return { lat: null, lng: null, radiusMeters: 0, radius: 0, enabled: false };
