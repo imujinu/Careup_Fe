@@ -6,6 +6,7 @@ import { useShopCart } from '../hooks/useShopCart';
 import { customerProductService } from '../../service/customerProductService';
 import { cartService } from '../../service/cartService';
 import { customerAuthService } from '../../service/customerAuthService';
+import { inventoryService } from '../../service/inventoryService';
 
 const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
 const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
@@ -127,19 +128,103 @@ function ProductDetailPage() {
         
         // 2단 옵션 조합 구성 (상품이 조합 단위로 나뉜 경우)
         // 각 상품의 attributeValues에서 타입별 값을 추출해 조합 맵 생성
-        const optionTypeOrder = [];
         const comboMap = new Map(); // key: `${opt1Id}-${opt2Id}` -> variant info
+        
+        // 상품의 카테고리 ID 가져오기 (여러 방법으로 시도)
+        let categoryId = foundProduct.categoryId || foundProduct.category?.id || foundProduct.category?.categoryId;
+        
+        // categoryId가 없고 categoryName이 있으면 카테고리 이름으로 ID 찾기
+        if (!categoryId && foundProduct.categoryName) {
+          try {
+            const categoriesResponse = await shopApi.get('/api/categories');
+            const categoriesData = categoriesResponse?.data?.data ?? categoriesResponse?.data ?? [];
+            const categories = Array.isArray(categoriesData) ? categoriesData : [];
+            
+            // 카테고리 이름으로 ID 찾기
+            const matchedCategory = categories.find(c => 
+              c.name === foundProduct.categoryName || 
+              c.categoryName === foundProduct.categoryName
+            );
+            
+            if (matchedCategory) {
+              categoryId = matchedCategory.id || matchedCategory.categoryId;
+            }
+          } catch (err) {
+            console.warn('카테고리 목록 조회 실패:', err);
+          }
+        }
+        
+        // 카테고리별 속성 정보 가져오기 (displayOrder를 위해)
+        let categoryAttributesMap = new Map();
+        if (categoryId) {
+          try {
+            const categoryAttributes = await inventoryService.getCategoryAttributes(categoryId);
+            if (Array.isArray(categoryAttributes)) {
+              // attributeTypeName을 키로 하는 Map 생성 (displayOrder 포함)
+              categoryAttributes.forEach(ca => {
+                const typeName = ca.attributeTypeName || ca.attributeType?.name;
+                if (typeName) {
+                  categoryAttributesMap.set(typeName, {
+                    displayOrder: ca.displayOrder || 0,
+                    attributeTypeId: ca.attributeTypeId || ca.attributeType?.id
+                  });
+                }
+              });
+            }
+          } catch (err) {
+            console.warn('카테고리 속성 조회 실패:', err);
+          }
+        }
+        
+        // 속성 타입별로 그룹화하고 displayOrder 수집
+        // attributeValues와 availableBranches 모두에서 속성 타입 수집
+        const attributeTypeMap = new Map(); // attributeTypeName -> { displayOrder, attributeTypeId }
+        
+        // 1. attributeValues에서 속성 타입 수집
         sameNameProducts.forEach(p => {
           const attrs = Array.isArray(p.attributeValues) ? p.attributeValues : [];
-          // 타입 순서 수집(최대 2개)
           attrs.forEach(a => {
             const tName = a.attributeTypeName;
-            if (tName && !optionTypeOrder.includes(tName)) optionTypeOrder.push(tName);
+            if (tName && !attributeTypeMap.has(tName)) {
+              // 카테고리별 displayOrder 우선 사용
+              const categoryAttr = categoryAttributesMap.get(tName);
+              const displayOrder = categoryAttr?.displayOrder !== undefined 
+                ? categoryAttr.displayOrder 
+                : (a.attributeType?.displayOrder || a.displayOrder || 999); // 없으면 큰 값으로 설정하여 뒤로
+              
+              attributeTypeMap.set(tName, {
+                displayOrder: displayOrder,
+                attributeTypeId: a.attributeTypeId || a.attributeType?.id
+              });
+            }
           });
         });
+        
+        // 2. availableBranches에서도 속성 타입 수집 (attributeValues가 없는 경우 대비)
+        allBranches.forEach(branch => {
+          const tName = branch.attributeTypeName;
+          if (tName && !attributeTypeMap.has(tName)) {
+            // 카테고리별 displayOrder 우선 사용
+            const categoryAttr = categoryAttributesMap.get(tName);
+            const displayOrder = categoryAttr?.displayOrder !== undefined 
+              ? categoryAttr.displayOrder 
+              : 999; // 기본값
+            
+            attributeTypeMap.set(tName, {
+              displayOrder: displayOrder,
+              attributeTypeId: branch.attributeTypeId
+            });
+          }
+        });
+        
+        // displayOrder 순으로 정렬
+        const sortedAttributeTypes = Array.from(attributeTypeMap.entries())
+          .sort((a, b) => (a[1].displayOrder || 0) - (b[1].displayOrder || 0))
+          .map(entry => entry[0]); // attributeTypeName만 추출
+        
         // 최대 2개로 제한
-        const type1 = optionTypeOrder[0];
-        const type2 = optionTypeOrder[1];
+        const type1 = sortedAttributeTypes[0];
+        const type2 = sortedAttributeTypes[1];
 
         sameNameProducts.forEach(p => {
           const attrs = Array.isArray(p.attributeValues) ? p.attributeValues : [];
