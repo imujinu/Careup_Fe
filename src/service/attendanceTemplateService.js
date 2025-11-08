@@ -103,19 +103,29 @@ export async function moveTemplateOrder(id, direction /* 'UP' | 'DOWN' */, step 
   }
 }
 
+/* ===== 호환용 네임드 export (기존 코드에서 사용) ===== */
+export async function fetchAttendanceTemplates(opts) {
+  return listAttendanceTemplates(opts);
+}
+
+/* ===== 별칭(기존 import 호환) ===== */
 export const listTemplates = listAttendanceTemplates;
 export const createTemplate = createAttendanceTemplate;
 export const updateTemplate = updateAttendanceTemplate;
 export const deleteTemplate = deleteAttendanceTemplate;
 
+/** 기본 export */
 export default {
   listAttendanceTemplates,
   createAttendanceTemplate,
   updateAttendanceTemplate,
   deleteAttendanceTemplate,
   moveTemplateOrder,
+  // aliases
   listTemplates,
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  // compatibility
+  fetchAttendanceTemplates,
 };
