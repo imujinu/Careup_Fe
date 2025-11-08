@@ -73,8 +73,10 @@ export async function createAttendanceTemplate(payload) {
 export async function updateAttendanceTemplate(id, payload) {
   const pathId = encodeURIComponent(String(id));
   try {
+    // 우선 POST로 업데이트 (CORS 안전)
     return await safeUpdate(`${BASE_URL}/attendance-template/update/${pathId}`, payload);
   } catch (e) {
+    // 보조: /update (body에 id 포함) 변형 엔드포인트 대응
     if (isMethodIssue(st(e))) {
       return safeUpdate(`${BASE_URL}/attendance-template/update`, { id, ...payload });
     }
@@ -96,6 +98,7 @@ export async function moveTemplateOrder(id, direction /* 'UP' | 'DOWN' */, step 
   try {
     return await safeUpdate(`${BASE_URL}/attendance-template/${pathId}/move-order`, body);
   } catch (e) {
+    // 대안: /attendance-template/move-order (id 포함)
     if (isMethodIssue(st(e))) {
       return safeUpdate(`${BASE_URL}/attendance-template/move-order`, { id, ...body });
     }
@@ -103,29 +106,61 @@ export async function moveTemplateOrder(id, direction /* 'UP' | 'DOWN' */, step 
   }
 }
 
-/* ===== 호환용 네임드 export (기존 코드에서 사용) ===== */
+/* =========================
+ * Broadcast utils (UI가 기대하는 시그니처 추가)
+ * ========================= */
+export const TEMPLATE_CHANGED_EVENT = 'attendance-template:changed';
+
+export function broadcastAttendanceTemplateChanged(detail) {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(TEMPLATE_CHANGED_EVENT, { detail: detail ?? null }));
+  }
+}
+export function addAttendanceTemplateChangedListener(handler) {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
+  const h = (e) => handler?.(e?.detail);
+  window.addEventListener(TEMPLATE_CHANGED_EVENT, h);
+  return () => window.removeEventListener(TEMPLATE_CHANGED_EVENT, h);
+}
+export function removeAttendanceTemplateChangedListener(handler) {
+  if (typeof window === 'undefined' || typeof window.removeEventListener !== 'function') return;
+  window.removeEventListener(TEMPLATE_CHANGED_EVENT, handler);
+}
+
+/* =========================
+ * Compatibility aliases (기존 import 호환)
+ * ========================= */
 export async function fetchAttendanceTemplates(opts) {
   return listAttendanceTemplates(opts);
 }
-
-/* ===== 별칭(기존 import 호환) ===== */
 export const listTemplates = listAttendanceTemplates;
 export const createTemplate = createAttendanceTemplate;
 export const updateTemplate = updateAttendanceTemplate;
 export const deleteTemplate = deleteAttendanceTemplate;
 
-/** 기본 export */
+/* =========================
+ * default export (누락없이 집약)
+ * ========================= */
 export default {
+  // CRUD
   listAttendanceTemplates,
   createAttendanceTemplate,
   updateAttendanceTemplate,
   deleteAttendanceTemplate,
   moveTemplateOrder,
-  // aliases
+
+  // 호환 별칭
   listTemplates,
   createTemplate,
   updateTemplate,
   deleteTemplate,
-  // compatibility
+
+  // 브로드캐스트 유틸
+  TEMPLATE_CHANGED_EVENT,
+  broadcastAttendanceTemplateChanged,
+  addAttendanceTemplateChangedListener,
+  removeAttendanceTemplateChangedListener,
+
+  // 컬렉션 로더 호환
   fetchAttendanceTemplates,
 };
