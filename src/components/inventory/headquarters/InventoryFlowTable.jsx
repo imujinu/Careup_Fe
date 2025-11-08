@@ -67,15 +67,10 @@ const TableCell = styled.td`
   }};
   overflow: ${props => {
     if (props.$remark) return 'visible';
-    if (props.$productName || props.$branch) return 'hidden';
-    return 'visible';
+    return 'hidden';
   }};
-  text-overflow: ${props => (props.$productName || props.$branch) ? 'ellipsis' : 'clip'};
-  white-space: ${props => {
-    if (props.$remark) return 'normal';
-    if (props.$productName || props.$branch) return 'nowrap';
-    return 'normal';
-  }};
+  text-overflow: ${props => (props.$remark) ? 'clip' : 'ellipsis'};
+  white-space: ${props => (props.$remark) ? 'normal' : 'nowrap'};
   word-break: ${props => props.$remark ? 'break-word' : 'normal'};
   line-height: 1.5;
 `;
