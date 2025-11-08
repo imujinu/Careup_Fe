@@ -1,4 +1,4 @@
-// src/pages/attendance/AttendanceTemplateManagement.jsx
+// src/pages/attendance/AttendanceTypeManagement.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
@@ -15,155 +15,75 @@ import {
 import { useAppSelector } from '../../stores/hooks';
 import { useToast } from '../../components/common/Toast';
 import {
-  listAttendanceTemplates,
-  createAttendanceTemplate,
-  updateAttendanceTemplate,
-  deleteAttendanceTemplate,
-  broadcastAttendanceTemplateChanged,
-} from '../../service/attendanceTemplateService';
+  listWorkTypes,
+  createWorkType,
+  updateWorkType,
+  deleteWorkType,
+  listLeaveTypes,
+  createLeaveType,
+  updateLeaveType,
+  deleteLeaveType,
+} from '../../service/attendanceTypeService';
 
-// 공통 상수(테이블 표준 준수)
 const ROW_H = 57;
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 100];
 
-const COL_WIDTH = {
-  id: 90,
-  name: 240,
-  clockIn: 140,
-  breakStart: 140,
-  breakEnd: 140,
-  clockOut: 140,
-  _actions: 200,
-};
-const TABLE_MIN_WIDTH =
-  COL_WIDTH.id +
-  COL_WIDTH.name +
-  COL_WIDTH.clockIn +
-  COL_WIDTH.breakStart +
-  COL_WIDTH.breakEnd +
-  COL_WIDTH.clockOut +
-  COL_WIDTH._actions;
+const COL_WIDTH_WORK = { id: 90, name: 280, flag: 160, _actions: 220 };
+const TABLE_MIN_WIDTH_WORK =
+  COL_WIDTH_WORK.id + COL_WIDTH_WORK.name + COL_WIDTH_WORK.flag + COL_WIDTH_WORK._actions;
+
+const COL_WIDTH_LEAVE = { id: 90, name: 280, flag: 120, _actions: 220 };
+const TABLE_MIN_WIDTH_LEAVE =
+  COL_WIDTH_LEAVE.id + COL_WIDTH_LEAVE.name + COL_WIDTH_LEAVE.flag + COL_WIDTH_LEAVE._actions;
 
 const Mdi = ({ path, size = 0.95, ...props }) => <Icon path={path} size={size} aria-hidden {...props} />;
 
-// 시간을 HH:mm으로 보장
-const normalizeTime = (v) => {
-  if (!v) return '';
-  if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) return v;
-  try {
-    const d = new Date(`1970-01-01T${v}`);
-    if (Number.isNaN(d.getTime())) return '';
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
-  } catch {
-    return '';
-  }
+const TABS = { WORK: 'WORK', LEAVE: 'LEAVE' };
+
+// 🆕 백엔드가 Y/N, 1/0, 'true'/'false'로 줄 때를 모두 흡수
+const asBool = (v) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  const s = String(v ?? '').trim().toUpperCase();
+  return s === 'Y' || s === 'TRUE' || s === '1';
 };
 
-export default function AttendanceTemplateManagement() {
+export default function AttendanceTypeManagement() {
   const { addToast } = useToast();
-  const { role: rawRole } = useAppSelector((s) => s.auth);
+  const { role: rawRole } = useAppSelector((s) => s?.auth ?? {});
   const role = useMemo(() => (rawRole || '').replace(/^ROLE_/, '').toUpperCase(), [rawRole]);
 
-  // ✅ 정책 반영: 조회는 HQ/지점관리자/가맹오너, 수정/삭제는 HQ만
-  const canView = useMemo(() => ['HQ_ADMIN','BRANCH_ADMIN','FRANCHISE_OWNER'].includes(role), [role]);
+  const canView = useMemo(() => ['HQ_ADMIN', 'BRANCH_ADMIN', 'FRANCHISE_OWNER'].includes(role), [role]);
   const canManage = role === 'HQ_ADMIN';
 
-  // 상태
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState(TABS.WORK);
 
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
-  const [totalPages, setTotalPages] = useState(0);
-
-  // 서버 정렬 필드: name
-  const [sort, setSort] = useState({ field: 'name', dir: 'asc' });
-  const [search, setSearch] = useState('');
   const [searchDraft, setSearchDraft] = useState('');
+  const [search, setSearch] = useState('');
 
-  // 모달
+  const [sort, setSort] = useState({ field: 'name', dir: 'asc' });
+
+  const [workLoading, setWorkLoading] = useState(false);
+  const [workItems, setWorkItems] = useState([]);
+  const [workPage, setWorkPage] = useState(0);
+  const [workPageSize, setWorkPageSize] = useState(20);
+  const [workTotalPages, setWorkTotalPages] = useState(0);
+
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [leaveItems, setLeaveItems] = useState([]);
+  const [leavePage, setLeavePage] = useState(0);
+  const [leavePageSize, setLeavePageSize] = useState(20);
+  const [leaveTotalPages, setLeaveTotalPages] = useState(0);
+
   const [openModal, setOpenModal] = useState(false);
-  const [editing, setEditing] = useState(null); // null=create
-  const [form, setForm] = useState({
-    name: '',
-    defaultClockIn: '',
-    defaultBreakStart: '',
-    defaultBreakEnd: '',
-    defaultClockOut: '',
-  });
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', flag: false });
   const nameInputRef = useRef(null);
 
-  const fetchList = useCallback(async () => {
-    if (!canView) return; // 권한 없으면 호출 금지
-    setLoading(true);
-    try {
-      const params = {
-        page,
-        size: pageSize,
-        sort: `${sort.field},${sort.dir}`,
-      };
-      const data = await listAttendanceTemplates(params);
-
-      const content = Array.isArray(data?.content)
-        ? data.content
-        : Array.isArray(data?.items)
-        ? data.items
-        : Array.isArray(data)
-        ? data
-        : [];
-
-      // 표시에 맞춰 time 정규화
-      const normalized = content.map((t) => ({
-        ...t,
-        defaultClockIn: normalizeTime(t.defaultClockIn),
-        defaultBreakStart: normalizeTime(t.defaultBreakStart),
-        defaultBreakEnd: normalizeTime(t.defaultBreakEnd),
-        defaultClockOut: normalizeTime(t.defaultClockOut),
-      }));
-
-      setItems(normalized);
-      setTotalPages(
-        Number.isFinite(data?.totalPages)
-          ? data.totalPages
-          : (Array.isArray(content) ? 1 : 0)
-      );
-    } catch (e) {
-      const status = e?.response?.status;
-      const msg403 = e?.response?.data?.status_message || '템플릿 조회 권한이 없습니다.';
-      if (status === 403) {
-        addToast({ type: 'warning', title: '권한 없음', message: msg403, duration: 3000 });
-      } else {
-        addToast({ type: 'error', title: '오류', message: '템플릿을 불러오는 중 문제가 발생했습니다.', duration: 3000 });
-      }
-      setItems([]);
-      setTotalPages(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, sort.field, sort.dir, addToast, canView]);
-
-  useEffect(() => {
-    fetchList();
-  }, [fetchList]);
-
-  const submitSearch = (e) => {
-    if (e) e.preventDefault();
-    setSearch(searchDraft.trim());
-    setPage(0);
-  };
-
-  const filtered = useMemo(() => {
-    if (!search) return items;
-    const q = search.toLowerCase();
-    return (items || []).filter((r) => String(r.name || '').toLowerCase().includes(q));
-  }, [items, search]);
-
-  const list = filtered;
-
   const toggleSort = (field) => {
-    setPage(0);
+    if (field !== 'name') return;
+    if (tab === TABS.WORK) setWorkPage(0);
+    else setLeavePage(0);
     setSort((prev) => {
       if (prev.field !== field) return { field, dir: 'asc' };
       if (prev.dir === 'asc') return { field, dir: 'desc' };
@@ -177,103 +97,194 @@ export default function AttendanceTemplateManagement() {
     </HeadSort>
   );
 
+  const fetchWorkList = useCallback(async () => {
+    if (!canView) return;
+    setWorkLoading(true);
+    try {
+      const params = { page: workPage, size: workPageSize, sort: `${sort.field},${sort.dir}`, keyword: search || undefined }; // 🆕 keyword 전달
+      const data = await listWorkTypes(params);
+      const content = Array.isArray(data?.content)
+        ? data.content
+        : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data)
+        ? data
+        : [];
+      // 🆕 불리언 정규화
+      const normalized = content.map((r) => ({
+        ...r,
+        geofenceRequired: asBool(r?.geofenceRequired),
+      }));
+      setWorkItems(normalized);
+      setWorkTotalPages(Number.isFinite(data?.totalPages) ? data.totalPages : (Array.isArray(content) ? 1 : 0));
+    } catch (e) {
+      const status = e?.response?.status;
+      const msg403 = e?.response?.data?.status_message || '근무 타입 조회 권한이 없습니다.';
+      if (status === 403) addToast(msg403, { color: 'warning' });
+      else addToast('근무 타입을 불러오는 중 문제가 발생했습니다.', { color: 'error' });
+      setWorkItems([]);
+      setWorkTotalPages(0);
+    } finally {
+      setWorkLoading(false);
+    }
+  }, [canView, workPage, workPageSize, sort.field, sort.dir, addToast, search]);
+
+  const fetchLeaveList = useCallback(async () => {
+    if (!canView) return;
+    setLeaveLoading(true);
+    try {
+      const params = { page: leavePage, size: leavePageSize, sort: `${sort.field},${sort.dir}`, keyword: search || undefined }; // 🆕
+      const data = await listLeaveTypes(params);
+      const content = Array.isArray(data?.content)
+        ? data.content
+        : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data)
+        ? data
+        : [];
+      const normalized = content.map((r) => ({
+        ...r,
+        paid: asBool(r?.paid), // 🆕
+      }));
+      setLeaveItems(normalized);
+      setLeaveTotalPages(Number.isFinite(data?.totalPages) ? data.totalPages : (Array.isArray(content) ? 1 : 0));
+    } catch (e) {
+      const status = e?.response?.status;
+      const msg403 = e?.response?.data?.status_message || '휴가 타입 조회 권한이 없습니다.';
+      if (status === 403) addToast(msg403, { color: 'warning' });
+      else addToast('휴가 타입을 불러오는 중 문제가 발생했습니다.', { color: 'error' });
+      setLeaveItems([]);
+      setLeaveTotalPages(0);
+    } finally {
+      setLeaveLoading(false);
+    }
+  }, [canView, leavePage, leavePageSize, sort.field, sort.dir, addToast, search]);
+
+  useEffect(() => {
+    if (tab === TABS.WORK) fetchWorkList();
+  }, [tab, fetchWorkList]);
+
+  useEffect(() => {
+    if (tab === TABS.LEAVE) fetchLeaveList();
+  }, [tab, fetchLeaveList]);
+
+  const submitSearch = (e) => {
+    if (e) e.preventDefault();
+    setSearch(searchDraft.trim());
+    if (tab === TABS.WORK) setWorkPage(0);
+    else setLeavePage(0);
+  };
+
+  const filteredWork = useMemo(() => {
+    if (!search) return workItems;
+    const q = search.toLowerCase();
+    return (workItems || []).filter((r) => String(r.name || '').toLowerCase().includes(q));
+  }, [workItems, search]);
+
+  const filteredLeave = useMemo(() => {
+    if (!search) return leaveItems;
+    const q = search.toLowerCase();
+    return (leaveItems || []).filter((r) => String(r.name || '').toLowerCase().includes(q));
+  }, [leaveItems, search]);
+
   const openCreate = () => {
     setEditing(null);
-    setForm({
-      name: '',
-      defaultClockIn: '',
-      defaultBreakStart: '',
-      defaultBreakEnd: '',
-      defaultClockOut: '',
-    });
+    setForm({ name: '', flag: false });
     setOpenModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 0);
   };
-
   const openEdit = (row) => {
     setEditing(row);
-    setForm({
-      name: row.name || '',
-      defaultClockIn: normalizeTime(row.defaultClockIn),
-      defaultBreakStart: normalizeTime(row.defaultBreakStart),
-      defaultBreakEnd: normalizeTime(row.defaultBreakEnd),
-      defaultClockOut: normalizeTime(row.defaultClockOut),
-    });
+    // 🔧 불리언 정규화 사용
+    setForm({ name: row.name || '', flag: !!(tab === TABS.WORK ? asBool(row.geofenceRequired) : asBool(row.paid)) });
     setOpenModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 0);
   };
-
   const closeModal = () => {
     setOpenModal(false);
     setEditing(null);
-    setForm({
-      name: '',
-      defaultClockIn: '',
-      defaultBreakStart: '',
-      defaultBreakEnd: '',
-      defaultClockOut: '',
-    });
+    setForm({ name: '', flag: false });
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!canManage) return;
 
-    const payload = {
-      name: form.name?.trim(),
-      defaultClockIn: form.defaultClockIn || null,
-      defaultBreakStart: form.defaultBreakStart || null,
-      defaultBreakEnd: form.defaultBreakEnd || null,
-      defaultClockOut: form.defaultClockOut || null,
-    };
+    const payload =
+      tab === TABS.WORK
+        ? { name: form.name?.trim(), geofenceRequired: !!form.flag }
+        : { name: form.name?.trim(), paid: !!form.flag };
+
     if (!payload.name) {
-      addToast({ type: 'warning', title: '안내', message: '템플릿명을 입력해 주세요.', duration: 2200 });
+      addToast('이름을 입력해 주세요.', { color: 'warning' });
       nameInputRef.current?.focus();
       return;
     }
 
     try {
       if (editing?.id) {
-        await updateAttendanceTemplate(editing.id, payload);
-        addToast({ type: 'success', title: '완료', message: '템플릿이 수정되었습니다.', duration: 2200 });
+        if (tab === TABS.WORK) {
+          await updateWorkType(editing.id, payload);
+          addToast('근무 타입이 수정되었습니다.', { color: 'success' });
+          fetchWorkList();
+        } else {
+          await updateLeaveType(editing.id, payload);
+          addToast('휴가 타입이 수정되었습니다.', { color: 'success' });
+          fetchLeaveList();
+        }
       } else {
-        await createAttendanceTemplate(payload);
-        addToast({ type: 'success', title: '완료', message: '템플릿이 등록되었습니다.', duration: 2200 });
+        if (tab === TABS.WORK) {
+          await createWorkType(payload);
+          addToast('근무 타입이 등록되었습니다.', { color: 'success' });
+          fetchWorkList();
+        } else {
+          await createLeaveType(payload);
+          addToast('휴가 타입이 등록되었습니다.', { color: 'success' });
+          fetchLeaveList();
+        }
       }
-      broadcastAttendanceTemplateChanged();
       closeModal();
-      fetchList();
     } catch (err) {
       const msg =
         err?.response?.data?.status_message ||
         err?.response?.data?.message ||
-        (editing ? '템플릿 수정 중 오류가 발생했습니다.' : '템플릿 등록 중 오류가 발생했습니다.');
-      addToast({ type: 'error', title: '오류', message: msg, duration: 3200 });
+        (editing
+          ? tab === TABS.WORK
+            ? '근무 타입 수정 중 오류가 발생했습니다.'
+            : '휴가 타입 수정 중 오류가 발생했습니다.'
+          : tab === TABS.WORK
+          ? '근무 타입 등록 중 오류가 발생했습니다.'
+          : '휴가 타입 등록 중 오류가 발생했습니다.');
+      addToast(msg, { color: 'error' });
     }
   };
 
   const onDelete = async (row) => {
     if (!canManage) return;
-    if (!window.confirm(`'(${row.id}) ${row.name}' 템플릿을 삭제하시겠습니까?`)) return;
+    const label = tab === TABS.WORK ? '근무 타입' : '휴가 타입';
+    if (!window.confirm(`'(${row.id}) ${row.name}' ${label}을 삭제하시겠습니까?`)) return;
     try {
-      await deleteAttendanceTemplate(row.id);
-      addToast({ type: 'success', title: '완료', message: '삭제되었습니다.', duration: 2200 });
-      if (list.length === 1 && page > 0) setPage((p) => p - 1);
-      broadcastAttendanceTemplateChanged();
-      fetchList();
+      if (tab === TABS.WORK) {
+        await deleteWorkType(row.id);
+        addToast('삭제되었습니다.', { color: 'success' });
+        if (filteredWork.length === 1 && workPage > 0) setWorkPage((p) => p - 1);
+        fetchWorkList();
+      } else {
+        await deleteLeaveType(row.id);
+        addToast('삭제되었습니다.', { color: 'success' });
+        if (filteredLeave.length === 1 && leavePage > 0) setLeavePage((p) => p - 1);
+        fetchLeaveList();
+      }
     } catch (err) {
       const msg =
         err?.response?.data?.status_message ||
         err?.response?.data?.message ||
         '삭제 중 오류가 발생했습니다.';
-      addToast({ type: 'error', title: '오류', message: msg, duration: 3200 });
+      addToast(msg, { color: 'error' });
     }
   };
 
-  // 서버에서 순서 이동 API를 제공하지 않으므로 비활성
-  const canMove = false;
-
-  const pageItems = useMemo(() => {
+  const pageItems = useCallback((page, totalPages) => {
     const tp = Math.max(0, totalPages);
     const last = Math.max(0, tp - 1);
     if (tp <= 7) return Array.from({ length: tp }, (_, i) => i);
@@ -291,29 +302,47 @@ export default function AttendanceTemplateManagement() {
     if (end < last - 1) items.push('ellipsis');
     items.push(last);
     return items;
-  }, [page, totalPages]);
+  }, []);
 
   if (!canView) {
-    return <div style={{ padding: 24 }}>템플릿 관리에 접근 권한이 없습니다.</div>;
+    return <div style={{ padding: 24 }}>타입 관리에 접근 권한이 없습니다.</div>;
   }
+
+  const isWork = tab === TABS.WORK;
+  const loading = isWork ? workLoading : leaveLoading;
+  const list = isWork ? filteredWork : filteredLeave;
+  const page = isWork ? workPage : leavePage;
+  const setPage = isWork ? setWorkPage : setLeavePage;
+  const pageSize = isWork ? workPageSize : leavePageSize;
+  const setPageSize = isWork ? setWorkPageSize : setLeavePageSize;
+  const totalPages = isWork ? workTotalPages : leaveTotalPages;
 
   return (
     <Wrap>
       <Header>
         <div>
-          <Title>근무 템플릿 관리</Title>
+          <Title>근무/휴가 타입 관리</Title>
+          <Tabs>
+            <TabButton className={isWork ? 'active' : ''} onClick={() => setTab(TABS.WORK)} type="button">
+              근무 타입
+            </TabButton>
+            <TabButton className={!isWork ? 'active' : ''} onClick={() => setTab(TABS.LEAVE)} type="button">
+              휴가 타입
+            </TabButton>
+          </Tabs>
         </div>
         <HeaderActions>
           <SearchBox as="form" onSubmit={submitSearch}>
             <input
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
-              placeholder="템플릿명 검색"
+              placeholder="이름 검색"
             />
             <IconBtn type="submit" title="검색">
               <Mdi path={mdiMagnify} size={0.9} />
             </IconBtn>
           </SearchBox>
+
           <PageSizeWrap>
             <span>페이지당</span>
             <select
@@ -326,7 +355,8 @@ export default function AttendanceTemplateManagement() {
             </select>
             <span>개</span>
           </PageSizeWrap>
-          <Primary onClick={openCreate} disabled={!canManage} title={canManage ? '템플릿 등록' : 'HQ 관리자만 등록 가능'}>
+
+          <Primary onClick={openCreate} disabled={!canManage} title={canManage ? '등록' : 'HQ 관리자만 등록 가능'}>
             <Mdi path={mdiPlus} />
             등록
           </Primary>
@@ -334,41 +364,29 @@ export default function AttendanceTemplateManagement() {
       </Header>
 
       <TableWrap>
-        <table style={{ minWidth: `${TABLE_MIN_WIDTH}px` }}>
+        <table style={{ minWidth: `${isWork ? TABLE_MIN_WIDTH_WORK : TABLE_MIN_WIDTH_LEAVE}px` }}>
           <colgroup>
-            <col style={{ width: `${COL_WIDTH.id}px` }} />
-            <col style={{ width: `${COL_WIDTH.name}px` }} />
-            <col style={{ width: `${COL_WIDTH.clockIn}px` }} />
-            <col style={{ width: `${COL_WIDTH.breakStart}px` }} />
-            <col style={{ width: `${COL_WIDTH.breakEnd}px` }} />
-            <col style={{ width: `${COL_WIDTH.clockOut}px` }} />
-            <col style={{ width: `${COL_WIDTH._actions}px` }} />
+            <col style={{ width: `${isWork ? COL_WIDTH_WORK.id : COL_WIDTH_LEAVE.id}px` }} />
+            <col style={{ width: `${isWork ? COL_WIDTH_WORK.name : COL_WIDTH_LEAVE.name}px` }} />
+            <col style={{ width: `${isWork ? COL_WIDTH_WORK.flag : COL_WIDTH_LEAVE.flag}px` }} />
+            <col style={{ width: `${isWork ? COL_WIDTH_WORK._actions : COL_WIDTH_LEAVE._actions}px` }} />
           </colgroup>
 
           <thead>
             <tr>
               <th className="id">
-                <HeadGroup>
-                  <HeadLabel>번호</HeadLabel>
-                </HeadGroup>
+                <HeadGroup><HeadLabel>번호</HeadLabel></HeadGroup>
               </th>
               <th className="name sortable" onClick={() => toggleSort('name')}>
                 <HeadGroup>
-                  <HeadLabel>템플릿명</HeadLabel>
+                  <HeadLabel>이름</HeadLabel>
                   <SortIcon active={sort.field === 'name'} dir={sort.dir} />
                 </HeadGroup>
               </th>
-              <th className="clockIn">
-                <HeadGroup><HeadLabel>출근</HeadLabel></HeadGroup>
-              </th>
-              <th className="breakStart">
-                <HeadGroup><HeadLabel>휴게 시작</HeadLabel></HeadGroup>
-              </th>
-              <th className="breakEnd">
-                <HeadGroup><HeadLabel>휴게 종료</HeadLabel></HeadGroup>
-              </th>
-              <th className="clockOut">
-                <HeadGroup><HeadLabel>퇴근</HeadLabel></HeadGroup>
+              <th className="flag">
+                <HeadGroup>
+                  <HeadLabel>{isWork ? 'GPS 적용 여부' : '유급 여부'}</HeadLabel>
+                </HeadGroup>
               </th>
               <th>
                 <HeadGroup><HeadLabel>조치</HeadLabel></HeadGroup>
@@ -379,30 +397,17 @@ export default function AttendanceTemplateManagement() {
           <tbody>
             {!loading && (!list || list.length === 0) && (
               <tr>
-                <td className="empty" colSpan={7}>데이터가 없습니다</td>
+                <td className="empty" colSpan={4}>데이터가 없습니다</td>
               </tr>
             )}
 
             {(list || []).map((row, idx) => (
-              <tr key={row.id}>
-                <td className="id">{page * pageSize + idx + 1}</td>
+              <tr key={`${isWork ? 'w' : 'l'}-${row.id}`}>
+                <td className="id">{(page * pageSize) + idx + 1}</td>
                 <td className="name"><strong>{row.name}</strong></td>
-                <td className="clockIn">{row.defaultClockIn || '-'}</td>
-                <td className="breakStart">{row.defaultBreakStart || '-'}</td>
-                <td className="breakEnd">{row.defaultBreakEnd || '-'}</td>
-                <td className="clockOut">{row.defaultClockOut || '-'}</td>
+                <td className="flag">{isWork ? (asBool(row.geofenceRequired) ? '필요' : '불필요') : (asBool(row.paid) ? '유급' : '무급')}</td> {/* 🔧 */}
                 <td>
                   <Actions>
-                    {false && (
-                      <>
-                        <IconSmallBtn type="button" title="위로" disabled>
-                          <Mdi path={mdiChevronUp} size={0.85} />
-                        </IconSmallBtn>
-                        <IconSmallBtn type="button" title="아래로" disabled>
-                          <Mdi path={mdiChevronDown} size={0.85} />
-                        </IconSmallBtn>
-                      </>
-                    )}
                     <TextBtn
                       onClick={() => openEdit(row)}
                       disabled={!canManage}
@@ -445,7 +450,7 @@ export default function AttendanceTemplateManagement() {
             <Mdi path={mdiChevronLeft} />
           </button>
 
-          {pageItems.map((it, idx) =>
+          {pageItems(page, totalPages).map((it, idx) =>
             it === 'ellipsis' ? (
               <span key={`e${idx}`} className="ellipsis">…</span>
             ) : (
@@ -483,50 +488,37 @@ export default function AttendanceTemplateManagement() {
         <ModalBackdrop onClick={closeModal}>
           <Modal onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
-              <h3>{editing ? '템플릿 수정' : '템플릿 등록'}</h3>
+              <h3>{editing ? (isWork ? '근무 타입 수정' : '휴가 타입 수정') : (isWork ? '근무 타입 등록' : '휴가 타입 등록')}</h3>
             </ModalHeader>
             <form onSubmit={onSubmit}>
               <FormRow>
-                <label>템플릿명</label>
+                <label>이름</label>
                 <input
                   ref={nameInputRef}
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="예: 기본 근무(09:00~18:00)"
+                  placeholder={isWork ? '예: 기본 근무' : '예: 연차'}
                 />
               </FormRow>
 
               <FormRow>
-                <label>출근</label>
-                <input
-                  type="time"
-                  value={form.defaultClockIn || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultClockIn: e.target.value }))}
-                />
-              </FormRow>
-              <FormRow>
-                <label>휴게 시작</label>
-                <input
-                  type="time"
-                  value={form.defaultBreakStart || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultBreakStart: e.target.value }))}
-                />
-              </FormRow>
-              <FormRow>
-                <label>휴게 종료</label>
-                <input
-                  type="time"
-                  value={form.defaultBreakEnd || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultBreakEnd: e.target.value }))}
-                />
-              </FormRow>
-              <FormRow>
-                <label>퇴근</label>
-                <input
-                  type="time"
-                  value={form.defaultClockOut || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, defaultClockOut: e.target.value }))}
-                />
+                <label>{isWork ? 'GPS 적용 여부' : '유급 여부'}</label>
+                <select
+                  value={String(!!form.flag)}
+                  onChange={(e) => setForm((p) => ({ ...p, flag: e.target.value === 'true' }))}
+                >
+                  {isWork ? (
+                    <>
+                      <option value="true">필요</option>
+                      <option value="false">불필요</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="true">유급</option>
+                      <option value="false">무급</option>
+                    </>
+                  )}
+                </select>
               </FormRow>
 
               <ModalActions>
@@ -543,7 +535,6 @@ export default function AttendanceTemplateManagement() {
   );
 }
 
-// ===== 스타일 (테이블 표준 준수) =====
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -559,6 +550,27 @@ const Title = styled.h1`
   font-size: 20px;
   font-weight: 700;
   color: #111827;
+`;
+const Tabs = styled.div`
+  margin-top: 8px;
+  display: inline-flex;
+  gap: 8px;
+`;
+const TabButton = styled.button`
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  &.active {
+    border-color: #8b5cf6;
+    background: #8b5cf6;
+    color: #fff;
+  }
 `;
 const HeaderActions = styled.div`
   display: flex;
@@ -612,21 +624,18 @@ const IconBtn = styled.button`
   border: 0; background: transparent; color: #6b7280; cursor: pointer;
   &:hover { color: #4b5563; }
 `;
-
 const TableWrap = styled.div`
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
   overflow-x: auto;
   width: 100%;
-
   table {
     border-collapse: separate;
     border-spacing: 0;
     table-layout: fixed;
     width: 100%;
   }
-
   thead th {
     position: relative;
     font-size: 14px;
@@ -643,7 +652,6 @@ const TableWrap = styled.div`
     vertical-align: middle;
   }
   th.sortable { cursor: pointer; user-select: none; }
-
   tbody td {
     padding: 0 12px;
     border-bottom: 1px solid #f1f5f9;
@@ -658,7 +666,6 @@ const TableWrap = styled.div`
     height: ${ROW_H}px;
   }
   tbody tr:hover { background: #fafafa; }
-
   .empty {
     color: #6b7280;
     text-align: center;
@@ -667,7 +674,6 @@ const TableWrap = styled.div`
     vertical-align: middle;
   }
 `;
-
 const HeadGroup = styled.div`
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -692,7 +698,6 @@ const HeadSort = styled.span`
   justify-content: center;
   opacity: ${(p) => (p.$active ? 1 : 0.35)};
 `;
-
 const Actions = styled.div`
   display: inline-flex;
   align-items: center;
@@ -700,7 +705,6 @@ const Actions = styled.div`
   gap: 8px;
   width: 100%;
 `;
-
 const TextBtn = styled.button`
   height: 30px;
   padding: 0 10px;
@@ -716,21 +720,6 @@ const TextBtn = styled.button`
   &:hover { background: ${(p) => (p.$danger ? '#fff1f2' : '#f9fafb')}; }
   &:disabled { opacity: 0.45; cursor: not-allowed; background: #f3f4f6; border-color: #e5e7eb; color: #9ca3af; }
 `;
-
-const IconSmallBtn = styled.button`
-  height: 30px;
-  width: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  border-radius: 8px;
-  cursor: pointer;
-  &:hover { background: #f9fafb; }
-  &:disabled { opacity: .45; cursor: not-allowed; }
-`;
-
 const PaginationBar = styled.div`
   margin-top: 12px;
   display: grid;
@@ -752,18 +741,17 @@ const Pager = styled.div`
   }
   .page.active { background: #8b5cf6; border-color: #8b5cf6; color: #fff; }
 `;
-
 const ModalBackdrop = styled.div`
   position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 50;
 `;
 const Modal = styled.div`
-  width: min(520px, 92vw); background: #fff; border-radius: 14px; border: 1px solid #e5e7eb; padding: 16px;
+  width: min(520px, 92vw); background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px;
 `;
 const ModalHeader = styled.div`
   padding: 4px 4px 12px; border-bottom: 1px solid #f1f5f9; margin-bottom: 12px;
   h3 { margin: 0; font-size: 18px; color: #111827; }
 `;
-const FormRow = styled.label`
+const FormRow = styled.div`
   display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; margin: 10px 0;
   > label { color: #374151; }
   input, select {
