@@ -226,36 +226,45 @@ const anyOf = (...vals) => {
   }
   return null;
 };
+/* =========================
+ * 지오펜스 필수 여부 판단 — "근무타입 플래그만 따른다"
+ * ========================= */
 async function resolveFenceRequired(detail, primary) {
-  let v = anyOf(
-    // schedule-level
-    detail?.geofenceRequired,
-    detail?.requireGeofence,
-    detail?.requiresGeofence,
-    detail?.geoFenceRequired,
-    detail?.geofenceValidation,
-    detail?.geofenceMode,
-
-    // workType-level
+  // 1) 스케줄에 연결된 근무타입에서만 1차 판정
+  const candsWorkType = [
     detail?.workType?.geofenceRequired,
+    detail?.workTypeGeofenceRequired,
     detail?.workType?.requireGeofence,
     detail?.workType?.requiresGeofence,
     detail?.workType?.geoFenceRequired,
-    detail?.workType?.geofenceValidation,
-    detail?.workType?.geofenceMode,
 
-    // primary fallback
+    primary?.workType?.geofenceRequired,
+    primary?.workTypeGeofenceRequired,
+    primary?.workType?.requireGeofence,
+    primary?.workType?.requiresGeofence,
+    primary?.workType?.geoFenceRequired,
+  ];
+  for (const v of candsWorkType) {
+    const t = truth(v);
+    if (t !== null) return t; // true/false 명시일 때만 채택
+  }
+
+  // 2) (선택) 스케줄 개체에 geofenceRequired가 '명시'돼 있으면 보조로 허용
+  const candsSchedule = [
+    detail?.geofenceRequired,
+    detail?.requireGeofence,
+    detail?.geofenceMode,
     primary?.geofenceRequired,
     primary?.requireGeofence,
-    primary?.workType?.geofenceRequired,
-    primary?.workTypeGeofenceRequired
-  );
+    primary?.geofenceMode,
+  ];
+  for (const v of candsSchedule) {
+    const t = truth(v);
+    if (t !== null) return t;
+  }
 
-  if (v !== null) return !!v;
-
-  // 명시 정보가 없으면: 지점 펜스가 설정되어 있다면 '필수'로 보수적 판단
-  const fence = await fetchBranchGeoNew().catch(() => null);
-  return !!(fence && isBranchGeoConfigured(fence));
+  // 3) 기본값: 필요 없음(프리패스). 지점 펜스 존재 여부로 강제하지 않음.
+  return false;
 }
 /* ========================= */
 
