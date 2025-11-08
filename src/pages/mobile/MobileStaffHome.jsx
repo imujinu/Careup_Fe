@@ -36,8 +36,6 @@ import { formatMeters } from '../../utils/geo';
 const LATE_THRESHOLD_MIN = 1;
 const GEOFENCE_SLACK = Number(import.meta.env.VITE_GEOFENCE_SLACK_METERS ?? 0);
 
-const [todayDetail, setTodayDetail] = useState(null);
-
 const Screen = styled.div`
   min-height: 100vh;
   min-height: 100svh;
@@ -553,6 +551,8 @@ export default function MobileStaffHome() {
   const [openDetail, setOpenDetail] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [branchGeoApi, setBranchGeoApi] = useState(null);
+
+  const [todayDetail, setTodayDetail] = useState(null);
 
   const hydrateWeekDaysWithServer = useCallback(async (days) => {
     const arr = Array.isArray(days) ? days.filter(Boolean) : [];
