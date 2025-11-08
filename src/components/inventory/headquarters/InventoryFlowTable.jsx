@@ -5,8 +5,8 @@ const TableContainer = styled.div`
   background: white;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
   overflow-x: auto;
+  overflow-y: visible;
 `;
 
 const Table = styled.table`
@@ -65,7 +65,7 @@ const TableCell = styled.td`
   max-width: ${props => {
     if (props.$productName) return '200px';
     if (props.$branch) return '140px';
-    if (props.$remark) return '260px';
+    if (props.$remark) return 'none';
     return 'none';
   }};
   overflow: ${props => {
@@ -73,9 +73,15 @@ const TableCell = styled.td`
     return 'hidden';
   }};
   text-overflow: ${props => (props.$remark) ? 'clip' : 'ellipsis'};
-  white-space: ${props => (props.$remark) ? 'normal' : 'nowrap'};
-  word-break: ${props => props.$remark ? 'break-word' : 'normal'};
-  line-height: 1.5;
+  white-space: ${props => {
+    if (props.$remark) return 'nowrap';
+    if (props.$productName || props.$branch) return 'nowrap';
+    return 'normal';
+  }};
+  ${props => props.$remark && `
+    min-width: 150px;
+    word-break: keep-all;
+  `}
 `;
 
 const StatusBadge = styled.span`
