@@ -38,6 +38,9 @@ const TableHeaderCell = styled.th`
   user-select: none;
   position: relative;
   transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   &:hover {
     ${props => props.$sortable && `
@@ -299,10 +302,10 @@ function InventoryFlowTable({
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.productName)
           }, '상품명', getSortIndicator(SORTABLE_COLUMNS.productName)),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션1'),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션명1'),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션2'),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션명2'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션 1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명 1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션 2'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명 2'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.branch)
