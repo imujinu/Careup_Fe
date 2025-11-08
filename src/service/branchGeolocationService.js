@@ -3,15 +3,17 @@
 
 import axios from '../utils/axiosConfig';
 
-/** 게이트웨이/브랜치 서비스 Base URL */
+/** 게이트웨이/브랜치 서비스 Base URL (항상 /branch-service 보장) */
 const BASE_URL = (() => {
-  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
-  if (explicit) return explicit;
-  const api = (
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const withBranch = (u) => (u.endsWith('/branch-service') ? u : `${u}/branch-service`);
+  const explicit = trim(import.meta.env.VITE_BRANCH_URL);
+  if (explicit) return withBranch(explicit);
+  const api = trim(
     import.meta.env.VITE_API_URL ||
     (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
-  ).replace(/\/$/, '');
-  return `${api}/branch-service`;
+  );
+  return withBranch(api);
 })();
 
 /** CommonSuccessDto / CommonResponseDto 언랩 (비 JSON 방어 포함) */
@@ -28,6 +30,18 @@ const unwrap = (res) => {
     return data ?? null;
   } catch {
     return null;
+  }
+};
+
+/** 내부: 404/405는 다음 후보 시도 */
+const tryGet = async (url) => {
+  try {
+    const r = await axios.get(url);
+    return unwrap(r);
+  } catch (e) {
+    const st = e?.response?.status;
+    if ([404, 405].includes(Number(st))) return null;
+    throw e;
   }
 };
 
@@ -155,6 +169,7 @@ const mapBranchGeo = (dto = {}) => {
     lat,
     lng,
     radius,
+    radiusMeters: radius, // alias 유지
     address,
     addressDetail,
   };
@@ -181,7 +196,7 @@ export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   if ([lat1, lon1, lat2, lon2].some((v) => !isFiniteNumber(v))) return NaN;
   const R = 6371000;
   const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon1 - lon2); // 동일
+  const dLon = toRad(lon1 - lon2);
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
@@ -197,11 +212,6 @@ export function distanceFromBranchMeters(userLat, userLng, branchGeo) {
 
 /**
  * 반경 안/밖 여부 판정
- * @param {number} userLat
- * @param {number} userLng
- * @param {{lat:number,lng:number,radius:number}} branchGeo
- * @param {number} slackMeters (선택) 허용 오차(m)
- * @returns {{inside:boolean, distance:number}}
  */
 export function isInsideGeofence(userLat, userLng, branchGeo, slackMeters = 0) {
   const dist = distanceFromBranchMeters(userLat, userLng, branchGeo);
@@ -219,19 +229,36 @@ export class ForbiddenError extends Error {
   }
 }
 
-/** 내 소속 지점 지오펜스 조회 */
+/** 내 소속 지점 지오펜스 조회 (후보 경로 자동 시도) */
 export async function fetchMyBranchGeofence() {
-  try {
-    const res = await axios.get(`${BASE_URL}/branch/my`);
-    const dto = unwrap(res) || {};
-    return mapBranchGeo(dto);
-  } catch (e) {
-    const status = e?.response?.status;
-    if (status === 403) {
-      throw new ForbiddenError(e?.response?.data?.status_message || '권한이 없습니다.');
+  const candidates = [
+    `${BASE_URL}/branch/my/geofence`,
+    `${BASE_URL}/branch/geofence/my`,
+    `${BASE_URL}/branch/my-branch/geofence`,
+    `${BASE_URL}/branch/geofence?scope=me`,
+    `${BASE_URL}/branch/my`, // 일반 브랜치 DTO도 파싱 시도
+  ];
+  let lastErr = null;
+
+  for (const url of candidates) {
+    try {
+      const raw = await tryGet(url);
+      if (!raw) continue;
+      const mapped = mapBranchGeo(raw);
+      // 좌표만 있어도 반환, 반경은 0일 수 있음
+      if (mapped && (Number.isFinite(mapped.lat) && Number.isFinite(mapped.lng))) {
+        return mapped;
+      }
+    } catch (e) {
+      const st = e?.response?.status;
+      if (st === 403) throw new ForbiddenError(e?.response?.data?.status_message || '권한이 없습니다.');
+      lastErr = e;
+      continue;
     }
-    throw e;
   }
+
+  if (lastErr) throw lastErr;
+  return { branchId: null, name: '', lat: null, lng: null, radius: null, radiusMeters: null, address: '', addressDetail: '' };
 }
 
 /** 특정 지점 지오펜스 조회 */
