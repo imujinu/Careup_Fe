@@ -30,12 +30,13 @@ const shouldTryNext = (e) => {
   return [0, 404, 405, 415, 500, 501, 502, 503].includes(c); // 🆕
 };
 
-/** 🆕 단일 시도 */
-async function httpTry(method, url, data) {
-  const cfg = { method, url, data };
-  // JSON 보장
-  if (method !== 'get') cfg.headers = { 'Content-Type': 'application/json;charset=UTF-8' };
-  return axios(cfg);
+async function httpTry(cfg) {
+  const c = { ...cfg };
+  const method = (c.method || 'get').toLowerCase();
+  if (method !== 'get') {
+    c.headers = { 'Content-Type': 'application/json;charset=UTF-8', ...(c.headers || {}) };
+  }
+  return axios(c);
 }
 
 /** 🆕 여러 조합을 순차 시도하고, 성공하면 언랩 반환 */
@@ -43,7 +44,7 @@ async function callAny(variants = []) {
   let lastErr;
   for (const v of variants) {
     try {
-      const res = await httpTry(v.method, v.url, v.data);
+      const res = await httpTry(v);
       return unwrap(res);
     } catch (e) {
       lastErr = e;
