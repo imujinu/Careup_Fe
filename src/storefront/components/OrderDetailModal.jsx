@@ -100,7 +100,13 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                 <span className="info-label">주문일시:</span>
                 <span className="info-value">
                   {orderDetail.createdAt
-                    ? new Date(orderDetail.createdAt).toLocaleString("ko-KR")
+                    ? (() => {
+                        const dateStr = orderDetail.createdAt;
+                        const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
+                          ? dateStr.trim() + 'Z' 
+                          : dateStr;
+                        return new Date(normalized).toLocaleString("ko-KR", { timeZone: 'Asia/Seoul' });
+                      })()
                     : orderDetail.createdDate || "-"}
                 </span>
               </div>
@@ -136,7 +142,13 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                 <div className="info-row">
                   <span className="info-label">거부 시간:</span>
                   <span className="info-value">
-                    {new Date(orderDetail.rejectedAt).toLocaleString('ko-KR')}
+                    {(() => {
+                        const dateStr = orderDetail.rejectedAt;
+                        const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
+                          ? dateStr.trim() + 'Z' 
+                          : dateStr;
+                        return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+                      })()}
                   </span>
                 </div>
               )}

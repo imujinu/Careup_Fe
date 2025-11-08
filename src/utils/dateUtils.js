@@ -13,7 +13,14 @@ export const formatDateKST = (dateString, options = {}) => {
   if (!dateString) return '-';
   
   try {
-    const date = dateString instanceof Date ? dateString : new Date(dateString);
+    // Z가 없으면 UTC로 간주하고 Z 추가
+    let normalizedDate = dateString;
+    if (typeof dateString === 'string' && !dateString.endsWith('Z') && 
+        !/[+-]\d{2}:?\d{2}$/.test(dateString)) {
+      normalizedDate = dateString.trim() + 'Z';
+    }
+    
+    const date = dateString instanceof Date ? dateString : new Date(normalizedDate);
     
     if (isNaN(date.getTime())) return '-';
     
@@ -111,21 +118,88 @@ export const formatDateTimeKST = (dateString) => {
   if (!dateString) return '-';
   
   try {
-    const date = dateString instanceof Date ? dateString : new Date(dateString);
+    // Z가 없으면 UTC로 간주하고 Z 추가
+    let normalizedDate = dateString;
+    if (typeof dateString === 'string' && !dateString.endsWith('Z') && 
+        !/[+-]\d{2}:?\d{2}$/.test(dateString)) {
+      normalizedDate = dateString.trim() + 'Z';
+    }
+    
+    const date = dateString instanceof Date ? dateString : new Date(normalizedDate);
     
     if (isNaN(date.getTime())) return '-';
     
-    // 한국 시간으로 변환
-    const kstOffset = 9 * 60 * 60 * 1000;
-    const kstDate = new Date(date.getTime() + kstOffset);
+    // 한국 시간으로 변환하여 표시
+    return date.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('날짜 포맷팅 오류:', error);
+    return '-';
+  }
+};
+
+/**
+ * UTC 날짜 문자열을 KST로 변환하여 toLocaleString 사용 (간편 함수)
+ * @param {string|Date} dateString - UTC 날짜 문자열 또는 Date 객체
+ * @param {object} options - toLocaleString 옵션
+ * @returns {string} 한국 시간으로 포맷된 문자열
+ */
+export const toLocaleStringKST = (dateString, options = {}) => {
+  if (!dateString) return '-';
+  
+  try {
+    // Z가 없으면 UTC로 간주하고 Z 추가
+    let normalizedDate = dateString;
+    if (typeof dateString === 'string' && !dateString.endsWith('Z') && 
+        !/[+-]\d{2}:?\d{2}$/.test(dateString)) {
+      normalizedDate = dateString.trim() + 'Z';
+    }
     
-    const year = kstDate.getUTCFullYear();
-    const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(kstDate.getUTCDate()).padStart(2, '0');
-    const hours = String(kstDate.getUTCHours()).padStart(2, '0');
-    const minutes = String(kstDate.getUTCMinutes()).padStart(2, '0');
+    const date = dateString instanceof Date ? dateString : new Date(normalizedDate);
     
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
+    if (isNaN(date.getTime())) return '-';
+    
+    return date.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      ...options
+    });
+  } catch (error) {
+    console.error('날짜 포맷팅 오류:', error);
+    return '-';
+  }
+};
+
+/**
+ * UTC 날짜 문자열을 KST로 변환하여 toLocaleDateString 사용 (간편 함수)
+ * @param {string|Date} dateString - UTC 날짜 문자열 또는 Date 객체
+ * @param {object} options - toLocaleDateString 옵션
+ * @returns {string} 한국 시간으로 포맷된 날짜 문자열
+ */
+export const toLocaleDateStringKST = (dateString, options = {}) => {
+  if (!dateString) return '-';
+  
+  try {
+    // Z가 없으면 UTC로 간주하고 Z 추가
+    let normalizedDate = dateString;
+    if (typeof dateString === 'string' && !dateString.endsWith('Z') && 
+        !/[+-]\d{2}:?\d{2}$/.test(dateString)) {
+      normalizedDate = dateString.trim() + 'Z';
+    }
+    
+    const date = dateString instanceof Date ? dateString : new Date(normalizedDate);
+    
+    if (isNaN(date.getTime())) return '-';
+    
+    return date.toLocaleDateString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      ...options
+    });
   } catch (error) {
     console.error('날짜 포맷팅 오류:', error);
     return '-';
