@@ -3,7 +3,12 @@ import axios from '../utils/axiosConfig';
 import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
-import * as geoSvc from './branchGeolocationService'; // ★ 단일 소스 통일
+
+// ▼ 새 지오펜스 서비스로 위임(과거 호환 유지 목적)
+import {
+  fetchMyBranchGeofence as fetchBranchGeoNew,
+  isBranchGeofenceConfigured as isBranchGeoConfigured,
+} from './branchGeolocationService';
 
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
@@ -114,11 +119,20 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
       .flatMap(splitForCalendar)
       .filter((p) => {
         const keySource =
-          p.cellDate || p.date ||
-          p.startAt || p.registeredClockIn || p.actualClockIn || p.clockInAt ||
-          p.registeredStartAt || p.actualStartAt ||
-          p.endAt || p.clockOutAt || p.actualClockOut ||
-          p.registeredClockOut || p.registeredEndAt || p.actualEndAt;
+          p.cellDate ||
+          p.date ||
+          p.startAt ||
+          p.registeredClockIn ||
+          p.actualClockIn ||
+          p.clockInAt ||
+          p.registeredStartAt ||
+          p.actualStartAt ||
+          p.endAt ||
+          p.clockOutAt ||
+          p.actualClockOut ||
+          p.registeredClockOut ||
+          p.registeredEndAt ||
+          p.actualEndAt;
         return keySource && toYMD(keySource) === ymd;
       });
 
@@ -333,11 +347,20 @@ export const fetchTodayStatus = async () => {
   const list = await fetchScheduleCalendar({ from: ymd, to: ymd, employeeId });
   const pieces = (Array.isArray(list) ? list : []).flatMap(splitForCalendar).filter((p) => {
     const keySource =
-      p.cellDate || p.date ||
-      p.startAt || p.registeredClockIn || p.actualClockIn || p.clockInAt ||
-      p.registeredStartAt || p.actualStartAt ||
-      p.endAt || p.clockOutAt || p.actualClockOut ||
-      p.registeredClockOut || p.registeredEndAt || p.actualEndAt;
+      p.cellDate ||
+      p.date ||
+      p.startAt ||
+      p.registeredClockIn ||
+      p.actualClockIn ||
+      p.clockInAt ||
+      p.registeredStartAt ||
+      p.actualStartAt ||
+      p.endAt ||
+      p.clockOutAt ||
+      p.actualClockOut ||
+      p.registeredClockOut ||
+      p.registeredEndAt ||
+      p.actualEndAt;
     return keySource && toYMD(keySource) === ymd;
   });
 
@@ -771,6 +794,47 @@ export const breakEnd = async (scheduleId, geo) => {
   throw lastErr || new Error('휴게 종료 처리 실패');
 };
 
-/* ---- 지오펜스 함수는 단일 소스(geoSvc) 래핑 재수출: 기존 import 호환 ---- */
-export const fetchMyBranchGeofence = geoSvc.fetchMyBranchGeofence;
-export const isBranchGeofenceConfigured = geoSvc.isBranchGeofenceConfigured;
+const unwrap = (res) => {
+  const d = res?.data;
+  if (d && typeof d === 'object' && 'result' in d) return d.result;
+  return d;
+};
+const tryGet = async (url) => {
+  try {
+    const r = await axios.get(url);
+    return unwrap(r);
+  } catch (e) {
+    const st = e?.response?.status;
+    if ([404, 405].includes(Number(st))) return null;
+    throw e;
+  }
+};
+
+// ▼▼▼ 여기부터 '과거 호환' 래퍼: 더 이상 잘못된 엔드포인트로 호출하지 않음 ▼▼▼
+export const fetchMyBranchGeofence = async () => {
+  const raw = await fetchBranchGeoNew().catch(() => null);
+  if (!raw) return { lat: null, lng: null, radiusMeters: 0, radius: 0, enabled: false };
+
+  const lat = Number(raw.lat ?? raw.latitude ?? NaN);
+  const lng = Number(raw.lng ?? raw.longitude ?? raw.lon ?? NaN);
+  const radiusMeters = Number(raw.radius ?? raw.radiusMeters ?? 0);
+  const enabled = isBranchGeoConfigured(raw);
+
+  return {
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
+    radiusMeters,
+    radius: radiusMeters,
+    enabled,
+    name: raw.name ?? '',
+    branchId: raw.branchId ?? null,
+    address: raw.address ?? '',
+    addressDetail: raw.addressDetail ?? '',
+  };
+};
+
+export const isBranchGeofenceConfigured = async () => {
+  const g = await fetchBranchGeoNew().catch(() => null);
+  return isBranchGeoConfigured(g || null);
+};
+// ▲▲▲ 래퍼 끝 ▲▲▲
