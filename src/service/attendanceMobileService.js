@@ -4,14 +4,11 @@ import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
 
-/* ===== 안정형 BASE_URL (중복/누락 자동 방지) ===== */
 const BASE_URL = (() => {
   const trim = (s) => (s || '').replace(/\/+$/, '');
   const withBranch = (u) => (u.endsWith('/branch-service') ? u : `${u}/branch-service`);
-
   const explicit = trim(import.meta.env.VITE_BRANCH_URL);
   if (explicit) return withBranch(explicit);
-
   const api = trim(
     import.meta.env.VITE_API_URL ||
       (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
@@ -22,7 +19,6 @@ const BASE_URL = (() => {
 const DOW_KR = ['일','월','화','수','목','금','토'];
 const LATE_THRESHOLD_MIN = 1;
 
-/* ===== 공통 유틸 ===== */
 const toYMD = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
   const y = dt.getFullYear();
@@ -69,7 +65,6 @@ const localIsoNoZ = () => {
   return local.toISOString().slice(0, 19);
 };
 
-/* ===== 이벤트별 시각 추출 ===== */
 const pickTimesForPiece = (ev) => {
   const s = ev.actualClockIn || ev.clockInAt || ev.actualStartAt || ev.registeredClockIn || ev.registeredStartAt || ev.startAt || null;
   const e = ev.actualClockOut || ev.clockOutAt || ev.actualEndAt || ev.registeredClockOut || ev.registeredEndAt || ev.endAt || null;
@@ -94,7 +89,6 @@ const pickScheduleId = (p) => p?.id ?? p?.scheduleId ?? p?.scheduleSeq ?? p?.seq
 const hasIn = (o) => !!(o?.clockInAt || o?.actualClockIn || o?.actualStartAt);
 const hasOut = (o) => !!(o?.clockOutAt || o?.actualClockOut || o?.actualEndAt);
 
-/** 일자별 겹침 분(min) 계산 */
 const minutesOverlapOnDay = (as, ae, ymd) => {
   if (!as || !ae) return 0;
   const s = toTime(as);
@@ -106,7 +100,6 @@ const minutesOverlapOnDay = (as, ae, ymd) => {
   return Math.max(0, Math.round(overlap / 60000));
 };
 
-/** 표시/상태 요약(조각 기준) */
 const summarizeWeekFromEvents = (events, anchorDate) => {
   const todayYMD = toYMD(new Date());
   const s = startOfWeek(anchorDate);
@@ -139,13 +132,10 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
 
     let dispMinS = null, dispMaxE = null;
     let planStart = null, planEnd = null;
-
     let anyIn = false, anyOut = false, anyOvernightHead = false, anyOvernightTail = false;
     let leaveTypeName = '';
-
     let primaryPiece = null;
     let primaryStartTs = NaN;
-
     let minutes = 0;
 
     for (const ev of pieces) {
@@ -244,7 +234,6 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
   return { days, totalMinutes };
 };
 
-/** 주간 요약 + 실제 기록(상세) 기반 분배로 합산 보강 */
 export const fetchWeekSummary = async (baseDate = new Date()) => {
   const user = tokenStorage.getUserInfo() || {};
   const employeeId = user.employeeId ?? null;
@@ -311,7 +300,6 @@ export const fetchWeekSummary = async (baseDate = new Date()) => {
   return { days, totalMinutes };
 };
 
-/** 👉 “주간 지표” */
 export const fetchWeekMetrics = async (baseDate = new Date()) => {
   const summary = await fetchWeekSummary(baseDate);
   const totalMinutes = Number(summary?.totalMinutes || 0);
@@ -342,7 +330,6 @@ export const fetchWeekMetrics = async (baseDate = new Date()) => {
   };
 };
 
-/** 오늘 카드 데이터 */
 export const fetchTodayStatus = async () => {
   const user = tokenStorage.getUserInfo() || {};
   const employeeId = user.employeeId ?? null;
@@ -626,7 +613,6 @@ export const fetchTodayStatus = async () => {
   return todayObj;
 };
 
-/** 버튼 활성화 기준 */
 const allowClockIn = (obj) => {
   if (!obj) return false;
   const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
@@ -656,7 +642,6 @@ const allowClockOut = (obj) => {
   return false;
 };
 
-/* 휴게 버튼 */
 export const allowBreakStartClient = (obj) => {
   if (!obj) return false;
   const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
@@ -676,7 +661,6 @@ export const allowBreakEndClient = (obj) => {
   return !!brStart && !brEnd && hasIn(obj) && !hasOut(obj);
 };
 
-/* ===== 출근/퇴근/휴게 ===== */
 const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const postJson = (url, data = {}) => {
   const key = idemp();
@@ -799,7 +783,6 @@ export const breakEnd = async (scheduleId, geo) => {
   throw lastErr || new Error('휴게 종료 처리 실패');
 };
 
-/* ===== 지점 지오펜스 조회 유틸 (모바일 홈에서 사용) ===== */
 const unwrap = (res) => {
   const d = res?.data;
   if (d && typeof d === 'object' && 'result' in d) return d.result;
@@ -816,7 +799,6 @@ const tryGet = async (url) => {
   }
 };
 
-/** 내 지점 지오펜스 설정 조회(여러 경로 폴백) */
 export const fetchMyBranchGeofence = async () => {
   const candidates = [
     `${BASE_URL}/branch/my/geofence`,
