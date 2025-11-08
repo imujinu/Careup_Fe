@@ -15,6 +15,14 @@ import { fetchAttendanceTemplates } from '../../service/attendanceTemplateServic
 import { useAppDispatch, useAppSelector } from '../../stores/hooks';
 import { loadHolidays } from '../../stores/slices/attendanceSlice';
 
+/* ===== 공통 유틸: 어떤 응답이 와도 안전하게 배열로 변환 ===== */
+const toArr = (v) => {
+  if (Array.isArray(v)) return v;
+  if (v && Array.isArray(v.content)) return v.content;
+  if (v && Array.isArray(v.items)) return v.items;
+  return [];
+};
+
 /* ===== 스타일 ===== */
 const Overlay = styled.div`
   position: fixed; inset: 0; z-index: 1100;
@@ -107,7 +115,6 @@ const AmPm = styled.select`
   background-position: right 10px center;
   background-size: 16px;
 
-  /* ✅ 보라색 포커스 이펙트(AttendanceCalendar의 Select와 동일) */
   &:not([disabled]):focus {
     border-color: #6d28d9;
     box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15);
@@ -219,7 +226,7 @@ const SectionHeader = styled.div`
   display: flex; align-items: center; gap: 8px;
   padding: 12px 14px; background: #fafafa; z-index: 1;
   border-top: 1px solid #ede9fe; border-bottom: 1px solid #ede9fe;
-  font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #5b21b6; text-transform: uppercase;
+  font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #5b21a6; text-transform: uppercase;
   &::before { content: ''; width: 6px; height: 14px; border-radius: 3px; background: #7c3aed; }
 `;
 const SectionSpacer = styled.div`height: 8px;`;
@@ -354,10 +361,11 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
 
   // 템플릿 옵션(드롭다운)
   const [templates, setTemplates] = useState([]);
+  const templatesArr = useMemo(() => toArr(templates), [templates]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const selectedTemplate = useMemo(
-    () => (templates || []).find(t => Number(t.id) === Number(selectedTemplateId)) || null,
-    [templates, selectedTemplateId]
+    () => templatesArr.find(t => Number(t.id) === Number(selectedTemplateId)) || null,
+    [templatesArr, selectedTemplateId]
   );
   const [templateOpen, setTemplateOpen] = useState(false);
   const templateRef = useRef(null);
@@ -394,10 +402,10 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
           fetchLeaveTypeOptions().catch(() => []),
           fetchAttendanceTemplates().catch(() => []),
         ]);
-        setBranches(branchList || []);
-        setWorkTypes(wt || []);
-        setLeaveTypes(lt || []);
-        setTemplates(tpl || []);
+        setBranches(toArr(branchList));
+        setWorkTypes(toArr(wt));
+        setLeaveTypes(toArr(lt));
+        setTemplates(toArr(tpl)); // 🔧 핵심: 여기서 확실히 배열로 정규화
       } catch {
         addToast('옵션 로딩 실패', { color: 'error' });
       }
@@ -419,8 +427,9 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
           keyword: empKeyword || undefined,
           all: false,
         });
-        setEmployees(list || []);
-        setEmployeeIds(prev => prev.filter(id => (list||[]).some(e => Number(e.id) === Number(id))));
+        const arr = toArr(list);
+        setEmployees(arr);
+        setEmployeeIds(prev => prev.filter(id => arr.some(e => Number(e.id) === Number(id))));
       } catch {
         addToast('직원 옵션 로딩 실패', { color: 'error' });
       }
@@ -587,10 +596,10 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
 
   // 직원 모달: 현재 목록(검색 결과)에 포함된 선택 수
   const employeeIdsOnList = useMemo(
-    () => employeeIds.filter(id => employees.some(e => Number(e.id) === Number(id))),
+    () => employeeIds.filter(id => toArr(employees).some(e => Number(e.id) === Number(id))),
     [employeeIds, employees]
   );
-  const allOnListChecked = employees.length > 0 && employeeIdsOnList.length === employees.length;
+  const allOnListChecked = toArr(employees).length > 0 && employeeIdsOnList.length === toArr(employees).length;
 
   /* ===== 토글 핸들러 ===== */
   const toggleTypeWork = (w) => {
@@ -614,10 +623,11 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
     );
   };
   const toggleAllEmployees = () => {
+    const list = toArr(employees);
     if (allOnListChecked) {
-      setEmployeeIds(prev => prev.filter(id => !employees.some(e => Number(e.id) === Number(id))));
+      setEmployeeIds(prev => prev.filter(id => !list.some(e => Number(e.id) === Number(id))));
     } else {
-      const idsOnList = employees.map(e => Number(e.id));
+      const idsOnList = list.map(e => Number(e.id));
       setEmployeeIds(prev => Array.from(new Set([...prev, ...idsOnList])));
     }
   };
@@ -630,13 +640,13 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
   /* 좌측 필드 표시용 선택 요약 텍스트 */
   const firstBranchName = useMemo(() => {
     if (!branchIds.length) return '';
-    const first = branches.find(b => Number(b.id) === Number(branchIds[0]));
+    const first = toArr(branches).find(b => Number(b.id) === Number(branchIds[0]));
     return first?.name || String(branchIds[0]);
   }, [branchIds, branches]);
 
   const firstEmployeeLabel = useMemo(() => {
     if (!employeeIds.length) return '';
-    const first = employees.find(e => Number(e.id) === Number(employeeIds[0]));
+    const first = toArr(employees).find(e => Number(e.id) === Number(employeeIds[0]));
     if (!first) return String(employeeIds[0]);
     const base = first.name || String(employeeIds[0]);
     return first.branchName ? `${base} - ${first.branchName}` : base;
@@ -728,7 +738,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
                       <span>선택 해제</span>
                       <Muted>직접 시간 입력</Muted>
                     </DropdownItem>
-                    {(templates || []).map(t => {
+                    {templatesArr.map(t => {
                       const active = Number(selectedTemplateId) === Number(t.id);
                       const { work, brk } = tplRanges(t);
                       const title = `${t.name}${work ? ` ${work}` : ''}${brk ? ` (${brk})` : ''}`;
@@ -753,7 +763,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
                         </DropdownItem>
                       );
                     })}
-                    {(!templates || templates.length === 0) && (
+                    {templatesArr.length === 0 && (
                       <DropdownItem>
                         <span>등록된 템플릿이 없습니다</span>
                       </DropdownItem>
@@ -888,7 +898,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
 
             <div style={{ padding: 0, overflow: 'auto' }}>
               <SectionHeader>근무 종류</SectionHeader>
-              {(workTypes || []).map(w => {
+              {toArr(workTypes).map(w => {
                 const active = selectedType?.kind==='WORK' && Number(selectedType?.id)===Number(w.id);
                 return (
                   <ListRow key={`w-${w.id}`} $active={active} onClick={() => setSelectedType(active ? null : { kind: 'WORK', id: w.id, name: w.name })}>
@@ -901,14 +911,14 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
                   </ListRow>
                 );
               })}
-              {(!workTypes || workTypes.length===0) && (
+              {toArr(workTypes).length===0 && (
                 <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>근무 종류가 없습니다.</div>
               )}
 
               <SectionSpacer />
 
               <SectionHeader>휴가 종류</SectionHeader>
-              {(leaveTypes || []).map(l => {
+              {toArr(leaveTypes).map(l => {
                 const active = selectedType?.kind==='LEAVE' && Number(selectedType?.id)===Number(l.id);
                 return (
                   <ListRow key={`l-${l.id}`} $active={active} onClick={() => setSelectedType(active ? null : { kind: 'LEAVE', id: l.id, name: l.name })}>
@@ -921,7 +931,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
                   </ListRow>
                 );
               })}
-              {(!leaveTypes || leaveTypes.length===0) && (
+              {toArr(leaveTypes).length===0 && (
                 <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>휴가 종류가 없습니다.</div>
               )}
             </div>
@@ -944,7 +954,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
               <Chips>
                 {branchIds.length === 0 && <Others>선택된 지점이 없습니다</Others>}
                 {branchIds.map(id => {
-                  const b = (branches || []).find(x => Number(x.id) === Number(id));
+                  const b = toArr(branches).find(x => Number(x.id) === Number(id));
                   const name = b?.name || id;
                   return (
                     <Chip key={`chip-b-${id}`}>
@@ -961,7 +971,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
 
             <div style={{ padding: 0, overflow: 'auto' }}>
               <SectionHeader>지점 목록</SectionHeader>
-              {(branches || []).map(b => {
+              {toArr(branches).map(b => {
                 const checked = branchIds.includes(Number(b.id));
                 return (
                   <ListRow key={`b-${b.id}`} $active={checked} onClick={() => toggleBranch(b.id)}>
@@ -974,7 +984,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
                   </ListRow>
                 );
               })}
-              {(!branches || branches.length === 0) && (
+              {toArr(branches).length === 0 && (
                 <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>지점 옵션이 없습니다.</div>
               )}
             </div>
@@ -997,7 +1007,7 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
               <Chips>
                 {employeeIds.length === 0 && <Others>선택된 직원이 없습니다</Others>}
                 {employeeIds.slice(0, 4).map(id => {
-                  const e = (employees || []).find(x => Number(x.id) === Number(id));
+                  const e = toArr(employees).find(x => Number(x.id) === Number(id));
                   const name = e?.name ? (e.branchName ? `${e.name} - ${e.branchName}` : e.name) : id;
                   return (
                     <Chip key={`chip-e-${id}`}>
@@ -1013,50 +1023,46 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
               <div />
             </SmallTopBar>
 
-            <div style={{ padding: 0, overflow: 'auto' }}>
-              <SectionHeader>직원 목록</SectionHeader>
-
-              <div style={{ padding: '10px 14px' }}>
-                <input
-                  placeholder="검색어"
-                  value={empKeyword}
-                  onChange={(e)=>setEmpKeyword(e.target.value)}
-                  style={{ width:'100%', height:36, border:'1px solid #e5e7eb', borderRadius:8, padding:'0 10px' }}
-                />
-              </div>
-
-              {employees.length > 0 && (
-                <ListRow key="all" $active={allOnListChecked} onClick={toggleAllEmployees}>
-                  <span className="name">전체선택</span>
-                  <PurpleCheck
-                    checked={allOnListChecked}
-                    onClick={(e)=>e.stopPropagation()}
-                    onChange={toggleAllEmployees}
-                  />
-                </ListRow>
-              )}
-
-              {(employees || []).map(e => {
-                const checked = employeeIds.includes(Number(e.id));
-                return (
-                  <ListRow key={`e-${e.id}`} $active={checked} onClick={() => toggleEmployee(e.id)}>
-                    <span className="name">
-                      {e.name}{e.branchName ? ` - ${e.branchName}` : ''}{e.employeeNumber ? ` (${e.employeeNumber})` : ''}
-                    </span>
-                    <PurpleCheck
-                      checked={checked}
-                      onClick={(ev)=>ev.stopPropagation()}
-                      onChange={() => toggleEmployee(e.id)}
-                    />
-                  </ListRow>
-                );
-              })}
-              {branchIds.length > 0 && (!employees || employees.length === 0) && (
-                <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>선택 지점 소속 직원이 없습니다.</div>
-              )}
+            <div style={{ padding: '10px 14px 0' }}>
+              <input
+                placeholder="검색어"
+                value={empKeyword}
+                onChange={(e)=>setEmpKeyword(e.target.value)}
+                style={{ width:'100%', height:36, border:'1px solid #e5e7eb', borderRadius:8, padding:'0 10px' }}
+              />
             </div>
 
-            <div style={{ padding: '12px 14px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            {toArr(employees).length > 0 && (
+              <ListRow key="all" $active={allOnListChecked} onClick={toggleAllEmployees}>
+                <span className="name">전체선택</span>
+                <PurpleCheck
+                  checked={allOnListChecked}
+                  onClick={(e)=>e.stopPropagation()}
+                  onChange={toggleAllEmployees}
+                />
+              </ListRow>
+            )}
+
+            {toArr(employees).map(e => {
+              const checked = employeeIds.includes(Number(e.id));
+              return (
+                <ListRow key={`e-${e.id}`} $active={checked} onClick={() => toggleEmployee(e.id)}>
+                  <span className="name">
+                    {e.name}{e.branchName ? ` - ${e.branchName}` : ''}{e.employeeNumber ? ` (${e.employeeNumber})` : ''}
+                  </span>
+                  <PurpleCheck
+                    checked={checked}
+                    onClick={(ev)=>ev.stopPropagation()}
+                    onChange={() => toggleEmployee(e.id)}
+                  />
+                </ListRow>
+              );
+            })}
+            {branchIds.length > 0 && toArr(employees).length === 0 && (
+              <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>선택 지점 소속 직원이 없습니다.</div>
+            )}
+
+            <div style={{ padding: '12px 14px', borderTop: 1, borderTopStyle:'solid', borderTopColor:'#e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Cancel onClick={()=>setEmployeeModal(false)}>취소</Cancel>
               <Confirm onClick={()=>setEmployeeModal(false)}>등록</Confirm>
             </div>
