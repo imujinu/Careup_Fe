@@ -685,7 +685,7 @@ const postJson = (url, data = {}) => {
 };
 
 const normalizeId = (v) => String(v ?? '').split(':')[0];
-const shouldTryNext = (status) => [400, 404, 405, 415].includes(Number(status));
+const shouldTryNext = (status) => [404, 405, 415].includes(Number(status));
 
 const buildActionPayload = (_scheduleId, geo) => {
   const lat = Number.isFinite(geo?.lat) ? geo.lat : undefined;

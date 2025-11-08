@@ -643,8 +643,9 @@ export default function MobileStaffHome() {
 
   const requireGeo = safeToday?.geofenceRequired === true;
 
+  /* ★ 수정: 지오펜스 필수 + 지점 미설정 시 비활성화 */
   const geoDisabled = requireGeo
-    ? (geoBlocked || (branchReady && (!geoTimedOut && (!geoReady || !inside))))
+    ? (!branchReady || geoBlocked || (!geoTimedOut && (!geoReady || !inside)))
     : false;
 
   const next = decideAction(safeToday, loading);
@@ -754,8 +755,8 @@ export default function MobileStaffHome() {
     try { await authService?.logout?.(); } catch {}
     try { tokenStorage?.clear?.(); } catch {}
     try { localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); } catch {}
-    const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
-    window.location.replace(`${origin}/m/login`);
+    /* ★ 수정: 절대경로 상대 리다이렉트로 단순화 */
+    window.location.assign('/m/login');
   };
 
   const moveWeek = (deltaWeeks) => {
@@ -775,8 +776,9 @@ export default function MobileStaffHome() {
       : `반경 밖입니다: ${formatMeters(distance)} / 허용 ${formatMeters(branchGeo.radius)}`;
   }, [requireGeo, branchReady, geoBlocked, geoTimedOut, geoReady, inside, distance, branchGeo]);
 
+  /* ★ 수정: 지점 미설정인 경우 OK 아님(경고 스타일) */
   const geoOk = requireGeo
-    ? (branchReady ? ((geoReady && inside && !geoBlocked) || geoTimedOut) : true)
+    ? (branchReady ? ((geoReady && inside && !geoBlocked) || geoTimedOut) : false)
     : true;
 
   return (
