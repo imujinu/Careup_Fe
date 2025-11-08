@@ -36,6 +36,8 @@ import { formatMeters } from '../../utils/geo';
 const LATE_THRESHOLD_MIN = 1;
 const GEOFENCE_SLACK = Number(import.meta.env.VITE_GEOFENCE_SLACK_METERS ?? 0);
 
+const [todayDetail, setTodayDetail] = useState(null);
+
 const Screen = styled.div`
   min-height: 100vh;
   min-height: 100svh;
@@ -280,7 +282,7 @@ const toBool = (v) => {
   return false;
 };
 
-// 기존 resolveGeofenceRequired 함수 전체 교체
+
 const resolveGeofenceRequired = (o) => {
   if (!o) return false;
 
@@ -455,9 +457,9 @@ function decideAction(today, loading) {
   return { label: '출근하기', icon: mdiChevronRight, onClickName: 'in', disabled: loading || !canIn };
 }
 
-/* today 보강: 스케줄 상세에서 geofenceRequired와 지점 좌표/반경을 today에 병합 */
 function enrichTodayWithDetail(today, detail) {
   if (!today || !detail) return today;
+
   const flagCand = [
     detail?.workType?.geofenceRequired,
     detail?.workType?.geofenceRequiredYn,
@@ -467,11 +469,17 @@ function enrichTodayWithDetail(today, detail) {
     detail?.gpsApply,
     detail?.type?.geofenceRequired,
     detail?.type?.geofenceRequiredYn,
+    detail?.workType?.geoFenceRequired,
+    detail?.workType?.geoFenceRequiredYn,
+    detail?.geoFenceRequired,
+    detail?.geoFenceRequiredYn,
   ];
-  let flag;
-  for (const v of flagCand) {
-    if (v !== undefined && v !== null && String(v) !== '') { flag = toBool(v); break; }
-  }
+
+  const flagVals = flagCand
+    .filter(v => v !== undefined && v !== null && String(v) !== '')
+    .map(v => toBool(v));
+  const flagKnown = flagVals.length > 0;
+  const flagTrue  = flagVals.some(Boolean);
 
   const latCand = [
     detail?.branchLat, detail?.branchLatitude, detail?.latitude,
@@ -489,16 +497,22 @@ function enrichTodayWithDetail(today, detail) {
     detail?.location?.radius, detail?.location?.radiusMeters,
   ];
 
-  const lat = Number(latCand.find((x) => Number.isFinite(Number(x))));
-  const lng = Number(lngCand.find((x) => Number.isFinite(Number(x))));
-  const radius = Number(radCand.find((x) => Number.isFinite(Number(x))));
+  const lat = Number(latCand.find(x => Number.isFinite(Number(x))));
+  const lng = Number(lngCand.find(x => Number.isFinite(Number(x))));
+  const radius = Number(radCand.find(x => Number.isFinite(Number(x))));
 
   const merged = { ...today };
-  if (flag !== undefined) {
-    merged.geofenceRequired = flag;
-    merged.workTypeGeofenceRequired = flag;
-    merged.workType = { ...(today.workType || {}), geofenceRequired: flag };
+
+  if (flagKnown) {
+    const prev = toBool(today?.workType?.geofenceRequired) ||
+                 toBool(today?.geofenceRequired) ||
+                 toBool(today?.workTypeGeofenceRequired);
+    const final = prev || flagTrue;
+    merged.geofenceRequired = final;
+    merged.workTypeGeofenceRequired = final;
+    merged.workType = { ...(today.workType || {}), geofenceRequired: final };
   }
+
   if (!Number.isFinite(Number(merged.branchLat)) && Number.isFinite(lat)) merged.branchLat = lat;
   if (!Number.isFinite(Number(merged.branchLng)) && Number.isFinite(lng)) merged.branchLng = lng;
   if (!Number.isFinite(Number(merged.geofenceRadius)) && Number.isFinite(radius)) merged.geofenceRadius = radius;
@@ -615,7 +629,8 @@ export default function MobileStaffHome() {
       if (t?.scheduleId) {
         try {
           const det = await getScheduleDetail(t.scheduleId);
-          t = enrichTodayWithDetail(t, det);
+          setTodayDetail(det);             // ✅ 상세 별도 보관
+          t = enrichTodayWithDetail(t, det); // today에 병합
         } catch {}
       }
 
@@ -681,7 +696,12 @@ export default function MobileStaffHome() {
   const geoReady = !!(coords?.lat && coords?.lng);
   const geoBlocked = permission === 'denied';
 
-  const requireGeo = resolveGeofenceRequired(safeToday);
+  const requireGeo = useMemo(() => (
+    resolveGeofenceRequired(todayDetail) ||
+    resolveGeofenceRequired(safeToday)   ||
+    toBool(safeToday?.requireGeo)        ||
+    toBool(safeToday?.requireGeoYn)
+  ), [todayDetail, safeToday]);  
 
   const geoDisabled = requireGeo ? (!branchReady || geoBlocked || !geoReady || !inside) : false;
 
