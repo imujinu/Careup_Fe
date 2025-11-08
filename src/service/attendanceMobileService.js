@@ -155,7 +155,12 @@ const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fal
   const slack = Number(cfg.slackMeters || 0);
 
   if (!geofenceRequired) {
-    return { ok: true, geo: geo ?? null, distance: null, radius: null, required: false };
+    // 필수 아님: 좌표가 없으면 "가능하면" 1회 측정 시도(실패해도 막지 않음)
+    let coord = geo ?? null;
+    if (!coord) {
+      try { coord = await getCurrentCoords({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }); } catch {}
+    }
+    return { ok: true, geo: coord, distance: null, radius: null, required: false };
   }
 
   let raw = await fetchBranchGeoNew().catch(() => null);
@@ -835,21 +840,10 @@ const postJson = (url, data = {}) => {
 const normalizeId = (v) => String(v ?? '').split(':')[0];
 
 // ――― 재시도 판단(보수적): 메시지 없으면 400도 재시도
-const shouldTryNext = (status, message) => {
-  const s = Number(status);
-  if ([404, 405, 415].includes(s)) return true;
-  if (s === 400) {
-    const msg = String(message || '').toLowerCase();
-    if (!msg) return true;
-    return (
-      msg.includes('required request body') ||
-      msg.includes('missing') ||
-      msg.includes('parameter') ||
-      msg.includes('cannot deserialize') ||
-      msg.includes('failed to read')
-    );
-  }
-  return false;
+const shouldTryNext = (status/*, message*/) => {
+   const s = Number(status);
+   // 400도 포함해서 1차 후보(event/{id}/action) 실패 시에는 후속 후보를 반드시 시도
+   return [400, 404, 405, 415].includes(s);
 };
 
 // 서버 DTO(AttendanceActionRequest)와 정확히 일치하는 바디 구성
@@ -879,8 +873,7 @@ const buildActionPayload = (_scheduleId, geo) => {
 const needsScheduleInBody = (urlPath) =>
   /\/attendance\/(clock-in|clock-out|break-start|break-end)$/.test(urlPath);
 
-const payloadForUrl = (url, baseBody, scheduleId) =>
-  needsScheduleInBody(url) ? { ...baseBody, scheduleId } : baseBody;
+const payloadForUrl = (url, baseBody, scheduleId) => ({ ...baseBody, scheduleId });
 
 /* =========================
  * 액션(출근/퇴근/휴게) — 지오펜스 필요 시 프론트 검증 + POST 우선
