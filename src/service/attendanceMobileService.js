@@ -202,8 +202,8 @@ const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fal
 
 /* =========================
  * 지오펜스 필수 여부 판단(강화)
- * - 다양한 필드명/문자값 지원
- * - 명시 정보 없고 지점 펜스가 있어도 "근무타입 플래그"만 따른다
+ * - 다양한 필드명/문자값 + gpsRequired/gpsApply 지원
+ * - 명시 정보 없으면 false
  * ========================= */
 const truth = (v) => {
   if (typeof v === 'boolean') return v;
@@ -233,41 +233,53 @@ const anyOf = (...vals) => {
 };
 
 /* =========================
- * 지오펜스 필수 여부 판단 — "근무타입 플래그만 따른다"
+ * 지오펜스 필수 여부 판단 — "근무타입 플래그 우선"
+ * gpsRequired / gpsApply도 인식
  * ========================= */
 async function resolveFenceRequired(detail, primary) {
+  // 1) WorkType 신호가 최우선
   const candsWorkType = [
     detail?.workType?.geofenceRequired,
     detail?.workTypeGeofenceRequired,
     detail?.workType?.requireGeofence,
     detail?.workType?.requiresGeofence,
     detail?.workType?.geoFenceRequired,
+    detail?.workType?.gpsRequired,
+    detail?.workType?.gpsApply,
 
     primary?.workType?.geofenceRequired,
     primary?.workTypeGeofenceRequired,
     primary?.workType?.requireGeofence,
     primary?.workType?.requiresGeofence,
     primary?.workType?.geoFenceRequired,
+    primary?.workType?.gpsRequired,
+    primary?.workType?.gpsApply,
   ];
   for (const v of candsWorkType) {
     const t = truth(v);
-    if (t !== null) return t; // true/false 명시일 때만 채택
+    if (t !== null) return t;
   }
 
+  // 2) 스케줄 자체 신호(보조)
   const candsSchedule = [
     detail?.geofenceRequired,
     detail?.requireGeofence,
     detail?.geofenceMode,
+    detail?.gpsRequired,
+    detail?.gpsApply,
+
     primary?.geofenceRequired,
     primary?.requireGeofence,
     primary?.geofenceMode,
+    primary?.gpsRequired,
+    primary?.gpsApply,
   ];
   for (const v of candsSchedule) {
     const t = truth(v);
     if (t !== null) return t;
   }
 
-  return false; // 기본값: 필요 없음
+  return false; // 기본값
 }
 /* ========================= */
 
@@ -750,7 +762,7 @@ export const fetchTodayStatus = async () => {
     leaveTypeName,
     missedCheckout,
     scheduleId,
-    geofenceRequired: !!geofenceRequired,
+    geofenceRequired: !!(geofenceRequired),
 
     clockInAt: raw.clockInAt,
     actualClockIn: raw.actualClockIn,
@@ -842,7 +854,6 @@ const normalizeId = (v) => String(v ?? '').split(':')[0];
 // ――― 재시도 판단(보수적): 메시지 없으면 400도 재시도
 const shouldTryNext = (status/*, message*/) => {
    const s = Number(status);
-   // 400도 포함해서 1차 후보(event/{id}/action) 실패 시에는 후속 후보를 반드시 시도
    return [400, 404, 405, 415].includes(s);
 };
 
@@ -873,7 +884,10 @@ const buildActionPayload = (_scheduleId, geo) => {
 const needsScheduleInBody = (urlPath) =>
   /\/attendance\/(clock-in|clock-out|break-start|break-end)$/.test(urlPath);
 
-const payloadForUrl = (url, baseBody, scheduleId) => ({ ...baseBody, scheduleId });
+const payloadForUrl = (url, baseBody, scheduleId) => {
+  const body = needsScheduleInBody(url) ? { ...baseBody, scheduleId } : baseBody;
+  return body;
+};
 
 /* =========================
  * 액션(출근/퇴근/휴게) — 지오펜스 필요 시 프론트 검증 + POST 우선
