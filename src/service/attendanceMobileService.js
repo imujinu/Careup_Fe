@@ -676,7 +676,6 @@ const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)
 const postJson = (url, data = {}) => {
   const key = idemp();
   const headers = { 'Content-Type': 'application/json' };
-  // 필요 시에만 헤더를 켜고 싶다면 .env로 토글
   if (import.meta.env.VITE_IDEMPOTENCY_HEADER === 'true') {
     headers['X-Idempotency-Key'] = key;
   }
