@@ -282,7 +282,7 @@ const toBool = (v) => {
 
 const resolveGeofenceRequired = (o) => {
    if (!o) return false;
-   // 🔒 WorkType/스케줄 명시 신호만 허용 (branch 전역 플래그는 제외)
+   // WorkType/스케줄 명시 신호만 허용
    const cands = [
      o.geofenceRequired,
      o.geofenceRequiredYn,
@@ -293,6 +293,10 @@ const resolveGeofenceRequired = (o) => {
      o.workType?.geofenceRequiredYn,
      o.type?.geofenceRequired,
      o.type?.geofenceRequiredYn,
+     o.workType?.gpsRequired,
+     o.workType?.gpsApply,
+     o.gpsRequired,
+     o.gpsApply,
    ];
    for (const v of cands) {
      if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
@@ -495,7 +499,7 @@ function initials(name = '') {
 }
 
 export default function MobileStaffHome() {
-  const { addToast } = useToast();
+  const { addToast } = useToast(); // ✅ 훅은 컴포넌트 최상단에서만
   const authUser = useAppSelector((s) => s?.auth?.user ?? s?.customerAuth?.user ?? null);
 
   const [loading, setLoading] = useState(false);
@@ -669,7 +673,7 @@ export default function MobileStaffHome() {
 
   const doClockOut = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     setLoading(true);
     try {
       await clockOut(
@@ -677,11 +681,11 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      useToast().addToast('퇴근 처리되었습니다.', { color:'success' });
+      addToast('퇴근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '퇴근 처리에 실패했습니다.';
-      useToast().addToast(msg, { color:'error' });
+      addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
@@ -692,9 +696,9 @@ export default function MobileStaffHome() {
   };
   const doClockIn = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     if (requireGeo && !geoReady) {
-      useToast().addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color: 'warning' });
+      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color: 'warning' });
       return;
     }
     setLoading(true);
@@ -704,20 +708,20 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      useToast().addToast('출근 처리되었습니다.', { color:'success' });
+      addToast('출근 처리되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '출근 처리에 실패했습니다.';
-      useToast().addToast(msg, { color:'error' });
+      addToast(msg, { color:'error' });
     } finally {
       setLoading(false);
     }
   };
   const doBreakStart = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     if (requireGeo && !geoReady) {
-      useToast().addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
+      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -727,11 +731,11 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      useToast().addToast('휴게 시작되었습니다.', { color:'success' });
+      addToast('휴게 시작되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '휴게 시작 처리에 실패했습니다.';
-      useToast().addToast(msg, { color:'error' });
+      addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
@@ -742,9 +746,9 @@ export default function MobileStaffHome() {
   };
   const doBreakEnd = async () => {
     const sid = safeToday?.scheduleId;
-    if (!sid) { useToast().addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
+    if (!sid) { addToast('오늘 스케줄이 없습니다.', { color:'error' }); return; }
     if (requireGeo && !geoReady) {
-      useToast().addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
+      addToast('현재 위치를 확인 중입니다. 반경 내로 진입하거나 위치 권한을 허용해 주세요.', { color:'warning' });
       return;
     }
     setLoading(true);
@@ -754,11 +758,11 @@ export default function MobileStaffHome() {
         requireGeo ? coords : null,
         { slackMeters: GEOFENCE_SLACK, fallbackFence: (requireGeo && branchReady) ? branchGeo : null }
       );
-      useToast().addToast('휴게 종료되었습니다.', { color:'success' });
+      addToast('휴게 종료되었습니다.', { color:'success' });
       await loadAll(weekAnchor);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.status_message || '휴게 종료 처리에 실패했습니다.';
-      useToast().addToast(msg, { color:'error' });
+      addToast(msg, { color:'error' });
       if (String(msg).includes('시각을 직접 지정')) {
         setSelectedDay({ ...(safeToday || {}), ymd: toYMDlocal(new Date()) });
         setOpenDetail(true);
@@ -771,7 +775,7 @@ export default function MobileStaffHome() {
   const actionOnClick = next.onClickName === 'out'
     ? async () => {
         if (hasOpenBreak) {
-          useToast().addToast('휴게를 종료하신 후 퇴근할 수 있습니다.', { color: 'warning' });
+          addToast('휴게를 종료하신 후 퇴근할 수 있습니다.', { color: 'warning' });
           return;
         }
         await doClockOut();
@@ -902,7 +906,7 @@ export default function MobileStaffHome() {
               <SingleBtnRow>
                 <ActionBtn
                   $variant={next.variant}
-                  onClick={actionOnClick}
+                  onClick={next.onClickName === 'out' ? doClockOut : doClockIn}
                   disabled={finalDisabled}
                   aria-disabled={finalDisabled}
                 >
