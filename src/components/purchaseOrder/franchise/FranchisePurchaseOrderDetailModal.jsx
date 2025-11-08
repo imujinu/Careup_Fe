@@ -487,7 +487,9 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '-';
-      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+      // UTC로 저장된 날짜를 한국 시간(KST)으로 변환하여 표시
+      const kstDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+      return `${kstDate.getFullYear()}.${String(kstDate.getMonth() + 1).padStart(2, '0')}.${String(kstDate.getDate()).padStart(2, '0')}`;
     } catch (e) {
       return '-';
     }
@@ -717,11 +719,18 @@ function FranchisePurchaseOrderDetailModal({ isOpen, onClose, item, onOrderUpdat
                                   orderStatus === 'SHIPPED' ? 'shipped' :
                                   orderStatus === 'COMPLETED' ? 'completed' : 'request';
               
-              // 날짜 포맷
+              // 날짜 포맷 (UTC → KST 변환)
               const formatDate = (dateString) => {
                 if (!dateString) return '예정';
-                const date = new Date(dateString);
-                return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                try {
+                  const date = new Date(dateString);
+                  if (isNaN(date.getTime())) return '예정';
+                  // UTC로 저장된 날짜를 한국 시간(KST)으로 변환하여 표시
+                  const kstDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+                  return `${kstDate.getFullYear()}.${String(kstDate.getMonth() + 1).padStart(2, '0')}.${String(kstDate.getDate()).padStart(2, '0')} ${String(kstDate.getHours()).padStart(2, '0')}:${String(kstDate.getMinutes()).padStart(2, '0')}`;
+                } catch (e) {
+                  return '예정';
+                }
               };
               
               return React.createElement('div', null,

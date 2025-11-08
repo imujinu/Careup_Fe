@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
 import { MENU_PATH_MAP } from '../routes/routePaths';
+import sharkFavicon from '../assets/logos/shark-favicon.svg';
 
 import Icon from '@mdi/react';
 import {
@@ -57,7 +58,22 @@ const MenuButton = styled.button`
 `;
 
 const SidebarHeader = styled.div`padding: 20px 24px; border-bottom: 1px solid #e5e7eb; margin-bottom: 20px;`;
-const Logo = styled.div`width: 32px; height: 32px; background: #6b46c1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; margin-bottom: 8px;`;
+const Logo = styled.div`
+  width: 32px; 
+  height: 32px; 
+  background: transparent; 
+  border-radius: 6px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  margin-bottom: 8px;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+`;
 const AppTitle = styled.h2`font-size: 16px; font-weight: 600; color: #1f2937; margin: 0;`;
 
 /* ▼ 아코디언(하위 메뉴)용: 더 부드럽고 약간 느린 전환 */
@@ -177,9 +193,11 @@ function Sidebar({ isVisible, userType, branchId }) {
   return (
     <SidebarContainer $isVisible={isVisible}>
       <SidebarHeader>
-        <Logo>H</Logo>
+        <Logo>
+          <img src={sharkFavicon} alt="Shark Logo" />
+        </Logo>
         <AppTitle>
-          한솔도시락
+          Shark
           {userType === 'franchise' && branchName && (
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', fontWeight: 400 }}>
               {branchName}

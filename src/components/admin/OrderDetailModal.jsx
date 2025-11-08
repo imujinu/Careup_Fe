@@ -262,7 +262,16 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('ko-KR');
+    // UTC로 저장된 날짜를 한국 시간(KST)으로 변환하여 표시
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+      // 한국 시간대로 변환하여 표시
+      return date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    } catch (error) {
+      console.error('날짜 포맷팅 오류:', error);
+      return '-';
+    }
   };
 
   const handleApprove = () => {
