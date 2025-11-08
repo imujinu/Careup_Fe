@@ -1,4 +1,3 @@
-// src/service/attendanceMobileService.js
 // 모바일 출퇴근/휴게 전용 서비스 (전체 교체본)
 // - 기존 로직/함수/시그니처 보존
 // - 지점 지오펜스 로드 + 반경 내 검증(필요 시)

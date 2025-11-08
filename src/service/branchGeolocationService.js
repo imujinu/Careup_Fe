@@ -52,8 +52,8 @@ const nestedCandidates = (dto) => {
   const candidates = [];
   if (!dto || typeof dto !== 'object') return candidates;
   const containerKeys = [
-    'geofence','geoFence','geo','location','branchGeofence',
-    'branchLocation','coordinates','center','position',
+    'geofence', 'geoFence', 'geo', 'location', 'branchGeofence',
+    'branchLocation', 'coordinates', 'center', 'position',
   ];
   for (const key of containerKeys) {
     if (dto[key] && typeof dto[key] === 'object') candidates.push(dto[key]);
@@ -62,19 +62,17 @@ const nestedCandidates = (dto) => {
 };
 
 const mapBranchGeo = (dto = {}) => {
-  let lat = pickNumber(dto, ['latitude','lat','branchLat','centerLatitude','centerLat']);
-  let lng = pickNumber(dto, ['longitude','lng','lon','long','branchLng','branchLong','centerLongitude','centerLng']);
+  let lat = pickNumber(dto, ['latitude', 'lat', 'branchLat', 'centerLatitude', 'centerLat']);
+  let lng = pickNumber(dto, ['longitude', 'lng', 'lon', 'long', 'branchLng', 'branchLong', 'centerLongitude', 'centerLng']);
   let radius = pickNumber(dto, [
-    'geofenceRadius','geoFenceRadius','geofenceRadiusMeters','branchRadiusMeters','radiusMeters','radius','r',
+    'geofenceRadius', 'geoFenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters', 'radiusMeters', 'radius', 'r',
   ]);
 
   if (lat === null || lng === null || radius === null) {
     for (const nest of nestedCandidates(dto)) {
-      if (lat === null)   lat = pickNumber(nest, ['latitude','lat','branchLat','centerLatitude','centerLat']);
-      if (lng === null)   lng = pickNumber(nest, ['longitude','lng','lon','long','branchLng','branchLong','centerLongitude','centerLng']);
-      if (radius === null) radius = pickNumber(nest, [
-        'geofenceRadius','geoFenceRadius','geofenceRadiusMeters','branchRadiusMeters','radiusMeters','radius','r',
-      ]);
+      if (lat === null)    lat = pickNumber(nest, ['latitude', 'lat', 'branchLat', 'centerLatitude', 'centerLat']);
+      if (lng === null)    lng = pickNumber(nest, ['longitude', 'lng', 'lon', 'long', 'branchLng', 'branchLong', 'centerLongitude', 'centerLng']);
+      if (radius === null) radius = pickNumber(nest, ['geofenceRadius', 'geoFenceRadius', 'geofenceRadiusMeters', 'branchRadiusMeters', 'radiusMeters', 'radius', 'r']);
       if (lat !== null && lng !== null && radius !== null) break;
     }
   }
@@ -83,7 +81,7 @@ const mapBranchGeo = (dto = {}) => {
   let addressDetail = dto.addressDetail ?? dto.addrDetail ?? dto.detailAddress ?? '';
   if (!address || !addressDetail) {
     for (const nest of nestedCandidates(dto)) {
-      if (!address)      address = nest.address ?? nest.branchAddress ?? nest.addr ?? address;
+      if (!address)       address = nest.address ?? nest.branchAddress ?? nest.addr ?? address;
       if (!addressDetail) addressDetail = nest.addressDetail ?? nest.addrDetail ?? nest.detailAddress ?? addressDetail;
       if (address && addressDetail) break;
     }
@@ -115,11 +113,12 @@ export const isBranchGeofenceConfigured = (g) => {
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 
+// sign은 제곱되어 상관없지만 가독성을 위해 lon2 - lon1로 맞춤
 export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   if ([lat1, lon1, lat2, lon2].some((v) => !isFiniteNumber(v))) return NaN;
   const R = 6371000;
   const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon1 - lon2);
+  const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
@@ -154,14 +153,12 @@ export async function fetchMyBranchGeofence() {
     const dto = unwrap(res) || {};
     const mapped = mapBranchGeo(dto);
     if (isBranchGeofenceConfigured(mapped)) return mapped;
-    // 좌표 미포함이면 후속 폴백 시도
   } catch (e) {
     const status = e?.response?.status;
     if (status === 403) throw new ForbiddenError(e?.response?.data?.status_message || '권한이 없습니다.');
-    // 404/405/500 등은 폴백 시도
   }
   try {
-    // 2차 폴백: /branch/my/geofence (과거/다른 버전 호환)
+    // 2차: /branch/my/geofence (레거시 호환)
     const res2 = await axios.get(`${BASE_URL}/branch/my/geofence`);
     const dto2 = unwrap(res2) || {};
     return mapBranchGeo(dto2);
