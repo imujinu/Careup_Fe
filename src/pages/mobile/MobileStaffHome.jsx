@@ -280,28 +280,55 @@ const toBool = (v) => {
   return false;
 };
 
+
 const resolveGeofenceRequired = (o) => {
-   if (!o) return false;
-   // WorkType/스케줄 명시 신호만 허용
-   const cands = [
-     o.geofenceRequired,
-     o.geofenceRequiredYn,
-     o.requireGeofence,
-     o.workTypeGeofenceRequired,
-     o.workTypeGeofenceRequiredYn,
-     o.workType?.geofenceRequired,
-     o.workType?.geofenceRequiredYn,
-     o.type?.geofenceRequired,
-     o.type?.geofenceRequiredYn,
-     o.workType?.gpsRequired,
-     o.workType?.gpsApply,
-     o.gpsRequired,
-     o.gpsApply,
-   ];
-   for (const v of cands) {
-     if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
-   }
-   return false;
+  if (!o) return false;
+
+  // 1) WorkType 플래그 최우선 + true 우선(OR)
+  const workTypeSignals = [
+    o.workType?.geofenceRequired,
+    o.workType?.geofenceRequiredYn,
+    o.workTypeGeofenceRequired,
+    o.workTypeGeofenceRequiredYn,
+    // 백엔드에서 geoFenceRequired(대문자 F)로 내려오는 변형도 허용
+    o.workType?.geoFenceRequired,
+    o.workType?.geoFenceRequiredYn,
+    o.workType?.requireGeofence,
+    o.workType?.requiresGeofence,
+  ].filter((v) => v !== undefined && v !== null && String(v) !== '');
+
+  // workType에서 단 하나라도 true면 무조건 필요
+  if (workTypeSignals.some((v) => {
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    return s === 'y' || s === 'yes' || s === 'true' || s === '1' || s === 't';
+  })) return true;
+
+  // workType에 명시가 있었는데 모두 false/비활성이라면 필요 없음
+  if (workTypeSignals.length > 0) return false;
+
+  // 2) 스케줄/기타 신호(보조 판단, 여기는 true면 필요, 없으면 기본 false)
+  const schedSignals = [
+    o.geofenceRequired,
+    o.geofenceRequiredYn,
+    o.requireGeofence,
+    o.geofenceMode,
+    o.gpsRequired,
+    o.gpsApply,
+    o.type?.geofenceRequired,
+    o.type?.geofenceRequiredYn,
+    // 변형 케이스
+    o.geoFenceRequired,
+    o.geoFenceRequiredYn,
+  ].filter((v) => v !== undefined && v !== null && String(v) !== '');
+
+  if (schedSignals.some((v) => {
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    return s === 'y' || s === 'yes' || s === 'true' || s === '1' || s === 't' || s === 'required' || s === 'mandatory' || s === 'always' || s === 'on' || s === 'enabled';
+  })) return true;
+
+  return false;
 };
 
 const toTimeMs = (v) => (v instanceof Date ? v.getTime() : (v ? new Date(v).getTime() : NaN));
@@ -428,9 +455,9 @@ function decideAction(today, loading) {
   return { label: '출근하기', icon: mdiChevronRight, onClickName: 'in', disabled: loading || !canIn };
 }
 
-/* today 보강: 스케줄 상세에서 geofenceRequired와 지점 좌표/반경을 today에 병합 */
 function enrichTodayWithDetail(today, detail) {
   if (!today || !detail) return today;
+
   const flagCand = [
     detail?.workType?.geofenceRequired,
     detail?.workType?.geofenceRequiredYn,
@@ -440,11 +467,17 @@ function enrichTodayWithDetail(today, detail) {
     detail?.gpsApply,
     detail?.type?.geofenceRequired,
     detail?.type?.geofenceRequiredYn,
+    detail?.workType?.geoFenceRequired,
+    detail?.workType?.geoFenceRequiredYn,
+    detail?.geoFenceRequired,
+    detail?.geoFenceRequiredYn,
   ];
-  let flag;
-  for (const v of flagCand) {
-    if (v !== undefined && v !== null && String(v) !== '') { flag = toBool(v); break; }
-  }
+
+  const flagVals = flagCand
+    .filter(v => v !== undefined && v !== null && String(v) !== '')
+    .map(v => toBool(v));
+  const flagKnown = flagVals.length > 0;
+  const flagTrue  = flagVals.some(Boolean);
 
   const latCand = [
     detail?.branchLat, detail?.branchLatitude, detail?.latitude,
@@ -462,16 +495,22 @@ function enrichTodayWithDetail(today, detail) {
     detail?.location?.radius, detail?.location?.radiusMeters,
   ];
 
-  const lat = Number(latCand.find((x) => Number.isFinite(Number(x))));
-  const lng = Number(lngCand.find((x) => Number.isFinite(Number(x))));
-  const radius = Number(radCand.find((x) => Number.isFinite(Number(x))));
+  const lat = Number(latCand.find(x => Number.isFinite(Number(x))));
+  const lng = Number(lngCand.find(x => Number.isFinite(Number(x))));
+  const radius = Number(radCand.find(x => Number.isFinite(Number(x))));
 
   const merged = { ...today };
-  if (flag !== undefined) {
-    merged.geofenceRequired = flag;
-    merged.workTypeGeofenceRequired = flag;
-    merged.workType = { ...(today.workType || {}), geofenceRequired: flag };
+
+  if (flagKnown) {
+    const prev = toBool(today?.workType?.geofenceRequired) ||
+                 toBool(today?.geofenceRequired) ||
+                 toBool(today?.workTypeGeofenceRequired);
+    const final = prev || flagTrue;
+    merged.geofenceRequired = final;
+    merged.workTypeGeofenceRequired = final;
+    merged.workType = { ...(today.workType || {}), geofenceRequired: final };
   }
+
   if (!Number.isFinite(Number(merged.branchLat)) && Number.isFinite(lat)) merged.branchLat = lat;
   if (!Number.isFinite(Number(merged.branchLng)) && Number.isFinite(lng)) merged.branchLng = lng;
   if (!Number.isFinite(Number(merged.geofenceRadius)) && Number.isFinite(radius)) merged.geofenceRadius = radius;
@@ -512,6 +551,8 @@ export default function MobileStaffHome() {
   const [openDetail, setOpenDetail] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [branchGeoApi, setBranchGeoApi] = useState(null);
+
+  const [todayDetail, setTodayDetail] = useState(null);
 
   const hydrateWeekDaysWithServer = useCallback(async (days) => {
     const arr = Array.isArray(days) ? days.filter(Boolean) : [];
@@ -588,7 +629,8 @@ export default function MobileStaffHome() {
       if (t?.scheduleId) {
         try {
           const det = await getScheduleDetail(t.scheduleId);
-          t = enrichTodayWithDetail(t, det);
+          setTodayDetail(det);             // ✅ 상세 별도 보관
+          t = enrichTodayWithDetail(t, det); // today에 병합
         } catch {}
       }
 
@@ -654,7 +696,12 @@ export default function MobileStaffHome() {
   const geoReady = !!(coords?.lat && coords?.lng);
   const geoBlocked = permission === 'denied';
 
-  const requireGeo = resolveGeofenceRequired(safeToday);
+  const requireGeo = useMemo(() => (
+    resolveGeofenceRequired(todayDetail) ||
+    resolveGeofenceRequired(safeToday)   ||
+    toBool(safeToday?.requireGeo)        ||
+    toBool(safeToday?.requireGeoYn)
+  ), [todayDetail, safeToday]);  
 
   const geoDisabled = requireGeo ? (!branchReady || geoBlocked || !geoReady || !inside) : false;
 
