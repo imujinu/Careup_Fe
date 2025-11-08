@@ -281,24 +281,23 @@ const toBool = (v) => {
 };
 
 const resolveGeofenceRequired = (o) => {
-  if (!o) return false;
-  const cands = [
-    o.geofenceRequired,
-    o.geofenceRequiredYn,
-    o.workTypeGeofenceRequired,
-    o.workTypeGeofenceRequiredYn,
-    o.gpsRequired,
-    o.gpsApply,
-    o.requireGeofence,
-    o.workType?.geofenceRequired,
-    o.workType?.geofenceRequiredYn,
-    o.type?.geofenceRequired,
-    o.type?.geofenceRequiredYn,
-  ];
-  for (const v of cands) {
-    if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
-  }
-  return false;
+   if (!o) return false;
+   // 🔒 WorkType/스케줄 명시 신호만 허용 (branch 전역 플래그는 제외)
+   const cands = [
+     o.geofenceRequired,
+     o.geofenceRequiredYn,
+     o.requireGeofence,
+     o.workTypeGeofenceRequired,
+     o.workTypeGeofenceRequiredYn,
+     o.workType?.geofenceRequired,
+     o.workType?.geofenceRequiredYn,
+     o.type?.geofenceRequired,
+     o.type?.geofenceRequiredYn,
+   ];
+   for (const v of cands) {
+     if (v !== undefined && v !== null && String(v) !== '') return toBool(v);
+   }
+   return false;
 };
 
 const toTimeMs = (v) => (v instanceof Date ? v.getTime() : (v ? new Date(v).getTime() : NaN));
@@ -621,9 +620,13 @@ export default function MobileStaffHome() {
   const todayOut = getOutText(safeToday);
 
   const branchGeo = useMemo(() => {
-    const apiLat = Number(branchGeoApi?.lat);
-    const apiLng = Number(branchGeoApi?.lng);
-    const apiRad = Number(branchGeoApi?.radius ?? branchGeoApi?.radiusMeters);
+    const apiLat = Number(branchGeoApi?.lat ?? branchGeoApi?.latitude ?? branchGeoApi?.branchLat);
+    const apiLng = Number(
+      branchGeoApi?.lng ?? branchGeoApi?.lon ?? branchGeoApi?.longitude ?? branchGeoApi?.branchLng
+    );
+    const apiRad = Number(
+      branchGeoApi?.radius ?? branchGeoApi?.radiusMeters ?? branchGeoApi?.geofenceRadius ?? branchGeoApi?.geofenceRadiusMeters ?? branchGeoApi?.branchRadiusMeters
+    );
 
     const tLat = Number(pick(safeToday, ['branchLat', 'branchLatitude', 'latitude']));
     const tLng = Number(pick(safeToday, ['branchLng', 'branchLong', 'branchLongitude', 'longitude', 'lon']));
