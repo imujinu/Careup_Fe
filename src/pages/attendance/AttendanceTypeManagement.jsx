@@ -413,7 +413,6 @@ export default function AttendanceTypeManagement() {
               </th>
               <th className="flag">
                 <HeadGroup>
-                  {/* 라벨 변경 */}
                   <HeadLabel>{isWork ? 'GPS 적용 여부' : '유급 여부'}</HeadLabel>
                 </HeadGroup>
               </th>
@@ -434,7 +433,6 @@ export default function AttendanceTypeManagement() {
               <tr key={`${isWork ? 'w' : 'l'}-${row.id}`}>
                 <td className="id">{(page * pageSize) + idx + 1}</td>
                 <td className="name"><strong>{row.name}</strong></td>
-                {/* 값 표기 변경 */}
                 <td className="flag">{isWork ? (row.geofenceRequired ? '필요' : '불필요') : (row.paid ? '유급' : '무급')}</td>
                 <td>
                   <Actions>
@@ -534,7 +532,6 @@ export default function AttendanceTypeManagement() {
               </FormRow>
 
               <FormRow>
-                {/* 라벨 변경 + 드롭다운으로 변경 */}
                 <label>{isWork ? 'GPS 적용 여부' : '유급 여부'}</label>
                 <select
                   value={String(!!form.flag)}
@@ -568,7 +565,7 @@ export default function AttendanceTypeManagement() {
   );
 }
 
-/* ===== 스타일 (AttendanceTemplateManagement와 동일 톤) ===== */
+/* ===== 스타일 (테이블 표준 준수) ===== */
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -795,7 +792,7 @@ const ModalHeader = styled.div`
   padding: 4px 4px 12px; border-bottom: 1px solid #f1f5f9; margin-bottom: 12px;
   h3 { margin: 0; font-size: 18px; color: #111827; }
 `;
-const FormRow = styled.label`
+const FormRow = styled.div`
   display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; margin: 10px 0;
   > label { color: #374151; }
   input, select {
@@ -808,21 +805,4 @@ const FormRow = styled.label`
 `;
 const ModalActions = styled.div`
   display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
-`;
-
-// 토글 스위치 비주얼(간단하게)
-const SelectLike = styled.button`
-  height: 40px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  border-radius: 10px;
-  padding: 0 12px;
-  text-align: left;
-  cursor: pointer;
-  span {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 40px; height: 26px; border-radius: 14px;
-    background: #f3f4f6; color: #374151; font-weight: 700;
-  }
-  span.on { background: #8b5cf6; color: #fff; }
 `;
