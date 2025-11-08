@@ -243,6 +243,7 @@ const HistorySection = styled.div`
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
 `;
 
 const TableHeader = styled.thead`
@@ -256,6 +257,7 @@ const TableHeaderCell = styled.th`
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
 `;
 
 const TableBody = styled.tbody``;
@@ -271,6 +273,36 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: ${props => {
+    if (props.$remark) return '300px';
+    if (props.$date) return '180px';
+    if (props.$quantity) return '100px';
+    return '150px';
+  }};
+  ${props => props.$remark && `
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+    min-width: 200px;
+    max-width: 400px;
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 2px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 2px;
+      &:hover {
+        background: #555;
+      }
+    }
+  `}
 `;
 
 const TypeBadge = styled.span`
@@ -840,13 +872,13 @@ function InventoryDetailModal({ isOpen, onClose, item }) {
                     const date = new Date(history.createdAt).toLocaleString('ko-KR');
                     
                     return React.createElement(TableRow, { key: index },
-                      React.createElement(TableCell, null, date),
+                      React.createElement(TableCell, { $date: true }, date),
                       React.createElement(TableCell, null,
                         React.createElement(TypeBadge, { type }, type)
                       ),
-                      React.createElement(TableCell, null, quantity),
+                      React.createElement(TableCell, { $quantity: true }, quantity),
                       React.createElement(TableCell, null, history.reason || '-'),
-                      React.createElement(TableCell, null, history.remark || '-')
+                      React.createElement(TableCell, { $remark: true }, history.remark || '-')
                     );
                   })
             )

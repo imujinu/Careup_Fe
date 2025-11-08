@@ -5,8 +5,8 @@ const TableContainer = styled.div`
   background: white;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
   overflow-x: auto;
+  overflow-y: visible;
 `;
 
 const Table = styled.table`
@@ -62,20 +62,37 @@ const TableCell = styled.td`
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   text-align: ${props => props.$center ? 'center' : 'left'};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: ${props => {
     if (props.$productName) return '200px';
     if (props.$branch) return '140px';
-    if (props.$remark) return '260px';
-    return 'none';
+    if (props.$remark) return '300px';
+    if (props.$option) return '120px';
+    return '150px';
   }};
-  overflow: ${props => {
-    if (props.$remark) return 'visible';
-    return 'hidden';
-  }};
-  text-overflow: ${props => (props.$remark) ? 'clip' : 'ellipsis'};
-  white-space: ${props => (props.$remark) ? 'normal' : 'nowrap'};
-  word-break: ${props => props.$remark ? 'break-word' : 'normal'};
-  line-height: 1.5;
+  ${props => props.$remark && `
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+    min-width: 200px;
+    max-width: 400px;
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 2px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 2px;
+      &:hover {
+        background: #555;
+      }
+    }
+  `}
 `;
 
 const StatusBadge = styled.span`
@@ -349,14 +366,14 @@ function InventoryFlowTable({
           
           return React.createElement(TableRow, { key: item.id || index },
             React.createElement(TableCell, { $productName: true }, item.productName || '-'),
-            React.createElement(TableCell, { $center: true }, option1?.attributeTypeName || '-'),
-            React.createElement(TableCell, { $center: true }, option1?.attributeValueName || '-'),
-            React.createElement(TableCell, { $center: true }, option2?.attributeTypeName || '-'),
-            React.createElement(TableCell, { $center: true }, option2?.attributeValueName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option1?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option1?.attributeValueName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option2?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option2?.attributeValueName || '-'),
             React.createElement(TableCell, { $branch: true }, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
-            React.createElement(TableCell, null, formatQuantity(item.inQuantity)),
-            React.createElement(TableCell, null, formatQuantity(item.outQuantity)),
+            React.createElement(TableCell, { $center: true }, formatQuantity(item.inQuantity)),
+            React.createElement(TableCell, { $center: true }, formatQuantity(item.outQuantity)),
             React.createElement(TableCell, { $remark: true }, item.remark || '-'),
             React.createElement(TableCell, null, formatDate(item.createdAt)),
             React.createElement(TableCell, null,

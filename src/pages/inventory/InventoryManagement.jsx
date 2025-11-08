@@ -231,9 +231,43 @@ function InventoryManagement() {
       
       // 상품별 속성 정보를 가져오기 위한 Map (캐싱)
       const productAttributesMap = new Map();
+      // 카테고리별 속성 정보를 가져오기 위한 Map (캐싱)
+      const categoryAttributesMap = new Map();
       
       // 먼저 모든 고유한 상품 ID 수집
       const uniqueProductIds = [...new Set(allBranchProducts.map(bp => bp.productId).filter(Boolean))];
+      
+      // 모든 상품의 카테고리 ID 수집
+      const uniqueCategoryIds = [...new Set(
+        Array.from(productMap.values())
+          .map(p => p.categoryId || p.category?.id || p.category?.categoryId)
+          .filter(Boolean)
+      )];
+      
+      // 카테고리별 속성 정보를 먼저 가져오기 (캐싱)
+      for (const categoryId of uniqueCategoryIds) {
+        if (!categoryAttributesMap.has(categoryId)) {
+          try {
+            const categoryAttributes = await inventoryService.getCategoryAttributes(categoryId);
+            if (Array.isArray(categoryAttributes)) {
+              // attributeTypeId를 키로 하는 Map 생성
+              const categoryAttrMap = new Map();
+              categoryAttributes.forEach(ca => {
+                const typeId = String(ca.attributeTypeId || ca.attributeType?.id || ca.id || '');
+                if (typeId) {
+                  categoryAttrMap.set(typeId, {
+                    displayOrder: ca.displayOrder || 0,
+                    attributeTypeName: ca.attributeTypeName || ca.attributeType?.name
+                  });
+                }
+              });
+              categoryAttributesMap.set(categoryId, categoryAttrMap);
+            }
+          } catch (err) {
+            categoryAttributesMap.set(categoryId, new Map());
+          }
+        }
+      }
       
       // 모든 상품의 속성 정보를 배치로 가져오기 (동시 요청 수 제한)
       const batchSize = 10; // 한 번에 10개씩 처리
@@ -242,7 +276,13 @@ function InventoryManagement() {
         await Promise.all(batch.map(async (productId) => {
           if (!productAttributesMap.has(productId)) {
             try {
+              const product = productMap.get(productId);
+              const categoryId = product?.categoryId || product?.category?.id || product?.category?.categoryId;
               const productAttributes = await inventoryService.getProductAttributeValues(productId);
+              
+              // 카테고리별 displayOrder 가져오기
+              const categoryAttrMap = categoryAttributesMap.get(categoryId) || new Map();
+              
               // 속성 타입별로 그룹화
               const attributeMap = new Map();
               (productAttributes || []).forEach(attr => {
@@ -250,7 +290,12 @@ function InventoryManagement() {
                 const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
                 const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
                 const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName || '';
-                const displayOrder = attr.attributeType?.displayOrder || attr.displayOrder || 0;
+                
+                // 카테고리별 displayOrder 우선 사용, 없으면 속성 타입의 displayOrder 사용
+                const categoryDisplayOrder = categoryAttrMap.get(typeId)?.displayOrder;
+                const displayOrder = categoryDisplayOrder !== undefined 
+                  ? categoryDisplayOrder 
+                  : (attr.attributeType?.displayOrder || attr.displayOrder || 0);
                 
                 // typeId가 없으면 typeName을 키로 사용
                 const key = typeId || typeName;
@@ -451,17 +496,112 @@ function InventoryManagement() {
         // 고유한 productId 수집
         const uniqueProductIds = [...new Set(data.map(item => item.productId).filter(Boolean))];
         
+        // 상품 정보를 먼저 가져와서 카테고리 ID 수집
+        const productMap = new Map();
+        const batchSize = 10;
+        
+        for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+          const batch = uniqueProductIds.slice(i, i + batchSize);
+          await Promise.all(batch.map(async (productId) => {
+            try {
+              const productResponse = await inventoryService.getProduct(productId);
+              const product = productResponse.data?.data || productResponse.data;
+              if (product) {
+                productMap.set(String(productId), product);
+              }
+            } catch (err) {
+              // 상품 정보 조회 실패 시 무시
+            }
+          }));
+        }
+        
+        // 모든 상품의 카테고리 ID 수집
+        const uniqueCategoryIds = [...new Set(
+          Array.from(productMap.values())
+            .map(p => p.categoryId || p.category?.id || p.category?.categoryId)
+            .filter(Boolean)
+        )];
+        
+        // 카테고리별 속성 정보를 먼저 가져오기 (캐싱)
+        const categoryAttributesMap = new Map();
+        for (const categoryId of uniqueCategoryIds) {
+          if (!categoryAttributesMap.has(categoryId)) {
+            try {
+              const categoryAttributes = await inventoryService.getCategoryAttributes(categoryId);
+              if (Array.isArray(categoryAttributes)) {
+                // attributeTypeId를 키로 하는 Map 생성
+                const categoryAttrMap = new Map();
+                categoryAttributes.forEach(ca => {
+                  const typeId = String(ca.attributeTypeId || ca.attributeType?.id || ca.id || '');
+                  if (typeId) {
+                    categoryAttrMap.set(typeId, {
+                      displayOrder: ca.displayOrder || 0,
+                      attributeTypeName: ca.attributeTypeName || ca.attributeType?.name
+                    });
+                  }
+                });
+                categoryAttributesMap.set(categoryId, categoryAttrMap);
+              }
+            } catch (err) {
+              categoryAttributesMap.set(categoryId, new Map());
+            }
+          }
+        }
+        
         // 각 상품의 속성 정보를 배치로 가져오기
         const productAttributesMap = new Map();
-        const batchSize = 10;
         
         for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
           const batch = uniqueProductIds.slice(i, i + batchSize);
           const promises = batch.map(async (productId) => {
             try {
+              const product = productMap.get(String(productId));
+              const categoryId = product?.categoryId || product?.category?.id || product?.category?.categoryId;
               const attrs = await inventoryService.getProductAttributeValues(productId);
+              
               if (Array.isArray(attrs)) {
-                productAttributesMap.set(String(productId), attrs);
+                // 카테고리별 displayOrder 가져오기
+                const categoryAttrMap = categoryAttributesMap.get(categoryId) || new Map();
+                
+                // 속성 타입별로 그룹화하고 카테고리별 displayOrder 적용
+                const attributeMap = new Map();
+                attrs.forEach(attr => {
+                  const typeId = String(attr.attributeTypeId || attr.attributeType?.id || '');
+                  const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
+                  const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
+                  const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName || '';
+                  
+                  // 카테고리별 displayOrder 우선 사용, 없으면 속성 타입의 displayOrder 사용
+                  const categoryDisplayOrder = categoryAttrMap.get(typeId)?.displayOrder;
+                  const displayOrder = categoryDisplayOrder !== undefined 
+                    ? categoryDisplayOrder 
+                    : (attr.attributeType?.displayOrder || attr.displayOrder || 0);
+                  
+                  const key = typeId || typeName;
+                  if (!key) return;
+                  
+                  if (!attributeMap.has(key)) {
+                    attributeMap.set(key, {
+                      attributeTypeId: typeId,
+                      attributeTypeName: typeName,
+                      displayOrder: displayOrder,
+                      values: []
+                    });
+                  }
+                  
+                  if (valueId && valueName) {
+                    attributeMap.get(key).values.push({
+                      attributeValueId: valueId,
+                      attributeValueName: valueName
+                    });
+                  }
+                });
+                
+                // displayOrder 순으로 정렬
+                const sortedAttrs = Array.from(attributeMap.values())
+                  .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+                
+                productAttributesMap.set(String(productId), sortedAttrs);
               }
             } catch (err) {
               // 속성 정보 조회 실패 시 무시
@@ -489,21 +629,14 @@ function InventoryManagement() {
           });
         }
         
-        // displayOrder 순으로 정렬
-        const sortedAttrs = [...productAttributes].sort((a, b) => {
-          const aOrder = a.displayOrder || 0;
-          const bOrder = b.displayOrder || 0;
-          return aOrder - bOrder;
-        });
-        
         // 최대 2개까지 속성 추가하되, 이미 추가된 값은 제외
-        for (const attr of sortedAttrs) {
+        for (const attr of productAttributes) {
           if (attributes.length >= 2) {
             break;
           }
           
-          const typeName = attr.attributeTypeName || attr.attributeType?.name;
-          const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName;
+          const typeName = attr.attributeTypeName;
+          const valueName = attr.values[0]?.attributeValueName || '';
           
           if (!typeName || !valueName) {
             continue;
@@ -515,9 +648,9 @@ function InventoryManagement() {
 
           if (!isDuplicate) {
             attributes.push({
-              attributeTypeId: attr.attributeTypeId || attr.attributeType?.id,
+              attributeTypeId: attr.attributeTypeId,
               attributeTypeName: typeName,
-              attributeValueId: attr.attributeValueId || attr.attributeValue?.id || attr.id,
+              attributeValueId: attr.values[0]?.attributeValueId || null,
               attributeValueName: valueName
             });
           }
