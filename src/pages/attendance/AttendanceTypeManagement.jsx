@@ -1,3 +1,4 @@
+// src/pages/attendance/AttendanceTypeManagement.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import Icon from '@mdi/react';
@@ -38,6 +39,14 @@ const TABLE_MIN_WIDTH_LEAVE =
 const Mdi = ({ path, size = 0.95, ...props }) => <Icon path={path} size={size} aria-hidden {...props} />;
 
 const TABS = { WORK: 'WORK', LEAVE: 'LEAVE' };
+
+// 🆕 백엔드가 Y/N, 1/0, 'true'/'false'로 줄 때를 모두 흡수
+const asBool = (v) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  const s = String(v ?? '').trim().toUpperCase();
+  return s === 'Y' || s === 'TRUE' || s === '1';
+};
 
 export default function AttendanceTypeManagement() {
   const { addToast } = useToast();
@@ -92,7 +101,7 @@ export default function AttendanceTypeManagement() {
     if (!canView) return;
     setWorkLoading(true);
     try {
-      const params = { page: workPage, size: workPageSize, sort: `${sort.field},${sort.dir}` };
+      const params = { page: workPage, size: workPageSize, sort: `${sort.field},${sort.dir}`, keyword: search || undefined }; // 🆕 keyword 전달
       const data = await listWorkTypes(params);
       const content = Array.isArray(data?.content)
         ? data.content
@@ -101,7 +110,12 @@ export default function AttendanceTypeManagement() {
         : Array.isArray(data)
         ? data
         : [];
-      setWorkItems(content);
+      // 🆕 불리언 정규화
+      const normalized = content.map((r) => ({
+        ...r,
+        geofenceRequired: asBool(r?.geofenceRequired),
+      }));
+      setWorkItems(normalized);
       setWorkTotalPages(Number.isFinite(data?.totalPages) ? data.totalPages : (Array.isArray(content) ? 1 : 0));
     } catch (e) {
       const status = e?.response?.status;
@@ -113,13 +127,13 @@ export default function AttendanceTypeManagement() {
     } finally {
       setWorkLoading(false);
     }
-  }, [canView, workPage, workPageSize, sort.field, sort.dir, addToast]);
+  }, [canView, workPage, workPageSize, sort.field, sort.dir, addToast, search]);
 
   const fetchLeaveList = useCallback(async () => {
     if (!canView) return;
     setLeaveLoading(true);
     try {
-      const params = { page: leavePage, size: leavePageSize, sort: `${sort.field},${sort.dir}` };
+      const params = { page: leavePage, size: leavePageSize, sort: `${sort.field},${sort.dir}`, keyword: search || undefined }; // 🆕
       const data = await listLeaveTypes(params);
       const content = Array.isArray(data?.content)
         ? data.content
@@ -128,7 +142,11 @@ export default function AttendanceTypeManagement() {
         : Array.isArray(data)
         ? data
         : [];
-      setLeaveItems(content);
+      const normalized = content.map((r) => ({
+        ...r,
+        paid: asBool(r?.paid), // 🆕
+      }));
+      setLeaveItems(normalized);
       setLeaveTotalPages(Number.isFinite(data?.totalPages) ? data.totalPages : (Array.isArray(content) ? 1 : 0));
     } catch (e) {
       const status = e?.response?.status;
@@ -140,7 +158,7 @@ export default function AttendanceTypeManagement() {
     } finally {
       setLeaveLoading(false);
     }
-  }, [canView, leavePage, leavePageSize, sort.field, sort.dir, addToast]);
+  }, [canView, leavePage, leavePageSize, sort.field, sort.dir, addToast, search]);
 
   useEffect(() => {
     if (tab === TABS.WORK) fetchWorkList();
@@ -177,7 +195,8 @@ export default function AttendanceTypeManagement() {
   };
   const openEdit = (row) => {
     setEditing(row);
-    setForm({ name: row.name || '', flag: !!(tab === TABS.WORK ? row.geofenceRequired : row.paid) });
+    // 🔧 불리언 정규화 사용
+    setForm({ name: row.name || '', flag: !!(tab === TABS.WORK ? asBool(row.geofenceRequired) : asBool(row.paid)) });
     setOpenModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 0);
   };
@@ -386,7 +405,7 @@ export default function AttendanceTypeManagement() {
               <tr key={`${isWork ? 'w' : 'l'}-${row.id}`}>
                 <td className="id">{(page * pageSize) + idx + 1}</td>
                 <td className="name"><strong>{row.name}</strong></td>
-                <td className="flag">{isWork ? (row.geofenceRequired ? '필요' : '불필요') : (row.paid ? '유급' : '무급')}</td>
+                <td className="flag">{isWork ? (asBool(row.geofenceRequired) ? '필요' : '불필요') : (asBool(row.paid) ? '유급' : '무급')}</td> {/* 🔧 */}
                 <td>
                   <Actions>
                     <TextBtn
