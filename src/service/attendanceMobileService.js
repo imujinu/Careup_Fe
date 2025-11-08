@@ -7,7 +7,10 @@ import { splitForCalendar } from '../utils/calendarSplit';
 const BASE_URL = (() => {
   const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
   if (explicit) return explicit;
-  const api = (import.meta.env.VITE_API_URL).replace(/\/$/, '');
+  const api = (
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
+  ).replace(/\/$/, '');
   return `${api}/branch-service`;
 })();
 
@@ -670,10 +673,17 @@ export const allowBreakEndClient = (obj) => {
 
 /* ===== 출근/퇴근/휴게 ===== */
 const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const postJson = (url, data = {}) =>
-  axios.post(url, data, {
-    headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemp() },
-  }).then(r => r?.data);
+const postJson = (url, data = {}) => {
+  const key = idemp();
+  const headers = { 'Content-Type': 'application/json' };
+  // 필요 시에만 헤더를 켜고 싶다면 .env로 토글
+  if (import.meta.env.VITE_IDEMPOTENCY_HEADER === 'true') {
+    headers['X-Idempotency-Key'] = key;
+  }
+  return axios
+    .post(url, { ...data, idempotencyKey: key }, { headers })
+    .then((r) => (r?.data?.result ?? r?.data ?? null));
+};
 
 const normalizeId = (v) => String(v ?? '').split(':')[0];
 const shouldTryNext = (status) => [400, 404, 405, 415].includes(Number(status));

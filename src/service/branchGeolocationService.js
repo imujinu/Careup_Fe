@@ -7,7 +7,10 @@ import axios from '../utils/axiosConfig';
 const BASE_URL = (() => {
   const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
   if (explicit) return explicit;
-  const api = (import.meta.env.VITE_CUSTOMER_API_URL).replace(/\/$/, '');
+  const api = (
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
+  ).replace(/\/$/, '');
   return `${api}/branch-service`;
 })();
 
