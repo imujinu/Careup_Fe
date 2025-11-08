@@ -854,10 +854,11 @@ function InventoryManagement() {
           maxPrice: formData.maxPrice || 0,
           supplyPrice: formData.supplyPrice || 0,
           imageUrl: formData.imageUrl || '',
-          visibility: formData.visibility || 'ALL'
+          visibility: formData.visibility || 'ALL',
+          imageFile: formData.imageFile || null // 이미지 파일 추가
         };
         
-        const productResponse = await inventoryService.createProduct(productData, null);
+        const productResponse = await inventoryService.createProduct(productData);
         
         // 등록된 상품의 ID 추출 (ResponseDto 구조 고려)
         const responseData = productResponse.data?.data || productResponse.data;
