@@ -264,7 +264,13 @@ function FranchiseDashboard() {
                   <td>{o.memberName}</td>
                   <td>₩{(o.totalAmount||0).toLocaleString()}</td>
                   <td>{translateOrderStatus(o.status)}</td>
-                  <td>{o.createdAt ? new Date(o.createdAt).toLocaleString('ko-KR') : '-'}</td>
+                  <td>{o.createdAt ? (() => {
+                      const dateStr = o.createdAt;
+                      const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
+                        ? dateStr.trim() + 'Z' 
+                        : dateStr;
+                      return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+                    })() : '-'}</td>
                 </tr>
               ))}
             </tbody>

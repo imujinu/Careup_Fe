@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
 import { MENU_PATH_MAP } from '../routes/routePaths';
-import sharkFavicon from '../assets/logos/shark-favicon.svg';
+import SharkLogo from '../storefront/components/SharkLogo';
 
 import Icon from '@mdi/react';
 import {
@@ -59,20 +59,10 @@ const MenuButton = styled.button`
 
 const SidebarHeader = styled.div`padding: 20px 24px; border-bottom: 1px solid #e5e7eb; margin-bottom: 20px;`;
 const Logo = styled.div`
-  width: 32px; 
-  height: 32px; 
-  background: transparent; 
-  border-radius: 6px; 
   display: flex; 
   align-items: center; 
   justify-content: center; 
   margin-bottom: 8px;
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
 `;
 const AppTitle = styled.h2`font-size: 16px; font-weight: 600; color: #1f2937; margin: 0;`;
 
@@ -194,7 +184,7 @@ function Sidebar({ isVisible, userType, branchId }) {
     <SidebarContainer $isVisible={isVisible}>
       <SidebarHeader>
         <Logo>
-          <img src={sharkFavicon} alt="Shark Logo" />
+          <SharkLogo size={32} />
         </Logo>
         <AppTitle>
           Shark

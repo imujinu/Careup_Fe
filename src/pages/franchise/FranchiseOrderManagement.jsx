@@ -527,7 +527,15 @@ function FranchiseOrderManagement() {
                   <TableCell>
                     <StatusBadge $status={order.status}>{getStatusText(order.status)}</StatusBadge>
                   </TableCell>
-                  <TableCell>{new Date(order.createdAt).toLocaleString('ko-KR')}</TableCell>
+                  <TableCell>
+                    {order.createdAt ? (() => {
+                        const dateStr = order.createdAt;
+                        const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
+                          ? dateStr.trim() + 'Z' 
+                          : dateStr;
+                        return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+                      })() : '-'}
+                  </TableCell>
                   <TableCell>
                     <ActionButton onClick={() => handleOpenDetail(order)}>상세</ActionButton>
                     {order.status === 'PENDING' && (

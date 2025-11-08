@@ -29,8 +29,14 @@ const OrderCompletePage = ({ orderData, paymentData, onBackToHome, onViewOrders 
               <span className="label">주문일시</span>
               <span className="value">
                 {orderData?.createdAt ? 
-                  new Date(orderData.createdAt).toLocaleString('ko-KR') : 
-                  new Date().toLocaleString('ko-KR')
+                  (() => {
+                    const dateStr = orderData.createdAt;
+                    const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
+                      ? dateStr.trim() + 'Z' 
+                      : dateStr;
+                    return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+                  })() : 
+                  new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
                 }
               </span>
             </div>
