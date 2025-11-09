@@ -1,13 +1,15 @@
-// src/service/scheduleService.js
 import axios from '../utils/axiosConfig';
 
 /**
- * BASE_URL을 항상 "브랜치 서비스 루트"로 맞춤
+ * 브랜치 서비스 루트: VITE_BRANCH_URL 우선, 없으면 게이트웨이(API_URL)/branch-service
  */
 const BASE_URL = (() => {
-  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
-  if (explicit) return explicit;
-  const api = (import.meta.env.VITE_CUSTOMER_API_URL).replace(/\/$/, '');
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const explicit = trim(import.meta.env.VITE_BRANCH_URL);
+  if (explicit) return explicit; // e.g. https://server.careup.store/branch-service
+  const api =
+    trim(import.meta.env.VITE_API_URL) ||
+    (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
   return `${api}/branch-service`;
 })();
 
@@ -15,6 +17,7 @@ const BASE_URL = (() => {
 const unwrap = (res) => {
   const data = res?.data;
   if (data && typeof data === 'object' && 'result' in data) return data.result;
+  if (data && typeof data === 'object' && 'data' in data) return data.data;
   return data;
 };
 
@@ -77,7 +80,7 @@ export const fetchWorkTypeOptions = async () => {
   try {
     const res = await axios.get(`${BASE_URL}/api/work-types/options`);
     const data = unwrap(res) || [];
-    if (Array.isArray(data) && data.length >= 0) return data;
+    if (Array.isArray(data)) return data;
   } catch { /* fallthrough */ }
   const res2 = await axios.get(`${BASE_URL}/work-type/list`, { params: { page: 0, size: 1000 } });
   const page = unwrap(res2);
@@ -94,7 +97,7 @@ export const fetchLeaveTypeOptions = async () => {
   try {
     const res = await axios.get(`${BASE_URL}/api/leave-types/options`);
     const data = unwrap(res) || [];
-    if (Array.isArray(data) && data.length >= 0) return data;
+    if (Array.isArray(data)) return data;
   } catch { /* fallthrough */ }
   const res2 = await axios.get(`${BASE_URL}/leave-type/list`, { params: { page: 0, size: 1000 } });
   const page = unwrap(res2);

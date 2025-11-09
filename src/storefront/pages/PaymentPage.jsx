@@ -57,16 +57,76 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
     };
   }, []);
 
+  // UTC 시간 문자열을 Date 객체로 변환 (Z가 없으면 UTC로 간주)
+  const parseUTCDate = (dateString) => {
+    if (!dateString) return null;
+    
+    // 이미 Date 객체면 그대로 반환
+    if (dateString instanceof Date) return dateString;
+    
+    let normalizedDate = String(dateString).trim();
+    
+    // 타임존 정보가 있는지 확인 (Z, +HH:MM, -HH:MM 형식)
+    const hasTimezone = normalizedDate.endsWith('Z') || 
+                        /[+-]\d{2}:?\d{2}$/.test(normalizedDate);
+    
+    // 타임존 정보가 없으면 UTC로 간주 (Z 추가)
+    if (!hasTimezone) {
+      normalizedDate = normalizedDate + 'Z';
+    }
+    
+    const date = new Date(normalizedDate);
+    if (isNaN(date.getTime())) {
+      console.error('날짜 파싱 실패:', dateString, '→', normalizedDate);
+      return null;
+    }
+    
+    return date;
+  };
+
   // 주문 생성 시간 확인 및 저장
   useEffect(() => {
     if (actualOrderData?.orderId && !orderCreatedAt) {
+      // orderData에 createdAt이 있으면 우선 사용 (더 빠름)
+      if (actualOrderData?.createdAt) {
+        // UTC 시간을 정확히 파싱
+        const utcDate = parseUTCDate(actualOrderData.createdAt);
+        if (utcDate) {
+          setOrderCreatedAt(utcDate.getTime());
+          console.log('📅 orderData에서 createdAt 사용:', {
+            original: actualOrderData.createdAt,
+            normalized: utcDate.toISOString(),
+            local: utcDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+            timestamp: utcDate.getTime(),
+            now: Date.now(),
+            elapsed: Date.now() - utcDate.getTime()
+          });
+        } else {
+          // 파싱 실패 시 현재 시간 사용
+          setOrderCreatedAt(Date.now());
+        }
+        return;
+      }
+      
       // 주문 상세 조회하여 생성 시간 확인
       cartService.getOrderDetail(actualOrderData.orderId)
         .then(response => {
           const order = response?.data || response;
           const createdAt = order.createdAt || order.created_at;
           if (createdAt) {
-            setOrderCreatedAt(new Date(createdAt).getTime());
+            // UTC 시간을 정확히 파싱
+            const utcDate = parseUTCDate(createdAt);
+            if (utcDate) {
+              setOrderCreatedAt(utcDate.getTime());
+              console.log('📅 주문 상세에서 createdAt 사용:', {
+                original: createdAt,
+                normalized: utcDate.toISOString(),
+                local: utcDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+                timestamp: utcDate.getTime(),
+                now: Date.now(),
+                elapsed: Date.now() - utcDate.getTime()
+              });
+            }
           }
         })
         .catch(error => {
@@ -75,7 +135,7 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
           setOrderCreatedAt(Date.now());
         });
     }
-  }, [actualOrderData?.orderId, orderCreatedAt]);
+  }, [actualOrderData?.orderId, actualOrderData?.createdAt, orderCreatedAt]);
 
   // 남은 시간 계산 및 표시
   useEffect(() => {
@@ -132,7 +192,19 @@ const PaymentPage = ({ orderData, onBack, onPaymentSuccess, currentUser }) => {
         
         // 주문 생성 시간 업데이트 (처음 한 번만)
         if (!orderCreatedAt && order.createdAt) {
-          setOrderCreatedAt(new Date(order.createdAt).getTime());
+          // UTC 시간을 정확히 파싱
+          const utcDate = parseUTCDate(order.createdAt);
+          if (utcDate) {
+            setOrderCreatedAt(utcDate.getTime());
+            console.log('📅 주문 상태 확인에서 createdAt 업데이트:', {
+              original: order.createdAt,
+              normalized: utcDate.toISOString(),
+              local: utcDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+              timestamp: utcDate.getTime(),
+              now: Date.now(),
+              elapsed: Date.now() - utcDate.getTime()
+            });
+          }
         }
         
         // 주문이 취소된 경우

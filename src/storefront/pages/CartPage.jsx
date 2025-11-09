@@ -48,7 +48,7 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
       for (const item of items) {
         const itemKey = getItemKey(item);
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+          const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
           const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
           // 상품 상세와 동일한 API 사용: 상품 ID로 지점 정보 조회
@@ -295,7 +295,8 @@ const CartPage = ({ onBack, currentUser, onProceedToOrder }) => {
         items,
         branchId: selectedBranchId,
         selectedBranches,
-        availableBranches
+        availableBranches,
+        createdAt: created?.createdAt || new Date().toISOString() // UTC 시간 포함
       };
 
       if (onProceedToOrder) {

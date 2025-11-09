@@ -3,18 +3,27 @@ import axios from '../utils/axiosConfig';
 import { fetchScheduleCalendar, getScheduleDetail } from './scheduleService';
 import { tokenStorage } from './authService';
 import { splitForCalendar } from '../utils/calendarSplit';
+import {
+  fetchMyBranchGeofence as fetchBranchGeoNew,
+  isBranchGeofenceConfigured as isBranchGeoConfigured,
+} from './branchGeolocationService';
+import { getWorkType } from './attendanceTypeService';
 
 const BASE_URL = (() => {
-  const explicit = (import.meta.env.VITE_BRANCH_URL || '').replace(/\/$/, '');
-  if (explicit) return explicit;
-  const api = (import.meta.env.VITE_API_URL).replace(/\/$/, '');
-  return `${api}/branch-service`;
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const withBranch = (u) => (u.endsWith('/branch-service') ? u : `${u}/branch-service`);
+  const explicit = trim(import.meta.env.VITE_BRANCH_URL);
+  if (explicit) return withBranch(explicit);
+  const api = trim(
+    import.meta.env.VITE_API_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080')
+  );
+  return withBranch(api);
 })();
 
 const DOW_KR = ['일','월','화','수','목','금','토'];
 const LATE_THRESHOLD_MIN = 1;
 
-/* ===== 공통 유틸 ===== */
 const toYMD = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
   const y = dt.getFullYear();
@@ -61,7 +70,6 @@ const localIsoNoZ = () => {
   return local.toISOString().slice(0, 19);
 };
 
-/* ===== 이벤트별 시각 추출 ===== */
 const pickTimesForPiece = (ev) => {
   const s = ev.actualClockIn || ev.clockInAt || ev.actualStartAt || ev.registeredClockIn || ev.registeredStartAt || ev.startAt || null;
   const e = ev.actualClockOut || ev.clockOutAt || ev.actualEndAt || ev.registeredClockOut || ev.registeredEndAt || ev.endAt || null;
@@ -86,7 +94,6 @@ const pickScheduleId = (p) => p?.id ?? p?.scheduleId ?? p?.scheduleSeq ?? p?.seq
 const hasIn = (o) => !!(o?.clockInAt || o?.actualClockIn || o?.actualStartAt);
 const hasOut = (o) => !!(o?.clockOutAt || o?.actualClockOut || o?.actualEndAt);
 
-/** 일자별 겹침 분(min) 계산 */
 const minutesOverlapOnDay = (as, ae, ymd) => {
   if (!as || !ae) return 0;
   const s = toTime(as);
@@ -98,7 +105,179 @@ const minutesOverlapOnDay = (as, ae, ymd) => {
   return Math.max(0, Math.round(overlap / 60000));
 };
 
-/** 표시/상태 요약(조각 기준) */
+const haversineMeters = (lat1, lng1, lat2, lng2) => {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+};
+
+const getCurrentCoords = (opts = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }) =>
+  new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      reject(new Error('이 기기에서 위치 정보를 사용할 수 없습니다.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          at: localIsoNoZ(),
+        }),
+      (err) => reject(err),
+      opts
+    );
+  });
+
+const isValidFence = (f) =>
+  f && Number.isFinite(Number(f.lat)) && Number.isFinite(Number(f.lng)) && Number.isFinite(Number(f.radius)) && Number(f.radius) > 0;
+
+const ensureFenceOk = async (geofenceRequired, geo, opts = { slackMeters: 0, fallbackFence: null }) => {
+  const cfg = typeof opts === 'number' ? { slackMeters: opts } : (opts || {});
+  const slack = Number(cfg.slackMeters || 0);
+
+  if (!geofenceRequired) {
+    let coord = geo ?? null;
+    if (!coord) {
+      try { coord = await getCurrentCoords({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }); } catch {}
+    }
+    return { ok: true, geo: coord, distance: null, radius: null, required: false };
+  }
+
+  let raw = await fetchBranchGeoNew().catch(() => null);
+
+  if (!raw || !isBranchGeoConfigured(raw)) {
+    if (isValidFence(cfg.fallbackFence || {})) {
+      raw = {
+        lat: Number(cfg.fallbackFence.lat),
+        lng: Number(cfg.fallbackFence.lng),
+        radius: Number(cfg.fallbackFence.radius),
+      };
+    } else {
+      throw new Error('지점 지오펜스가 설정되어 있지 않습니다.');
+    }
+  }
+
+  const fenceLat = Number(raw.lat ?? raw.latitude ?? NaN);
+  const fenceLng = Number(raw.lng ?? raw.longitude ?? raw.lon ?? NaN);
+  const radius =
+    Number(raw.radius ?? raw.radiusMeters ?? 0) + Number(slack.toFixed(0));
+
+  if (!Number.isFinite(fenceLat) || !Number.isFinite(fenceLng) || !(radius > 0)) {
+    throw new Error('지점 지오펜스 데이터가 올바르지 않습니다.');
+  }
+
+  const coord = geo ?? (await getCurrentCoords());
+  if (!coord || !Number.isFinite(coord.lat) || !Number.isFinite(coord.lng)) {
+    throw new Error('현재 위치를 확인할 수 없습니다.');
+  }
+
+  const dist = haversineMeters(coord.lat, coord.lng, fenceLat, fenceLng);
+  if (dist > radius) {
+    throw new Error(`지점 반경 밖입니다. 현재 거리: ${Math.round(dist)}m`);
+    }
+  return { ok: true, geo: coord, distance: dist, radius, required: true };
+};
+
+const truth = (v) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v > 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toUpperCase();
+    if (['Y','YES','TRUE','REQUIRED','MANDATORY','ALWAYS','REQUIRE','ON','ENABLED'].includes(s)) return true;
+    if (['N','NO','FALSE','NONE','OPTIONAL','DISABLED','OFF'].includes(s)) return false;
+  }
+  return null;
+};
+const parseMode = (v) => {
+  if (v == null) return null;
+  const s = String(v).trim().toUpperCase();
+  if (['REQUIRED','MANDATORY','ALWAYS'].includes(s)) return true;
+  if (['NONE','OPTIONAL','DISABLED','OFF'].includes(s)) return false;
+  return null;
+};
+const anyOf = (...vals) => {
+  for (const v of vals) {
+    const t = truth(v);
+    if (t !== null) return t;
+    const p = parseMode(v);
+    if (p !== null) return p;
+  }
+  return null;
+};
+
+/* 강화: workTypeId 기반 서버 조회로 geofenceRequired 확정 */
+async function resolveFenceRequired(detail, primary) {
+  const candsWorkType = [
+    detail?.workType?.geofenceRequired,
+    detail?.workTypeGeofenceRequired,
+    detail?.workType?.requireGeofence,
+    detail?.workType?.requiresGeofence,
+    detail?.workType?.geoFenceRequired,
+    detail?.workType?.gpsRequired,
+    detail?.workType?.gpsApply,
+
+    primary?.workType?.geofenceRequired,
+    primary?.workTypeGeofenceRequired,
+    primary?.workType?.requireGeofence,
+    primary?.workType?.requiresGeofence,
+    primary?.workType?.geoFenceRequired,
+    primary?.workType?.gpsRequired,
+    primary?.workType?.gpsApply,
+  ];
+  let t = anyOf(...candsWorkType);
+  if (t !== null) return t;
+
+  const candsSchedule = [
+    detail?.geofenceRequired,
+    detail?.requireGeofence,
+    detail?.geofenceMode,
+    detail?.gpsRequired,
+    detail?.gpsApply,
+
+    primary?.geofenceRequired,
+    primary?.requireGeofence,
+    primary?.geofenceMode,
+    primary?.gpsRequired,
+    primary?.gpsApply,
+  ];
+  t = anyOf(...candsSchedule);
+  if (t !== null) return t;
+
+  const workTypeId =
+    detail?.workTypeId ||
+    detail?.workType?.id ||
+    detail?.workTypeSeq ||
+    primary?.workTypeId ||
+    primary?.workType?.id ||
+    primary?.workTypeSeq ||
+    null;
+
+  if (workTypeId != null) {
+    try {
+      const wt = await getWorkType(workTypeId);
+      const t2 = anyOf(
+        wt?.geofenceRequired,
+        wt?.requireGeofence,
+        wt?.requiresGeofence,
+        wt?.geoFenceRequired,
+        wt?.gpsRequired,
+        wt?.gpsApply
+      );
+      if (t2 !== null) return t2;
+    } catch {}
+  }
+
+  return false;
+}
+
 const summarizeWeekFromEvents = (events, anchorDate) => {
   const todayYMD = toYMD(new Date());
   const s = startOfWeek(anchorDate);
@@ -131,13 +310,10 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
 
     let dispMinS = null, dispMaxE = null;
     let planStart = null, planEnd = null;
-
     let anyIn = false, anyOut = false, anyOvernightHead = false, anyOvernightTail = false;
     let leaveTypeName = '';
-
     let primaryPiece = null;
     let primaryStartTs = NaN;
-
     let minutes = 0;
 
     for (const ev of pieces) {
@@ -236,7 +412,6 @@ const summarizeWeekFromEvents = (events, anchorDate) => {
   return { days, totalMinutes };
 };
 
-/** 주간 요약 + 실제 기록(상세) 기반 분배로 합산 보강 */
 export const fetchWeekSummary = async (baseDate = new Date()) => {
   const user = tokenStorage.getUserInfo() || {};
   const employeeId = user.employeeId ?? null;
@@ -303,7 +478,6 @@ export const fetchWeekSummary = async (baseDate = new Date()) => {
   return { days, totalMinutes };
 };
 
-/** 👉 “주간 지표” */
 export const fetchWeekMetrics = async (baseDate = new Date()) => {
   const summary = await fetchWeekSummary(baseDate);
   const totalMinutes = Number(summary?.totalMinutes || 0);
@@ -334,7 +508,6 @@ export const fetchWeekMetrics = async (baseDate = new Date()) => {
   };
 };
 
-/** 오늘 카드 데이터 */
 export const fetchTodayStatus = async () => {
   const user = tokenStorage.getUserInfo() || {};
   const employeeId = user.employeeId ?? null;
@@ -418,10 +591,7 @@ export const fetchTodayStatus = async () => {
       try {
         const detail = await getScheduleDetail(sid);
 
-        geofenceRequired =
-          !!(detail?.workType?.geofenceRequired
-            ?? detail?.workTypeGeofenceRequired
-            ?? detail?.geofenceRequired);
+        geofenceRequired = await resolveFenceRequired(detail, primary);
 
         const plannedStart =
           detail?.registeredClockIn || detail?.registeredStartAt || detail?.startAt ||
@@ -484,15 +654,12 @@ export const fetchTodayStatus = async () => {
 
         missedCheckout = detail?.missedCheckout === true;
       } catch {
+        geofenceRequired = await resolveFenceRequired(null, primary);
+
         const plannedStart = primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
         const plannedEnd   = primary.registeredClockOut || primary.registeredEndAt   || primary.endAt   || null;
         const aIn = primary.actualClockIn || primary.clockInAt || primary.actualStartAt || null;
         const aOut= primary.actualClockOut || primary.clockOutAt || primary.actualEndAt || null;
-
-        geofenceRequired =
-          !!(primary?.workType?.geofenceRequired
-            ?? primary?.workTypeGeofenceRequired
-            ?? primary?.geofenceRequired);
 
         raw.clockInAt = primary?.clockInAt ?? null;
         raw.actualClockIn = primary?.actualClockIn ?? null;
@@ -532,15 +699,12 @@ export const fetchTodayStatus = async () => {
         }
       }
     } else {
+      geofenceRequired = await resolveFenceRequired(null, primary);
+
       const plannedStart = primary.registeredClockIn || primary.registeredStartAt || primary.startAt || null;
       const plannedEnd   = primary.registeredClockOut || primary.registeredEndAt   || primary.endAt   || null;
       const aIn = primary.actualClockIn || primary.clockInAt || primary.actualStartAt || null;
       const aOut= primary.actualClockOut || primary.clockOutAt || primary.actualEndAt || null;
-
-      geofenceRequired =
-        !!(primary?.workType?.geofenceRequired
-          ?? primary?.workTypeGeofenceRequired
-          ?? primary?.geofenceRequired);
 
       raw.clockInAt = primary?.clockInAt ?? null;
       raw.actualClockIn = primary?.actualClockIn ?? null;
@@ -592,7 +756,7 @@ export const fetchTodayStatus = async () => {
     leaveTypeName,
     missedCheckout,
     scheduleId,
-    geofenceRequired,
+    geofenceRequired: !!(geofenceRequired),
 
     clockInAt: raw.clockInAt,
     actualClockIn: raw.actualClockIn,
@@ -618,7 +782,6 @@ export const fetchTodayStatus = async () => {
   return todayObj;
 };
 
-/** 버튼 활성화 기준 */
 const allowClockIn = (obj) => {
   if (!obj) return false;
   const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
@@ -648,7 +811,6 @@ const allowClockOut = (obj) => {
   return false;
 };
 
-/* 휴게 버튼 */
 export const allowBreakStartClient = (obj) => {
   if (!obj) return false;
   const st = String(obj.status || obj.attendanceStatus || '').toUpperCase();
@@ -668,32 +830,63 @@ export const allowBreakEndClient = (obj) => {
   return !!brStart && !brEnd && hasIn(obj) && !hasOut(obj);
 };
 
-/* ===== 출근/퇴근/휴게 ===== */
 const idemp = () => `idm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const postJson = (url, data = {}) =>
-  axios.post(url, data, {
-    headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemp() },
-  }).then(r => r?.data);
-
-const normalizeId = (v) => String(v ?? '').split(':')[0];
-const shouldTryNext = (status) => [400, 404, 405, 415].includes(Number(status));
-
-const buildActionPayload = (_scheduleId, geo) => {
-  const lat = Number.isFinite(geo?.lat) ? geo.lat : undefined;
-  const lng = Number.isFinite(geo?.lng) ? geo.lng
-           : Number.isFinite(geo?.lon) ? geo.lon : undefined;
-  const at  = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
-  const accuracyMeters = Number.isFinite(geo?.accuracyMeters) ? geo.accuracyMeters : undefined;
-
-  const payload = { lat, lng, at, accuracyMeters };
-  return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+const postJson = (url, data = {}) => {
+  const key = idemp();
+  const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+  if (import.meta.env.VITE_IDEMPOTENCY_HEADER === 'true') {
+    headers['X-Idempotency-Key'] = key;
+  }
+  return axios
+    .post(url, data, { headers })
+    .then((r) => (r?.data?.result ?? r?.data ?? null));
 };
 
-export const clockIn = async (scheduleId, geo) => {
-  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+const normalizeId = (v) => String(v ?? '').split(':')[0];
+
+const shouldTryNext = (status) => {
+   const s = Number(status);
+   return [400, 404, 405, 415].includes(s);
+};
+
+const buildActionPayload = (_scheduleId, geo) => {
+  const pickNum = (...cands) => {
+    for (const v of cands) if (Number.isFinite(v)) return v;
+    return undefined;
+  };
+  const lat = pickNum(geo?.lat, geo?.latitude);
+  const lng = pickNum(geo?.lng, geo?.lon, geo?.longitude);
+  const accuracyMeters = pickNum(geo?.accuracyMeters, geo?.accuracy);
+  const at = (typeof geo?.at === 'string' && geo.at) ? geo.at : localIsoNoZ();
+
+  const payload = {
+    lat, lng,
+    latitude: lat, longitude: lng,
+    accuracyMeters,
+    accuracy: accuracyMeters,
+    at,
+    actionAt: at,
+    clientAt: at,
+  };
+  return Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined));
+};
+
+const needsScheduleInBody = (urlPath) =>
+  /\/attendance\/(clock-in|clock-out|break-start|break-end)$/.test(urlPath);
+
+const payloadForUrl = (url, baseBody, scheduleId) => {
+  const body = needsScheduleInBody(url) ? { ...baseBody, scheduleId } : baseBody;
+  return body;
+};
+
+export const clockIn = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
+  const today = await fetchTodayStatus();
+  const id0 = scheduleId ?? today?.scheduleId;
   if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
   const id = normalizeId(id0);
-  const body = buildActionPayload(id, geo);
+
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-in`,
@@ -703,21 +896,27 @@ export const clockIn = async (scheduleId, geo) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try {
+      return await postJson(url, body);
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('출근 처리 실패');
 };
 
-export const clockOut = async (scheduleId, geo) => {
-  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+export const clockOut = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
+  const today = await fetchTodayStatus();
+  const id0 = scheduleId ?? today?.scheduleId;
   if (!id0) throw new Error('오늘 등록된 스케줄이 없습니다.');
   const id = normalizeId(id0);
-  const body = buildActionPayload(id, geo);
+
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/clock-out`,
@@ -727,21 +926,27 @@ export const clockOut = async (scheduleId, geo) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try { 
+      return await postJson(url, body); 
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('퇴근 처리 실패');
 };
 
-export const breakStart = async (scheduleId, geo) => {
-  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+export const breakStart = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
+  const today = await fetchTodayStatus();
+  const id0 = scheduleId ?? today?.scheduleId;
   if (!id0) throw new Error('오늘 스케줄이 없습니다.');
   const id = normalizeId(id0);
-  const body = buildActionPayload(id, geo);
+
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/break-start`,
@@ -751,21 +956,27 @@ export const breakStart = async (scheduleId, geo) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try { 
+      return await postJson(url, body); 
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('휴게 시작 처리 실패');
 };
 
-export const breakEnd = async (scheduleId, geo) => {
-  const id0 = scheduleId ?? (await fetchTodayStatus())?.scheduleId;
+export const breakEnd = async (scheduleId, geo, opts = { slackMeters: 0 }) => {
+  const today = await fetchTodayStatus();
+  const id0 = scheduleId ?? today?.scheduleId;
   if (!id0) throw new Error('오늘 스케줄이 없습니다.');
   const id = normalizeId(id0);
-  const body = buildActionPayload(id, geo);
+
+  const { geo: verifiedGeo } = await ensureFenceOk(!!today?.geofenceRequired, geo, opts);
+  const baseBody = buildActionPayload(id, verifiedGeo);
 
   const candidates = [
     `${BASE_URL}/attendance/event/${encodeURIComponent(id)}/break-end`,
@@ -775,12 +986,56 @@ export const breakEnd = async (scheduleId, geo) => {
 
   let lastErr;
   for (const url of candidates) {
-    try { return await postJson(url, body); }
-    catch (e) {
+    const body = payloadForUrl(url, baseBody, id);
+    try { 
+      return await postJson(url, body); 
+    } catch (e) {
       lastErr = e;
       const st = e?.response?.status;
-      if (!shouldTryNext(st)) break;
+      const em = e?.response?.data?.message || e?.response?.data?.status_message || e?.message;
+      if (!shouldTryNext(st, em)) break;
     }
   }
   throw lastErr || new Error('휴게 종료 처리 실패');
+};
+
+export const fetchMyBranchGeofence = async () => {
+  const raw = await fetchBranchGeoNew().catch(() => null);
+  if (!raw) return { lat: null, lng: null, radiusMeters: 0, radius: 0, enabled: false };
+
+  const lat = Number(raw.lat ?? raw.latitude ?? NaN);
+  const lng = Number(raw.lng ?? raw.longitude ?? raw.lon ?? NaN);
+  const radiusMeters = Number(raw.radius ?? raw.radiusMeters ?? 0);
+  const enabled = isBranchGeoConfigured(raw);
+
+  return {
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
+    radiusMeters,
+    radius: radiusMeters,
+    enabled,
+    name: raw.name ?? '',
+    branchId: raw.branchId ?? null,
+    address: raw.address ?? '',
+    addressDetail: raw.addressDetail ?? '',
+  };
+};
+
+export const isBranchGeofenceConfigured = async () => {
+  const g = await fetchBranchGeoNew().catch(() => null);
+  return isBranchGeoConfigured(g || null);
+};
+
+export default {
+  fetchWeekSummary,
+  fetchWeekMetrics,
+  fetchTodayStatus,
+  allowBreakStartClient,
+  allowBreakEndClient,
+  clockIn,
+  clockOut,
+  breakStart,
+  breakEnd,
+  fetchMyBranchGeofence,
+  isBranchGeofenceConfigured,
 };

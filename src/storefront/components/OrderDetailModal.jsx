@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { customerOrderService } from "../../service/orderService";
+import { formatDateKST } from "../../utils/dateUtils";
 import "./OrderDetailModal.css";
 
 const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
@@ -100,7 +101,7 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                 <span className="info-label">주문일시:</span>
                 <span className="info-value">
                   {orderDetail.createdAt
-                    ? new Date(orderDetail.createdAt).toLocaleString("ko-KR")
+                    ? formatDateKST(orderDetail.createdAt)
                     : orderDetail.createdDate || "-"}
                 </span>
               </div>
@@ -136,7 +137,7 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                 <div className="info-row">
                   <span className="info-label">거부 시간:</span>
                   <span className="info-value">
-                    {new Date(orderDetail.rejectedAt).toLocaleString('ko-KR')}
+                    {formatDateKST(orderDetail.rejectedAt)}
                   </span>
                 </div>
               )}

@@ -6,6 +6,7 @@ import orderService from '../../service/orderService';
 import authService from '../../service/authService';
 import OrderDetailModal from '../../components/admin/OrderDetailModal';
 import RejectReasonModal from '../../components/admin/RejectReasonModal';
+import { formatDateKST } from '../../utils/dateUtils';
 
 const PageContainer = styled.div`
   width: 100%;
@@ -527,7 +528,7 @@ function FranchiseOrderManagement() {
                   <TableCell>
                     <StatusBadge $status={order.status}>{getStatusText(order.status)}</StatusBadge>
                   </TableCell>
-                  <TableCell>{new Date(order.createdAt).toLocaleString('ko-KR')}</TableCell>
+                  <TableCell>{formatDateKST(order.createdAt)}</TableCell>
                   <TableCell>
                     <ActionButton onClick={() => handleOpenDetail(order)}>상세</ActionButton>
                     {order.status === 'PENDING' && (

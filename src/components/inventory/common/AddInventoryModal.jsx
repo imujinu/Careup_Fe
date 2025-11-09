@@ -1212,7 +1212,9 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
             React.createElement(Label, null, '상품 속성'),
             formData.category ? (
               React.createElement(React.Fragment, null,
-                categoryAttributes.length > 0 ? categoryAttributes.map(categoryAttr => {
+                categoryAttributes.length > 0 ? [...categoryAttributes].sort((a, b) => 
+                  (a.displayOrder || 0) - (b.displayOrder || 0)
+                ).map(categoryAttr => {
               const activeValues = categoryAttr.availableValues?.filter(av => av.isActive !== false) || [];
               const typeId = String(categoryAttr.attributeTypeId || categoryAttr.attributeType?.id || categoryAttr.id);
               const selectedValueId = selectedAttributeValues[typeId];
@@ -1279,7 +1281,7 @@ function AddInventoryModal({ isOpen, onClose, onSave }) {
                   React.createElement(AttributeInfo, null, '필수 속성입니다. 최소 1개를 선택해주세요.')
                 )
               );
-            }) : (
+                }) : (
               loadingAttributes ? React.createElement('div', { style: { padding: '12px', textAlign: 'center', color: '#6b7280' } }, '속성 로딩 중...') :
               React.createElement(AttributeInfo, null, '등록된 속성이 없습니다. 아래 버튼을 클릭하여 속성 타입을 추가하세요.')
             ),

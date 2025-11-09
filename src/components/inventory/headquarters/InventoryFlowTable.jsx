@@ -5,11 +5,13 @@ const TableContainer = styled.div`
   background: white;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 `;
 
 const Table = styled.table`
   width: 100%;
+  min-width: 1100px;
   border-collapse: collapse;
 `;
 
@@ -36,6 +38,9 @@ const TableHeaderCell = styled.th`
   user-select: none;
   position: relative;
   transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   &:hover {
     ${props => props.$sortable && `
@@ -57,15 +62,38 @@ const TableCell = styled.td`
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   text-align: ${props => props.$center ? 'center' : 'left'};
+  white-space: nowrap;
+  overflow: ${props => props.$datetime ? 'visible' : 'hidden'};
+  text-overflow: ${props => props.$datetime ? 'unset' : 'ellipsis'};
   max-width: ${props => {
     if (props.$productName) return '200px';
-    if (props.$branch) return '120px';
-    if (props.$remark) return '200px';
-    return 'none';
+    if (props.$branch) return '140px';
+    if (props.$remark) return '300px';
+    if (props.$datetime) return 'none';
+    if (props.$option) return '120px';
+    return '150px';
   }};
-  overflow: ${props => (props.$productName || props.$branch || props.$remark) ? 'hidden' : 'visible'};
-  text-overflow: ${props => (props.$productName || props.$branch || props.$remark) ? 'ellipsis' : 'clip'};
-  white-space: ${props => (props.$productName || props.$branch || props.$remark) ? 'nowrap' : 'normal'};
+  ${props => props.$remark && `
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+    min-width: 200px;
+    max-width: 400px;
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 2px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 2px;
+      &:hover {
+        background: #555;
+      }
+    }
+  `}
 `;
 
 const StatusBadge = styled.span`
@@ -262,7 +290,8 @@ function InventoryFlowTable({
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString; // 날짜 파싱 실패시 원본 문자열 반환
-      return date.toLocaleString('ko-KR', {
+      const adjustedDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+      return adjustedDate.toLocaleString('ko-KR', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -292,10 +321,10 @@ function InventoryFlowTable({
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.productName)
           }, '상품명', getSortIndicator(SORTABLE_COLUMNS.productName)),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션1'),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션명1'),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션2'),
-          React.createElement(TableHeaderCell, { $center: true }, '옵션명2'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션 1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명 1'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션 2'),
+          React.createElement(TableHeaderCell, { $center: true }, '옵션명 2'),
           React.createElement(TableHeaderCell, { 
             $sortable: true,
             onClick: () => handleSort(SORTABLE_COLUMNS.branch)
@@ -339,16 +368,16 @@ function InventoryFlowTable({
           
           return React.createElement(TableRow, { key: item.id || index },
             React.createElement(TableCell, { $productName: true }, item.productName || '-'),
-            React.createElement(TableCell, { $center: true }, option1?.attributeTypeName || '-'),
-            React.createElement(TableCell, { $center: true }, option1?.attributeValueName || '-'),
-            React.createElement(TableCell, { $center: true }, option2?.attributeTypeName || '-'),
-            React.createElement(TableCell, { $center: true }, option2?.attributeValueName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option1?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option1?.attributeValueName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option2?.attributeTypeName || '-'),
+            React.createElement(TableCell, { $center: true, $option: true }, option2?.attributeValueName || '-'),
             React.createElement(TableCell, { $branch: true }, getBranchName(item.branchId, item.branchName)),
             React.createElement(TableCell, null, getStatusBadge(item)),
-            React.createElement(TableCell, null, formatQuantity(item.inQuantity)),
-            React.createElement(TableCell, null, formatQuantity(item.outQuantity)),
+            React.createElement(TableCell, { $center: true }, formatQuantity(item.inQuantity)),
+            React.createElement(TableCell, { $center: true }, formatQuantity(item.outQuantity)),
             React.createElement(TableCell, { $remark: true }, item.remark || '-'),
-            React.createElement(TableCell, null, formatDate(item.createdAt)),
+            React.createElement(TableCell, { $datetime: true }, formatDate(item.createdAt)),
             React.createElement(TableCell, null,
               React.createElement(ActionButton, {
                 className: 'edit',

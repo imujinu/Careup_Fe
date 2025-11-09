@@ -347,6 +347,62 @@ export const inventoryService = {
     const response = await inventoryApi.delete(`${API_BASE_URL}/api/category-attributes/${id}`);
     return response.data;
   },
+
+  // 상품 설명 이미지 업로드
+  uploadDescriptionImage: async (file) => {
+    const formData = new FormData();
+    // 백엔드에서 요구하는 키 이름에 맞게 조정 필요
+    // 가능한 키 이름: 'image', 'file', 'descriptionImage', 'description-image'
+    formData.append('image', file);
+    
+    try {
+      // 가능한 엔드포인트들 시도 (백엔드 실제 엔드포인트에 맞게 수정 필요)
+      // 1. /api/products/description-image
+      // 2. /api/products/description-images
+      // 3. /api/images/upload
+      // 4. /api/products/images/description
+      const response = await inventoryApi.post(`${API_BASE_URL}/api/products/description-image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      // 응답 구조 확인을 위한 로깅
+      console.log('상품 설명 이미지 업로드 응답:', response);
+      console.log('상품 설명 이미지 업로드 응답 데이터:', response.data);
+      
+      // 응답에서 이미지 URL 추출 (백엔드 응답 구조에 맞게 조정 필요)
+      // 일반적인 응답 구조들:
+      // 1. { data: { imageUrl: "..." } } - ResponseDto 구조
+      // 2. { data: { url: "..." } }
+      // 3. { data: "https://..." } - 직접 URL
+      // 4. { imageUrl: "..." }
+      // 5. { url: "..." }
+      // 6. "https://..." (직접 URL 문자열)
+      const imageUrl = response.data?.data?.imageUrl 
+        || response.data?.data?.url
+        || (typeof response.data?.data === 'string' ? response.data.data : null)
+        || response.data?.imageUrl 
+        || response.data?.url 
+        || (typeof response.data === 'string' ? response.data : null);
+      
+      if (!imageUrl) {
+        console.error('이미지 URL을 찾을 수 없습니다. 응답 구조:', response.data);
+        throw new Error('이미지 URL을 응답에서 찾을 수 없습니다.');
+      }
+      
+      return imageUrl;
+    } catch (error) {
+      console.error('상품 설명 이미지 업로드 실패:', error);
+      console.error('에러 상세:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
+      throw error;
+    }
+  },
 };
 
 
