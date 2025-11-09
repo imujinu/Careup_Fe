@@ -1141,19 +1141,39 @@ function InventoryManagement() {
       
       // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환 (사이즈 정보 포함)
       const formattedBranchProducts = (branchProductsData.data || branchProductsData || []).map(item => {
-        const sizeInfo = item.attributeValueName 
-          ? ` - ${item.attributeTypeName || ''} ${item.attributeValueName}` 
+        let normalizedName = item.productName || '알 수 없음';
+        if (normalizedName.includes(' - ')) {
+          normalizedName = normalizedName.split(' - ')[0].trim();
+        } else {
+          normalizedName = normalizedName.trim();
+        }
+
+        const attributeLabel = item.attributeValueName
+          ? `${item.attributeTypeName || ''} ${item.attributeValueName}`.trim()
           : '';
+
+        const fullDisplayName = attributeLabel
+          ? `${normalizedName} - ${attributeLabel}`
+          : normalizedName;
+
+        const nameTokens = new Set(
+          fullDisplayName
+            .split(/[\s-]+/)
+            .map(token => token.trim())
+            .filter(Boolean)
+        );
+
         return {
           id: item.branchProductId,
           productId: item.productId,
           product: { id: item.productId },
-          productName: `${item.productName || '알 수 없음'}${sizeInfo}`,
+          productName: fullDisplayName,
           branchId: item.branchId || branchId,
           attributeValueId: item.attributeValueId || null,
           attributeValueName: item.attributeValueName || null,
           attributeTypeName: item.attributeTypeName || null,
-          stockQuantity: item.stockQuantity || 0
+          stockQuantity: item.stockQuantity || 0,
+          nameTokens
         };
       });
       
