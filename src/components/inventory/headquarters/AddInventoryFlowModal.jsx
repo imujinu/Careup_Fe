@@ -352,87 +352,20 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       return;
     }
 
-    const requiredAttributeCount = attributeGroups.length > 0 ? attributeGroups.length : categoryAttributes.length;
-    if (requiredAttributeCount > 0 && selectedAttributeDetails.length < requiredAttributeCount) {
-      setSelectedBranchProduct(null);
-      setFormData(prev => ({ ...prev, branchProductId: '' }));
-      return;
-    }
-
     // 모든 속성 타입이 선택되었는지 확인
-    let filteredBranchProductsByProductId = productBranchProducts;
-    if (productAttributeValuesData.length > 0) {
-      let matchingProductIds = null;
-
-      selectedAttributeDetails.forEach(detail => {
-        const detailValueId = detail.valueId;
-        if (!detailValueId) {
-          return;
-        }
-
-        const idsForValue = productAttributeValuesData
-          .filter(pav => {
-            const pavValueId = pav.attributeValueId || pav.attributeValue?.id || pav.id;
-            return String(pavValueId) === String(detailValueId);
-          })
-          .map(pav => String(pav.productId));
-
-        if (idsForValue.length === 0) {
-          matchingProductIds = matchingProductIds === null ? new Set() : matchingProductIds;
-          return;
-        }
-
-        const idsSet = new Set(idsForValue);
-        if (matchingProductIds === null) {
-          matchingProductIds = idsSet;
-        } else {
-          matchingProductIds = new Set(
-            Array.from(matchingProductIds).filter(id => idsSet.has(id))
-          );
-        }
-      });
-
-      if (matchingProductIds && matchingProductIds.size > 0) {
-        filteredBranchProductsByProductId = productBranchProducts.filter(bp =>
-          matchingProductIds.has(String(bp.productId))
-        );
-      } else if (matchingProductIds && matchingProductIds.size === 0) {
-        setSelectedBranchProduct(null);
-        setFormData(prev => ({ ...prev, branchProductId: '' }));
-        return;
-      }
-    }
-
     const filteredByAttributes = selectedAttributeDetails.length > 0
-      ? filteredBranchProductsByProductId.filter(bp => {
+      ? productBranchProducts.filter(bp => {
           const name = bp.productName || '';
           return selectedAttributeDetails.every(detail => {
             if (!detail.valueName) return true;
             return name.includes(detail.valueName);
           });
         })
-      : filteredBranchProductsByProductId;
+      : productBranchProducts;
 
-    const additionalFiltered = selectedAttributeDetails.length > 0
-      ? filteredBranchProductsByProductId.filter(bp =>
-          selectedAttributeDetails.every(detail => {
-            const tokens = bp.nameTokens || [];
-            const normalizedValue = (detail.valueName || '').toLowerCase();
-            if (!normalizedValue) return true;
-            return Array.from(tokens).some(token => token.toLowerCase() === normalizedValue);
-          })
-        )
-      : filteredBranchProductsByProductId;
-
-    const candidateBranchProducts = additionalFiltered.length > 0
-      ? additionalFiltered
-      : filteredByAttributes;
-
-    if (selectedAttributeDetails.length > 0 && candidateBranchProducts.length === 0) {
-      setSelectedBranchProduct(null);
-      setFormData(prev => ({ ...prev, branchProductId: '' }));
-      return;
-    }
+    const candidateBranchProducts = filteredByAttributes.length > 0
+      ? filteredByAttributes
+      : productBranchProducts;
 
     let matchingBP = null;
 
@@ -442,11 +375,27 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
           const matchesValueId =
             detail.valueId &&
             String(bp.attributeValueId || '') === String(detail.valueId);
-          return matchesValueId;
+          const matchesValueName =
+            detail.valueName &&
+            (bp.productName || '').includes(detail.valueName);
+
+          return matchesValueId || matchesValueName;
         })
       );
     }
 
+    if (!matchingBP && candidateBranchProducts.length > 0) {
+      matchingBP = candidateBranchProducts.find(bp => {
+        if (selectedValues.length === 0) return true;
+        return selectedValues.some(valueId =>
+          String(bp.attributeValueId || '') === String(valueId)
+        );
+      });
+    }
+
+    if (!matchingBP && candidateBranchProducts.length > 0) {
+      matchingBP = candidateBranchProducts[0];
+    }
 
     if (matchingBP) {
       setSelectedBranchProduct(matchingBP);
