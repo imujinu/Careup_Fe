@@ -4,6 +4,7 @@ import { Icon } from '@mdi/react';
 import { mdiClose } from '@mdi/js';
 import RejectReasonModal from './RejectReasonModal';
 import authService from '../../service/authService';
+import { formatDateKST } from '../../utils/dateUtils';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -260,19 +261,7 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    // UTC로 저장된 날짜를 한국 시간(KST)으로 변환하여 표시
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '-';
-      // 한국 시간대로 변환하여 표시
-      return date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-    } catch (error) {
-      console.error('날짜 포맷팅 오류:', error);
-      return '-';
-    }
-  };
+  const formatDate = (dateString) => formatDateKST(dateString);
 
   const handleApprove = () => {
     // 결제 완료 여부 확인

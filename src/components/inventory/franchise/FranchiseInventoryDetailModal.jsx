@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { inventoryService } from '../../../service/inventoryService';
+import { formatDateKST } from '../../../utils/dateUtils';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -398,13 +399,7 @@ function FranchiseInventoryDetailModal({ isOpen, onClose, item }) {
                       quantity = '0';
                     }
                     
-                    const date = new Date(history.createdAt || history.createAt).toLocaleString('ko-KR', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
+                    const date = formatDateKST(history.createdAt || history.createAt);
                     
                     return React.createElement(TableRow, { key: index },
                       React.createElement(TableCell, { $date: true }, date),

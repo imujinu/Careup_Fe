@@ -62,13 +62,14 @@ const TableCell = styled.td`
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   text-align: ${props => props.$center ? 'center' : 'left'};
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: ${props => props.$datetime ? 'normal' : 'nowrap'};
+  overflow: ${props => props.$datetime ? 'visible' : 'hidden'};
+  text-overflow: ${props => props.$datetime ? 'unset' : 'ellipsis'};
   max-width: ${props => {
     if (props.$productName) return '200px';
     if (props.$branch) return '140px';
     if (props.$remark) return '300px';
+    if (props.$datetime) return '220px';
     if (props.$option) return '120px';
     return '150px';
   }};
@@ -289,7 +290,8 @@ function InventoryFlowTable({
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString; // 날짜 파싱 실패시 원본 문자열 반환
-      return date.toLocaleString('ko-KR', {
+      const adjustedDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+      return adjustedDate.toLocaleString('ko-KR', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -375,7 +377,7 @@ function InventoryFlowTable({
             React.createElement(TableCell, { $center: true }, formatQuantity(item.inQuantity)),
             React.createElement(TableCell, { $center: true }, formatQuantity(item.outQuantity)),
             React.createElement(TableCell, { $remark: true }, item.remark || '-'),
-            React.createElement(TableCell, null, formatDate(item.createdAt)),
+            React.createElement(TableCell, { $datetime: true }, formatDate(item.createdAt)),
             React.createElement(TableCell, null,
               React.createElement(ActionButton, {
                 className: 'edit',

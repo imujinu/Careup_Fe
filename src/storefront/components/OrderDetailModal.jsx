@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { customerOrderService } from "../../service/orderService";
+import { formatDateKST } from "../../utils/dateUtils";
 import "./OrderDetailModal.css";
 
 const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
@@ -100,13 +101,7 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                 <span className="info-label">주문일시:</span>
                 <span className="info-value">
                   {orderDetail.createdAt
-                    ? (() => {
-                        const dateStr = orderDetail.createdAt;
-                        const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
-                          ? dateStr.trim() + 'Z' 
-                          : dateStr;
-                        return new Date(normalized).toLocaleString("ko-KR", { timeZone: 'Asia/Seoul' });
-                      })()
+                    ? formatDateKST(orderDetail.createdAt)
                     : orderDetail.createdDate || "-"}
                 </span>
               </div>
@@ -142,13 +137,7 @@ const OrderDetailModal = ({ order, currentUser, isOpen, onClose }) => {
                 <div className="info-row">
                   <span className="info-label">거부 시간:</span>
                   <span className="info-value">
-                    {(() => {
-                        const dateStr = orderDetail.rejectedAt;
-                        const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
-                          ? dateStr.trim() + 'Z' 
-                          : dateStr;
-                        return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-                      })()}
+                    {formatDateKST(orderDetail.rejectedAt)}
                   </span>
                 </div>
               )}

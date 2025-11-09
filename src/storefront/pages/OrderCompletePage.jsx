@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDateKST } from '../../utils/dateUtils';
 
 const OrderCompletePage = ({ orderData, paymentData, onBackToHome, onViewOrders }) => {
   return (
@@ -28,16 +29,9 @@ const OrderCompletePage = ({ orderData, paymentData, onBackToHome, onViewOrders 
             <div className="detail-row">
               <span className="label">주문일시</span>
               <span className="value">
-                {orderData?.createdAt ? 
-                  (() => {
-                    const dateStr = orderData.createdAt;
-                    const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
-                      ? dateStr.trim() + 'Z' 
-                      : dateStr;
-                    return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-                  })() : 
-                  new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-                }
+                {orderData?.createdAt
+                  ? formatDateKST(orderData.createdAt)
+                  : formatDateKST(new Date())}
               </span>
             </div>
             <div className="detail-row">
