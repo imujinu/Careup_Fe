@@ -62,14 +62,14 @@ const TableCell = styled.td`
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   text-align: ${props => props.$center ? 'center' : 'left'};
-  white-space: ${props => props.$datetime ? 'normal' : 'nowrap'};
+  white-space: nowrap;
   overflow: ${props => props.$datetime ? 'visible' : 'hidden'};
   text-overflow: ${props => props.$datetime ? 'unset' : 'ellipsis'};
   max-width: ${props => {
     if (props.$productName) return '200px';
     if (props.$branch) return '140px';
     if (props.$remark) return '300px';
-    if (props.$datetime) return '220px';
+    if (props.$datetime) return 'none';
     if (props.$option) return '120px';
     return '150px';
   }};
