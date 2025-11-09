@@ -88,10 +88,10 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
   }, [memberId]);
 
   const handleProductClick = async (product) => {
-    // 상품 조회 기록 POST 요청 (전역 서비스 사용)
+    // 상품 클릭 시 조회 API 요청
     const productId = product.productId || product.id;
     if (productId) {
-      await customerProductService.recordProductView(productId);
+      await customerProductService.recordProductViewClick(productId);
     }
     
     if (onOpenDetail) {

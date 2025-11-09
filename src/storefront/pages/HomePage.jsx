@@ -2,11 +2,16 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeroSlider from '../components/HeroSlider';
 import Tabs from '../components/Tabs';
+import ProductRanking from '../components/ProductRanking';
 import { useShopData } from '../hooks/useShopData';
+import { useShopCart } from '../hooks/useShopCart';
+import { useShopAuth } from '../hooks/useShopAuth';
 
 function HomePage() {
   const navigate = useNavigate();
   const { categories, loadingCategories, categoriesError, products, loadingProducts, productsError, favorites, toggleFavorite, getCategoryIdByName } = useShopData();
+  const { handleAddToCart } = useShopCart();
+  const { currentUser } = useShopAuth();
   
   // 카테고리가 로딩되기 전에는 카테고리 클릭 무시
   const isCategoryReady = !loadingCategories && categories.length > 0;
@@ -35,7 +40,15 @@ function HomePage() {
   }, [activeTab, products]);
 
   const handleProductClick = async (product) => {
-    navigate(`/shop/products/${product.productId}`);
+    const { customerProductService } = await import('../../service/customerProductService');
+    const productId = product.productId || product.id;
+    
+    // 상품 클릭 시 조회 API 요청
+    if (productId) {
+      await customerProductService.recordProductViewClick(productId);
+    }
+    
+    navigate(`/shop/products/${productId}`);
   };
 
   const handleCategoryClick = (categoryName) => {
@@ -240,6 +253,17 @@ function HomePage() {
                 🔄 업데이트 중...
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="section">
+          <div className="container">
+            <div className="section-title">🏆 실시간 인기 랭킹</div>
+            <ProductRanking 
+              memberId={currentUser?.memberId}
+              onAddToCart={handleAddToCart}
+              onOpenDetail={handleProductClick}
+            />
           </div>
         </section>
       </div>
