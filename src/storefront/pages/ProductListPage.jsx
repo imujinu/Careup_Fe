@@ -34,41 +34,230 @@ const ProductListPage = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 상품 로딩 시작:', selectedBranch.branchId);
-      
+      // ==========================================
+      // 1단계: API 호출
+      // ==========================================
+      // 지점별로 모든 branchProduct를 가져옵니다
+      // 옵션이 있는 상품은 같은 productId를 가진 여러 branchProduct가 반환됩니다
       const res = await shopApi.get(`/inventory/branch-products/branch/${selectedBranch.branchId}`);
-      console.log('📡 API 응답:', res);
       
       const raw = res?.data?.data ?? res?.data ?? [];
-      console.log('📦 원본 데이터:', raw);
       
+      // ==========================================
+      // 2단계: 이미지 찾기 함수
+      // ==========================================
+      // 각 branchProduct에 대해 다음 우선순위로 이미지를 찾습니다:
+      // 1순위: Product 레벨 이미지 (상품 전체 이미지)
+      // 2순위: BranchProduct 레벨 이미지 (옵션별 이미지)
+      // 3순위: 옵션 속성별 이미지
+      // 4순위: 기본 이미지
+      const findImage = (item) => {
+        const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+        
+        // 1순위: product 객체 내부의 이미지 확인 (최우선 - 상품 레벨 이미지)
+        if (item.product?.imageUrl) {
+          return item.product.imageUrl;
+        }
+        if (item.product?.image) {
+          return item.product.image;
+        }
+        if (item.product?.productImageUrl) {
+          return item.product.productImageUrl;
+        }
+        if (item.product?.productImage) {
+          return item.product.productImage;
+        }
+        // 2순위: branchProduct의 imageUrl 확인 (옵션별 이미지)
+        if (item.imageUrl) {
+          return item.imageUrl;
+        }
+        if (item.productImageUrl) {
+          return item.productImageUrl;
+        }
+        if (item.image) {
+          return item.image;
+        }
+        if (item.productImage) {
+          return item.productImage;
+        }
+        // 3순위: 옵션 속성별 이미지 확인
+        if (item.attributeValueImageUrl) {
+          return item.attributeValueImageUrl;
+        }
+        if (item.attributeValue?.imageUrl) {
+          return item.attributeValue.imageUrl;
+        }
+        // 4순위: 기본 이미지 사용
+        return defaultImage;
+      };
+      
+      // 상품명 정규화 (옵션 정보 제거)
+      const normalizeProductName = (name) => {
+        if (!name) return "상품";
+        // " - " 패턴으로 속성 정보가 포함되어 있으면 제거
+        if (name.includes(' - ')) {
+          return name.split(' - ')[0].trim();
+        }
+        return name.trim();
+      };
+      
+      // ==========================================
+      // 3단계: 원본 데이터 매핑
+      // ==========================================
+      // 각 branchProduct를 표준 형식으로 변환하고 이미지를 찾습니다
       const mapped = (Array.isArray(raw) ? raw : [])
         .filter((item) => item.branchProductId != null || item.productId != null) // ID가 없는 항목 제외
-        .map((item) => ({
-        id: item.branchProductId ?? item.productId, // ID가 있는 경우만 사용
-        productId: item.productId,
-        branchProductId: item.branchProductId,
-        branchId: item.branchId,
-        name: item.productName || "상품",
-        price: Number(item.price || 0),
-        promotionPrice: item.promotionPrice ? Number(item.promotionPrice) : null,
-        discountRate: item.discountRate ? Number(item.discountRate) : null,
-        imageAlt: item.productName || "상품 이미지",
-        image: item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
-        category: item.categoryName || item.category || "미분류",
-        stock: Number(item.stockQuantity || 0),
-        safetyStock: Number(item.safetyStock || 0),
-        isOutOfStock: Number(item.stockQuantity || 0) <= 0,
-        isLowStock: Number(item.stockQuantity || 0) <= Number(item.safetyStock || 0),
-        brand: item.brand || item.manufacturer || "",
-        likes: Number(item.likes || 0),
-        reviews: Number(item.reviews || 0),
-        pop: Number(item.pop || 0),
-        discount: item.discountRate ? Number(item.discountRate) : 0,
-      }));
+        .map((item) => {
+          return {
+          id: item.branchProductId ?? item.productId,
+          productId: item.productId,
+          branchProductId: item.branchProductId,
+          branchId: item.branchId,
+          name: item.productName || "상품",
+          normalizedName: normalizeProductName(item.productName),
+          price: Number(item.price || 0),
+          promotionPrice: item.promotionPrice ? Number(item.promotionPrice) : null,
+          discountRate: item.discountRate ? Number(item.discountRate) : null,
+          imageAlt: item.productName || "상품 이미지",
+          image: findImage(item),
+          category: item.categoryName || item.category || "미분류",
+          stock: Number(item.stockQuantity || 0),
+          safetyStock: Number(item.safetyStock || 0),
+          isOutOfStock: Number(item.stockQuantity || 0) <= 0,
+          isLowStock: Number(item.stockQuantity || 0) <= Number(item.safetyStock || 0),
+          brand: item.brand || item.manufacturer || "",
+          likes: Number(item.likes || 0),
+          reviews: Number(item.reviews || 0),
+          pop: Number(item.pop || 0),
+          discount: item.discountRate ? Number(item.discountRate) : 0,
+          // 원본 데이터 보관 (그룹화 시 사용)
+          originalItem: item,
+        }));
       
-      console.log('✅ 매핑된 상품:', mapped);
-      setProducts(mapped);
+      // ==========================================
+      // 4단계: 상품 그룹화
+      // ==========================================
+      // 같은 productId를 가진 상품들을 하나로 묶습니다
+      // 예: "사이즈 S", "사이즈 M", "사이즈 L" → 하나의 상품으로 표시
+      const productMap = new Map();
+      const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+      
+      mapped.forEach((item) => {
+        const key = item.productId;
+        
+        if (!productMap.has(key)) {
+          // 첫 번째 상품을 기준으로 그룹 생성
+          productMap.set(key, {
+            ...item,
+            variants: [item],
+            // 이미지: product 레벨 이미지 우선, 없으면 첫 번째 variant의 이미지 사용
+            image: item.originalItem?.product?.imageUrl || 
+                   item.originalItem?.product?.image ||
+                   item.originalItem?.product?.productImageUrl ||
+                   item.originalItem?.product?.productImage ||
+                   (item.image !== defaultImage ? item.image : defaultImage),
+            // 가격 범위 계산
+            minPrice: item.price,
+            maxPrice: item.price,
+            // 재고 합계
+            totalStock: item.stock,
+            // product 레벨 이미지 여부 추적
+            hasProductLevelImage: !!(item.originalItem?.product?.imageUrl || item.originalItem?.product?.image),
+          });
+        } else {
+          // 기존 그룹에 추가
+          const group = productMap.get(key);
+          group.variants.push(item);
+          
+          // 가격 범위 업데이트
+          if (item.price < group.minPrice) group.minPrice = item.price;
+          if (item.price > group.maxPrice) group.maxPrice = item.price;
+          
+          // 재고 합계 업데이트
+          group.totalStock += item.stock;
+          
+          // product 레벨 이미지가 있으면 우선 사용 (최우선)
+          if (item.originalItem?.product?.imageUrl) {
+            group.image = item.originalItem.product.imageUrl;
+            group.hasProductLevelImage = true;
+          } else if (item.originalItem?.product?.image) {
+            group.image = item.originalItem.product.image;
+            group.hasProductLevelImage = true;
+          } else if (item.originalItem?.product?.productImageUrl) {
+            group.image = item.originalItem.product.productImageUrl;
+            group.hasProductLevelImage = true;
+          } else if (item.originalItem?.product?.productImage) {
+            group.image = item.originalItem.product.productImage;
+            group.hasProductLevelImage = true;
+          }
+          // product 레벨 이미지가 없고, 현재 그룹의 이미지가 기본 이미지인 경우
+          // 새로운 variant의 이미지가 기본 이미지가 아니면 업데이트
+          else if (!group.hasProductLevelImage && group.image === defaultImage && item.image !== defaultImage) {
+            group.image = item.image;
+          }
+        }
+      });
+      
+      // ==========================================
+      // 5단계: 최종 이미지 결정 및 데이터 정리
+      // ==========================================
+      // 그룹화된 상품들의 최종 이미지를 결정합니다
+      // - Product 레벨 이미지가 있으면 우선 사용
+      // - 없으면 variants 중 이미지가 있는 것을 사용
+      // - 모두 없으면 기본 이미지 사용
+      const groupedProducts = Array.from(productMap.values()).map((group) => {
+        // 가격이 여러 개면 범위로 표시
+        const displayPrice = group.minPrice === group.maxPrice 
+          ? group.maxPrice 
+          : group.maxPrice;
+        
+        // 최종 이미지 결정: product 레벨 이미지가 있으면 사용, 없으면 variants 중 이미지가 있는 것 사용
+        let finalImage = group.image;
+        if (finalImage === defaultImage) {
+          // 기본 이미지인 경우, variants 중 이미지가 있는 것을 찾기
+          for (const variant of group.variants) {
+            if (variant.image && variant.image !== defaultImage) {
+              finalImage = variant.image;
+              break;
+            }
+            // variant의 originalItem에서도 확인
+            if (variant.originalItem) {
+              const variantImage = findImage(variant.originalItem);
+              if (variantImage && variantImage !== defaultImage) {
+                finalImage = variantImage;
+                break;
+              }
+            }
+          }
+        }
+        
+        return {
+          id: group.productId, // productId를 id로 사용 (같은 상품은 하나로 표시)
+          productId: group.productId,
+          branchProductId: group.variants[0]?.branchProductId, // 첫 번째 variant의 branchProductId
+          branchId: group.branchId,
+          name: group.normalizedName || group.name,
+          price: displayPrice,
+          promotionPrice: group.promotionPrice,
+          discountRate: group.discountRate,
+          imageAlt: group.normalizedName || group.name,
+          image: finalImage, // 최종 결정된 이미지 사용
+          category: group.category,
+          stock: group.totalStock,
+          safetyStock: group.safetyStock,
+          isOutOfStock: group.totalStock <= 0,
+          isLowStock: group.variants.some(v => v.isLowStock),
+          brand: group.brand,
+          likes: group.likes,
+          reviews: group.reviews,
+          pop: group.pop,
+          discount: group.discount,
+          // variants 정보 보관 (상세 페이지에서 사용 가능)
+          variants: group.variants,
+        };
+      });
+      
+      setProducts(groupedProducts);
     } catch (e) {
       console.error('❌ 상품 로딩 실패:', e);
       console.error('❌ 에러 상세:', {
@@ -80,7 +269,6 @@ const ProductListPage = () => {
       
       // API가 준비되지 않았을 경우 테스트 데이터 사용
       if (e.response?.status === 404 || e.code === 'ERR_NETWORK') {
-        console.log('🧪 테스트 데이터 사용');
         const testProducts = [
           {
             id: 1,
@@ -331,6 +519,10 @@ const ProductListPage = () => {
                 <img
                   src={product.image}
                   alt={product.imageAlt}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+                  }}
                   style={{
                     width: '100%',
                     height: '200px',
