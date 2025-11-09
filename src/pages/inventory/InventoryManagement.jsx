@@ -1141,23 +1141,13 @@ function InventoryManagement() {
       
       // BranchProduct 데이터를 모달에서 사용할 수 있도록 변환 (사이즈 정보 포함)
       const formattedBranchProducts = (branchProductsData.data || branchProductsData || []).map(item => {
-        let normalizedName = item.productName || '알 수 없음';
-        if (normalizedName.includes(' - ')) {
-          normalizedName = normalizedName.split(' - ')[0].trim();
-        } else {
-          normalizedName = normalizedName.trim();
-        }
-
-        const attributeLabel = item.attributeValueName
-          ? `${item.attributeTypeName || ''} ${item.attributeValueName}`.trim()
-          : '';
-
-        const fullDisplayName = attributeLabel
-          ? `${normalizedName} - ${attributeLabel}`
-          : normalizedName;
+        const rawProductName = (item.productName || '알 수 없음').trim();
+        const baseProductName = rawProductName.includes(' - ')
+          ? rawProductName.split(' - ')[0].trim()
+          : rawProductName;
 
         const nameTokens = new Set(
-          fullDisplayName
+          rawProductName
             .split(/[\s-]+/)
             .map(token => token.trim())
             .filter(Boolean)
@@ -1167,13 +1157,14 @@ function InventoryManagement() {
           id: item.branchProductId,
           productId: item.productId,
           product: { id: item.productId },
-          productName: fullDisplayName,
+          productName: rawProductName,
           branchId: item.branchId || branchId,
           attributeValueId: item.attributeValueId || null,
           attributeValueName: item.attributeValueName || null,
           attributeTypeName: item.attributeTypeName || null,
           stockQuantity: item.stockQuantity || 0,
-          nameTokens
+          nameTokens,
+          baseProductName
         };
       });
       
