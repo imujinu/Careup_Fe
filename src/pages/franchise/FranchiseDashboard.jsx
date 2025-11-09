@@ -7,6 +7,7 @@ import { useAppSelector } from '../../stores/hooks';
 import { salesReportService } from '../../service/salesReportService';
 import orderService from '../../service/orderService';
 import { inventoryService } from '../../service/inventoryService';
+import { formatDateKST } from '../../utils/dateUtils';
 
 const Page = styled.div`
   width: 100%;
@@ -264,13 +265,7 @@ function FranchiseDashboard() {
                   <td>{o.memberName}</td>
                   <td>₩{(o.totalAmount||0).toLocaleString()}</td>
                   <td>{translateOrderStatus(o.status)}</td>
-                  <td>{o.createdAt ? (() => {
-                      const dateStr = o.createdAt;
-                      const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
-                        ? dateStr.trim() + 'Z' 
-                        : dateStr;
-                      return new Date(normalized).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-                    })() : '-'}</td>
+                  <td>{formatDateKST(o.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
