@@ -9,9 +9,16 @@ const TableContainer = styled.div`
   border: 1px solid #e5e7eb;
 `;
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
+  min-width: 1080px;
+  white-space: nowrap;
 `;
 
 const TableHeader = styled.thead`
@@ -29,6 +36,7 @@ const TableHeaderCell = styled.th`
   user-select: none;
   position: relative;
   transition: all 0.2s;
+  white-space: nowrap;
   
   &:hover {
     ${props => props.$sortable && `
@@ -58,14 +66,7 @@ const TableCell = styled.td`
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
   text-align: ${props => props.$center ? 'center' : 'left'};
-  max-width: ${props => {
-    if (props.$productName) return '200px';
-    if (props.$category) return '150px';
-    return 'none';
-  }};
-  overflow: ${props => (props.$productName || props.$category) ? 'hidden' : 'visible'};
-  text-overflow: ${props => (props.$productName || props.$category) ? 'ellipsis' : 'clip'};
-  white-space: ${props => (props.$productName || props.$category) ? 'nowrap' : 'normal'};
+  white-space: nowrap;
 `;
 
 const ProductInfo = styled.div`
@@ -77,9 +78,6 @@ const ProductName = styled.div`
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 4px;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 `;
 
@@ -215,6 +213,7 @@ function FranchiseInventoryTable({
     );
   };
   return React.createElement(TableContainer, null,
+    React.createElement(TableScroll, null,
     React.createElement(Table, null,
       React.createElement(TableHeader, null,
         React.createElement('tr', null,
@@ -294,7 +293,7 @@ function FranchiseInventoryTable({
           );
         })
       )
-    ),
+    )),
     React.createElement(PaginationContainer, null,
       React.createElement('div', null,
         React.createElement('span', { style: { marginRight: '8px', fontSize: '14px', color: '#6b7280' } }, '페이지당 표시'),

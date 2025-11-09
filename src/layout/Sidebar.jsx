@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../stores/hooks';
 import { logoutUser } from '../stores/slices/authSlice';
 import { MENU_PATH_MAP } from '../routes/routePaths';
+import SharkLogo from '../storefront/components/SharkLogo';
 
 import Icon from '@mdi/react';
 import {
@@ -56,9 +57,31 @@ const MenuButton = styled.button`
   &:hover { background: #f9fafb; color: #6b46c1; }
 `;
 
-const SidebarHeader = styled.div`padding: 20px 24px; border-bottom: 1px solid #e5e7eb; margin-bottom: 20px;`;
-const Logo = styled.div`width: 32px; height: 32px; background: #6b46c1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; margin-bottom: 8px;`;
-const AppTitle = styled.h2`font-size: 16px; font-weight: 600; color: #1f2937; margin: 0;`;
+const SidebarHeader = styled.div`
+  padding: 20px 24px; 
+  border-bottom: 1px solid #e5e7eb; 
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+const Logo = styled.div`
+  width: 32px; 
+  height: 32px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-shrink: 0;
+`;
+const AppTitle = styled.h2`
+  font-size: 24px; 
+  font-weight: 800; 
+  letter-spacing: 0.5px;
+  font-family: "Oswald", sans-serif;
+  color: #1f2937; 
+  margin: 0;
+  flex: 1;
+`;
 
 /* ▼ 아코디언(하위 메뉴)용: 더 부드럽고 약간 느린 전환 */
 const ArrowWrap = styled.button`
@@ -177,9 +200,11 @@ function Sidebar({ isVisible, userType, branchId }) {
   return (
     <SidebarContainer $isVisible={isVisible}>
       <SidebarHeader>
-        <Logo>H</Logo>
+        <Logo>
+          <SharkLogo size={32} />
+        </Logo>
         <AppTitle>
-          한솔도시락
+          Shark
           {userType === 'franchise' && branchName && (
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', fontWeight: 400 }}>
               {branchName}

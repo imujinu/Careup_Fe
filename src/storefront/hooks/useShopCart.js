@@ -222,9 +222,11 @@ export function useShopCart() {
       return;
     }
     
+    // 상품 클릭 시 조회 API 요청
     if (productId) {
-      await customerProductService.recordProductView(productId);
+      await customerProductService.recordProductViewClick(productId);
     }
+    
     navigate(`/shop/products/${productId}`);
   };
 

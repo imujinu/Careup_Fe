@@ -1,16 +1,13 @@
-// src/utils/axiosConfig.js
 // 직원용 axios 전역 설정
-
 import axios from 'axios';
 import { tokenStorage, authService } from '../service/authService';
 
 // ✅ 게이트웨이 baseURL (Vite .env에서 VITE_API_URL 제공 권장)
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
+  (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '') ||
   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
-axios.defaults.baseURL = API_BASE_URL;
 
-// 공용 기본값
+axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.timeout = 30000;
 
@@ -19,6 +16,12 @@ let refreshPromise = null;
 const REFRESH_PATH = '/auth/refresh';
 const LOGOUT_PATH = '/auth/logout';
 export const SKIP_FLAG = '__skipAuthRefresh'; // 개별 요청에서 리프레시 스킵하기 위한 플래그
+
+// ✅ 로그인 경로 헬퍼(모바일 분기)
+const goLogin = () => {
+  const isMobile = typeof window !== 'undefined' && window.location.pathname.startsWith('/m');
+  window.location.replace(isMobile ? '/m/login' : '/login');
+};
 
 // ---- Request Interceptor ----
 axios.interceptors.request.use(
@@ -102,11 +105,18 @@ axios.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // ✅ RT가 없으면 리프레시 시도 금지 → 즉시 로그인 이동
+    if (!tokenStorage.getRefreshToken()) {
+      try { tokenStorage.clearTokens(); } catch {}
+      goLogin();
+      return Promise.reject(error);
+    }
+
     // refresh 자체가 401이면 -> 루프 방지: 바로 토큰 제거 & 로그인 이동 (logout 호출 금지)
     const reqUrl = (originalRequest.url || '').toString();
     if (reqUrl.includes(REFRESH_PATH)) {
       try { tokenStorage.clearTokens(); } catch {}
-      window.location.href = '/login';
+      goLogin();
       return Promise.reject(error);
     }
 
@@ -136,7 +146,7 @@ axios.interceptors.response.use(
     } catch (refreshError) {
       refreshPromise = null;
       try { tokenStorage.clearTokens(); } catch {}
-      window.location.href = '/login';
+      goLogin();
       return Promise.reject(refreshError);
     }
   }

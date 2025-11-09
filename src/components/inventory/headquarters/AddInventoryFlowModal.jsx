@@ -198,6 +198,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
   const [selectedAttributeValues, setSelectedAttributeValues] = useState({}); // { attributeTypeId: attributeValueId }
   const [selectedBranchProduct, setSelectedBranchProduct] = useState(null);
   const [productAttributeValuesData, setProductAttributeValuesData] = useState([]); // 상품 속성 값 데이터 저장
+  const [branchProductError, setBranchProductError] = useState('');
 
   // 모달이 열릴 때 뒷단 스크롤 방지
   useEffect(() => {
@@ -221,26 +222,69 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     const productMap = new Map();
     branchProducts.forEach(bp => {
       const productId = bp.productId || bp.product?.id;
-      if (productId) {
-        // productName에서 속성 정보 제거 (예: "사이다 - 사이즈 S" -> "사이다")
-        let productName = bp.productName || '알 수 없음';
-        // " - " 패턴으로 속성 정보가 포함되어 있으면 제거
-        if (productName.includes(' - ')) {
-          productName = productName.split(' - ')[0];
-        }
-        productName = productName.trim();
-        
-        // 상품명 기준으로 중복 제거 (같은 상품명이면 하나만 표시)
-        if (!productMap.has(productName)) {
-          productMap.set(productName, {
-          productId: String(productId),
-            productName: productName
+      if (!productId) return;
+
+      let normalizedName = bp.productName || '알 수 없음';
+      if (normalizedName.includes(' - ')) {
+        normalizedName = normalizedName.split(' - ')[0].trim();
+      } else {
+        normalizedName = normalizedName.trim();
+      }
+
+      if (!productMap.has(normalizedName)) {
+        productMap.set(normalizedName, {
+          productName: normalizedName,
+          productIds: new Set([String(productId)]),
         });
-        }
+      } else {
+        productMap.get(normalizedName).productIds.add(String(productId));
       }
     });
-    return Array.from(productMap.values());
+
+    return Array.from(productMap.values()).map(item => ({
+      productName: item.productName,
+      productId: item.productIds.values().next().value,
+      productIds: Array.from(item.productIds),
+    }));
   }, [branchProducts]);
+
+  const selectedAttributeDetails = useMemo(() => {
+    const details = [];
+    if (!categoryAttributes || categoryAttributes.length === 0) return details;
+
+    categoryAttributes.forEach(attr => {
+      const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id || '');
+      const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name || '';
+      if (!typeId && !typeName) return;
+
+      const selectedValueId =
+        selectedAttributeValues[typeId] ||
+        selectedAttributeValues[typeName];
+
+      if (!selectedValueId) return;
+
+      const availableValues =
+        attr.availableValues ||
+        attr.attributeType?.attributeValues ||
+        [];
+
+      const matchedValue = availableValues.find(val =>
+        String(val.id || val.attributeValueId || val.valueId) === String(selectedValueId)
+      );
+
+      details.push({
+        typeId,
+        typeName,
+        valueId: String(selectedValueId),
+        valueName: matchedValue?.displayName ||
+          matchedValue?.name ||
+          matchedValue?.attributeValueName ||
+          ''
+      });
+    });
+
+    return details;
+  }, [categoryAttributes, selectedAttributeValues]);
 
   // 선택한 상품의 속성별 BranchProduct 그룹화
   const attributeGroups = useMemo(() => {
@@ -273,6 +317,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     if (!selectedProductId || !selectedProduct || !branchProducts.length) {
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
+      setBranchProductError('');
       return;
     }
 
@@ -297,172 +342,123 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       } else {
         setSelectedBranchProduct(null);
         setFormData(prev => ({ ...prev, branchProductId: '' }));
+        setBranchProductError('선택한 상품의 재고 정보를 찾을 수 없습니다.');
+        return;
       }
+      setBranchProductError('');
       return;
     }
 
     // 선택한 속성 값들과 일치하는 BranchProduct 찾기
-    const selectedValues = Object.values(selectedAttributeValues);
+    const selectedValues = selectedAttributeDetails.map(detail => detail.valueId);
     if (selectedValues.length === 0) {
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
+      setBranchProductError('');
       return;
     }
 
     // 모든 속성 타입이 선택되었는지 확인
-    const sortedAttributes = [...categoryAttributes].sort((a, b) => 
-      (a.displayOrder || 0) - (b.displayOrder || 0)
-    );
-    
-    const allSelected = sortedAttributes.every(attr => {
-      const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id);
-      const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name || '';
-      const isSelected = !!selectedAttributeValues[typeId] || (!!typeName && !!selectedAttributeValues[typeName]);
-      return isSelected;
-    });
+    const filteredByAttributes = selectedAttributeDetails.length > 0
+      ? productBranchProducts.filter(bp => {
+          const name = bp.productName || '';
+          return selectedAttributeDetails.every(detail => {
+            if (!detail.valueName) return true;
+            return name.includes(detail.valueName);
+          });
+        })
+      : productBranchProducts;
 
-    if (!allSelected) {
-      setSelectedBranchProduct(null);
-      setFormData(prev => ({ ...prev, branchProductId: '' }));
-      return;
-    }
-    
-    const primaryAttribute = sortedAttributes[sortedAttributes.length - 1];
-    const primaryTypeId = primaryAttribute 
-      ? String(primaryAttribute.attributeTypeId || primaryAttribute.attributeType?.id || primaryAttribute.id)
-      : null;
-    const primaryTypeName = primaryAttribute
-      ? primaryAttribute.attributeTypeName || primaryAttribute.attributeType?.name || primaryAttribute.name || ''
-      : '';
-    let selectedPrimaryValue = null;
-    if (primaryTypeId) {
-      if (selectedAttributeValues.hasOwnProperty(primaryTypeId)) {
-        selectedPrimaryValue = selectedAttributeValues[primaryTypeId];
-      } else if (
-        primaryTypeName &&
-        selectedAttributeValues.hasOwnProperty(primaryTypeName)
-      ) {
-        selectedPrimaryValue = selectedAttributeValues[primaryTypeName];
-      }
-    }
+    const candidateBranchProducts = filteredByAttributes.length > 0
+      ? filteredByAttributes
+      : productBranchProducts;
+
     let matchingBP = null;
 
-    // 우선 순위 속성(가장 마지막 속성)으로 BranchProduct 매칭 시도
-    if (primaryTypeId && selectedPrimaryValue) {
-      matchingBP = productBranchProducts.find(bp => {
-        const bpTypeId = String(bp.attributeTypeId || '');
-        const bpTypeName = bp.attributeTypeName || '';
-        const bpValueId = String(bp.attributeValueId || '');
-        const typeMatches = bpTypeId === primaryTypeId || (bpTypeName && bpTypeName === primaryTypeName);
-        return typeMatches && bpValueId === String(selectedPrimaryValue);
-      });
+    if (selectedAttributeDetails.length > 0) {
+      matchingBP = candidateBranchProducts.find(bp =>
+        selectedAttributeDetails.every(detail => {
+          const matchesValueId =
+            detail.valueId &&
+            String(bp.attributeValueId || '') === String(detail.valueId);
+          const matchesValueName =
+            detail.valueName &&
+            (bp.productName || '').includes(detail.valueName);
+
+          return matchesValueId || matchesValueName;
+        })
+      );
     }
 
-    // 속성이 하나인 경우
-    if (!matchingBP && sortedAttributes.length === 1) {
-      matchingBP = productBranchProducts.find(bp => {
-        return String(bp.attributeValueId) === String(selectedValues[0]);
-      });
-    } else if (!matchingBP) {
-      // 여러 속성이 있는 경우 - productAttributeValuesData를 사용해서 정확한 조합 찾기
-      if (productAttributeValuesData.length > 0) {
-        // 선택한 속성 값들을 타입별로 정리
-        const selectedAttrMap = new Map();
-        sortedAttributes.forEach(attr => {
-          const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id);
-          const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name;
-          const selectedValueId = selectedAttributeValues[typeId] || selectedAttributeValues[typeName];
-          
-          if (selectedValueId) {
-            selectedAttrMap.set(typeId, String(selectedValueId));
-            selectedAttrMap.set(typeName, String(selectedValueId));
-          }
-        });
-        
-        // productAttributeValuesData에서 선택한 모든 속성 값과 일치하는 조합 찾기
-        const productIdGroups = new Map();
-        productAttributeValuesData.forEach(pav => {
-          const productId = String(pav.productId || '');
-          if (!productIdGroups.has(productId)) {
-            productIdGroups.set(productId, []);
-          }
-          productIdGroups.get(productId).push(pav);
-        });
-        
-        // 모든 선택한 속성이 일치하는 productId 찾기
-        let matchedProductId = null;
-        productIdGroups.forEach((attrs, productId) => {
-          let allMatch = true;
-          
-          // 각 선택한 속성이 이 productId의 속성에 포함되어 있는지 확인
-          for (const [attrKey, selectedValueId] of selectedAttrMap.entries()) {
-            const hasMatchingAttr = attrs.some(pav => {
-              const pavTypeId = String(pav.attributeTypeId || pav.attributeType?.id || '');
-              const pavTypeName = String(pav.attributeTypeName || pav.attributeType?.name || '');
-              const pavValueId = String(pav.attributeValueId || pav.attributeValue?.id || pav.id || '');
-              
-              const typeMatches = pavTypeId === attrKey || pavTypeName === attrKey;
-              const valueMatches = pavValueId === selectedValueId;
-              
-              return typeMatches && valueMatches;
-            });
-            
-            if (!hasMatchingAttr) {
-              allMatch = false;
-              break;
-            }
-          }
-          
-          if (allMatch && matchedProductId === null) {
-            matchedProductId = productId;
-          }
-        });
-        
-        // 매칭된 productId의 속성 값 중 하나와 일치하는 BranchProduct 찾기
-        if (matchedProductId) {
-        // 매칭된 productId와 동일한 상품을 가진 BranchProduct 찾기
-        matchingBP = productBranchProducts.find(bp => {
-          return String(bp.productId) === matchedProductId;
-        });
-        
-        // branchProduct에 직접 연결된 attributeValueId가 있는 경우 보조 확인
-        if (!matchingBP) {
-          const matchedAttrValueIds = Array.from(new Set(
-            Array.from(selectedAttrMap.values())
-          ));
-          
-          matchingBP = productBranchProducts.find(bp => {
-            const bpValueId = String(bp.attributeValueId || '');
-            return matchedAttrValueIds.includes(bpValueId);
-          });
+    if (!matchingBP && productAttributeValuesData.length > 0 && selectedValues.length > 0) {
+      const productIdGroups = new Map();
+
+      productAttributeValuesData.forEach(pav => {
+        const productId = String(pav.productId || pav.product?.id || '');
+        if (!productId) return;
+
+        if (!productIdGroups.has(productId)) {
+          productIdGroups.set(productId, new Set());
         }
+
+        const valueId =
+          pav.attributeValueId ||
+          pav.attributeValue?.id ||
+          pav.id;
+
+        if (valueId != null) {
+          productIdGroups.get(productId).add(String(valueId));
+        }
+      });
+
+      let matchedProductId = null;
+      for (const [productId, valueSet] of productIdGroups.entries()) {
+        const matchesAll = selectedValues.every(valueId =>
+          valueSet.has(String(valueId))
+        );
+        if (matchesAll) {
+          matchedProductId = productId;
+          break;
         }
       }
-      
-      // productAttributeValuesData를 사용한 매칭 실패 시, 기존 방식으로 폴백
-      if (!matchingBP) {
-        matchingBP = productBranchProducts.find(bp => {
-          return selectedValues.some(selectedValue => 
-            String(bp.attributeValueId) === String(selectedValue)
+
+      if (matchedProductId) {
+        matchingBP =
+          candidateBranchProducts.find(bp =>
+            String(bp.productId || bp.product?.id || '') === matchedProductId
+          ) ||
+          productBranchProducts.find(bp =>
+            String(bp.productId || bp.product?.id || '') === matchedProductId
+          );
+      }
+    }
+
+    const hasSelectedAllRequired = categoryAttributes.length === 0
+      ? true
+      : categoryAttributes.every(attr => {
+          if (attr.isRequired === false) return true;
+          const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id);
+          const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name || '';
+          return Boolean(
+            selectedAttributeValues[typeId] ||
+            (typeName && selectedAttributeValues[typeName])
           );
         });
-      }
-    }
-
-    // 매칭 실패 시: BranchProduct에 속성 정보가 없는 경우
-    // 첫 번째 BranchProduct를 사용 (속성 정보가 없어도 해당 상품의 재고이므로)
-    if (!matchingBP && productBranchProducts.length > 0) {
-      matchingBP = productBranchProducts[0];
-    }
 
     if (matchingBP) {
       setSelectedBranchProduct(matchingBP);
       setFormData(prev => ({ ...prev, branchProductId: matchingBP.id }));
+      setBranchProductError('');
     } else {
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
+      if (hasSelectedAllRequired && selectedValues.length > 0) {
+        setBranchProductError('선택한 속성 조합의 재고 정보가 없습니다.');
+      } else {
+        setBranchProductError('');
+      }
     }
-  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes]);
+  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes, selectedAttributeDetails, productAttributeValuesData]);
 
   // 상품 선택 시 카테고리 속성 조회
   useEffect(() => {
@@ -480,6 +476,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       setCategoryAttributes([]);
       setSelectedAttributeValues({});
       setSelectedBranchProduct(null);
+      setBranchProductError('');
     };
 
     resetForm();
@@ -491,11 +488,13 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       setSelectedProduct(null);
       setCategoryAttributes([]);
       setSelectedAttributeValues({});
+      setBranchProductError('');
       return;
     }
 
     setSelectedProductId(String(productId));
     setSelectedAttributeValues({});
+    setBranchProductError('');
     
     // 선택한 상품 정보 찾기
     const product = uniqueProducts.find(p => String(p.productId) === String(productId));
@@ -514,6 +513,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     });
     if (productBPs.length === 0) {
       setCategoryAttributes([]);
+      setBranchProductError('선택한 상품의 재고 정보를 찾을 수 없습니다.');
       return;
     }
 
@@ -791,6 +791,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       }
       return newValues;
     });
+    setBranchProductError('');
   };
 
   const handleSubmit = async (e) => {
@@ -1098,15 +1099,24 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
                 <div style={{ marginBottom: '4px' }}>
                   선택한 상품: {selectedProduct?.productName || ''}
                 </div>
-                {selectedBranchProduct.attributeTypeName && selectedBranchProduct.attributeValueName && (
+                {selectedAttributeDetails.length > 0 && (
                   <div>
-                    속성: {selectedBranchProduct.attributeTypeName} {selectedBranchProduct.attributeValueName}
+                    속성:{' '}
+                    {selectedAttributeDetails
+                      .map(detail => `${detail.typeName} ${detail.valueName}`.trim())
+                      .join(', ')}
                   </div>
                 )}
                 <div style={{ marginTop: '4px', fontSize: '12px', opacity: 0.8 }}>
                   현재 재고: {selectedBranchProduct.stockQuantity || 0}개
                 </div>
               </SelectedProductInfo>
+            </FormGroup>
+          )}
+
+          {branchProductError && (
+            <FormGroup>
+              <ErrorMessage>{branchProductError}</ErrorMessage>
             </FormGroup>
           )}
 

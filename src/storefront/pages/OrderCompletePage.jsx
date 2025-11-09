@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDateKST } from '../../utils/dateUtils';
 
 const OrderCompletePage = ({ orderData, paymentData, onBackToHome, onViewOrders }) => {
   return (
@@ -28,10 +29,9 @@ const OrderCompletePage = ({ orderData, paymentData, onBackToHome, onViewOrders 
             <div className="detail-row">
               <span className="label">주문일시</span>
               <span className="value">
-                {orderData?.createdAt ? 
-                  new Date(orderData.createdAt).toLocaleString('ko-KR') : 
-                  new Date().toLocaleString('ko-KR')
-                }
+                {orderData?.createdAt
+                  ? formatDateKST(orderData.createdAt)
+                  : formatDateKST(new Date())}
               </span>
             </div>
             <div className="detail-row">

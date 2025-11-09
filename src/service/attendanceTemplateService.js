@@ -1,130 +1,166 @@
-// src/service/attendanceTemplateService.js
-// 근무 템플릿(프리셋) CRUD + 브로드캐스트 유틸 (백엔드 스펙 정합)
+// 근무 템플릿(프리셋) CRUD — CORS(PATCH 차단) 우회: POST → PUT → PATCH 폴백 + 페이지 언랩 가드
 import axios from '../utils/axiosConfig';
 
-const BASE = '/branch-service/attendance-template';
+const BASE_URL = (() => {
+  const trim = (s) => (s || '').replace(/\/+$/, '');
+  const explicit = trim(import.meta.env.VITE_BRANCH_URL);
+  if (explicit) return explicit; // e.g. https://server.careup.store/branch-service
+  const api =
+    trim(import.meta.env.VITE_API_URL) ||
+    (typeof window !== 'undefined' ? trim(window.location.origin) : 'http://localhost:8080');
+  return `${api}/branch-service`;
+})();
 
-// 공통 래퍼 파싱 (CommonResponseDto 호환) + JSON 가드
+/** 공통 언랩 (+ JSON 가드) */
 function unwrap(res) {
   const ct = (res?.headers?.['content-type'] || '').toLowerCase();
   const d = res?.data;
-
-  // ✅ 개발 서버 fallback(HTML)을 200으로 받는 경우를 즉시 감지
-  if (typeof d === 'string' && !ct.includes('application/json')) {
-    throw new Error('API 응답이 JSON이 아닙니다. baseURL 또는 프록시 설정을 확인하세요.');
+  if (typeof d === 'string' && !ct.includes('application/json')) return null;
+  if (d && typeof d === 'object') {
+    if ('result' in d) return d.result;
+    if ('data' in d) return d.data;
   }
-
-  if (d?.result !== undefined) return d.result;
-  if (d?.data !== undefined) return d.data;
   return d ?? null;
 }
+const st = (e) => Number(e?.response?.status || 0);
+const isMethodIssue = (code) => [404, 405, 415].includes(Number(code));
 
-// 페이지 응답 정규화
+async function safeUpdate(url, payload) {
+  try {
+    return unwrap(await axios.post(url, payload));
+  } catch (e1) {
+    if (!isMethodIssue(st(e1))) throw e1;
+    try {
+      return unwrap(await axios.put(url, payload));
+    } catch (e2) {
+      if (!isMethodIssue(st(e2))) throw e2;
+      return unwrap(await axios.patch(url, payload));
+    }
+  }
+}
+async function safeDelete(urlDelete, urlPostDelete) {
+  try {
+    return unwrap(await axios.delete(urlDelete));
+  } catch (e1) {
+    if (!isMethodIssue(st(e1))) throw e1;
+    return unwrap(await axios.post(urlPostDelete));
+  }
+}
+
+/** 페이지 정규화 */
 function normalizePage(body) {
-  if (!body) return { content: [], totalPages: 0, totalElements: 0 };
-  if (Array.isArray(body)) return { content: body, totalPages: 1, totalElements: body.length };
-  if (Array.isArray(body.content)) {
-    return {
-      content: body.content,
-      totalPages: Number.isFinite(body.totalPages) ? body.totalPages : 1,
-      totalElements: Number.isFinite(body.totalElements) ? body.totalElements : body.content.length,
-    };
-  }
-  if (Array.isArray(body.items)) {
-    return {
-      content: body.items,
-      totalPages: Number.isFinite(body.totalPages) ? body.totalPages : 1,
-      totalElements: Number.isFinite(body.totalElements) ? body.totalElements : body.items.length,
-    };
-  }
-  return { content: [], totalPages: 0, totalElements: 0 };
+  if (!body) return { content: [], totalPages: 0, totalElements: 0, size: 0, number: 0 };
+  if (Array.isArray(body)) return { content: body, totalPages: 1, totalElements: body.length, size: body.length, number: 0 };
+  const page = body?.page || body; // CommonResponseDto 래퍼/직접 반환 모두 수용
+  const content = page?.content ?? [];
+  const totalPages = page?.totalPages ?? 0;
+  const totalElements = page?.totalElements ?? content.length ?? 0;
+  const size = page?.size ?? content.length ?? 0;
+  const number = page?.number ?? 0;
+  return { content, totalPages, totalElements, size, number };
 }
 
-// '09:00' → '09:00:00' 보정
-function toHHMMSS(v) {
-  if (!v) return null;
-  if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) return `${v}:00`;
-  return v;
-}
-
-/**
- * 템플릿 목록 (페이지)
- * @param {{page?:number,size?:number,sort?:string}} params
- */
-export async function listAttendanceTemplates(params = {}) {
-  const { page = 0, size = 20, sort = 'name,asc' } = params;
-  const q = { page, size, sort };
-
-  const res = await axios.get(`${BASE}/list`, { params: q });
+/* =========================
+ * Templates
+ * ========================= */
+export async function listAttendanceTemplates({ page = 0, size = 20, sort = 'name,asc' } = {}) {
+  const res = await axios.get(`${BASE_URL}/attendance-template/list`, { params: { page, size, sort } });
   return normalizePage(unwrap(res));
 }
-
-/** 단건 조회 (detail/{id}) */
-export async function getAttendanceTemplate(id) {
-  const res = await axios.get(`${BASE}/detail/${id}`);
-  return unwrap(res);
-}
-
-/**
- * 생성 (POST /create)
- * payload: { name, defaultClockIn?, defaultBreakStart?, defaultBreakEnd?, defaultClockOut? }
- */
 export async function createAttendanceTemplate(payload) {
-  const body = {
-    name: payload?.name,
-    defaultClockIn: toHHMMSS(payload?.defaultClockIn),
-    defaultBreakStart: toHHMMSS(payload?.defaultBreakStart),
-    defaultBreakEnd: toHHMMSS(payload?.defaultBreakEnd),
-    defaultClockOut: toHHMMSS(payload?.defaultClockOut),
-  };
-  const res = await axios.post(`${BASE}/create`, body);
-  return unwrap(res);
+  return safeUpdate(`${BASE_URL}/attendance-template/create`, payload);
 }
-
-/** 수정 (PATCH /update/{id}) */
 export async function updateAttendanceTemplate(id, payload) {
-  const body = {
-    name: payload?.name,
-    defaultClockIn: toHHMMSS(payload?.defaultClockIn),
-    defaultBreakStart: toHHMMSS(payload?.defaultBreakStart),
-    defaultBreakEnd: toHHMMSS(payload?.defaultBreakEnd),
-    defaultClockOut: toHHMMSS(payload?.defaultClockOut),
-    // 선택 반영 옵션이 있다면 payload에 포함된 필드가 그대로 전달됩니다(백엔드 DTO와 일치 시)
-    propagate: payload?.propagate,
-    propagateFrom: payload?.propagateFrom,
-    propagateTo: payload?.propagateTo,
-    strategy: payload?.strategy,
-  };
-  const res = await axios.patch(`${BASE}/update/${id}`, body);
-  return unwrap(res);
-}
-
-/** 삭제 (DELETE /delete/{id}) */
-export async function deleteAttendanceTemplate(id) {
-  const res = await axios.delete(`${BASE}/delete/${id}`);
-  return unwrap(res);
-}
-
-/** 드롭다운/모달용 간단 목록 */
-export async function fetchAttendanceTemplates(limit = 1000) {
-  const res = await axios.get(`${BASE}/list`, { params: { page: 0, size: limit, sort: 'name,asc' } });
-  const body = unwrap(res);
-  if (Array.isArray(body?.content)) return body.content;
-  if (Array.isArray(body)) return body;
-  if (Array.isArray(body?.items)) return body.items;
-  return [];
-}
-
-/** 변경 브로드캐스트 */
-export function broadcastAttendanceTemplateChanged() {
+  const pathId = encodeURIComponent(String(id));
   try {
-    window.dispatchEvent(new Event('attendanceTemplate:changed'));
-    localStorage.setItem('attendanceTemplate:ping', String(Date.now()));
-    localStorage.removeItem('attendanceTemplate:ping');
-    if ('BroadcastChannel' in window) {
-      const bc = new BroadcastChannel('attendanceTemplate');
-      bc.postMessage({ type: 'changed' });
-      bc.close();
+    // 우선 POST로 업데이트 (CORS 안전)
+    return await safeUpdate(`${BASE_URL}/attendance-template/update/${pathId}`, payload);
+  } catch (e) {
+    // 보조: /update (body에 id 포함) 변형 엔드포인트 대응
+    if (isMethodIssue(st(e))) {
+      return safeUpdate(`${BASE_URL}/attendance-template/update`, { id, ...payload });
     }
-  } catch {}
+    throw e;
+  }
 }
+export async function deleteAttendanceTemplate(id) {
+  const pathId = encodeURIComponent(String(id));
+  return safeDelete(
+    `${BASE_URL}/attendance-template/delete/${pathId}`,
+    `${BASE_URL}/attendance-template/delete/${pathId}`
+  );
+}
+
+/* ===== (선택) 순서 이동 지원 — 서버가 지원할 때만 사용 ===== */
+export async function moveTemplateOrder(id, direction /* 'UP' | 'DOWN' */, step = 1) {
+  const pathId = encodeURIComponent(String(id));
+  const body = { direction, step };
+  try {
+    return await safeUpdate(`${BASE_URL}/attendance-template/${pathId}/move-order`, body);
+  } catch (e) {
+    // 대안: /attendance-template/move-order (id 포함)
+    if (isMethodIssue(st(e))) {
+      return safeUpdate(`${BASE_URL}/attendance-template/move-order`, { id, ...body });
+    }
+    throw e;
+  }
+}
+
+/* =========================
+ * Broadcast utils (UI가 기대하는 시그니처 추가)
+ * ========================= */
+export const TEMPLATE_CHANGED_EVENT = 'attendance-template:changed';
+
+export function broadcastAttendanceTemplateChanged(detail) {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(TEMPLATE_CHANGED_EVENT, { detail: detail ?? null }));
+  }
+}
+export function addAttendanceTemplateChangedListener(handler) {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
+  const h = (e) => handler?.(e?.detail);
+  window.addEventListener(TEMPLATE_CHANGED_EVENT, h);
+  return () => window.removeEventListener(TEMPLATE_CHANGED_EVENT, h);
+}
+export function removeAttendanceTemplateChangedListener(handler) {
+  if (typeof window === 'undefined' || typeof window.removeEventListener !== 'function') return;
+  window.removeEventListener(TEMPLATE_CHANGED_EVENT, handler);
+}
+
+/* =========================
+ * Compatibility aliases (기존 import 호환)
+ * ========================= */
+export async function fetchAttendanceTemplates(opts) {
+  return listAttendanceTemplates(opts);
+}
+export const listTemplates = listAttendanceTemplates;
+export const createTemplate = createAttendanceTemplate;
+export const updateTemplate = updateAttendanceTemplate;
+export const deleteTemplate = deleteAttendanceTemplate;
+
+/* =========================
+ * default export (누락없이 집약)
+ * ========================= */
+export default {
+  // CRUD
+  listAttendanceTemplates,
+  createAttendanceTemplate,
+  updateAttendanceTemplate,
+  deleteAttendanceTemplate,
+  moveTemplateOrder,
+
+  // 호환 별칭
+  listTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+
+  // 브로드캐스트 유틸
+  TEMPLATE_CHANGED_EVENT,
+  broadcastAttendanceTemplateChanged,
+  addAttendanceTemplateChangedListener,
+  removeAttendanceTemplateChangedListener,
+
+  // 컬렉션 로더 호환
+  fetchAttendanceTemplates,
+};

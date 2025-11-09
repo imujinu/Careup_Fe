@@ -4,6 +4,7 @@ import { Icon } from '@mdi/react';
 import { mdiClose } from '@mdi/js';
 import RejectReasonModal from './RejectReasonModal';
 import authService from '../../service/authService';
+import { formatDateKST } from '../../utils/dateUtils';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -260,10 +261,7 @@ function OrderDetailModal({ order, onClose, onApprove, onReject, canApproveAndRe
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('ko-KR');
-  };
+  const formatDate = (dateString) => formatDateKST(dateString);
 
   const handleApprove = () => {
     // 결제 완료 여부 확인

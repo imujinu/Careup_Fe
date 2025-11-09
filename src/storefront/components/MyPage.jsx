@@ -212,7 +212,13 @@ const MyPage = ({ onBack, currentUser: propCurrentUser, initialTab = "profile" }
                             <div className="purchase-name">주문번호: {order.orderId || order.id}</div>
                             <div className="purchase-price">{(order.totalAmount || 0).toLocaleString()}원</div>
                             <div className="purchase-date">
-                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ko-KR') : '-'}
+                              {order.createdAt ? (() => {
+                                  const dateStr = order.createdAt;
+                                  const normalized = typeof dateStr === 'string' && !dateStr.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(dateStr) 
+                                    ? dateStr.trim() + 'Z' 
+                                    : dateStr;
+                                  return new Date(normalized).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+                                })() : '-'}
                             </div>
                             <div className={`purchase-status ${order.orderStatus?.toLowerCase() || 'pending'}`}>
                               {order.orderStatus === 'CONFIRMED' || order.orderStatus === 'APPROVED' ? '구매완료' : 

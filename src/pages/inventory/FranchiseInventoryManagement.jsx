@@ -92,9 +92,43 @@ function FranchiseInventoryManagement() {
       
       // 상품별 속성 정보를 가져오기 위한 Map (캐싱)
       const productAttributesMap = new Map();
+      // 카테고리별 속성 정보를 가져오기 위한 Map (캐싱)
+      const categoryAttributesMap = new Map();
       
       // 모든 고유한 상품 ID 수집
       const uniqueProductIds = [...new Set(data.map(bp => bp.productId).filter(Boolean))];
+      
+      // 모든 상품의 카테고리 ID 수집
+      const uniqueCategoryIds = [...new Set(
+        Array.from(productMap.values())
+          .map(p => p.categoryId || p.category?.id || p.category?.categoryId)
+          .filter(Boolean)
+      )];
+      
+      // 카테고리별 속성 정보를 먼저 가져오기 (캐싱)
+      for (const categoryId of uniqueCategoryIds) {
+        if (!categoryAttributesMap.has(categoryId)) {
+          try {
+            const categoryAttributes = await inventoryService.getCategoryAttributes(categoryId);
+            if (Array.isArray(categoryAttributes)) {
+              // attributeTypeId를 키로 하는 Map 생성
+              const categoryAttrMap = new Map();
+              categoryAttributes.forEach(ca => {
+                const typeId = String(ca.attributeTypeId || ca.attributeType?.id || ca.id || '');
+                if (typeId) {
+                  categoryAttrMap.set(typeId, {
+                    displayOrder: ca.displayOrder || 0,
+                    attributeTypeName: ca.attributeTypeName || ca.attributeType?.name
+                  });
+                }
+              });
+              categoryAttributesMap.set(categoryId, categoryAttrMap);
+            }
+          } catch (err) {
+            categoryAttributesMap.set(categoryId, new Map());
+          }
+        }
+      }
       
       // 모든 상품의 속성 정보를 배치로 가져오기
       const batchSize = 10;
@@ -103,7 +137,13 @@ function FranchiseInventoryManagement() {
         await Promise.all(batch.map(async (productId) => {
           if (!productAttributesMap.has(productId)) {
             try {
+              const product = productMap.get(productId);
+              const categoryId = product?.categoryId || product?.category?.id || product?.category?.categoryId;
               const productAttributes = await inventoryService.getProductAttributeValues(productId);
+              
+              // 카테고리별 displayOrder 가져오기
+              const categoryAttrMap = categoryAttributesMap.get(categoryId) || new Map();
+              
               // 속성 타입별로 그룹화
               const attributeMap = new Map();
               (productAttributes || []).forEach(attr => {
@@ -111,7 +151,12 @@ function FranchiseInventoryManagement() {
                 const typeName = attr.attributeTypeName || attr.attributeType?.name || '';
                 const valueId = attr.attributeValueId || attr.attributeValue?.id || attr.id;
                 const valueName = attr.attributeValueName || attr.attributeValue?.name || attr.displayName || '';
-                const displayOrder = attr.attributeType?.displayOrder || attr.displayOrder || 0;
+                
+                // 카테고리별 displayOrder 우선 사용, 없으면 속성 타입의 displayOrder 사용
+                const categoryDisplayOrder = categoryAttrMap.get(typeId)?.displayOrder;
+                const displayOrder = categoryDisplayOrder !== undefined 
+                  ? categoryDisplayOrder 
+                  : (attr.attributeType?.displayOrder || attr.displayOrder || 0);
                 
                 const key = typeId || typeName;
                 if (!key) return;

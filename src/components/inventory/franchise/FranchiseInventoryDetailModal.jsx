@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { inventoryService } from '../../../service/inventoryService';
+import { formatDateKST } from '../../../utils/dateUtils';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -138,6 +139,7 @@ const SectionTitle = styled.h3`
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
+  min-width: 500px;
 `;
 
 const TableHeader = styled.thead`
@@ -151,6 +153,7 @@ const TableHeaderCell = styled.th`
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
 `;
 
 const TableBody = styled.tbody``;
@@ -166,6 +169,36 @@ const TableCell = styled.td`
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: ${props => {
+    if (props.$remark) return '300px';
+    if (props.$date) return '180px';
+    if (props.$quantity) return '100px';
+    return '150px';
+  }};
+  ${props => props.$remark && `
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+    min-width: 200px;
+    max-width: 400px;
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 2px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 2px;
+      &:hover {
+        background: #555;
+      }
+    }
+  `}
 `;
 
 const TypeBadge = styled.span`
@@ -366,21 +399,15 @@ function FranchiseInventoryDetailModal({ isOpen, onClose, item }) {
                       quantity = '0';
                     }
                     
-                    const date = new Date(history.createdAt || history.createAt).toLocaleString('ko-KR', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
+                    const date = formatDateKST(history.createdAt || history.createAt);
                     
                     return React.createElement(TableRow, { key: index },
-                      React.createElement(TableCell, null, date),
+                      React.createElement(TableCell, { $date: true }, date),
                       React.createElement(TableCell, null,
                         React.createElement(TypeBadge, { type }, type)
                       ),
-                      React.createElement(TableCell, null, quantity),
-                      React.createElement(TableCell, null, remark)
+                      React.createElement(TableCell, { $quantity: true }, quantity),
+                      React.createElement(TableCell, { $remark: true }, remark)
                     );
                   })
             )
