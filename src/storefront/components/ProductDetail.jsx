@@ -23,16 +23,98 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
 
   // product가 변경될 때 기본 이미지 설정
   useEffect(() => {
-    if (product?.image && Object.keys(selectedAttributes).length === 0) {
-      setCurrentProductImage(product.image);
+    const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+    
+    // 옵션 선택이 없을 때는 상품 기본 이미지 사용
+    if (Object.keys(selectedAttributes).length === 0) {
+      // product.image가 있으면 사용, 없으면 기본 이미지
+      const baseImage = product?.image || (product?.images && product.images.length > 0 ? product.images[0] : null) || defaultImage;
+      setCurrentProductImage(baseImage);
     }
-  }, [product?.image]);
+  }, [product?.image, product?.images, selectedAttributes]);
 
   // 선택된 속성에 해당하는 이미지 가져오기
   useEffect(() => {
-    if (Object.keys(selectedAttributes).length > 0 && product?.attributeGroups) {
-      // 선택된 속성 중 가장 최근에 선택된 속성의 이미지 사용
-      // 또는 첫 번째 선택된 속성의 이미지 사용
+    const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+    
+    // 옵션이 선택되지 않았으면 상품 기본 이미지 사용
+    if (Object.keys(selectedAttributes).length === 0) {
+      const baseImage = product?.image || (product?.images && product.images.length > 0 ? product.images[0] : null) || defaultImage;
+      setCurrentProductImage(baseImage);
+      return;
+    }
+    
+    // 옵션이 선택된 경우: optionCombos에서 선택된 옵션에 맞는 product의 imageUrl 찾기
+    const type1 = product.optionTypes?.[0];
+    const type2 = product.optionTypes?.[1];
+    const opt1Selected = type1 ? selectedAttributes[type1] : undefined;
+    const opt2Selected = type2 ? selectedAttributes[type2] : undefined;
+    
+    // 1순위: optionCombos에서 선택된 옵션 조합에 맞는 product의 imageUrl 찾기
+    if (opt1Selected && opt2Selected && Array.isArray(product.optionCombos)) {
+      const combo = product.optionCombos.find(c => 
+        String(c.opt1Id) === String(opt1Selected) && 
+        String(c.opt2Id) === String(opt2Selected)
+      );
+      
+      if (combo?.imageUrl) {
+        setCurrentProductImage(combo.imageUrl);
+        return;
+      }
+      
+      // combo에 imageUrl이 없으면 해당 productId로 variants에서 찾기
+      if (combo?.productId && product?.variants) {
+        const variantProduct = product.variants.find(v => 
+          String(v.productId) === String(combo.productId)
+        );
+        
+        if (variantProduct?.imageUrl) {
+          setCurrentProductImage(variantProduct.imageUrl);
+          return;
+        }
+        
+        if (variantProduct?.image) {
+          setCurrentProductImage(variantProduct.image);
+          return;
+        }
+      }
+    }
+    
+    // 2순위: 하나의 옵션만 선택된 경우 - 해당 옵션에 맞는 product 찾기
+    if ((opt1Selected || opt2Selected) && Array.isArray(product.optionCombos)) {
+      // 첫 번째 옵션만 선택된 경우
+      if (opt1Selected && !opt2Selected) {
+        const matchingCombos = product.optionCombos.filter(c => 
+          String(c.opt1Id) === String(opt1Selected)
+        );
+        
+        // 첫 번째 매칭되는 combo의 이미지 사용
+        if (matchingCombos.length > 0) {
+          const firstCombo = matchingCombos[0];
+          if (firstCombo.imageUrl) {
+            setCurrentProductImage(firstCombo.imageUrl);
+            return;
+          }
+        }
+      }
+      // 두 번째 옵션만 선택된 경우
+      else if (!opt1Selected && opt2Selected) {
+        const matchingCombos = product.optionCombos.filter(c => 
+          String(c.opt2Id) === String(opt2Selected)
+        );
+        
+        if (matchingCombos.length > 0) {
+          const firstCombo = matchingCombos[0];
+          if (firstCombo.imageUrl) {
+            setCurrentProductImage(firstCombo.imageUrl);
+            return;
+          }
+        }
+      }
+    }
+    
+    // 3순위: attributeGroups에서 찾기
+    if (product?.attributeGroups) {
       const selectedKeys = Object.keys(selectedAttributes);
       if (selectedKeys.length > 0) {
         // 마지막으로 선택된 속성 타입의 이미지 사용
@@ -52,11 +134,19 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
         }
       }
     }
-    // 속성이 선택되지 않았거나 이미지를 찾을 수 없으면 기본 이미지 사용
-    if (Object.keys(selectedAttributes).length === 0) {
-      setCurrentProductImage(product?.image || null);
-    }
-  }, [selectedAttributes, product?.attributeGroups, product?.image]);
+    
+    // 모든 방법으로 이미지를 찾지 못한 경우 상품 기본 이미지 사용
+    const baseImage = product?.image || (product?.images && product.images.length > 0 ? product.images[0] : null) || defaultImage;
+    setCurrentProductImage(baseImage);
+  }, [
+    selectedAttributes, 
+    product?.availableBranches, 
+    product?.optionCombos, 
+    product?.optionTypes, 
+    product?.attributeGroups, 
+    product?.image, 
+    product?.variants
+  ]);
 
   const getBranchKey = (branch) => {
     if (!branch) return '';
@@ -215,19 +305,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
     }
     
     // 지점 선택은 필수가 아님 - 장바구니에서 선택하도록 함
-    console.log('🛒 ProductDetail - 장바구니 추가 버튼 클릭:', {
-      resolvedSelectedBranch: resolvedSelectedBranch ? {
-        branchName: resolvedSelectedBranch.branchName,
-        branchId: resolvedSelectedBranch.branchId,
-        branchProductId: resolvedSelectedBranch.branchProductId
-      } : null,
-      product: {
-        productId: product?.productId,
-        name: product?.name,
-        availableBranches: product?.availableBranches?.length || 0
-      }
-    });
-    
     setIsInCart(true);
     if (onAddToCart) {
       const branchData = resolvedSelectedBranch;
@@ -240,7 +317,6 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
         selectedOptions,
         availableBranches: product?.availableBranches || []
       };
-      console.log('📤 ProductDetail - onAddToCart 호출:', productWithBranch);
       onAddToCart(productWithBranch);
     } else {
       console.error('❌ onAddToCart 함수가 없습니다!');
@@ -474,9 +550,9 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                                 if (b) setSelectedBranch(b);
                               }
                               
-                              // 속성 선택 시 해당 상품의 이미지로 변경
-                              if (!isSelected && valueGroup.imageUrl) {
-                                setCurrentProductImage(valueGroup.imageUrl);
+                              // 속성 선택 시 이미지는 useEffect에서 자동으로 처리됨
+                              // 여기서는 이미지 인덱스만 초기화
+                              if (!isSelected) {
                                 setSelectedImageIndex(0); // 이미지 인덱스 초기화
                               }
                             }}
@@ -512,13 +588,7 @@ const ProductDetail = ({ product, onBack, onBuy, onAddToCart }) => {
                   className="size-select branch-select"
                   value={resolvedSelectedBranch ? getBranchKey(resolvedSelectedBranch) : ''}
                   onChange={(e) => {
-                    console.log('📍 지점 선택 변경:', e.target.value);
                     const branch = product.availableBranches.find(b => getBranchKey(b) === e.target.value);
-                    console.log('📍 찾은 지점:', branch ? {
-                      branchName: branch.branchName,
-                      branchId: branch.branchId,
-                      branchProductId: branch.branchProductId
-                    } : '없음');
                     setSelectedBranch(branch || null);
                   }}
                 >

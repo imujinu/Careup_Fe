@@ -391,6 +391,39 @@ function ProductDetailPage() {
         const minPrice = allMinPrices.length > 0 ? Math.min(...allMinPrices) : (foundProduct.minPrice || 0);
         const maxPrice = allMaxPrices.length > 0 ? Math.max(...allMaxPrices) : (foundProduct.maxPrice || 0);
 
+        // 이미지 찾기 헬퍼 함수
+        const findImage = (item) => {
+          const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+          
+          // 1순위: imageUrl 필드 확인
+          if (item.imageUrl) {
+            return item.imageUrl;
+          }
+          // 2순위: image 필드 확인
+          if (item.image) {
+            return item.image;
+          }
+          // 3순위: productImageUrl 확인
+          if (item.productImageUrl) {
+            return item.productImageUrl;
+          }
+          // 4순위: 기본 이미지 사용
+          return defaultImage;
+        };
+        
+        // 상품 이미지 찾기: 같은 이름의 상품들 중 이미지가 있는 것을 찾기
+        let productImage = findImage(foundProduct);
+        if (productImage === "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png") {
+          // 기본 이미지인 경우, 같은 이름의 다른 상품들에서 이미지 찾기
+          for (const p of sameNameProducts) {
+            const img = findImage(p);
+            if (img !== "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png") {
+              productImage = img;
+              break;
+            }
+          }
+        }
+        
         // 상품 데이터 매핑 (같은 이름의 모든 상품 통합)
         const mappedProduct = {
           id: foundProduct.productId, // 대표 productId
@@ -402,7 +435,7 @@ function ProductDetailPage() {
           promotionPrice: null,
           discountRate: null,
           imageAlt: foundProduct.productName || "상품 이미지",
-          image: foundProduct.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
+          image: productImage,
           category: foundProduct.categoryName || "미분류",
           stock: 0,
           safetyStock: 0,
@@ -417,7 +450,7 @@ function ProductDetailPage() {
           specifications: [
             { name: "카테고리", value: foundProduct.categoryName || "정보 없음" },
           ],
-          images: [foundProduct.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"],
+          images: [productImage],
           relatedProducts: [],
           availableBranches: allBranches, // 모든 상품의 브랜치 통합
           availableBranchCount: allBranches.length,

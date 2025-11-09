@@ -8,6 +8,7 @@ const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 // 상품명 기준으로 그룹화하는 함수
 function groupProductsByName(products) {
   const groupedMap = {};
+  const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
   
   products.forEach(product => {
     // 상품명 정규화 (공백 제거, 대소문자 통일)
@@ -23,6 +24,9 @@ function groupProductsByName(products) {
         id: product.id,
         productId: product.productId,
         name: normalizedName,
+        // 이미지: 기본 이미지가 아니면 사용, 아니면 나중에 variants에서 찾기
+        image: product.image && product.image !== defaultImage ? product.image : product.image,
+        images: product.images && product.images.length > 0 ? product.images : [product.image || defaultImage],
         // variants: 같은 이름의 다른 상품들
         variants: [product],
         // 모든 variants의 productId 목록
@@ -44,6 +48,12 @@ function groupProductsByName(products) {
       if (allMaxPrices.length > 0) {
         group.maxPrice = Math.max(...allMaxPrices);
         group.price = group.maxPrice;
+      }
+      
+      // 이미지 업데이트: 기본 이미지가 아니고, 현재 그룹의 이미지가 기본 이미지면 업데이트
+      if (group.image === defaultImage && product.image && product.image !== defaultImage) {
+        group.image = product.image;
+        group.images = [product.image];
       }
       
       // availableBranches 통합
@@ -76,6 +86,7 @@ function groupProductsByName(products) {
                     attributeValueId: valueGroup.attributeValueId,
                     attributeValueName: valueGroup.attributeValueName,
                     attributeTypeName: attrTypeName,
+                    imageUrl: valueGroup.imageUrl, // 이미지 URL 추가
                     branches: []
                   };
                 }
@@ -100,8 +111,20 @@ function groupProductsByName(products) {
     }
   });
   
-  // 그룹화된 상품들을 배열로 변환
-  return Object.values(groupedMap);
+  // 그룹화된 상품들을 배열로 변환하고 최종 이미지 확인
+  return Object.values(groupedMap).map(group => {
+    // 그룹의 이미지가 기본 이미지인 경우, variants에서 이미지 찾기
+    if (group.image === defaultImage) {
+      for (const variant of group.variants) {
+        if (variant.image && variant.image !== defaultImage) {
+          group.image = variant.image;
+          group.images = [variant.image];
+          break;
+        }
+      }
+    }
+    return group;
+  });
 }
 
 export function useShopData() {
@@ -266,6 +289,38 @@ export function useShopData() {
           }
         }
         
+        // 이미지 찾기 헬퍼 함수
+        const findImage = (item) => {
+          const defaultImage = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+          
+          // 1순위: imageUrl 필드 확인
+          if (item.imageUrl) {
+            return item.imageUrl;
+          }
+          // 2순위: image 필드 확인
+          if (item.image) {
+            return item.image;
+          }
+          // 3순위: productImageUrl 확인
+          if (item.productImageUrl) {
+            return item.productImageUrl;
+          }
+          // 4순위: productImage 확인
+          if (item.productImage) {
+            return item.productImage;
+          }
+          // 5순위: availableBranches에서 이미지 찾기
+          if (item.availableBranches && item.availableBranches.length > 0) {
+            for (const branch of item.availableBranches) {
+              if (branch.imageUrl) {
+                return branch.imageUrl;
+              }
+            }
+          }
+          // 6순위: 기본 이미지 사용
+          return defaultImage;
+        };
+        
         const mapProduct = (item) => {
             // 속성별로 상품을 그룹화하기 위해 availableBranches를 속성 타입별로 분류
             const branchesByAttributeType = {};
@@ -288,6 +343,7 @@ export function useShopData() {
                   branchesByAttributeType[attributeTypeName].values[valueName] = {
                     attributeValueId: branch.attributeValueId,
                     attributeValueName: branch.attributeValueName,
+                    imageUrl: branch.imageUrl, // 속성 값별 이미지 추가
                     branches: []
                   };
                 }
@@ -301,6 +357,9 @@ export function useShopData() {
               values: Object.values(typeGroup.values)
             }));
             
+            // findImage는 외부에서 호출하므로 여기서는 기본값만 설정
+            const productImage = item.imageUrl || item.image || item.productImageUrl || item.productImage || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+            
             return {
               id: item.productId, // productId가 있는 경우만 사용
               productId: item.productId,
@@ -311,7 +370,7 @@ export function useShopData() {
               promotionPrice: null,
               discountRate: null,
               imageAlt: item.productName || "상품 이미지",
-              image: item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png",
+              image: productImage,
               category: item.categoryName || "미분류",
               stock: 0,
               safetyStock: 0,
@@ -326,7 +385,7 @@ export function useShopData() {
               specifications: [
                 { name: "카테고리", value: item.categoryName || "정보 없음" },
               ],
-              images: [item.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"],
+              images: [productImage],
               relatedProducts: [],
               availableBranches: item.availableBranches || [],
               availableBranchCount: item.availableBranchCount || 0,
@@ -337,7 +396,15 @@ export function useShopData() {
 
           const mapped = (Array.isArray(allRawProducts) ? allRawProducts : [])
             .filter((item) => item.productId != null) // productId가 없는 항목 제외
-            .map(mapProduct);
+            .map((item, index) => {
+              // findImage에 index 전달
+              const productImage = findImage(item, index);
+              const mappedItem = mapProduct(item);
+              // mapProduct 내부에서 findImage를 호출하므로, 여기서 다시 설정
+              mappedItem.image = productImage;
+              mappedItem.images = [productImage];
+              return mappedItem;
+            });
         
           const filteredMapped = mapped.filter(item => {
             return item.availableBranchCount > 0 && item.availableBranches && item.availableBranches.length > 0;
