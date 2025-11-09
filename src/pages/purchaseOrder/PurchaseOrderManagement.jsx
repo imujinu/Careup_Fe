@@ -193,7 +193,7 @@ function PurchaseOrderManagement() {
         setPurchaseOrders(formattedData);
       }
       
-      // 지점 목록 설정
+      // 지점 목록 설정 (필터링용)
       console.log('지점 목록 API 응답:', branches);
       
       // API 응답이 배열이 아닌 경우 처리 (예: { data: [...] } 형태)

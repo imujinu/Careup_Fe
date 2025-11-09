@@ -87,7 +87,9 @@ const ChartTitle = styled.h3`
 `;
 
 function FranchisePurchaseOrderManagement() {
-  const branchId = authService.getCurrentUser()?.branchId || 2;
+  const currentUser = authService.getCurrentUser();
+  const branchId = currentUser?.branchId || 2;
+  const branchName = currentUser?.branchName || getBranchName(branchId); // 실제 지점 이름 사용
   
   const [summary, setSummary] = useState({
     totalOrders: 0,
@@ -373,7 +375,7 @@ function FranchisePurchaseOrderManagement() {
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
       React.createElement(HeaderLeft, null,
-        React.createElement(PageTitle, null, `발주관리 - ${getBranchName(branchId)}`),
+        React.createElement(PageTitle, null, `발주관리 - ${branchName}`),
         React.createElement(PageSubtitle, null, '가맹점 발주 내역 조회 및 발주 요청')
       ),
       React.createElement(HeaderRight, null,
