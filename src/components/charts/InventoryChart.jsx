@@ -15,7 +15,7 @@ const InventoryChart = ({ data }) => {
   const categoryDistribution = data?.categorySalesDistribution || {};
   const categoryData = Object.keys(categoryDistribution).map((key) => ({
     name: key,
-    value: categoryDistribution[key],
+    value: Number(categoryDistribution[key]) || 0,
   }));
 
   // 최고 카테고리 계산
@@ -23,9 +23,11 @@ const InventoryChart = ({ data }) => {
     ? categoryData.reduce((max, item) => (item.value > max.value ? item : max), categoryData[0])
     : null;
   
-  const totalSales = data?.totalSales || 0;
-  const topCategoryPercentage = topCategory && totalSales > 0
-    ? ((topCategory.value / totalSales) * 100).toFixed(1)
+  const totalSales = Number(data?.totalSales) || 0;
+  const topCategoryName = data?.topCategory || topCategory?.name || '-';
+  const topCategoryValue = Number(data?.topCategorySales ?? topCategory?.value ?? 0);
+  const topCategoryPercentage = topCategoryValue && totalSales > 0
+    ? ((topCategoryValue / totalSales) * 100).toFixed(1)
     : '0';
 
   const COLORS = [
@@ -43,22 +45,17 @@ const InventoryChart = ({ data }) => {
     return formatCurrencyKRW(value);
   };
 
-  const formatLegend = (entry) => {
-    const percentage = totalSales > 0 ? ((entry.value / totalSales) * 100).toFixed(1) : '0';
-    return `${entry.name} (${percentage}%)`;
+  const formatLegend = (value, entry) => {
+    const categoryName = entry?.payload?.name ?? value;
+    const categoryValue = Number(entry?.payload?.value) || 0;
+    const percentage = totalSales > 0 ? ((categoryValue / totalSales) * 100).toFixed(1) : '0.0';
+    return `${categoryName} (${percentage}%)`;
   };
 
   return (
     <div className="inventory-chart">
       <div className="chart-header">
         <h3>카테고리별 매출 비중</h3>
-        <div className="chart-controls">
-          <select className="period-select" disabled>
-            <option value="today">오늘</option>
-            <option value="week">최근 1주</option>
-            <option value="month">최근 1개월</option>
-          </select>
-        </div>
       </div>
       <div className="chart-container">
         {categoryData.length > 0 ? (
@@ -77,16 +74,18 @@ const InventoryChart = ({ data }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip 
-                formatter={formatTooltip}
+              <Tooltip
+                formatter={(value, name, props) => [formatTooltip(value), props?.payload?.name || name]}
                 contentStyle={{
                   backgroundColor: 'rgba(0, 0, 0, 0.8)',
                   color: '#ffffff',
                   border: '1px solid #8B7FE6',
                   borderRadius: '8px',
                 }}
+                labelStyle={{ color: '#ffffff' }}
+                itemStyle={{ color: '#ffffff' }}
               />
-              <Legend 
+              <Legend
                 formatter={formatLegend}
                 wrapperStyle={{ fontSize: '11px', fontFamily: 'Pretendard, sans-serif' }}
               />
@@ -108,7 +107,7 @@ const InventoryChart = ({ data }) => {
         <div className="summary-item">
           <span className="summary-label">최고 카테고리</span>
           <span className="summary-value">
-            {topCategory ? `${topCategory.name} (${topCategoryPercentage}%)` : '-'}
+            {topCategoryName !== '-' ? `${topCategoryName} (${topCategoryPercentage}%)` : '-'}
           </span>
         </div>
         <div className="summary-item">

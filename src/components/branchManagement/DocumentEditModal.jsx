@@ -97,7 +97,7 @@ function DocumentEditModal({ isOpen, onClose, document, onSuccess }) {
         updateFormData.append('expiryDate', formData.expirationDate);
       }
 
-      await documentService.updateDocument(document.employeeId, document.id, updateFormData);
+      await documentService.updateDocument(document.id, updateFormData);
       
       onSuccess?.();
       handleClose();
