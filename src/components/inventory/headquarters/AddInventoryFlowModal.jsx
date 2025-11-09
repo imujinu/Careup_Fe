@@ -223,21 +223,28 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       const productId = bp.productId || bp.product?.id;
       if (!productId) return;
 
-      if (productMap.has(productId)) return;
-
-      let displayName = bp.productName || '알 수 없음';
-      if (displayName.includes(' - ')) {
-        displayName = displayName.split(' - ')[0].trim();
+      let normalizedName = bp.productName || '알 수 없음';
+      if (normalizedName.includes(' - ')) {
+        normalizedName = normalizedName.split(' - ')[0].trim();
       } else {
-        displayName = displayName.trim();
+        normalizedName = normalizedName.trim();
       }
 
-      productMap.set(productId, {
-        productId: String(productId),
-        productName: displayName
-      });
+      if (!productMap.has(normalizedName)) {
+        productMap.set(normalizedName, {
+          productName: normalizedName,
+          productIds: new Set([String(productId)]),
+        });
+      } else {
+        productMap.get(normalizedName).productIds.add(String(productId));
+      }
     });
-    return Array.from(productMap.values());
+
+    return Array.from(productMap.values()).map(item => ({
+      productName: item.productName,
+      productId: item.productIds.values().next().value,
+      productIds: Array.from(item.productIds),
+    }));
   }, [branchProducts]);
 
   const selectedAttributeDetails = useMemo(() => {
