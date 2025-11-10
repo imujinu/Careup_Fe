@@ -198,6 +198,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
   const [selectedAttributeValues, setSelectedAttributeValues] = useState({}); // { attributeTypeId: attributeValueId }
   const [selectedBranchProduct, setSelectedBranchProduct] = useState(null);
   const [productAttributeValuesData, setProductAttributeValuesData] = useState([]); // 상품 속성 값 데이터 저장
+  const [branchProductError, setBranchProductError] = useState('');
 
   // 모달이 열릴 때 뒷단 스크롤 방지
   useEffect(() => {
@@ -316,6 +317,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     if (!selectedProductId || !selectedProduct || !branchProducts.length) {
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
+      setBranchProductError('');
       return;
     }
 
@@ -340,7 +342,10 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       } else {
         setSelectedBranchProduct(null);
         setFormData(prev => ({ ...prev, branchProductId: '' }));
+        setBranchProductError('선택한 상품의 재고 정보를 찾을 수 없습니다.');
+        return;
       }
+      setBranchProductError('');
       return;
     }
 
@@ -349,6 +354,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     if (selectedValues.length === 0) {
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
+      setBranchProductError('');
       return;
     }
 
@@ -384,27 +390,75 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       );
     }
 
-    if (!matchingBP && candidateBranchProducts.length > 0) {
-      matchingBP = candidateBranchProducts.find(bp => {
-        if (selectedValues.length === 0) return true;
-        return selectedValues.some(valueId =>
-          String(bp.attributeValueId || '') === String(valueId)
-        );
+    if (!matchingBP && productAttributeValuesData.length > 0 && selectedValues.length > 0) {
+      const productIdGroups = new Map();
+
+      productAttributeValuesData.forEach(pav => {
+        const productId = String(pav.productId || pav.product?.id || '');
+        if (!productId) return;
+
+        if (!productIdGroups.has(productId)) {
+          productIdGroups.set(productId, new Set());
+        }
+
+        const valueId =
+          pav.attributeValueId ||
+          pav.attributeValue?.id ||
+          pav.id;
+
+        if (valueId != null) {
+          productIdGroups.get(productId).add(String(valueId));
+        }
       });
+
+      let matchedProductId = null;
+      for (const [productId, valueSet] of productIdGroups.entries()) {
+        const matchesAll = selectedValues.every(valueId =>
+          valueSet.has(String(valueId))
+        );
+        if (matchesAll) {
+          matchedProductId = productId;
+          break;
+        }
+      }
+
+      if (matchedProductId) {
+        matchingBP =
+          candidateBranchProducts.find(bp =>
+            String(bp.productId || bp.product?.id || '') === matchedProductId
+          ) ||
+          productBranchProducts.find(bp =>
+            String(bp.productId || bp.product?.id || '') === matchedProductId
+          );
+      }
     }
 
-    if (!matchingBP && candidateBranchProducts.length > 0) {
-      matchingBP = candidateBranchProducts[0];
-    }
+    const hasSelectedAllRequired = categoryAttributes.length === 0
+      ? true
+      : categoryAttributes.every(attr => {
+          if (attr.isRequired === false) return true;
+          const typeId = String(attr.attributeTypeId || attr.attributeType?.id || attr.id);
+          const typeName = attr.attributeTypeName || attr.attributeType?.name || attr.name || '';
+          return Boolean(
+            selectedAttributeValues[typeId] ||
+            (typeName && selectedAttributeValues[typeName])
+          );
+        });
 
     if (matchingBP) {
       setSelectedBranchProduct(matchingBP);
       setFormData(prev => ({ ...prev, branchProductId: matchingBP.id }));
+      setBranchProductError('');
     } else {
       setSelectedBranchProduct(null);
       setFormData(prev => ({ ...prev, branchProductId: '' }));
+      if (hasSelectedAllRequired && selectedValues.length > 0) {
+        setBranchProductError('선택한 속성 조합의 재고 정보가 없습니다.');
+      } else {
+        setBranchProductError('');
+      }
     }
-  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes, selectedAttributeDetails]);
+  }, [selectedProductId, selectedAttributeValues, branchProducts, categoryAttributes, selectedAttributeDetails, productAttributeValuesData]);
 
   // 상품 선택 시 카테고리 속성 조회
   useEffect(() => {
@@ -422,6 +476,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       setCategoryAttributes([]);
       setSelectedAttributeValues({});
       setSelectedBranchProduct(null);
+      setBranchProductError('');
     };
 
     resetForm();
@@ -433,11 +488,13 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       setSelectedProduct(null);
       setCategoryAttributes([]);
       setSelectedAttributeValues({});
+      setBranchProductError('');
       return;
     }
 
     setSelectedProductId(String(productId));
     setSelectedAttributeValues({});
+    setBranchProductError('');
     
     // 선택한 상품 정보 찾기
     const product = uniqueProducts.find(p => String(p.productId) === String(productId));
@@ -456,6 +513,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
     });
     if (productBPs.length === 0) {
       setCategoryAttributes([]);
+      setBranchProductError('선택한 상품의 재고 정보를 찾을 수 없습니다.');
       return;
     }
 
@@ -733,6 +791,7 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
       }
       return newValues;
     });
+    setBranchProductError('');
   };
 
   const handleSubmit = async (e) => {
@@ -1052,6 +1111,12 @@ function AddInventoryFlowModal({ isOpen, onClose, onSave, branchProducts = [] })
                   현재 재고: {selectedBranchProduct.stockQuantity || 0}개
                 </div>
               </SelectedProductInfo>
+            </FormGroup>
+          )}
+
+          {branchProductError && (
+            <FormGroup>
+              <ErrorMessage>{branchProductError}</ErrorMessage>
             </FormGroup>
           )}
 

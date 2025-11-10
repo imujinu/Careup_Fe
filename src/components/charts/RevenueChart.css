@@ -46,6 +46,13 @@
   color: #333;
 }
 
+.period-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+}
+
 .period-select:focus {
   outline: none;
   border-color: #8B7FE6;
@@ -71,6 +78,25 @@
   height: 100%;
   color: #999;
   font-size: 0.875rem;
+}
+
+.chart-loading,
+.chart-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.chart-loading {
+  color: #666;
+}
+
+.chart-error {
+  color: #EF4444;
 }
 
 .chart-summary {

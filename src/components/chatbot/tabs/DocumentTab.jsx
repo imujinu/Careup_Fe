@@ -4,7 +4,7 @@ const DocumentTab = ({ onTabClick }) => {
   const documentTabs = [
     { id: "문서조회", label: "📄 문서 조회" },
     { id: "문서등록", label: "📝 문서 등록" },
-    { id: "문서수정", label: "✏️ 문서 수정" },
+    { id: "문서질의", label: "💬 문서 질의" },
   ];
 
   return (

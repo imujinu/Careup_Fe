@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { Icon } from "@mdi/react";
 import { mdiClose } from "@mdi/js";
 import InfoModal from "../common/InfoModal";
+import { fetchCoordinatesByAddress } from "../../service/geocodingService";
 
 function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
   // controlled component로 시작하기 위해 모든 필드를 초기값으로 설정
@@ -239,7 +240,7 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
   const handlePostcodeSearch = () => {
     if (window.daum && window.daum.Postcode) {
       new window.daum.Postcode({
-        oncomplete: function (data) {
+        oncomplete: async function (data) {
           let addr = "";
           if (data.userSelectedType === "R") {
             addr = data.roadAddress;
@@ -247,11 +248,30 @@ function BranchEditRequestModal({ branch, isOpen, onClose, onSubmit }) {
             addr = data.jibunAddress;
           }
 
-          setFormData((prev) => ({
-            ...prev,
-            zipcode: data.zonecode,
-            address: addr,
-          }));
+          try {
+            const coordinates = await fetchCoordinatesByAddress(addr);
+
+            setFormData((prev) => ({
+              ...prev,
+              zipcode: data.zonecode,
+              address: addr,
+              latitude: coordinates?.latitude ? String(coordinates.latitude) : "",
+              longitude: coordinates?.longitude ? String(coordinates.longitude) : "",
+            }));
+
+            setErrors((prev) => ({
+              ...prev,
+              latitude: coordinates ? "" : "좌표를 자동으로 찾지 못했습니다. 직접 입력해주세요.",
+              longitude: coordinates ? "" : "좌표를 자동으로 찾지 못했습니다. 직접 입력해주세요.",
+            }));
+          } catch (error) {
+            console.error("좌표 조회 실패:", error);
+            setErrors((prev) => ({
+              ...prev,
+              latitude: "좌표 조회 중 오류가 발생했습니다. 직접 입력해주세요.",
+              longitude: "좌표 조회 중 오류가 발생했습니다. 직접 입력해주세요.",
+            }));
+          }
         },
       }).open();
     } else {

@@ -21,7 +21,8 @@ export const documentService = {
   // 서류 생성(업로드)
   async createDocument(branchId, formData) {
     const url = `${BASE_URL}/documents/branch/${branchId}`;
-    const response = await axios.post(url, formData, {
+    const multipartData = buildDocumentMultipartFormData(formData);
+    const response = await axios.post(url, multipartData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -38,16 +39,17 @@ export const documentService = {
   },
 
   // 서류 단건 조회
-  async getDocument(employeeId, documentId) {
-    const url = `${BASE_URL}/documents/${employeeId}/${documentId}`;
+  async getDocument(documentId) {
+    const url = `${BASE_URL}/documents/${documentId}`;
     const response = await axios.get(url);
     return response.data?.result || response.data;
   },
 
   // 서류 수정
-  async updateDocument(employeeId, documentId, formData) {
-    const url = `${BASE_URL}/documents/${employeeId}/${documentId}`;
-    const response = await axios.patch(url, formData, {
+  async updateDocument(documentId, formData) {
+    const url = `${BASE_URL}/documents/${documentId}`;
+    const multipartData = buildDocumentMultipartFormData(formData, { isUpdate: true });
+    const response = await axios.patch(url, multipartData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -56,18 +58,64 @@ export const documentService = {
   },
 
   // 서류 삭제
-  async deleteDocument(employeeId, documentId) {
-    const url = `${BASE_URL}/documents/${employeeId}/${documentId}`;
+  async deleteDocument(documentId) {
+    const url = `${BASE_URL}/documents/${documentId}`;
     const response = await axios.delete(url);
     return response.data?.result || response.data;
   },
 
   // 서류 다운로드 URL 조회
-  async getDocumentDownloadUrl(employeeId, documentId) {
-    const url = `${BASE_URL}/documents/${employeeId}/${documentId}/download`;
+  async getDocumentDownloadUrl(documentId) {
+    const url = `${BASE_URL}/documents/${documentId}/download`;
     const response = await axios.get(url);
     return response.data?.result || response.data;
   }
 };
 
 export default documentService;
+
+function buildDocumentMultipartFormData(sourceFormData, { isUpdate = false } = {}) {
+  const payload = new FormData();
+  const meta = {};
+
+  const getValue = (key) => {
+    const value = sourceFormData.get(key);
+    return value === undefined ? null : value;
+  };
+
+  const documentType = getValue('documentType');
+  if (documentType) {
+    meta.documentType = documentType;
+  }
+
+  const title = getValue('title');
+  if (title) {
+    meta.title = title;
+  }
+
+  const description = getValue('description');
+  if (description) {
+    meta.description = description;
+  }
+
+  const expiryDate = getValue('expiryDate') || getValue('expirationDate');
+  if (expiryDate) {
+    meta.expiryDate = expiryDate;
+  }
+
+  if (Object.keys(meta).length === 0 && !isUpdate) {
+    throw new Error('문서 메타데이터가 제공되지 않았습니다.');
+  }
+
+  payload.append(
+    'meta',
+    new Blob([JSON.stringify(meta)], { type: 'application/json' })
+  );
+
+  const file = sourceFormData.get('documentUrl') || sourceFormData.get('file');
+  if (file) {
+    payload.append('file', file);
+  }
+
+  return payload;
+}

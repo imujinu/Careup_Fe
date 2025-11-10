@@ -460,8 +460,7 @@ function ProductSelectionModal({ isOpen, onClose, onNext, existingProducts = [] 
                   React.createElement(ProductInfo, null, `카테고리: ${product.categoryName || '미분류'}`),
                   attributeDisplay && React.createElement(ProductInfo, { 
                     style: { color: '#6b46c1', fontWeight: '500', marginTop: '4px' } 
-                  }, attributeDisplay),
-                  React.createElement(ProductInfo, null, `설명: ${product.productDescription || '-'}`)
+                  }, attributeDisplay)
                 );
               })
             ),

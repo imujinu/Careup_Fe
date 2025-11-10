@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { useToast } from '../../components/common/Toast';
 import { createBranch } from '../../service/branchService';
 import InfoModal from '../../components/common/InfoModal';
+import { fetchCoordinatesByAddress } from '../../service/geocodingService';
 
 const BranchRegistration = () => {
   const navigate = useNavigate();
@@ -212,7 +213,7 @@ const BranchRegistration = () => {
   const handlePostcodeSearch = () => {
     if (window.daum && window.daum.Postcode) {
       new window.daum.Postcode({
-        oncomplete: function(data) {
+        oncomplete: async function(data) {
           // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드
           let addr = ''; // 주소 변수
           let extraAddr = ''; // 참고항목 변수
@@ -245,12 +246,43 @@ const BranchRegistration = () => {
             // document.getElementById("sample6_extraAddress").value = '';
           }
 
-          // 우편번호와 주소 정보를 해당 필드에 넣는다.
-          setFormData(prev => ({
-            ...prev,
-            zipcode: data.zonecode,
-            address: addr
-          }));
+          try {
+            const coordinates = await fetchCoordinatesByAddress(addr);
+
+            setFormData(prev => {
+              const updated = {
+                ...prev,
+                zipcode: data.zonecode,
+                address: addr,
+                latitude: coordinates?.latitude ? String(coordinates.latitude) : '',
+                longitude: coordinates?.longitude ? String(coordinates.longitude) : '',
+              };
+
+              if (useAddressForCommute) {
+                const fullAddress = [addr, updated.addressDetail].filter(Boolean).join(' ');
+                updated.commuteLocation = fullAddress;
+              }
+
+              return updated;
+            });
+
+            if (!coordinates) {
+              addToast({
+                type: 'warning',
+                title: '좌표 미확인',
+                message: '선택한 주소의 좌표를 찾지 못했습니다. 위도/경도를 직접 입력해주세요.',
+                duration: 3000,
+              });
+            }
+          } catch (error) {
+            console.error('좌표 조회 실패:', error);
+            addToast({
+              type: 'error',
+              title: '좌표 조회 실패',
+              message: '주소 좌표를 조회하는 중 오류가 발생했습니다.',
+              duration: 3000,
+            });
+          }
         }
       }).open();
     } else {

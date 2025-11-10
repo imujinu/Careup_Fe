@@ -1,8 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RotateCcw, Calendar, GripVertical } from 'lucide-react';
-import GridLayout from 'react-grid-layout';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
+import React, { useState, useEffect, useCallback } from 'react';
+import { RotateCcw } from 'lucide-react';
 import SalesCard from '../cards/SalesCard';
 import InventoryCard from '../cards/InventoryCard';
 import EmployeeCard from '../cards/EmployeeCard';
@@ -14,110 +11,40 @@ import branchDashboardService from '../../service/branchDashboardService';
 import { useToast } from '../common/Toast';
 import './BranchDashboard.css';
 
-// 초기 레이아웃 정의 (12열 그리드 기준)
-const getDefaultLayout = () => [
-  { i: 'sales', x: 0, y: 0, w: 3, h: 8, minW: 3, minH: 8 },
-  { i: 'inventory', x: 3, y: 0, w: 3, h: 8, minW: 3, minH: 8 },
-  { i: 'employee', x: 6, y: 0, w: 3, h: 8, minW: 3, minH: 8 },
-  { i: 'order', x: 9, y: 0, w: 3, h: 8, minW: 3, minH: 8 },
-  { i: 'revenue', x: 0, y: 8, w: 6, h: 7, minW: 4, minH: 7 },
-  { i: 'category', x: 6, y: 8, w: 6, h: 7, minW: 4, minH: 7 },
-  { i: 'attendance', x: 0, y: 15, w: 12, h: 7, minW: 6, minH: 7 },
-];
-
 const BranchDashboard = ({ branchId }) => {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [period, setPeriod] = useState('MONTHLY');
   const [dashboardData, setDashboardData] = useState(null);
-  const containerRef = useRef(null);
-  const [containerWidth, setContainerWidth] = useState(1200);
-  const [gridCols, setGridCols] = useState(12);
-
-  // 레이아웃 상태 관리 (12열 기준으로 저장)
-  const defaultLayout = useMemo(() => getDefaultLayout(), []);
-  const [savedLayout12Col, setSavedLayout12Col] = useState(() => {
-    const saved = localStorage.getItem(`dashboard-layout-${branchId}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return defaultLayout;
-      }
-    }
-    return defaultLayout;
-  });
-
-  // 현재 그리드 열 수에 맞게 스케일링된 레이아웃
-  const [layout, setLayout] = useState(savedLayout12Col);
-
-  // 컨테이너 너비 및 그리드 열 수 상태 관리
-  useEffect(() => {
-    let resizeTimeout;
-    const updateWidth = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const width = Math.max(600, rect.width - 48);
-
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-          setContainerWidth(width);
-
-          let newCols;
-          if (width < 600) {
-            newCols = 4;
-          } else if (width < 900) {
-            newCols = 6;
-          } else if (width < 1200) {
-            newCols = 8;
-          } else if (width < 1600) {
-            newCols = 10;
-          } else if (width < 1920) {
-            newCols = 11;
-          } else {
-            newCols = 12;
-          }
-
-          setGridCols(newCols);
-        }, 150);
-      }
-    };
-
-    updateWidth();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateWidth();
-    });
-
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-
-    window.addEventListener('resize', updateWidth);
-
-    return () => {
-      clearTimeout(resizeTimeout);
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', updateWidth);
-    };
-  }, []);
+  const [salesTrendPeriod, setSalesTrendPeriod] = useState('MONTHLY');
+  const [attendancePeriod, setAttendancePeriod] = useState('WEEKLY');
+  const [salesTrendData, setSalesTrendData] = useState(null);
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [salesTrendLoading, setSalesTrendLoading] = useState(false);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [salesTrendError, setSalesTrendError] = useState(null);
+  const [attendanceError, setAttendanceError] = useState(null);
+  const [categorySalesData, setCategorySalesData] = useState(null);
 
   useEffect(() => {
     if (branchId) {
       fetchDashboardData();
     }
-  }, [branchId, period]);
+  }, [branchId]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await branchDashboardService.getDashboard(branchId, period);
+      const response = await branchDashboardService.getDashboard(branchId);
 
       if (response.status_code === 200 && response.result) {
-        setDashboardData(response.result);
+        const result = response.result;
+        setDashboardData(result);
+        setSalesTrendData(result?.salesTrend || null);
+        setCategorySalesData(result?.categorySales || null);
+        setAttendanceData(result?.attendanceSummary || null);
       } else {
         throw new Error(response.status_message || '대시보드 데이터를 불러오는데 실패했습니다.');
       }
@@ -137,104 +64,92 @@ const BranchDashboard = ({ branchId }) => {
     }
   };
 
-  const handlePeriodChange = (newPeriod) => {
-    setPeriod(newPeriod);
-  };
+  const fetchSalesTrendData = useCallback(
+    async (targetPeriod) => {
+      if (!branchId || !targetPeriod) return;
+      try {
+        setSalesTrendLoading(true);
+        setSalesTrendError(null);
+
+        const response = await branchDashboardService.getDashboard(branchId, targetPeriod);
+
+        if (response.status_code === 200 && response.result) {
+          setSalesTrendData(response.result?.salesTrend || null);
+        } else {
+          throw new Error(response.status_message || '매출 추이 데이터를 불러오는데 실패했습니다.');
+        }
+      } catch (err) {
+        console.error('매출 추이 데이터 조회 실패:', err);
+        setSalesTrendError(err.message || '매출 추이 데이터를 불러오는데 실패했습니다.');
+        if (addToast) {
+          addToast({
+            type: 'error',
+            title: '매출 추이 조회 오류',
+            message: err.message || '매출 추이 데이터를 불러오는데 실패했습니다.',
+            duration: 3000,
+          });
+        }
+      } finally {
+        setSalesTrendLoading(false);
+      }
+    },
+    [branchId, addToast]
+  );
+
+  const fetchAttendanceData = useCallback(
+    async (targetPeriod) => {
+      if (!branchId || !targetPeriod) return;
+      try {
+        setAttendanceLoading(true);
+        setAttendanceError(null);
+
+        const response = await branchDashboardService.getDashboard(branchId, targetPeriod);
+
+        if (response.status_code === 200 && response.result) {
+          setAttendanceData(response.result?.attendanceSummary || null);
+        } else {
+          throw new Error(response.status_message || '출근 현황 데이터를 불러오는데 실패했습니다.');
+        }
+      } catch (err) {
+        console.error('출근 현황 데이터 조회 실패:', err);
+        setAttendanceError(err.message || '출근 현황 데이터를 불러오는데 실패했습니다.');
+        if (addToast) {
+          addToast({
+            type: 'error',
+            title: '출근 현황 조회 오류',
+            message: err.message || '출근 현황 데이터를 불러오는데 실패했습니다.',
+            duration: 3000,
+          });
+        }
+      } finally {
+        setAttendanceLoading(false);
+      }
+    },
+    [branchId, addToast]
+  );
+
+  useEffect(() => {
+    if (!branchId) return;
+    fetchSalesTrendData(salesTrendPeriod);
+  }, [branchId, salesTrendPeriod, fetchSalesTrendData]);
+
+  useEffect(() => {
+    if (!branchId) return;
+    fetchAttendanceData(attendancePeriod);
+  }, [branchId, attendancePeriod, fetchAttendanceData]);
 
   const handleRefresh = () => {
     fetchDashboardData();
+    fetchSalesTrendData(salesTrendPeriod);
+    fetchAttendanceData(attendancePeriod);
   };
 
-  // 레이아웃 변경 핸들러
-  const handleLayoutChange = (newLayout) => {
-    const normalizedLayout = newLayout.map((item) => {
-      const minW = Math.min(3, Math.max(2, Math.floor(gridCols / 4)));
-      const minH = item.minH || 2;
-
-      let w = Math.max(minW, Math.min(item.w, gridCols));
-      let x = Math.max(0, Math.min(item.x, gridCols - w));
-      const h = Math.max(minH, item.h || 2);
-
-      return {
-        ...item,
-        x,
-        w,
-        h,
-        minW: minW,
-        minH: minH,
-      };
-    });
-
-    setLayout(normalizedLayout);
-
-    const savedLayout12Col = normalizedLayout.map((item) => {
-      const scaleFactor = 12 / gridCols;
-      return {
-        ...item,
-        x: Math.max(0, Math.round(item.x * scaleFactor)),
-        w: Math.max(3, Math.round(item.w * scaleFactor)),
-        minW: 3,
-        minH: item.minH || 2,
-      };
-    });
-
-    setSavedLayout12Col(savedLayout12Col);
-    localStorage.setItem(`dashboard-layout-${branchId}`, JSON.stringify(savedLayout12Col));
+  const handleSalesTrendPeriodChange = (newPeriod) => {
+    setSalesTrendPeriod(newPeriod);
   };
 
-  // 그리드 열 수가 변경될 때 레이아웃 스케일링
-  const prevGridColsRef = useRef(gridCols);
-  useEffect(() => {
-    if (savedLayout12Col.length > 0 && gridCols > 0 && prevGridColsRef.current !== gridCols) {
-      const scaledLayout = savedLayout12Col.map((item) => {
-        const scaleFactor = gridCols / 12;
-        let newW = Math.round(item.w * scaleFactor);
-        let newX = Math.round(item.x * scaleFactor);
-
-        const minW = Math.min(3, Math.max(2, Math.floor(gridCols / 4)));
-        const minH = item.minH || 2;
-
-        newW = Math.max(minW, Math.min(newW, gridCols));
-        newX = Math.max(0, Math.min(newX, gridCols - newW));
-
-        return {
-          ...item,
-          x: newX,
-          w: newW,
-          minW: minW,
-          minH: minH,
-        };
-      });
-
-      setLayout(scaledLayout);
-      prevGridColsRef.current = gridCols;
-    }
-  }, [gridCols, savedLayout12Col]);
-
-  // 초기 레이아웃으로 되돌리기
-  const resetLayout = () => {
-    const initialLayout = getDefaultLayout();
-    setSavedLayout12Col(initialLayout);
-    const scaleFactor = gridCols / 12;
-    const minW = Math.min(3, Math.max(2, Math.floor(gridCols / 4)));
-    const scaledLayout = initialLayout.map((item) => {
-      let newW = Math.round(item.w * scaleFactor);
-      let newX = Math.round(item.x * scaleFactor);
-      const minH = item.minH || 2;
-
-      newW = Math.max(minW, Math.min(newW, gridCols));
-      newX = Math.max(0, Math.min(newX, gridCols - newW));
-
-      return {
-        ...item,
-        x: newX,
-        w: newW,
-        minW: minW,
-        minH: minH,
-      };
-    });
-    setLayout(scaledLayout);
-    localStorage.removeItem(`dashboard-layout-${branchId}`);
+  const handleAttendancePeriodChange = (newPeriod) => {
+    setAttendancePeriod(newPeriod);
   };
 
   if (loading) {
@@ -278,25 +193,9 @@ const BranchDashboard = ({ branchId }) => {
       <div className="dashboard-header">
         <div className="dashboard-title">
           <h2>대시보드</h2>
-          <p>카드를 드래그하여 레이아웃을 조정할 수 있습니다</p>
+          <p>지점 운영 현황을 한눈에 확인하세요</p>
         </div>
         <div className="dashboard-controls">
-          <div className="period-selector">
-            <Calendar size={16} />
-            <select
-              value={period}
-              onChange={(e) => handlePeriodChange(e.target.value)}
-              className="period-select"
-            >
-              <option value="WEEKLY">주간</option>
-              <option value="MONTHLY">월간</option>
-              <option value="YEARLY">연간</option>
-            </select>
-          </div>
-          <button className="reset-btn" onClick={resetLayout} title="레이아웃 초기화">
-            <RotateCcw size={16} />
-            <span>레이아웃 리셋</span>
-          </button>
           <button className="refresh-btn" onClick={handleRefresh}>
             <RotateCcw size={16} />
             <span>새로고침</span>
@@ -304,80 +203,66 @@ const BranchDashboard = ({ branchId }) => {
         </div>
       </div>
 
-      {/* 그리드 레이아웃 */}
-      <div className="dashboard-grid-container" ref={containerRef}>
-        <GridLayout
-          className="dashboard-grid-layout"
-          layout={layout}
-          cols={gridCols}
-          rowHeight={60}
-          width={containerWidth}
-          onLayoutChange={handleLayoutChange}
-          isDraggable={true}
-          isResizable={true}
-          draggableHandle=".drag-handle"
-          margin={[24, 24]}
-          compactType="vertical"
-          preventCollision={false}
-          verticalCompact={true}
-          allowOverlap={false}
-        >
-          {/* 매출 현황 */}
-          <div key="sales" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <SalesCard data={dashboardData?.salesSummary} />
-          </div>
+      {/* 고정 그리드 레이아웃 */}
+      <div className="dashboard-grid">
+        {/* 매출 현황 */}
+        <div className="dashboard-card card-sales">
+          <SalesCard data={dashboardData?.salesSummary} />
+        </div>
 
-          {/* 재고 현황 */}
-          <div key="inventory" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <InventoryCard data={dashboardData?.inventorySummary} />
-          </div>
+        {/* 재고 현황 */}
+        <div className="dashboard-card card-inventory">
+          <InventoryCard data={dashboardData?.inventorySummary} />
+        </div>
 
-          {/* 직원 현황 */}
-          <div key="employee" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <EmployeeCard data={dashboardData?.employeeSummary} />
-          </div>
+        {/* 직원 현황 */}
+        <div className="dashboard-card card-employee">
+          <EmployeeCard data={dashboardData?.employeeSummary} />
+        </div>
 
-          {/* 주문 현황 */}
-          <div key="order" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <OrderCard data={dashboardData?.orderSummary} />
-          </div>
+        {/* 주문 현황 */}
+        <div className="dashboard-card card-order">
+          <OrderCard data={dashboardData?.orderSummary} />
+        </div>
 
-          {/* 매출 추이 */}
-          <div key="revenue" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <RevenueChart data={dashboardData?.salesTrend} period={period} />
-          </div>
+        {/* 매출 추이 */}
+        <div className="dashboard-card card-revenue">
+          <RevenueChart
+            data={salesTrendData}
+            period={salesTrendPeriod}
+            onPeriodChange={handleSalesTrendPeriodChange}
+            loading={salesTrendLoading}
+            error={salesTrendError}
+            periodOptions={[
+              { value: 'WEEKLY', label: '주간' },
+              { value: 'MONTHLY', label: '월간' },
+              { value: 'YEARLY', label: '연간' },
+            ]}
+          />
+        </div>
 
-          {/* 카테고리별 매출 비중 */}
-          <div key="category" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <InventoryChart data={dashboardData?.categorySales} />
-          </div>
+        {/* 재고 분석 */}
+        <div className="dashboard-card card-category">
+          <InventoryChart
+            data={categorySalesData}
+          />
+        </div>
 
-          {/* 출근 현황 */}
-          <div key="attendance" className="dashboard-card" style={{ position: 'relative' }}>
-            <div className="drag-handle" title="드래그하여 이동">
-              <GripVertical size={16} />
-            </div>
-            <AttendanceChart data={dashboardData?.attendanceSummary} />
-          </div>
-        </GridLayout>
+        {/* 출근 현황 */}
+        <div className="dashboard-card card-attendance">
+          <AttendanceChart
+            data={attendanceData}
+            period={attendancePeriod}
+            onPeriodChange={handleAttendancePeriodChange}
+            loading={attendanceLoading}
+            error={attendanceError}
+            periodOptions={[
+              { value: 'WEEKLY', label: '주간' },
+              { value: 'MONTHLY', label: '월간' },
+              { value: 'YEARLY', label: '연간' },
+            ]}
+          />
+        </div>
       </div>
     </div>
   );

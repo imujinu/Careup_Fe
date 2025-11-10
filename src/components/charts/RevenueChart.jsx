@@ -12,16 +12,110 @@ import {
 import './RevenueChart.css';
 import { formatCurrencyKRW } from '../../service/branchDashboardService';
 
-const RevenueChart = ({ data, period = 'MONTHLY' }) => {
+const RevenueChart = ({
+  data,
+  period = 'MONTHLY',
+  onPeriodChange,
+  loading = false,
+  error = null,
+  periodOptions = [
+    { value: 'YEARLY', label: '연간' },
+    { value: 'MONTHLY', label: '월간' },
+    { value: 'WEEKLY', label: '주간' },
+  ],
+}) => {
+  const normalizeDate = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return date;
+  };
+
+  const formatDateLabel = (value, fallback) => {
+    const date = normalizeDate(value);
+    if (!date) {
+      if (fallback !== undefined && fallback !== null) {
+        return String(fallback);
+      }
+      return value ?? '';
+    }
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
   // 데이터 변환
-  const chartData = data?.salesData?.map((item) => ({
-    label: item.periodLabel,
-    sales: item.sales,
-    target: item.target || 0,
-  })) || [];
+  const chartData =
+    data?.salesData?.map((item) => {
+      const startDate =
+        item.startDate ||
+        item.periodStart ||
+        item.from ||
+        item.rangeStart ||
+        item.begin;
+      const endDate =
+        item.endDate ||
+        item.periodEnd ||
+        item.to ||
+        item.rangeEnd ||
+        item.finish;
+
+      const [rawStartLabel, rawEndLabel] =
+        typeof item.periodLabel === 'string'
+          ? item.periodLabel.split('~').map((part) => part.trim())
+          : [null, null];
+
+      const displayStart = formatDateLabel(startDate, rawStartLabel);
+      const displayEnd = formatDateLabel(endDate, rawEndLabel);
+
+      const weeklyLabel =
+        displayStart && displayEnd
+          ? `${displayStart} ~ ${displayEnd}`
+          : item.periodLabel || '';
+
+      return {
+        label:
+          period === 'WEEKLY'
+            ? weeklyLabel
+            : period === 'MONTHLY'
+              ? item.periodLabel || displayStart
+              : item.periodLabel,
+        sales: item.sales,
+        target: item.target || 0,
+        startDate,
+        endDate,
+        displayStart,
+        displayEnd,
+      };
+    }) || [];
+
+  const displayedData =
+    period === 'WEEKLY' && chartData.length > 7
+      ? chartData.slice(-7)
+      : chartData;
 
   const formatTooltip = (value) => {
     return formatCurrencyKRW(value);
+  };
+
+  const formatTooltipLabel = (label, payload) => {
+    if (period === 'WEEKLY' && payload && payload.length > 0) {
+      const { startDate, endDate, displayStart, displayEnd } = payload[0].payload || {};
+      const startLabel = displayStart || formatDateLabel(startDate);
+      const endLabel = displayEnd || formatDateLabel(endDate);
+
+      if (startLabel && endLabel) {
+        return `${startLabel} ~ ${endLabel}`;
+      }
+      if (startLabel) {
+        return `${startLabel} ~`;
+      }
+    }
+    return label;
   };
 
   const formatYAxis = (value) => {
@@ -47,22 +141,34 @@ const RevenueChart = ({ data, period = 'MONTHLY' }) => {
       <div className="chart-header">
         <h3>{getChartTitle()}</h3>
         <div className="chart-controls">
-          <select className="period-select" value={period} disabled>
-            <option value="YEARLY">연간</option>
-            <option value="MONTHLY">월간</option>
-            <option value="WEEKLY">주간</option>
+          <select
+            className="period-select"
+            value={period}
+            onChange={(e) => onPeriodChange && onPeriodChange(e.target.value)}
+            disabled={!onPeriodChange || loading}
+          >
+            {periodOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
       <div className="chart-container">
-        {chartData.length > 0 ? (
+        {loading ? (
+          <div className="chart-loading">데이터를 불러오는 중입니다...</div>
+        ) : error ? (
+          <div className="chart-error">{error}</div>
+        ) : displayedData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={displayedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis 
               dataKey="label" 
               stroke="#666"
               style={{ fontSize: '11px', fontFamily: 'Pretendard, sans-serif' }}
+              interval={period === 'WEEKLY' ? 0 : 'preserveEnd'}
             />
             <YAxis 
               tickFormatter={formatYAxis}
@@ -71,12 +177,15 @@ const RevenueChart = ({ data, period = 'MONTHLY' }) => {
             />
             <Tooltip 
               formatter={formatTooltip}
+              labelFormatter={formatTooltipLabel}
               contentStyle={{
                 backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 color: '#ffffff',
                 border: '1px solid #8B7FE6',
                 borderRadius: '8px',
               }}
+              labelStyle={{ color: '#ffffff' }}
+              itemStyle={{ color: '#ffffff' }}
             />
             <Legend 
               wrapperStyle={{ fontSize: '12px', fontFamily: 'Pretendard, sans-serif' }}
