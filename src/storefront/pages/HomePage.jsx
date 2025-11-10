@@ -258,7 +258,6 @@ function HomePage() {
 
         <section className="section">
           <div className="container">
-            <div className="section-title">🏆 실시간 인기 랭킹</div>
             <ProductRanking 
               memberId={currentUser?.memberId}
               onAddToCart={handleAddToCart}

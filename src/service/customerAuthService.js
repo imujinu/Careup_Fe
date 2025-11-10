@@ -113,6 +113,12 @@ export const customerAuthService = {
       // 무시: RT가 이미 무효이면 여기서 실패할 수 있음
     } finally {
       customerTokenStorage.clear();
+      // 로그아웃 시 챗봇 메시지 삭제
+      try {
+        localStorage.removeItem('chatbot_messages_customer');
+      } catch (error) {
+        console.error('챗봇 메시지 삭제 실패:', error);
+      }
     }
   },
 
