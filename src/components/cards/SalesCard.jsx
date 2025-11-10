@@ -15,6 +15,36 @@ const SalesCard = ({ data }) => {
     return new Intl.NumberFormat('ko-KR').format(num || 0);
   };
 
+  const renderGrowthIndicator = (value) => {
+    const numericValue = Number(value);
+    const growth = Number.isFinite(numericValue) ? numericValue : 0;
+
+    if (growth > 0) {
+      return (
+        <div className="stat-change positive">
+          <TrendingUp size={14} />
+          <span>{`+${growth.toFixed(1)}%`}</span>
+        </div>
+      );
+    }
+
+    if (growth < 0) {
+      return (
+        <div className="stat-change negative">
+          <TrendingDown size={14} />
+          <span>{`${growth.toFixed(1)}%`}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="stat-change neutral">
+        <span>-</span>
+        <span>{`${growth.toFixed(1)}%`}</span>
+      </div>
+    );
+  };
+
   // 최근 7일 매출 데이터 처리
   const last7DaysSales = data?.last7DaysSales || [];
   const maxSales = last7DaysSales.length > 0 
@@ -39,10 +69,7 @@ const SalesCard = ({ data }) => {
           <div className="stat-value primary">
             {formatCurrency(data?.totalSales)}
           </div>
-          <div className={`stat-change ${totalSalesGrowth >= 0 ? 'positive' : 'negative'}`}>
-            <TrendingUp size={14} />
-            <span>{totalSalesGrowth >= 0 ? '+' : ''}{totalSalesGrowth.toFixed(1)}%</span>
-          </div>
+          {renderGrowthIndicator(totalSalesGrowth)}
         </div>
 
         <div className="stat-item">
@@ -50,10 +77,7 @@ const SalesCard = ({ data }) => {
           <div className="stat-value">
             {formatCurrency(data?.monthlySales)}
           </div>
-          <div className={`stat-change ${monthlySalesGrowth >= 0 ? 'positive' : 'negative'}`}>
-            <TrendingUp size={14} />
-            <span>{monthlySalesGrowth >= 0 ? '+' : ''}{monthlySalesGrowth.toFixed(1)}%</span>
-          </div>
+          {renderGrowthIndicator(monthlySalesGrowth)}
         </div>
 
         <div className="stat-item">
@@ -61,10 +85,7 @@ const SalesCard = ({ data }) => {
           <div className="stat-value">
             {formatNumber(data?.totalOrders)}건
           </div>
-          <div className={`stat-change ${totalOrdersGrowth >= 0 ? 'positive' : 'negative'}`}>
-            <TrendingDown size={14} />
-            <span>{Math.abs(totalOrdersGrowth).toFixed(1)}%</span>
-          </div>
+          {renderGrowthIndicator(totalOrdersGrowth)}
         </div>
       </div>
 

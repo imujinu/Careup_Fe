@@ -13,10 +13,11 @@ export const formatCurrencyKRW = (amount) =>
 
 export const branchDashboardService = {
   // GET /branch/{branchId}?period=MONTHLY
-  async getDashboard(branchId, period = "MONTHLY") {
+  async getDashboard(branchId, period) {
     try {
+      const params = period ? { period } : undefined;
       const response = await axios.get(`${BASE_PATH}/branch/${branchId}`, {
-        params: { period },
+        params,
       });
       console.log("[대시보드 API] 응답:", response);
       console.log("[대시보드 API] 응답 데이터:", response.data);

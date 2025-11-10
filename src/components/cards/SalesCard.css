@@ -90,11 +90,15 @@
 }
 
 .stat-change.positive {
-  color: #10B981;
+  color: #EF4444;
 }
 
 .stat-change.negative {
-  color: #EF4444;
+  color: #3B82F6;
+}
+
+.stat-change.neutral {
+  color: #4B5563;
 }
 
 .sales-chart-mini {

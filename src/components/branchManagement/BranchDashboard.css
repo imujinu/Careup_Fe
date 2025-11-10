@@ -3,7 +3,7 @@
 .branch-dashboard {
   padding: 24px;
   background-color: #f8f9fa;
-  min-height: 100vh;
+  min-height: 1vh;
   font-family: 'Pretendard', sans-serif;
   box-sizing: border-box;
   width: 100%;
@@ -127,8 +127,7 @@
   color: #8B7FE6;
 }
 
-.refresh-btn,
-.reset-btn {
+.refresh-btn {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -144,122 +143,52 @@
   box-shadow: 0 4px 12px rgba(139, 127, 230, 0.3);
 }
 
-.refresh-btn:hover,
-.reset-btn:hover {
+.refresh-btn:hover {
   box-shadow: 0 6px 20px rgba(139, 127, 230, 0.4);
   transform: translateY(-2px) scale(1.05);
 }
 
-.refresh-btn:active,
-.reset-btn:active {
+.refresh-btn:active {
   transform: translateY(0) scale(0.95);
 }
 
-.reset-btn {
-  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.reset-btn:hover {
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-}
-
-/* React Grid Layout 스타일 */
-.dashboard-grid-container {
-  width: 100%;
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas:
+    "sales sales sales sales inventory inventory inventory inventory employee employee employee employee"
+    "order order order order revenue revenue revenue revenue revenue revenue revenue revenue"
+    "category category category category category category attendance attendance attendance attendance attendance attendance";
+  gap: 24px;
   margin-bottom: 32px;
-  overflow-x: hidden;
-  box-sizing: border-box;
 }
 
-.dashboard-grid-layout {
-  width: 100% !important;
-  margin: 0 auto;
-  box-sizing: border-box;
+.card-sales {
+  grid-area: sales;
 }
 
-/* 그리드 레이아웃이 화면을 벗어나지 않도록 */
-.react-grid-layout {
-  width: 100% !important;
-  box-sizing: border-box;
-  margin: 0 !important;
-  padding: 0 !important;
+.card-inventory {
+  grid-area: inventory;
 }
 
-.react-grid-layout > .react-grid-item {
-  box-sizing: border-box;
-  margin: 0 !important;
+.card-employee {
+  grid-area: employee;
 }
 
-/* 그리드 아이템이 오른쪽 경계를 넘지 않도록 */
-.react-grid-item {
-  max-width: 100% !important;
+.card-order {
+  grid-area: order;
 }
 
-.dashboard-item-wrapper {
-  position: relative;
-  height: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  overflow: visible;
+.card-revenue {
+  grid-area: revenue;
 }
 
-.dashboard-item-wrapper .react-grid-item {
-  transition: all 0.2s ease;
-  box-sizing: border-box;
+.card-category {
+  grid-area: category;
 }
 
-.dashboard-item-wrapper .react-grid-item.react-grid-placeholder {
-  background: rgba(139, 127, 230, 0.2);
-  border: 2px dashed #8B7FE6;
-  border-radius: 16px;
-  opacity: 0.5;
-}
-
-.dashboard-item-wrapper .react-grid-item.react-draggable-dragging {
-  transition: none;
-  z-index: 1000;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-  cursor: grabbing !important;
-}
-
-/* 그리드 아이템이 경계를 벗어나지 않도록 */
-.react-grid-layout {
-  position: relative;
-  width: 100% !important;
-}
-
-.react-grid-item {
-  position: absolute;
-  box-sizing: border-box;
-}
-
-.drag-handle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-  cursor: move;
-  color: #999;
-  padding: 4px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dashboard-item-wrapper:hover .drag-handle,
-.dashboard-card:hover .drag-handle {
-  opacity: 1;
-}
-
-.drag-handle:hover {
-  color: #8B7FE6;
-  background: rgba(139, 127, 230, 0.1);
+.card-attendance {
+  grid-area: attendance;
 }
 
 .dashboard-card {
@@ -277,7 +206,12 @@
   box-sizing: border-box;
 }
 
-.dashboard-item-wrapper:hover .dashboard-card {
+/* 카드 내부 컨텐츠가 모두 보이도록 - flex로 적절히 배치 */
+.dashboard-card > * {
+  flex: 0 0 auto;
+}
+
+.dashboard-card:hover {
   box-shadow: 0 8px 32px rgba(139, 127, 230, 0.15);
 }
 
@@ -296,13 +230,8 @@
   overflow: hidden;
 }
 
-.dashboard-item-wrapper:hover .dashboard-chart {
+.dashboard-card:hover .dashboard-chart {
   box-shadow: 0 8px 32px rgba(139, 127, 230, 0.15);
-}
-
-/* 리사이즈 비활성화 */
-.react-resizable-handle {
-  display: none !important;
 }
 
 /* 애니메이션 */
@@ -353,14 +282,24 @@
   animation: fadeInScale 0.5s ease-out forwards;
 }
 
-/* 반응형 디자인 */
 @media (max-width: 1400px) {
-  .dashboard-grid-container {
-    width: 100%;
+  .dashboard-grid {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-areas:
+      "sales sales sales inventory inventory inventory employee employee employee employee"
+      "order order order revenue revenue revenue revenue revenue revenue revenue"
+      "category category category attendance attendance attendance attendance attendance attendance attendance";
   }
-  
-  .dashboard-grid-layout {
-    width: 100% !important;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-areas:
+      "sales sales sales sales inventory inventory inventory inventory"
+      "employee employee employee employee order order order order"
+      "revenue revenue revenue revenue revenue revenue revenue revenue"
+      "category category category category attendance attendance attendance attendance";
   }
 }
 
@@ -382,6 +321,18 @@
   .dashboard-controls {
     width: 100%;
     justify-content: space-between;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "sales sales"
+      "inventory inventory"
+      "employee employee"
+      "order order"
+      "revenue revenue"
+      "category category"
+      "attendance attendance";
   }
   
   .period-selector {
@@ -423,6 +374,18 @@
   .refresh-btn {
     width: 100%;
     justify-content: center;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "sales"
+      "inventory"
+      "employee"
+      "order"
+      "revenue"
+      "category"
+      "attendance";
   }
   
   .dashboard-chart {
