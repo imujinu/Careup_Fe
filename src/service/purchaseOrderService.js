@@ -117,7 +117,6 @@ export const purchaseOrderService = {
     window.URL.revokeObjectURL(url);
   },
 
-  /*
   // 본사용 발주 통계 조회 (전체)
   getHQStatistics: async (startDate = null, endDate = null) => {
     const params = new URLSearchParams();
@@ -188,7 +187,6 @@ export const purchaseOrderService = {
     const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/statistics/franchise/${branchId}/product?${params}`);
     return response.data;
   },
-  */
 
   // 지점 목록 조회 (필터용)
   getBranchList: async () => {
