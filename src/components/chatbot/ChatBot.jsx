@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ChatBot.css";
+import "./TurnoverTable.css";
 import axios from "axios";
 import AttendanceTab from "./tabs/AttendanceTab";
 import InventoryTab from "./tabs/InventoryTab";
@@ -13,15 +14,34 @@ import { documentService, DOCUMENT_TYPES } from "../../service/documentService";
 import { purchaseOrderService } from "../../service/purchaseOrderService";
 
 const ChatBot = ({ onClose }) => {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      content:
-        "안녕하세요!\n케어업 챗봇 케이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
-      timestamp: new Date(),
-    },
-  ]);
+  // localStorage에서 챗봇 메시지 불러오기
+  const getInitialMessages = () => {
+    try {
+      const savedMessages = localStorage.getItem('chatbot_messages');
+      if (savedMessages) {
+        const parsed = JSON.parse(savedMessages);
+        // timestamp를 Date 객체로 변환
+        return parsed.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+        }));
+      }
+    } catch (error) {
+      console.error('챗봇 메시지 불러오기 실패:', error);
+    }
+    // 기본 메시지
+    return [
+      {
+        id: 1,
+        type: "bot",
+        content:
+          "안녕하세요!\n케어업 챗봇 케이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
+        timestamp: new Date(),
+      },
+    ];
+  };
+
+  const [messages, setMessages] = useState(getInitialMessages);
   const [inputValue, setInputValue] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState(null);
@@ -76,6 +96,20 @@ const ChatBot = ({ onClose }) => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // 메시지가 변경될 때마다 localStorage에 저장
+  useEffect(() => {
+    try {
+      // timestamp를 문자열로 변환하여 저장
+      const messagesToSave = messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
+      }));
+      localStorage.setItem('chatbot_messages', JSON.stringify(messagesToSave));
+    } catch (error) {
+      console.error('챗봇 메시지 저장 실패:', error);
+    }
+  }, [messages]);
 
   // branchId 가져오기
   const getBranchId = () => {
@@ -2332,15 +2366,25 @@ const ChatBot = ({ onClose }) => {
   };
 
   const handleResetChat = () => {
-    setMessages([
+    const resetMessages = [
       {
         id: 1,
         type: "bot",
         content:
-          "안녕하세요!\nCare Up 챗봇 케이에요!\n\n카드 이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
+          "안녕하세요!\n케어업 챗봇 케이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
         timestamp: new Date(),
       },
-    ]);
+    ];
+    setMessages(resetMessages);
+    // localStorage에도 저장 (useEffect가 자동으로 처리하지만 명시적으로 저장)
+    try {
+      localStorage.setItem('chatbot_messages', JSON.stringify(resetMessages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp.toISOString()
+      }))));
+    } catch (error) {
+      console.error('챗봇 메시지 저장 실패:', error);
+    }
     setShowResetConfirm(false);
   };
 
@@ -3447,46 +3491,48 @@ const ChatBot = ({ onClose }) => {
                         ) : message.content.type === "turnover_table" ? (
                           // ✅ 회전율 테이블 (avgWeeklySales 표시, 권장발주/버튼 제거)
                           <>
-                            <div className="attendance-header turnover-table-header">
-                              <div className="attendance-cell header">
-                                상품명
-                              </div>
-                              <div className="attendance-cell header">
-                                현재재고
-                              </div>
-                              <div className="attendance-cell header">
-                                평균주간판매량
-                              </div>
-                              <div className="attendance-cell header">
-                                회전율
-                              </div>
-                              <div className="attendance-cell header">상태</div>
-                            </div>
-                            {message.content.data.products.map(
-                              (product, index) => (
-                                <div key={index} className="attendance-row turnover-table-row">
-                                  <div className="attendance-cell">
-                                    {product.productName}
-                                  </div>
-                                  <div className="attendance-cell">
-                                    {product.currentStock}
-                                  </div>
-                                  <div className="attendance-cell">
-                                    {product.avgWeeklySales ?? "-"}
-                                  </div>
-                                  <div className="attendance-cell">
-                                    {product.turnoverRate}%
-                                  </div>
-                                  <div className="attendance-cell">
-                                    <span
-                                      className={`status-badge status-${String(product.status || "").toLowerCase()}`}
-                                    >
-                                      {product.turnoverStatus || "-"}
-                                    </span>
-                                  </div>
+                            <div className="turnover-table-container">
+                              <div className="turnover-table-header">
+                                <div className="turnover-table-cell header">
+                                  상품명
                                 </div>
-                              )
-                            )}
+                                <div className="turnover-table-cell header">
+                                  현재재고
+                                </div>
+                                <div className="turnover-table-cell header">
+                                  주간판매량
+                                </div>
+                                <div className="turnover-table-cell header">
+                                  회전율
+                                </div>
+                                <div className="turnover-table-cell header">상태</div>
+                              </div>
+                              {message.content.data.products.map(
+                                (product, index) => (
+                                  <div key={index} className="turnover-table-row">
+                                    <div className="turnover-table-cell">
+                                      {product.productName}
+                                    </div>
+                                    <div className="turnover-table-cell">
+                                      {product.currentStock}
+                                    </div>
+                                    <div className="turnover-table-cell">
+                                      {product.avgWeeklySales ?? "-"}
+                                    </div>
+                                    <div className="turnover-table-cell">
+                                      {product.turnoverRate}%
+                                    </div>
+                                    <div className="turnover-table-cell">
+                                      <span
+                                        className={`status-badge status-${String(product.status || "").toLowerCase()}`}
+                                      >
+                                        {product.turnoverStatus || "-"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
                             {message.content?.data?.summary
                               ?.turnoverMessage && (
                               <div className="summary-note">

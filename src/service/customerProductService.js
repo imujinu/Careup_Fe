@@ -52,30 +52,23 @@ export const customerProductService = {
     }
   },
 
-  // 상품 조회 GET 요청 (클릭 시마다)
+  // 상품 조회 GET 요청 (클릭 시마다) - 로그인 여부와 상관없이 요청
   recordProductViewClick: async (productId) => {
     try {
-      const userInfo = customerAuthService.getCurrentUser();
-      
       // 유효한 productId인지 확인 (정수이고 0보다 커야 함)
       const isValidProductId = productId != null && 
                                typeof productId === 'number' && 
                                Number.isInteger(productId) && 
                                productId > 0;
       
-      // 로그인 상태가 아니거나 유효하지 않은 productId면 요청하지 않음
-      if (!userInfo || !userInfo.memberId || !isValidProductId) {
+      // 유효하지 않은 productId면 요청하지 않음
+      if (!isValidProductId) {
         return null;
       }
-
-      const memberId = userInfo.memberId;
       
-      // GET 요청: /customers/product/view/{productId}?memberId={memberId}
-      const response = await customerAxios.get(
-        `${API_BASE_URL}/customers/product/view/${productId}`,
-        {
-          params: { memberId: memberId }
-        }
+      // GET 요청: /customers/product/view/{productId} (productId만 전송)
+      const response = await customerAxios.post(
+        `${API_BASE_URL}/customers/product/view/${productId}`
       );
       
       return response.data;

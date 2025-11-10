@@ -203,6 +203,12 @@ export const authService = {
       // 이미 폐기되었을 수 있으므로 무시
     } finally {
       tokenStorage.clearTokens();
+      // 로그아웃 시 챗봇 메시지 삭제
+      try {
+        localStorage.removeItem('chatbot_messages');
+      } catch (error) {
+        console.error('챗봇 메시지 삭제 실패:', error);
+      }
     }
   },
 
