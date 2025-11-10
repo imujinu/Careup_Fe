@@ -132,26 +132,26 @@ function PurchaseOrderManagement() {
       
       const [
         data,
-        // statistics,
-        // statusStats,
-        // branchStats,
-        // productStats,
+        statistics,
+        statusStats,
+        branchStats,
+        productStats,
         branches
       ] = await Promise.all([
         purchaseOrderService.getPurchaseOrders(branchId),
-        // purchaseOrderService.getHQOverallStatistics(),
-        // purchaseOrderService.getHQStatusStatistics().catch((err) => {
-        //   console.error('상태 통계 API 호출 실패:', err);
-        //   return [];
-        // }),
-        // purchaseOrderService.getHQBranchStatistics().catch((err) => {
-        //   console.error('지점 통계 API 호출 실패:', err);
-        //   return [];
-        // }),
-        // purchaseOrderService.getHQProductStatistics().catch((err) => {
-        //   console.error('상품 통계 API 호출 실패:', err);
-        //   return [];
-        // }),
+        purchaseOrderService.getHQOverallStatistics(),
+        purchaseOrderService.getHQStatusStatistics().catch((err) => {
+          console.error('상태 통계 API 호출 실패:', err);
+          return [];
+        }),
+        purchaseOrderService.getHQBranchStatistics().catch((err) => {
+          console.error('지점 통계 API 호출 실패:', err);
+          return [];
+        }),
+        purchaseOrderService.getHQProductStatistics().catch((err) => {
+          console.error('상품 통계 API 호출 실패:', err);
+          return [];
+        }),
         purchaseOrderService.getBranchList().catch((err) => {
           console.error('지점 목록 API 호출 실패:', err);
           console.error('에러 상세:', err.response?.data || err.message);
