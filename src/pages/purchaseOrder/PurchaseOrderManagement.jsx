@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import SummaryCards from '../../components/purchaseOrder/common/SummaryCards';
-import StatisticsChart from '../../components/purchaseOrder/common/StatisticsChart';
+// import StatisticsChart from '../../components/purchaseOrder/common/StatisticsChart';
 import SearchAndFilter from '../../components/purchaseOrder/common/SearchAndFilter';
 import PurchaseOrderTable from '../../components/purchaseOrder/common/PurchaseOrderTable';
 import PurchaseOrderDetailModal from '../../components/purchaseOrder/common/PurchaseOrderDetailModal';
@@ -91,9 +91,9 @@ function PurchaseOrderManagement() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [statusStatistics, setStatusStatistics] = useState([]);
-  const [branchStatistics, setBranchStatistics] = useState([]);
-  const [productStatistics, setProductStatistics] = useState([]);
+  // const [statusStatistics, setStatusStatistics] = useState([]);
+  // const [branchStatistics, setBranchStatistics] = useState([]);
+  // const [productStatistics, setProductStatistics] = useState([]);
   const [branchList, setBranchList] = useState([]);
   const [sort, setSort] = useState(null); // { field, direction }
   
@@ -130,21 +130,28 @@ function PurchaseOrderManagement() {
       const userInfo = authService.getCurrentUser();
       const branchId = userInfo?.branchId || 1; // 본사 ID
       
-      const [data, statistics, statusStats, branchStats, productStats, branches] = await Promise.all([
+      const [
+        data,
+        // statistics,
+        // statusStats,
+        // branchStats,
+        // productStats,
+        branches
+      ] = await Promise.all([
         purchaseOrderService.getPurchaseOrders(branchId),
-        purchaseOrderService.getHQOverallStatistics(),
-        purchaseOrderService.getHQStatusStatistics().catch((err) => {
-          console.error('상태 통계 API 호출 실패:', err);
-          return [];
-        }),
-        purchaseOrderService.getHQBranchStatistics().catch((err) => {
-          console.error('지점 통계 API 호출 실패:', err);
-          return [];
-        }),
-        purchaseOrderService.getHQProductStatistics().catch((err) => {
-          console.error('상품 통계 API 호출 실패:', err);
-          return [];
-        }),
+        // purchaseOrderService.getHQOverallStatistics(),
+        // purchaseOrderService.getHQStatusStatistics().catch((err) => {
+        //   console.error('상태 통계 API 호출 실패:', err);
+        //   return [];
+        // }),
+        // purchaseOrderService.getHQBranchStatistics().catch((err) => {
+        //   console.error('지점 통계 API 호출 실패:', err);
+        //   return [];
+        // }),
+        // purchaseOrderService.getHQProductStatistics().catch((err) => {
+        //   console.error('상품 통계 API 호출 실패:', err);
+        //   return [];
+        // }),
         purchaseOrderService.getBranchList().catch((err) => {
           console.error('지점 목록 API 호출 실패:', err);
           console.error('에러 상세:', err.response?.data || err.message);
@@ -252,42 +259,53 @@ function PurchaseOrderManagement() {
       }
       
       // 차트 데이터 설정
-      if (statusStats && statusStats.length > 0) {
-        const statusChartData = statusStats.map(stat => ({
-          status: getStatusText(stat.status),
-          count: stat.count
-        }));
-        setStatusStatistics(statusChartData);
-      }
+      // if (statusStats && statusStats.length > 0) {
+      //   const statusChartData = statusStats.map(stat => ({
+      //     status: getStatusText(stat.status),
+      //     count: stat.count
+      //   }));
+      //   setStatusStatistics(statusChartData);
+      // }
+      //
+      // if (branchStats && branchStats.length > 0) {
+      //    const branchChartData = branchStats.map(stat => ({
+      //      branchName: stat.branchName || `지점-${stat.branchId}`,
+      //      orderCount: stat.orderCount || 0,
+      //      totalAmount: (stat.totalAmount || 0) / 10000
+      //    }));
+      //    setBranchStatistics(branchChartData);
+      // }
+      //
+      // if (productStats && productStats.length > 0) {
+      //   const productChartData = productStats.map(stat => ({
+      //     productName: stat.productName,
+      //     totalQuantity: stat.totalQuantity || 0,
+      //     totalAmount: (stat.totalAmount || 0) / 10000
+      //   }));
+      //   const sortedData = productChartData
+      //     .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0))
+      //     .slice(0, 10);
+      //   setProductStatistics(sortedData);
+      // }
 
-      if (branchStats && branchStats.length > 0) {
-        const branchChartData = branchStats.map(stat => ({
-          branchName: stat.branchName || `지점-${stat.branchId}`,
-          orderCount: stat.orderCount || 0,
-          totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
-        }));
-        setBranchStatistics(branchChartData);
-      }
-
-      if (productStats && productStats.length > 0) {
-        const productChartData = productStats.map(stat => ({
-          productName: stat.productName,
-          totalQuantity: stat.totalQuantity || 0,
-          totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
-        }));
-        // 정렬 후 상위 10개만 저장 (차트 컴포넌트에서 다시 정렬하지 않도록)
-        const sortedData = productChartData
-          .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0))
-          .slice(0, 10);
-        console.log('상품별 통계 정렬 후:', sortedData);
-        setProductStatistics(sortedData);
-      }
+      const totalOrders = formattedData.length;
+      const pending = formattedData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
+      const completed = formattedData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
+      const totalAmount = formattedData.reduce((sum, item) => sum + item.totalAmount, 0);
       
+      setSummary({
+        totalOrders,
+        pending,
+        completed,
+        totalAmount
+      });
+
+      /*
       if (statistics) {
         setSummary({
           totalOrders: statistics.totalOrderCount || 0,
           pending: statistics.pendingCount || 0,
-          completed: statistics.totalOrderCount - statistics.pendingCount || 0,  // 완료는 전체 - 대기
+          completed: statistics.totalOrderCount - statistics.pendingCount || 0,
           totalAmount: statistics.totalOrderAmount || 0
         });
       } else {
@@ -303,6 +321,7 @@ function PurchaseOrderManagement() {
           totalAmount
         });
       }
+      */
     } catch (err) {
       console.error('발주 목록 조회 실패:', err);
       setError('발주 데이터를 불러오는데 실패했습니다.');
@@ -493,11 +512,11 @@ function PurchaseOrderManagement() {
       )
     ),
     React.createElement(SummaryCards, { summary }),
-    React.createElement(StatisticsChart, {
-      statusData: statusStatistics,
-      branchData: branchStatistics,
-      productData: productStatistics
-    }),
+    // React.createElement(StatisticsChart, {
+    //   statusData: statusStatistics,
+    //   branchData: branchStatistics,
+    //   productData: productStatistics
+    // }),
     React.createElement(SearchAndFilter, {
       filters,
       onFiltersChange: handleFiltersChange,
