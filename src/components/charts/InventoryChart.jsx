@@ -105,7 +105,7 @@ const InventoryChart = ({ data }) => {
           </span>
         </div>
         <div className="summary-item">
-          <span className="summary-label">최고 카테고리</span>
+          <span className="summary-label">가장 많이 팔린 카테고리</span>
           <span className="summary-value">
             {topCategoryName !== '-' ? `${topCategoryName} (${topCategoryPercentage}%)` : '-'}
           </span>

@@ -30,10 +30,13 @@ const AttendanceChart = ({
   const resolveAttendanceCollection = () => {
     if (!data) return null;
     const candidates = [
+      data?.chartData,
       data?.attendanceByPeriod?.[normalizedPeriod],
       data?.attendanceByPeriod?.[period],
       data?.[`attendanceBy${capitalize(normalizedPeriod)}`],
       data?.[`${normalizedPeriod}Attendance`],
+      data?.attendanceData,
+      data?.attendanceRecords,
       data?.attendanceData?.[normalizedPeriod],
       data?.attendance,
       data?.weeklyAttendance,
@@ -45,11 +48,49 @@ const AttendanceChart = ({
 
   const formatLabelDate = (value) => {
     if (!value) return '-';
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) {
+    const stringValue = String(value);
+
+    const parseDateLike = (input) => {
+      if (!input) return null;
+      if (input instanceof Date) return input;
+      const stringInput = String(input);
+      if (/^\d{4}-\d{2}$/.test(stringInput)) {
+        const [year, month] = stringInput.split('-').map(Number);
+        return new Date(year, (month || 1) - 1, 1);
+      }
+      const parsed = new Date(stringInput);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    if (period === 'MONTHLY') {
+      const monthDate = parseDateLike(stringValue);
+      if (monthDate) {
+        return `${monthDate.getMonth() + 1}월`;
+      }
+      const monthMatch = stringValue.match(/(?:^|\D)(\d{1,2})(?:월)?$/);
+      if (monthMatch?.[1]) {
+        return `${Number(monthMatch[1])}월`;
+      }
+      return stringValue;
+    }
+
+    if (period === 'YEARLY') {
+      const yearDate = parseDateLike(stringValue);
+      if (yearDate) {
+        return `${yearDate.getFullYear()}년`;
+      }
+      const yearMatch = stringValue.match(/(\d{4})/);
+      if (yearMatch?.[1]) {
+        return `${yearMatch[1]}년`;
+      }
+      return stringValue;
+    }
+
+    const date = parseDateLike(stringValue);
+    if (date) {
       return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
     }
-    return value;
+    return stringValue;
   };
 
   const chartData = (() => {
