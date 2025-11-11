@@ -129,44 +129,27 @@ function BrandingManager() {
 
 function SSEConnectionManager() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
-  const prevAuthenticated = useRef(isAuthenticated);
+  const connectedRef = useRef(false);
 
   useEffect(() => {
-    // 인증된 상태일 때 알림 목록 조회 및 SSE 연결
-    if (isAuthenticated) {
-      const initializeConnection = async () => {
-        await sseService.disconnect();
-        store.dispatch(fetchNotificationList());
-        sseService.connect();
-      };
-      initializeConnection();
-    } else if (!isAuthenticated && prevAuthenticated.current) {
+    if (isAuthenticated && !connectedRef.current) {
+      // 최초 로그인 후 한 번만 연결
+      store.dispatch(fetchNotificationList());
+      sseService.connect();
+      connectedRef.current = true;
+    } else if (!isAuthenticated && connectedRef.current) {
+      // 로그아웃 시 한 번만 끊기
       sseService.disconnect();
+      connectedRef.current = false;
     }
 
-    prevAuthenticated.current = isAuthenticated;
-
-    return () => {
-      if (isAuthenticated) {
-        sseService.disconnect();
-      }
-    };
-  }, [isAuthenticated]);
-
-  useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isAuthenticated) {
-        sseService.disconnectSync();
-      }
+      if (connectedRef.current) sseService.disconnectSync();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      if (isAuthenticated) {
-        sseService.disconnect();
-      }
     };
   }, [isAuthenticated]);
 

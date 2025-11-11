@@ -2,15 +2,34 @@ import React, { useState, useRef, useEffect } from "react";
 import "./ChatBot.css";
 
 const ChatBot = ({ onClose }) => {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      content:
-        "안녕하세요!\n케어업 챗봇 환이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 환이에게 물어보세요.",
-      timestamp: new Date(),
-    },
-  ]);
+  // localStorage에서 챗봇 메시지 불러오기
+  const getInitialMessages = () => {
+    try {
+      const savedMessages = localStorage.getItem('chatbot_messages_customer');
+      if (savedMessages) {
+        const parsed = JSON.parse(savedMessages);
+        // timestamp를 Date 객체로 변환
+        return parsed.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+        }));
+      }
+    } catch (error) {
+      console.error('챗봇 메시지 불러오기 실패:', error);
+    }
+    // 기본 메시지
+    return [
+      {
+        id: 1,
+        type: "bot",
+        content:
+          "안녕하세요!\n케어업 챗봇 케이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 케이에게 물어보세요.",
+        timestamp: new Date(),
+      },
+    ];
+  };
+
+  const [messages, setMessages] = useState(getInitialMessages);
   const [inputValue, setInputValue] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const messagesEndRef = useRef(null);
@@ -21,6 +40,20 @@ const ChatBot = ({ onClose }) => {
 
   useEffect(() => {
     scrollToBottom();
+  }, [messages]);
+
+  // 메시지가 변경될 때마다 localStorage에 저장
+  useEffect(() => {
+    try {
+      // timestamp를 문자열로 변환하여 저장
+      const messagesToSave = messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
+      }));
+      localStorage.setItem('chatbot_messages_customer', JSON.stringify(messagesToSave));
+    } catch (error) {
+      console.error('챗봇 메시지 저장 실패:', error);
+    }
   }, [messages]);
 
   const quickButtons = [
@@ -78,15 +111,25 @@ const ChatBot = ({ onClose }) => {
   };
 
   const handleResetChat = () => {
-    setMessages([
+    const resetMessages = [
       {
         id: 1,
         type: "bot",
         content:
-          "안녕하세요!\n신한카드 챗봇 레이에요!\n\n카드 이용 관련 궁금한 점이 생기면,\n언제든지 레이에게 물어보세요.",
+          "안녕하세요!\n케어업 챗봇 환이에요!\n\n이용 관련 궁금한 점이 생기면,\n언제든지 환이에게 물어보세요.",
         timestamp: new Date(),
       },
-    ]);
+    ];
+    setMessages(resetMessages);
+    // localStorage에도 저장 (useEffect가 자동으로 처리하지만 명시적으로 저장)
+    try {
+      localStorage.setItem('chatbot_messages_customer', JSON.stringify(resetMessages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp.toISOString()
+      }))));
+    } catch (error) {
+      console.error('챗봇 메시지 저장 실패:', error);
+    }
     setShowResetConfirm(false);
   };
 

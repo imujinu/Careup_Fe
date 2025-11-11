@@ -1,18 +1,32 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { customerAuthService } from "../../service/customerAuthService";
 import { customerProductService } from "../../service/customerProductService";
+import "./ProductRanking.css";
 
 const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
-  const [products, setProducts] = useState([]);
+  const navigate = useNavigate();
+  const [allProducts, setAllProducts] = useState([]); // 전체 상품 데이터 (30개)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasRecentView, setHasRecentView] = useState(false);
   const [lastViewProductName, setLastViewProductName] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isPersonalized, setIsPersonalized] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
+  const PAGE_SIZE = 5;
+  const INITIAL_FETCH_SIZE = 30; // 초기 요청 시 30개
+  const MAX_PAGE = 5; // 최대 페이지 번호 (0~5)
+  
+  // 현재 페이지에 표시할 상품들 (5개씩)
+  const currentProducts = allProducts.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const totalPages = Math.ceil(allProducts.length / PAGE_SIZE) || 1;
 
+  // 초기 데이터 로딩 (한 번만 실행)
   useEffect(() => {
     const fetchRankingData = async () => {
       try {
@@ -21,15 +35,29 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
 
         // userInfo 확인
         const userInfo = customerAuthService.getCurrentUser();
+        const custUserInfoRaw = localStorage.getItem('cust_userInfo');
+        const custUserInfo = custUserInfoRaw ? JSON.parse(custUserInfoRaw) : null;
+        
         let endpoint;
+        let isPersonalizedMode = false;
 
-        if (memberId && userInfo) {
-          // memberId가 있고 userInfo가 있으면 개인화 추천
+        if (memberId && custUserInfo) {
+          // memberId가 있고 cust_userInfo가 있으면 개인화 추천
           endpoint = `/rec/${memberId}`;
+          isPersonalizedMode = true;
+          console.log("✅ 개인화 추천 모드 - endpoint:", endpoint);
         } else {
-          // userInfo가 없으면 일반 인기 상품
+          // cust_userInfo가 없으면 일반 인기 상품
           endpoint = '/api/rank';
+          isPersonalizedMode = false;
+          console.log("📊 일반 인기 상품 모드 - endpoint:", endpoint, "이유: memberId=", memberId, "custUserInfo=", custUserInfo);
         }
+
+        setIsPersonalized(isPersonalizedMode);
+
+        // 초기 로딩 시 30개 요청
+        endpoint = `${endpoint}?page=0&size=${INITIAL_FETCH_SIZE}`;
+        console.log("🚀 요청 URL:", endpoint);
 
         const res = await shopApi.get(endpoint);
         
@@ -49,7 +77,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
             // { products: [...] }
             productList = result.products;
           } else if (result.content && Array.isArray(result.content)) {
-            // { content: [...] }
+            // { content: [...] } - 페이지네이션 응답
             productList = result.content;
           } else if (Array.isArray(result)) {
             // 직접 배열
@@ -59,33 +87,34 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
             productList = res.data;
           }
           
-          setProducts(Array.isArray(productList) ? productList : []);
+          // 최대 30개까지만 저장 (6페이지 * 5개 = 30개)
+          const limitedProducts = Array.isArray(productList) ? productList.slice(0, INITIAL_FETCH_SIZE) : [];
+          setAllProducts(limitedProducts);
           
           // hasRecentView와 lastViewProductName은 /rec/{memberId}에만 있음
-          if (endpoint.startsWith('/rec/')) {
+          if (isPersonalizedMode) {
             setHasRecentView(result.hasRecentView || false);
             setLastViewProductName(result.lastViewProductName || "");
           } else {
-            // /api/rank는 일반 인기 상품이므로 해당 필드 없음
             setHasRecentView(false);
             setLastViewProductName("");
           }
         } else {
-          setProducts([]);
+          setAllProducts([]);
           setHasRecentView(false);
           setLastViewProductName("");
         }
       } catch (err) {
         console.error('❌ 인기 랭킹 데이터 로딩 실패:', err);
         setError(err?.response?.data?.message || err?.message || '인기 랭킹을 불러오는데 실패했습니다.');
-        setProducts([]);
+        setAllProducts([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchRankingData();
-  }, [memberId]);
+  }, [memberId]); // memberId만 의존성으로 설정 (초기 로딩만)
 
   const handleProductClick = async (product) => {
     // 상품 클릭 시 조회 API 요청
@@ -139,9 +168,47 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
     }
   };
 
+  const handlePrevPage = () => {
+    if (currentPage > 0 && !isTransitioning) {
+      setIsTransitioning(true);
+      setCurrentPage(currentPage - 1);
+      setTimeout(() => setIsTransitioning(false), 300);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (!isTransitioning) {
+      setIsTransitioning(true);
+      // 5번 페이지에서 다음을 누르면 0번으로 순환
+      if (currentPage >= MAX_PAGE) {
+        setCurrentPage(0);
+      } else if (currentPage < totalPages - 1) {
+        setCurrentPage(currentPage + 1);
+      }
+      setTimeout(() => setIsTransitioning(false), 300);
+    }
+  };
+  
+  const handlePageClick = (page) => {
+    if (!isTransitioning && page !== currentPage) {
+      setIsTransitioning(true);
+      setCurrentPage(page);
+      setTimeout(() => setIsTransitioning(false), 300);
+    }
+  };
+
+  const handleViewAll = () => {
+    navigate('/shop/products');
+  };
+
+  // 페이지에 따른 순위 번호 계산 (페이지 0: 1~5위, 페이지 1: 6~10위 등)
+  const getRankNumber = (index) => {
+    return currentPage * PAGE_SIZE + index + 1;
+  };
+
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280" }}>
+      <div className="loading-container">
         🔄 인기 랭킹을 불러오는 중...
       </div>
     );
@@ -149,90 +216,131 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
 
   if (error) {
     return (
-      <div style={{ 
-        textAlign: "center", 
-        padding: "40px 0", 
-        color: "#ef4444",
-        background: "#fef2f2",
-        borderRadius: "8px",
-        margin: "20px 0"
-      }}>
+      <div className="error-container">
         ❌ {error}
       </div>
     );
   }
 
-  if (products.length === 0) {
+  if (allProducts.length === 0 && !loading) {
     return (
-      <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280" }}>
+      <div className="empty-container">
         📦 표시할 상품이 없습니다.
       </div>
     );
   }
 
+
   return (
     <>
+      {/* 타이틀 - hasRecentView에 따라 변경 */}
+      <div className="section-title">
+        {hasRecentView ? "📦 연관 상품" : "🏆 인기 랭킹"}
+      </div>
+      
       {hasRecentView && lastViewProductName && (
-        <div style={{ 
-          marginBottom: "16px", 
-          padding: "12px 16px", 
-          background: "#f0f9ff", 
-          borderRadius: "8px",
-          border: "1px solid #bae6fd"
-        }}>
-          <div style={{ fontSize: "14px", color: "#0369a1", fontWeight: 500 }}>
+        <div className="personalized-message">
+          <div className="personalized-message-text">
             💡 "{lastViewProductName}"과 관련된 상품을 찾아보세요
           </div>
         </div>
       )}
       
-      <div className="grid ranking-grid">
-        {products.slice(0, 5).map((product, i) => (
-          <article 
-            className="rank-card" 
-            key={product.productId || i}
-            onClick={() => handleProductClick(product)}
-            style={{ cursor: "pointer" }}
+      <div className="product-ranking-container">
+        <div className="product-ranking-slider">
+          {/* 좌우 화살표 버튼 (페이지가 2개 이상일 때 표시) */}
+          {totalPages > 1 && (
+            <>
+              <button
+                aria-label="이전 페이지"
+                className={`slider-nav-btn prev ${currentPage === 0 ? 'disabled' : ''}`}
+                onClick={handlePrevPage}
+                disabled={currentPage === 0}
+              >
+                ‹
+              </button>
+              <button
+                aria-label="다음 페이지"
+                className="slider-nav-btn next"
+                onClick={handleNextPage}
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <div 
+            className={`grid ranking-grid ${loading ? 'loading' : ''} ${isTransitioning ? 'transitioning' : ''}`}
           >
-            <div className="rank-badge">{i + 1}</div>
-            <div className="rank-img">
-              <img 
-                src={product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
-                alt={product.productName || product.name}
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
-                }}
-              />
-            </div>
-            <button 
-              className="deal-cta"
-              onClick={(e) => handleAddToCartClick(e, product)}
-            >
-              🛒 담기
-            </button>
-            <div className="card-body">
-              <div className="name">{product.productName || product.name}</div>
-              <div className="price">
-                {product.price ? (
-                  <>
-                    <b>{product.price.toLocaleString()}원</b>
-                    {product.coPurchaseCount && (
-                      <span style={{ fontSize: "12px", color: "#6b7280", marginLeft: "8px" }}>
-                        (함께 구매 {product.coPurchaseCount}회)
-                      </span>
+            {/* 현재 페이지의 5개 상품 표시 */}
+            {currentProducts.map((product, i) => (
+              <article 
+                className={`rank-card ranking-card ${loading ? 'no-animation' : ''} ${isTransitioning ? 'slide-in' : ''}`}
+                key={product.productId || `${currentPage}-${i}`}
+                onClick={() => handleProductClick(product)}
+              >
+                <div className="rank-badge">{getRankNumber(i)}</div>
+                <div className="rank-img">
+                  <img 
+                    src={product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
+                    alt={product.productName || product.name}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png";
+                    }}
+                  />
+                </div>
+                <button 
+                  className="deal-cta"
+                  onClick={(e) => handleAddToCartClick(e, product)}
+                >
+                  🛒 담기
+                </button>
+                <div className="card-body">
+                  <div className="name">{product.productName || product.name}</div>
+                  <div className="price">
+                    {product.price ? (
+                      <b>{product.price.toLocaleString()}원</b>
+                    ) : (
+                      <span style={{ color: "#6b7280" }}>가격 정보 없음</span>
                     )}
-                  </>
-                ) : (
-                  <span style={{ color: "#6b7280" }}>가격 정보 없음</span>
-                )}
-              </div>
+                  </div>
+                  {product.coPurchaseCount != null && product.coPurchaseCount > 0 && (
+                    <div className="co-purchase-count" style={{ 
+                      fontSize: "12px", 
+                      color: "#6b7280", 
+                      marginTop: "4px" 
+                    }}>
+                      함께 구매된 횟수 : {product.coPurchaseCount}
+                    </div>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {/* 페이지 인디케이터 (페이지가 2개 이상일 때 표시, 최대 6개) */}
+          {totalPages > 1 && (
+            <div className="page-indicator-container">
+              {Array.from({ length: Math.min(totalPages, MAX_PAGE + 1) }, (_, i) => (
+                <span
+                  key={i}
+                  className={`page-indicator-dot ${i === currentPage ? 'active' : ''}`}
+                  onClick={() => handlePageClick(i)}
+                />
+              ))}
             </div>
-          </article>
-        ))}
+          )}
+        </div>
       </div>
-      <div style={{ textAlign: "center", marginTop: 16 }}>
-        <button className="tab">전체보기 ▸</button>
+      
+      <div className="view-all-container">
+        <button 
+          className="tab view-all-btn"
+          onClick={handleViewAll}
+        >
+          전체보기 ▸
+        </button>
       </div>
     </>
   );

@@ -25,8 +25,24 @@ export const purchaseOrderService = {
   },
 
   // 발주 목록 조회 (본사/가맹점 구분)
-  getPurchaseOrders: async (branchId) => {
-    const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/branch/${branchId}`);
+  getPurchaseOrders: async (branchId, options = {}) => {
+    const {
+      page = 0,
+      size = 10,
+      sort = 'createdAt,DESC'
+    } = options;
+
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('size', size);
+    if (sort) {
+      params.append('sort', sort);
+    }
+
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/purchase-orders/branch/${branchId}${queryString ? `?${queryString}` : ''}`;
+
+    const response = await purchaseOrderApi.get(url);
     return response.data;
   },
 
@@ -117,7 +133,6 @@ export const purchaseOrderService = {
     window.URL.revokeObjectURL(url);
   },
 
-  /*
   // 본사용 발주 통계 조회 (전체)
   getHQStatistics: async (startDate = null, endDate = null) => {
     const params = new URLSearchParams();
@@ -188,7 +203,6 @@ export const purchaseOrderService = {
     const response = await purchaseOrderApi.get(`${API_BASE_URL}/purchase-orders/statistics/franchise/${branchId}/product?${params}`);
     return response.data;
   },
-  */
 
   // 지점 목록 조회 (필터용)
   getBranchList: async () => {

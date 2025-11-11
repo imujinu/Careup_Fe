@@ -86,6 +86,15 @@ const ChartTitle = styled.h3`
   margin: 0 0 20px 0;
 `;
 
+const SORT_FIELD_MAP = {
+  orderNo: 'purchaseOrderId',
+  orderDate: 'createdAt',
+  productCount: 'productCount',
+  totalAmount: 'totalPrice',
+  status: 'orderStatus',
+  deliveryDate: 'updatedAt'
+};
+
 function FranchisePurchaseOrderManagement() {
   const currentUser = authService.getCurrentUser();
   const branchId = currentUser?.branchId || 2;
@@ -115,22 +124,52 @@ function FranchisePurchaseOrderManagement() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [productStatistics, setProductStatistics] = useState([]);
-  const [sort, setSort] = useState(null); // { field, direction }
+  const [sort, setSort] = useState({ field: 'orderDate', direction: 'desc' }); // { field, direction }
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+
+  const buildSortParam = React.useCallback((sortOption) => {
+    if (!sortOption || !sortOption.field) {
+      return 'createdAt,DESC';
+    }
+    const backendField = SORT_FIELD_MAP[sortOption.field] || SORT_FIELD_MAP.orderDate;
+    const direction = (sortOption.direction || 'desc').toUpperCase();
+    return `${backendField},${direction}`;
+  }, []);
 
   // 가맹점용 발주 목록 조회
-  const fetchPurchaseOrders = async () => {
+  const fetchPurchaseOrders = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const [data, productStats] = await Promise.all([
-        purchaseOrderService.getPurchaseOrders(branchId),
-        purchaseOrderService.getFranchiseProductStatistics(branchId).catch(() => [])
+
+      const sortParam = buildSortParam(sort);
+      const pageRequest = Math.max(currentPage - 1, 0);
+
+      const [pageData, productStats, franchiseStats] = await Promise.all([
+        purchaseOrderService.getPurchaseOrders(branchId, {
+          page: pageRequest,
+          size: pageSize,
+          sort: sortParam
+        }),
+        purchaseOrderService.getFranchiseProductStatistics(branchId).catch(() => []),
+        purchaseOrderService.getFranchiseStatistics(branchId).catch(() => null)
       ]);
-      console.log('가맹점 발주 목록 API 응답:', data);
-      
-      // 데이터 변환 (백엔드 API 응답 필드명에 맞게 수정)
-      const formattedData = data.map(item => {
+
+      const content = Array.isArray(pageData?.content) ? pageData.content : [];
+      const totalElementsValue = pageData?.totalElements ?? content.length;
+
+      setTotalPages(pageData?.totalPages ? Math.max(pageData.totalPages, 1) : 1);
+      setTotalElements(totalElementsValue);
+
+      if (typeof pageData?.number === 'number') {
+        const serverPage = pageData.number + 1;
+        if (serverPage !== currentPage) {
+          setCurrentPage(serverPage);
+        }
+      }
+
+      const formattedData = content.map(item => {
         const orderDate = item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0];
         const serial = String(item.purchaseOrderId || 0).padStart(6, '0');
         const yyyymmdd = orderDate.replace(/-/g, '');
@@ -195,15 +234,16 @@ function FranchisePurchaseOrderManagement() {
         // ignore enrichment errors
       }
       
-      const totalOrders = uniqueData.length;
-      const pending = uniqueData.filter(item => item.status === 'PENDING').length;
+      const totalOrders = franchiseStats?.totalOrders ?? totalElementsValue ?? uniqueData.length;
+      const pending = franchiseStats?.pendingOrders ?? uniqueData.filter(item => item.status === 'PENDING').length;
+      const approvedOrders = franchiseStats?.approvedOrders ?? uniqueData.filter(item => item.status === 'APPROVED').length;
       const inProgress = uniqueData.filter(item => item.status === 'APPROVED' || item.status === 'PARTIAL' || item.status === 'SHIPPED').length;
       const completed = uniqueData.filter(item => item.status === 'COMPLETED').length;
-      
+
       setSummary({
         totalOrders,
         pending,
-        inProgress,
+        inProgress: franchiseStats ? (franchiseStats.approvedOrders ?? inProgress) : inProgress,
         completed
       });
       
@@ -216,11 +256,11 @@ function FranchisePurchaseOrderManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [branchId, buildSortParam, currentPage, pageSize, sort]);
 
   useEffect(() => {
     fetchPurchaseOrders();
-  }, []);
+  }, [fetchPurchaseOrders]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -228,10 +268,16 @@ function FranchisePurchaseOrderManagement() {
   };
 
   const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages || page === currentPage) {
+      return;
+    }
     setCurrentPage(page);
   };
 
   const handlePageSizeChange = (size) => {
+    if (size === pageSize) {
+      return;
+    }
     setPageSize(size);
     setCurrentPage(1);
   };
@@ -275,6 +321,7 @@ function FranchisePurchaseOrderManagement() {
 
   const handleSort = (field, direction) => {
     setSort({ field, direction });
+    setCurrentPage(1);
   };
 
   // 필터링된 데이터
@@ -320,57 +367,9 @@ function FranchisePurchaseOrderManagement() {
     return matchProductName && matchDate && matchStatus;
     });
 
-    // 정렬 적용
-    if (sort && sort.field) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue, bValue;
-
-        switch (sort.field) {
-          case 'orderNo':
-            // 발주번호를 숫자로 변환하여 정렬 (PO-YYYYMMDD-###### 형식)
-            const aOrderNo = String(a.displayOrderNo || a.id || '').split('-').pop() || '';
-            const bOrderNo = String(b.displayOrderNo || b.id || '').split('-').pop() || '';
-            aValue = parseInt(aOrderNo) || 0;
-            bValue = parseInt(bOrderNo) || 0;
-            break;
-          case 'orderDate':
-            aValue = new Date(a.orderDate || 0);
-            bValue = new Date(b.orderDate || 0);
-            break;
-          case 'productCount':
-            aValue = a.productCount || 0;
-            bValue = b.productCount || 0;
-            break;
-          case 'totalAmount':
-            aValue = a.totalAmount || 0;
-            bValue = b.totalAmount || 0;
-            break;
-          case 'status':
-            aValue = a.status || '';
-            bValue = b.status || '';
-            break;
-          case 'deliveryDate':
-            aValue = a.deliveryDate ? new Date(a.deliveryDate) : new Date(0);
-            bValue = b.deliveryDate ? new Date(b.deliveryDate) : new Date(0);
-            break;
-          default:
-            return 0;
-        }
-
-        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
     return filtered;
-  }, [purchaseOrders, filters, sort]);
-
-  // 페이지네이션
-  const totalPages = Math.ceil(filteredData.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
+  }, [purchaseOrders, filters]);
+  const effectiveTotalPages = Math.max(1, totalPages);
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
@@ -413,9 +412,9 @@ function FranchisePurchaseOrderManagement() {
       onOrderRequest: handleOrderRequest
     }),
     React.createElement(PurchaseOrderTable, {
-      data: paginatedData,
+      data: filteredData,
       currentPage,
-      totalPages,
+      totalPages: effectiveTotalPages,
       pageSize,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
