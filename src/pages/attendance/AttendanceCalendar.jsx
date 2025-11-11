@@ -341,11 +341,14 @@ const LATE_THRESHOLD_MIN = 1;
 function getEventVariant(ev, now = new Date()) {
   if (isLeaveEvent(ev)) return 'purple';
   const status = String(ev?.status || ev?.attendanceStatus || '').toUpperCase();
+  if (status === 'CLOCKED_IN' || status === 'ON_BREAK') return 'green';
+  if (status === 'CLOCKED_OUT') return 'green';
   if (status === 'ABSENT') return 'red';
   if (status === 'MISSED_CHECKOUT' || ev?.missedCheckout === true) return 'orange';
   if (status === 'EARLY_LEAVE') return 'orange';
   if (status === 'OVERTIME') return 'orange';
-  if (status === 'CLOCKED_OUT') return 'green';
+  if (status === 'LATE') return 'orange';
+  if (status === 'PLANNED') return 'blue';
 
   const plannedStart = ev?.registeredClockIn || ev?.registeredStartAt || ev?.startAt || null;
   const plannedEnd   = ev?.registeredClockOut || ev?.registeredEndAt   || ev?.endAt   || null;
