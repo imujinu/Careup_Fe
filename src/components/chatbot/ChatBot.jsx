@@ -4131,7 +4131,7 @@ const ChatBot = ({ onClose }) => {
           <div className="input-container">
             <input
               type="text"
-              placeholder="레이에게 물어보세요"
+              placeholder="케이에게 물어보세요"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -4147,9 +4147,6 @@ const ChatBot = ({ onClose }) => {
           </div>
         </div>
 
-        <div className="chatbot-footer">
-          <span>오전 10:46</span>
-        </div>
 
         {/* 초기화 확인 모달 */}
         {showResetConfirm && (

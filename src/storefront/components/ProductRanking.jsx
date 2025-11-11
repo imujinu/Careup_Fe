@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { customerAuthService } from "../../service/customerAuthService";
 import { customerProductService } from "../../service/customerProductService";
@@ -222,11 +223,10 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
   }
 
   // rec 요청으로 상품이 없으면 아무것도 표시하지 않음
-  if (products.length === 0) {
-    if (isRecRequest) {
+  if (allProducts.length === 0 && !loading) {
+    if (isPersonalized) {
       return null;
     }
-  if (allProducts.length === 0 && !loading) {
     return (
       <div className="empty-container">
         📦 표시할 상품이 없습니다.
