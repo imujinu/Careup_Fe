@@ -9,6 +9,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
   const [error, setError] = useState(null);
   const [hasRecentView, setHasRecentView] = useState(false);
   const [lastViewProductName, setLastViewProductName] = useState("");
+  const [isRecRequest, setIsRecRequest] = useState(false);
   
   const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
@@ -26,9 +27,11 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
         if (memberId && userInfo) {
           // memberId가 있고 userInfo가 있으면 개인화 추천
           endpoint = `/rec/${memberId}`;
+          setIsRecRequest(true);
         } else {
           // userInfo가 없으면 일반 인기 상품
           endpoint = '/api/rank';
+          setIsRecRequest(false);
         }
 
         const res = await shopApi.get(endpoint);
@@ -162,7 +165,11 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
     );
   }
 
+  // rec 요청으로 상품이 없으면 아무것도 표시하지 않음
   if (products.length === 0) {
+    if (isRecRequest) {
+      return null;
+    }
     return (
       <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280" }}>
         📦 표시할 상품이 없습니다.
@@ -181,7 +188,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
           border: "1px solid #bae6fd"
         }}>
           <div style={{ fontSize: "14px", color: "#0369a1", fontWeight: 500 }}>
-            💡 "{lastViewProductName}"과 관련된 상품을 찾아보세요
+            💡 "{lastViewProductName}"과(와) 관련된 상품을 찾아보세요
           </div>
         </div>
       )}
