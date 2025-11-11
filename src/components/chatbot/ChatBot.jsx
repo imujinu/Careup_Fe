@@ -550,6 +550,7 @@ const ChatBot = ({ onClose }) => {
 
       setMessages((prev) => [...prev, botMessage]);
       setShowTurnoverOrderConfirm(false);
+      setActiveTab(null); // 발주 요청 탭 닫기
 
       // 발주 현황 재조회
       const ordRes = await sendChatbotRequest(
@@ -671,6 +672,7 @@ const ChatBot = ({ onClose }) => {
 
       setMessages((prev) => [...prev, botMessage]);
       setShowManualOrderConfirm(false);
+      setActiveTab(null); // 발주 요청 탭 닫기
       
       // 발주 수량 초기화
       setOrderQuantities({});
@@ -4129,7 +4131,7 @@ const ChatBot = ({ onClose }) => {
           <div className="input-container">
             <input
               type="text"
-              placeholder="레이에게 물어보세요"
+              placeholder="케이에게 물어보세요"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -4145,9 +4147,6 @@ const ChatBot = ({ onClose }) => {
           </div>
         </div>
 
-        <div className="chatbot-footer">
-          <span>오전 10:46</span>
-        </div>
 
         {/* 초기화 확인 모달 */}
         {showResetConfirm && (
@@ -4365,29 +4364,43 @@ const ChatBot = ({ onClose }) => {
                   }}
                 />
               </div>
-              <div className="reset-modal-buttons">
-                <button
-                  className="reset-cancel-btn"
-                  onClick={() => {
-                    setShowDocumentQueryModal(false);
-                    setSelectedDocumentForQuery(null);
-                    setDocumentQueryText("");
-                  }}
-                >
-                  취소
-                </button>
-                <button
-                  className="reset-confirm-btn"
-                  onClick={handleDocumentQuery}
-                  disabled={!selectedDocumentForQuery || !documentQueryText.trim()}
-                  style={{
-                    opacity: (!selectedDocumentForQuery || !documentQueryText.trim()) ? 0.5 : 1,
-                    cursor: (!selectedDocumentForQuery || !documentQueryText.trim()) ? "not-allowed" : "pointer"
-                  }}
-                >
-                  질의 전송
-                </button>
-              </div>
+              {isLoading ? (
+                <div style={{ 
+                  textAlign: "center", 
+                  padding: "20px",
+                  color: "#6b7280"
+                }}>
+                  <div className="loading-spinner" style={{ 
+                    display: "inline-block",
+                    marginRight: "10px"
+                  }}></div>
+                  <span>{loadingMessage}</span>
+                </div>
+              ) : (
+                <div className="reset-modal-buttons">
+                  <button
+                    className="reset-cancel-btn"
+                    onClick={() => {
+                      setShowDocumentQueryModal(false);
+                      setSelectedDocumentForQuery(null);
+                      setDocumentQueryText("");
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    className="reset-confirm-btn"
+                    onClick={handleDocumentQuery}
+                    disabled={!selectedDocumentForQuery || !documentQueryText.trim()}
+                    style={{
+                      opacity: (!selectedDocumentForQuery || !documentQueryText.trim()) ? 0.5 : 1,
+                      cursor: (!selectedDocumentForQuery || !documentQueryText.trim()) ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    질의 전송
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
