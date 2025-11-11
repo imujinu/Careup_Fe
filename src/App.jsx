@@ -162,8 +162,13 @@ export default function App() {
   const { isOpen: showChatBot } = useAppSelector((state) => state.chatbot);
 
   // 챗봇 표시 여부 확인: role이 BRANCH_ADMIN, FRANCHISE_OWNER, STAFF 중 하나일 때만 표시
+  // 단, cust_userInfo가 있으면 챗봇을 표시하지 않음
   const shouldShowChatbot = () => {
     try {
+      // cust_userInfo가 있으면 챗봇 숨김
+      const custUserInfo = localStorage.getItem("cust_userInfo");
+      if (custUserInfo) return false;
+
       const userInfoStr = localStorage.getItem("userInfo");
       if (!userInfoStr) return false;
 

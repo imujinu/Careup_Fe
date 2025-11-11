@@ -4,32 +4,24 @@ import { customerAuthService } from './customerAuthService';
 const API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
 
 export const customerProductService = {
-  // 상품 조회 기록 POST 요청 (로그인 상태에서만)
+  // 상품 조회 기록 POST 요청
   recordProductView: async (productId) => {
     try {
-      const userInfo = customerAuthService.getCurrentUser();
-      
       // 유효한 productId인지 확인 (정수이고 0보다 커야 함)
       const isValidProductId = productId != null && 
                                typeof productId === 'number' && 
                                Number.isInteger(productId) && 
                                productId > 0;
       
-      // 로그인 상태가 아니거나 유효하지 않은 productId면 요청하지 않음
-      if (!userInfo || !userInfo.memberId || !isValidProductId) {
+      // 유효하지 않은 productId면 요청하지 않음
+      if (!isValidProductId) {
         return null;
       }
-
-      const memberId = userInfo.memberId;
       
-      // POST 요청: /customers/product/{productId}?memberId={memberId}
+      // POST 요청: /customers/product/{productId}
       // ordering-service URL을 full path로 사용
       const response = await customerAxios.post(
-        `${API_BASE_URL}/customers/product/${productId}`,
-        null,
-        {
-          params: { memberId: memberId }
-        }
+        `${API_BASE_URL}/customers/product/${productId}`
       );
       
       return response.data;
@@ -52,7 +44,7 @@ export const customerProductService = {
     }
   },
 
-  // 상품 조회 GET 요청 (클릭 시마다) - 로그인 여부와 상관없이 요청
+  // 상품 조회 GET 요청 (클릭 시마다)
   recordProductViewClick: async (productId) => {
     try {
       // 유효한 productId인지 확인 (정수이고 0보다 커야 함)
@@ -66,7 +58,7 @@ export const customerProductService = {
         return null;
       }
       
-      // GET 요청: /customers/product/view/{productId} (productId만 전송)
+      // GET 요청: /customers/product/view/{productId}
       const response = await customerAxios.post(
         `${API_BASE_URL}/customers/product/view/${productId}`
       );

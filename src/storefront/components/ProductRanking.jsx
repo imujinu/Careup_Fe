@@ -15,13 +15,13 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  
+
   const API_BASE_URL = import.meta.env.VITE_ORDERING_URL || 'http://localhost:8080/ordering-service';
   const shopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
   const PAGE_SIZE = 5;
   const INITIAL_FETCH_SIZE = 30; // 초기 요청 시 30개
   const MAX_PAGE = 5; // 최대 페이지 번호 (0~5)
-  
+
   // 현재 페이지에 표시할 상품들 (5개씩)
   const currentProducts = allProducts.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(allProducts.length / PAGE_SIZE) || 1;
@@ -37,7 +37,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
         const userInfo = customerAuthService.getCurrentUser();
         const custUserInfoRaw = localStorage.getItem('cust_userInfo');
         const custUserInfo = custUserInfoRaw ? JSON.parse(custUserInfoRaw) : null;
-        
+
         let endpoint;
         let isPersonalizedMode = false;
 
@@ -188,7 +188,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
       setTimeout(() => setIsTransitioning(false), 300);
     }
   };
-  
+
   const handlePageClick = (page) => {
     if (!isTransitioning && page !== currentPage) {
       setIsTransitioning(true);
@@ -222,7 +222,11 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
     );
   }
 
+  // rec 요청으로 상품이 없으면 아무것도 표시하지 않음
   if (allProducts.length === 0 && !loading) {
+    if (isPersonalized) {
+      return null;
+    }
     return (
       <div className="empty-container">
         📦 표시할 상품이 없습니다.
@@ -237,7 +241,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
       <div className="section-title">
         {hasRecentView ? "📦 연관 상품" : "🏆 인기 랭킹"}
       </div>
-      
+
       {hasRecentView && lastViewProductName && (
         <div className="personalized-message">
           <div className="personalized-message-text">
@@ -269,20 +273,20 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
             </>
           )}
 
-          <div 
+          <div
             className={`grid ranking-grid ${loading ? 'loading' : ''} ${isTransitioning ? 'transitioning' : ''}`}
           >
             {/* 현재 페이지의 5개 상품 표시 */}
             {currentProducts.map((product, i) => (
-              <article 
+              <article
                 className={`rank-card ranking-card ${loading ? 'no-animation' : ''} ${isTransitioning ? 'slide-in' : ''}`}
                 key={product.productId || `${currentPage}-${i}`}
                 onClick={() => handleProductClick(product)}
               >
                 <div className="rank-badge">{getRankNumber(i)}</div>
                 <div className="rank-img">
-                  <img 
-                    src={product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"} 
+                  <img
+                    src={product.imageUrl || "https://beyond-16-care-up.s3.ap-northeast-2.amazonaws.com/image/products/default/product-default-image.png"}
                     alt={product.productName || product.name}
                     onError={(e) => {
                       e.currentTarget.onerror = null;
@@ -290,7 +294,7 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
                     }}
                   />
                 </div>
-                <button 
+                <button
                   className="deal-cta"
                   onClick={(e) => handleAddToCartClick(e, product)}
                 >
@@ -306,10 +310,10 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
                     )}
                   </div>
                   {product.coPurchaseCount != null && product.coPurchaseCount > 0 && (
-                    <div className="co-purchase-count" style={{ 
-                      fontSize: "12px", 
-                      color: "#6b7280", 
-                      marginTop: "4px" 
+                    <div className="co-purchase-count" style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginTop: "4px"
                     }}>
                       함께 구매된 횟수 : {product.coPurchaseCount}
                     </div>
@@ -333,9 +337,9 @@ const ProductRanking = ({ memberId, onAddToCart, onOpenDetail }) => {
           )}
         </div>
       </div>
-      
+
       <div className="view-all-container">
-        <button 
+        <button
           className="tab view-all-btn"
           onClick={handleViewAll}
         >
