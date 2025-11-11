@@ -420,7 +420,7 @@ const HeadquartersDashboard = () => {
 
   // 원 → 만원 → 억 자동 변환 포맷팅 함수
   const formatCurrency = (value) => {
-    if (!value && value !== 0) return '₩0';
+    if (!value && value !== 0) return '0원';
     
     const numValue = typeof value === 'number' ? value : Number(value);
     
@@ -429,9 +429,9 @@ const HeadquartersDashboard = () => {
       const eok = Math.floor(numValue / 100000000);
       const remainder = Math.floor((numValue % 100000000) / 10000);
       if (remainder > 0) {
-        return `₩${eok}억 ${remainder}만`;
+        return `${eok}억 ${remainder}만원`;
       }
-      return `₩${eok}억`;
+      return `${eok}억원`;
     }
     
     // 1만원 이상이면 만원 단위로 표시
@@ -439,13 +439,13 @@ const HeadquartersDashboard = () => {
       const man = Math.floor(numValue / 10000);
       const remainder = numValue % 10000;
       if (remainder > 0) {
-        return `₩${man}만 ${remainder.toLocaleString()}원`;
+        return `${man}만 ${remainder.toLocaleString()}원`;
       }
-      return `₩${man}만`;
+      return `${man}만원`;
     }
     
     // 그 외는 원 단위로 표시
-    return `₩${numValue.toLocaleString()}`;
+    return `${numValue.toLocaleString()}원`;
   };
 
   const formatLargeNumber = (value) => {
