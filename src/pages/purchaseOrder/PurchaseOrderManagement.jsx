@@ -69,6 +69,16 @@ const ExportButton = styled.button`
   }
 `;
 
+const SORT_FIELD_MAP = {
+  orderNo: 'purchaseOrderId',
+  branch: 'branchName',
+  orderDate: 'createdAt',
+  productCount: 'productCount',
+  totalAmount: 'totalPrice',
+  status: 'orderStatus',
+  deliveryDate: 'updatedAt'
+};
+
 function PurchaseOrderManagement() {
   const [summary, setSummary] = useState({
     totalOrders: 0,
@@ -91,11 +101,13 @@ function PurchaseOrderManagement() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [branchList, setBranchList] = useState([]);
+  const [sort, setSort] = useState({ field: 'orderDate', direction: 'desc' }); // { field, direction }
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const [statusStatistics, setStatusStatistics] = useState([]);
   const [branchStatistics, setBranchStatistics] = useState([]);
   const [productStatistics, setProductStatistics] = useState([]);
-  const [branchList, setBranchList] = useState([]);
-  const [sort, setSort] = useState(null); // { field, direction }
   
   // 정렬 디버깅
   React.useEffect(() => {
@@ -120,18 +132,40 @@ function PurchaseOrderManagement() {
     }
   };
 
+  const buildSortParam = React.useCallback((sortOption) => {
+    if (!sortOption || !sortOption.field) {
+      return 'createdAt,DESC';
+    }
+    const backendField = SORT_FIELD_MAP[sortOption.field] || SORT_FIELD_MAP.orderDate;
+    const direction = (sortOption.direction || 'desc').toUpperCase();
+    return `${backendField},${direction}`;
+  }, []);
+
   // 본사용 발주 목록 조회 (모든 지점)
-  const fetchPurchaseOrders = async () => {
+  const fetchPurchaseOrders = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // 본사는 모든 지점의 발주를 조회해야 하므로 각 지점별로 조회
+
       const userInfo = authService.getCurrentUser();
       const branchId = userInfo?.branchId || 1; // 본사 ID
-      
-      const [data, statistics, statusStats, branchStats, productStats, branches] = await Promise.all([
-        purchaseOrderService.getPurchaseOrders(branchId),
+
+      const sortParam = buildSortParam(sort);
+      const pageRequest = Math.max(currentPage - 1, 0);
+
+      const [
+        pageData,
+        overallStatistics,
+        statusStatsData,
+        branchStatsData,
+        productStatsData,
+        branches
+      ] = await Promise.all([
+        purchaseOrderService.getPurchaseOrders(branchId, {
+          page: pageRequest,
+          size: pageSize,
+          sort: sortParam
+        }),
         purchaseOrderService.getHQOverallStatistics(),
         purchaseOrderService.getHQStatusStatistics().catch((err) => {
           console.error('상태 통계 API 호출 실패:', err);
@@ -151,9 +185,21 @@ function PurchaseOrderManagement() {
           return null;
         })
       ]);
-      
-      // 데이터 변환
-      const formattedData = data.map(item => {
+
+      const content = Array.isArray(pageData?.content) ? pageData.content : [];
+      const totalElementsValue = pageData?.totalElements ?? content.length;
+
+      setTotalPages(pageData?.totalPages ? Math.max(pageData.totalPages, 1) : 1);
+      setTotalElements(totalElementsValue);
+
+      if (typeof pageData?.number === 'number') {
+        const serverPage = pageData.number + 1;
+        if (serverPage !== currentPage) {
+          setCurrentPage(serverPage);
+        }
+      }
+
+      const formattedData = content.map(item => {
         const orderDate = item.createdAt ? item.createdAt.split('T')[0] : (item.orderDate || new Date().toISOString().split('T')[0]);
         const serial = String(item.purchaseOrderId || 0).padStart(6, '0');
         const yyyymmdd = orderDate.replace(/-/g, '');
@@ -252,56 +298,100 @@ function PurchaseOrderManagement() {
       }
       
       // 차트 데이터 설정
-      if (statusStats && statusStats.length > 0) {
-        const statusChartData = statusStats.map(stat => ({
-          status: getStatusText(stat.status),
-          count: stat.count
-        }));
-        setStatusStatistics(statusChartData);
-      }
+      // if (statusStats && statusStats.length > 0) {
+      //   const statusChartData = statusStats.map(stat => ({
+      //     status: getStatusText(stat.status),
+      //     count: stat.count
+      //   }));
+      //   setStatusStatistics(statusChartData);
+      // }
+      //
+      // if (branchStats && branchStats.length > 0) {
+      //    const branchChartData = branchStats.map(stat => ({
+      //      branchName: stat.branchName || `지점-${stat.branchId}`,
+      //      orderCount: stat.orderCount || 0,
+      //      totalAmount: (stat.totalAmount || 0) / 10000
+      //    }));
+      //    setBranchStatistics(branchChartData);
+      // }
+      //
+      // if (productStats && productStats.length > 0) {
+      //   const productChartData = productStats.map(stat => ({
+      //     productName: stat.productName,
+      //     totalQuantity: stat.totalQuantity || 0,
+      //     totalAmount: (stat.totalAmount || 0) / 10000
+      //   }));
+      //   const sortedData = productChartData
+      //     .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0))
+      //     .slice(0, 10);
+      //   setProductStatistics(sortedData);
+      // }
 
-      if (branchStats && branchStats.length > 0) {
-        const branchChartData = branchStats.map(stat => ({
-          branchName: stat.branchName || `지점-${stat.branchId}`,
-          orderCount: stat.orderCount || 0,
-          totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
-        }));
-        setBranchStatistics(branchChartData);
-      }
-
-      if (productStats && productStats.length > 0) {
-        const productChartData = productStats.map(stat => ({
-          productName: stat.productName,
-          totalQuantity: stat.totalQuantity || 0,
-          totalAmount: (stat.totalAmount || 0) / 10000  // 만원 단위
-        }));
-        // 정렬 후 상위 10개만 저장 (차트 컴포넌트에서 다시 정렬하지 않도록)
-        const sortedData = productChartData
-          .sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0))
-          .slice(0, 10);
-        console.log('상품별 통계 정렬 후:', sortedData);
-        setProductStatistics(sortedData);
-      }
-      
-      if (statistics) {
-        setSummary({
-          totalOrders: statistics.totalOrderCount || 0,
-          pending: statistics.pendingCount || 0,
-          completed: statistics.totalOrderCount - statistics.pendingCount || 0,  // 완료는 전체 - 대기
-          totalAmount: statistics.totalOrderAmount || 0
+      const totalOrders = formattedData.length;
+      let pendingCount = 0;
+      let completedCount = 0;
+      if (Array.isArray(statusStatsData)) {
+        statusStatsData.forEach((stat) => {
+          const statusKey = typeof stat.status === 'string' ? stat.status : stat.status?.name;
+          if ((statusKey || '').toUpperCase() === 'PENDING') {
+            pendingCount = stat.count || 0;
+          }
+          if ((statusKey || '').toUpperCase() === 'COMPLETED') {
+            completedCount = stat.count || 0;
+          }
         });
       } else {
-        const totalOrders = formattedData.length;
-        const pending = formattedData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
-        const completed = formattedData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
-        const totalAmount = formattedData.reduce((sum, item) => sum + item.totalAmount, 0);
-        
-        setSummary({
-          totalOrders,
-          pending,
-          completed,
-          totalAmount
+        pendingCount = formattedData.filter(item => (item.status || '').toLowerCase() === 'pending').length;
+        completedCount = formattedData.filter(item => (item.status || '').toLowerCase() === 'completed').length;
+      }
+
+      setSummary({
+        totalOrders: overallStatistics?.totalOrderCount ?? totalElementsValue ?? formattedData.length,
+        pending: overallStatistics?.pendingCount ?? pendingCount,
+        completed: completedCount,
+        totalAmount: overallStatistics?.totalOrderAmount ?? formattedData.reduce((sum, item) => sum + item.totalAmount, 0)
+      });
+
+      if (Array.isArray(statusStatsData) && statusStatsData.length > 0) {
+        const statusChartData = statusStatsData.map((stat) => {
+          const statusKey = typeof stat.status === 'string' ? stat.status : stat.status?.name;
+          return {
+            status: getStatusText(statusKey),
+            count: stat.count || 0,
+            totalAmount: stat.totalAmount || 0,
+            percentage: stat.percentage || 0
+          };
         });
+        setStatusStatistics(statusChartData);
+      } else {
+        setStatusStatistics([]);
+      }
+
+      if (Array.isArray(branchStatsData) && branchStatsData.length > 0) {
+        const branchChartData = branchStatsData.map((stat) => ({
+          branchName: stat.branchName || `지점-${stat.branchId}`,
+          orderCount: stat.orderCount || 0,
+          totalAmount: (stat.totalAmount || 0) / 10000,
+          averageAmount: stat.averageAmount || 0,
+          approvedCount: stat.approvedCount || 0,
+          rejectedCount: stat.rejectedCount || 0,
+          approvalRate: stat.approvalRate || 0
+        }));
+        setBranchStatistics(branchChartData);
+      } else {
+        setBranchStatistics([]);
+      }
+
+      if (Array.isArray(productStatsData) && productStatsData.length > 0) {
+        const productChartData = productStatsData.map((stat) => ({
+          productName: stat.productName || `상품-${stat.productId}`,
+          totalQuantity: stat.totalQuantity || 0,
+          approvedQuantity: stat.approvedQuantity || 0,
+          totalAmount: (stat.totalAmount || 0) / 10000
+        })).sort((a, b) => (b.totalQuantity || 0) - (a.totalQuantity || 0)).slice(0, 10);
+        setProductStatistics(productChartData);
+      } else {
+        setProductStatistics([]);
       }
     } catch (err) {
       console.error('발주 목록 조회 실패:', err);
@@ -309,11 +399,11 @@ function PurchaseOrderManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildSortParam, currentPage, pageSize, sort]);
 
   useEffect(() => {
     fetchPurchaseOrders();
-  }, []);
+  }, [fetchPurchaseOrders]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -321,10 +411,16 @@ function PurchaseOrderManagement() {
   };
 
   const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages || page === currentPage) {
+      return;
+    }
     setCurrentPage(page);
   };
 
   const handlePageSizeChange = (size) => {
+    if (size === pageSize) {
+      return;
+    }
     setPageSize(size);
     setCurrentPage(1);
   };
@@ -389,95 +485,9 @@ function PurchaseOrderManagement() {
     return matchesSearch && matchesBranch && matchesStatus;
     });
 
-    // 정렬 적용
-    if (sort && sort.field && filtered.length > 0) {
-      console.log('정렬 적용:', sort, '데이터 개수:', filtered.length);
-      filtered = [...filtered].sort((a, b) => {
-        let aValue, bValue;
-
-        switch (sort.field) {
-          case 'orderNo':
-            // 발주번호를 숫자로 변환하여 정렬 (PO-YYYYMMDD-###### 형식)
-            const aOrderNo = String(a.displayOrderNo || a.id || '').split('-').pop() || '';
-            const bOrderNo = String(b.displayOrderNo || b.id || '').split('-').pop() || '';
-            aValue = parseInt(aOrderNo) || 0;
-            bValue = parseInt(bOrderNo) || 0;
-            break;
-          case 'branch':
-            aValue = (a.branch || '').toLowerCase();
-            bValue = (b.branch || '').toLowerCase();
-            break;
-          case 'orderDate':
-            // 날짜 문자열을 직접 비교 (YYYY-MM-DD 형식)
-            aValue = a.orderDate || '0000-00-00';
-            bValue = b.orderDate || '0000-00-00';
-            break;
-          case 'productCount':
-            aValue = a.productCount || 0;
-            bValue = b.productCount || 0;
-            break;
-          case 'totalAmount':
-            aValue = a.totalAmount || 0;
-            bValue = b.totalAmount || 0;
-            break;
-          case 'status':
-            // 상태를 한글로 변환 후 정렬
-            const getStatusOrder = (status) => {
-              if (!status) return 999;
-              const upperStatus = status.toUpperCase();
-              switch(upperStatus) {
-                case 'PENDING': return 1;
-                case 'APPROVED': return 2;
-                case 'PARTIAL': return 3;
-                case 'SHIPPED': return 4;
-                case 'COMPLETED': return 5;
-                case 'REJECTED': return 6;
-                case 'CANCELLED': return 7;
-                default: return 999;
-              }
-            };
-            aValue = getStatusOrder(a.status || a.orderStatus);
-            bValue = getStatusOrder(b.status || b.orderStatus);
-            break;
-          case 'deliveryDate':
-            // '-'는 가장 뒤로
-            if (a.deliveryDate === '-' || !a.deliveryDate) aValue = new Date('9999-12-31');
-            else aValue = new Date(a.deliveryDate);
-            if (b.deliveryDate === '-' || !b.deliveryDate) bValue = new Date('9999-12-31');
-            else bValue = new Date(b.deliveryDate);
-            break;
-          default:
-            return 0;
-        }
-
-        // 비교 로직
-        let result = 0;
-        if (aValue < bValue) {
-          result = -1;
-        } else if (aValue > bValue) {
-          result = 1;
-        }
-        
-        // 방향에 따라 반전
-        return sort.direction === 'asc' ? result : -result;
-      });
-    }
-
     return filtered || [];
-  }, [purchaseOrders, filters, sort]);
-
-  // 페이지네이션
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
-  
-  // 현재 페이지가 유효한 범위를 벗어나면 첫 페이지로 조정
-  React.useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [totalPages, currentPage]);
+  }, [purchaseOrders, filters]);
+  const effectiveTotalPages = Math.max(1, totalPages);
 
   return React.createElement(PageContainer, null,
     React.createElement(PageHeader, null,
@@ -504,9 +514,9 @@ function PurchaseOrderManagement() {
       branchList
     }),
     React.createElement(PurchaseOrderTable, {
-      data: paginatedData,
+      data: filteredData,
       currentPage,
-      totalPages,
+      totalPages: effectiveTotalPages,
       pageSize,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,

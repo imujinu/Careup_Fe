@@ -98,7 +98,7 @@ const TimeRow = styled.div`
   display: grid; grid-template-columns: 64px 16px 64px 96px;
   gap: 8px; align-items: center;
 `;
-const TimeBox = styled.input`
+const TimeBox = styled.input.attrs({ inputMode: 'numeric', pattern: '[0-9]*' })`
   height: 40px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0 10px; font-size: 14px; text-align: center;
   background: ${(p)=>p.disabled ? '#f9fafb' : '#fff'};
   color: ${(p)=>p.disabled ? '#9ca3af' : '#111827'};
@@ -157,7 +157,7 @@ const DowRow = styled.div`
   background: #fafafa; border-bottom: 1px solid #e5e7eb;
 `;
 const Dow = styled.div`padding: 10px; font-size: 12px; font-weight: 700; color: #6b7280;`;
-const CalGrid = styled.div`display: grid; grid-template-columns: repeat(7, 1fr); overflow: auto;`;
+const CalGrid = styled.div`display: grid; grid-template-columns: repeat(7, 1fr); overflow: visible;`;
 
 /* 페이지의 Cell 스타일에 맞춤 */
 const CalCell = styled.div`
@@ -219,6 +219,14 @@ const ChipClose = styled.button`
   &:hover { filter: brightness(.95); }
 `;
 const Others = styled.span`color: #6b7280; font-size: 12px;`;
+
+const SmallBody = styled.div`
+  padding: 0;
+  min-height: 0;                /* grid/flex 자식 스크롤 핵심 */
+  overflow-y: auto;             /* 직원 목록만 스크롤 */
+  overscroll-behavior: contain; /* 모달 밖 스크롤 전파 방지 */
+  -webkit-overflow-scrolling: touch;
+`;
 
 /* 섹션 헤더 */
 const SectionHeader = styled.div`
@@ -1023,46 +1031,49 @@ export function ScheduleBulkModal({ open, onClose, onCompleted, defaultMonth }) 
               <div />
             </SmallTopBar>
 
-            <div style={{ padding: '10px 14px 0' }}>
-              <input
-                placeholder="검색어"
-                value={empKeyword}
-                onChange={(e)=>setEmpKeyword(e.target.value)}
-                style={{ width:'100%', height:36, border:'1px solid #e5e7eb', borderRadius:8, padding:'0 10px' }}
-              />
-            </div>
-
-            {toArr(employees).length > 0 && (
-              <ListRow key="all" $active={allOnListChecked} onClick={toggleAllEmployees}>
-                <span className="name">전체선택</span>
-                <PurpleCheck
-                  checked={allOnListChecked}
-                  onClick={(e)=>e.stopPropagation()}
-                  onChange={toggleAllEmployees}
+            <SmallBody>
+              <div style={{ padding: '10px 14px 0' }}>
+                <input
+                  placeholder="검색어"
+                  value={empKeyword}
+                  onChange={(e)=>setEmpKeyword(e.target.value)}
+                  style={{ width:'100%', height:36, border:'1px solid #e5e7eb', borderRadius:8, padding:'0 10px' }}
                 />
-              </ListRow>
-            )}
+              </div>
 
-            {toArr(employees).map(e => {
-              const checked = employeeIds.includes(Number(e.id));
-              return (
-                <ListRow key={`e-${e.id}`} $active={checked} onClick={() => toggleEmployee(e.id)}>
-                  <span className="name">
-                    {e.name}{e.branchName ? ` - ${e.branchName}` : ''}{e.employeeNumber ? ` (${e.employeeNumber})` : ''}
-                  </span>
+              {toArr(employees).length > 0 && (
+                <ListRow key="all" $active={allOnListChecked} onClick={toggleAllEmployees}>
+                  <span className="name">전체선택</span>
                   <PurpleCheck
-                    checked={checked}
-                    onClick={(ev)=>ev.stopPropagation()}
-                    onChange={() => toggleEmployee(e.id)}
+                    checked={allOnListChecked}
+                    onClick={(e)=>e.stopPropagation()}
+                    onChange={toggleAllEmployees}
                   />
                 </ListRow>
-              );
-            })}
-            {branchIds.length > 0 && toArr(employees).length === 0 && (
-              <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>선택 지점 소속 직원이 없습니다.</div>
-            )}
+              )}
 
-            <div style={{ padding: '12px 14px', borderTop: 1, borderTopStyle:'solid', borderTopColor:'#e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              {toArr(employees).map(e => {
+                const checked = employeeIds.includes(Number(e.id));
+                return (
+                  <ListRow key={`e-${e.id}`} $active={checked} onClick={() => toggleEmployee(e.id)}>
+                    <span className="name">
+                      {e.name}{e.branchName ? ` - ${e.branchName}` : ''}{e.employeeNumber ? ` (${e.employeeNumber})` : ''}
+                    </span>
+                    <PurpleCheck
+                      checked={checked}
+                      onClick={(ev)=>ev.stopPropagation()}
+                      onChange={() => toggleEmployee(e.id)}
+                    />
+                  </ListRow>
+                );
+              })}
+
+              {branchIds.length > 0 && toArr(employees).length === 0 && (
+                <div style={{ padding: 14, color: '#6b7280', fontSize: 13 }}>선택 지점 소속 직원이 없습니다.</div>
+              )}
+            </SmallBody>
+
+            <div style={{ padding: '12px 14px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Cancel onClick={()=>setEmployeeModal(false)}>취소</Cancel>
               <Confirm onClick={()=>setEmployeeModal(false)}>등록</Confirm>
             </div>

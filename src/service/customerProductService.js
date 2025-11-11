@@ -1,4 +1,5 @@
 import customerAxios from '../utils/customerAxios';
+import { customerAuthService } from './customerAuthService';
 
 const API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
 

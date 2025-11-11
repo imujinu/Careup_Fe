@@ -29,8 +29,6 @@ function DocumentManagement({ branchId, readOnly = false }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   
-  // 문서 단건 작업은 각 문서의 employeeId를 사용합니다.
-
   useEffect(() => {
     if (branchId) {
       fetchDocuments();
@@ -92,7 +90,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
 
   const handleDownload = async (document) => {
     try {
-      const downloadUrl = await documentService.getDocumentDownloadUrl(document.employeeId, document.id);
+      const downloadUrl = await documentService.getDocumentDownloadUrl(document.id);
       
       if (downloadUrl) {
         window.open(downloadUrl, '_blank');
@@ -123,7 +121,7 @@ function DocumentManagement({ branchId, readOnly = false }) {
 
   const handleDeleteConfirm = async () => {
     try {
-      await documentService.deleteDocument(selectedDocument.employeeId, selectedDocument.id);
+      await documentService.deleteDocument(selectedDocument.id);
       
       setShowDeleteModal(false);
       setSelectedDocument(null);

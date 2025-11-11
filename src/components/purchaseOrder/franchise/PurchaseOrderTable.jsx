@@ -275,9 +275,11 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
         )
       ),
       React.createElement(TableBody, null,
-        data.map((item, index) =>
-          React.createElement(TableRow, { key: index },
-            React.createElement(TableCell, null, index + 1),
+        data.map((item, index) => {
+          const rowNumber = (currentPage - 1) * pageSize + index + 1;
+          const rowKey = item.id ?? item.purchaseOrderId ?? `${index}-${item.displayOrderNo || ''}`;
+          return React.createElement(TableRow, { key: rowKey },
+            React.createElement(TableCell, null, rowNumber),
             React.createElement(TableCell, null, item.displayOrderNo || item.id),
             React.createElement(TableCell, null, item.orderDate),
             React.createElement(TableCell, null, `${item.productCount}개`),
@@ -289,8 +291,8 @@ function PurchaseOrderTable({ data, currentPage, totalPages, pageSize, onPageCha
             React.createElement(TableCell, null,
               React.createElement(DetailLink, { onClick: () => onDetail(item) }, '상세보기')
             )
-          )
-        )
+          );
+        })
       )
     ),
     React.createElement(PaginationContainer, null,
