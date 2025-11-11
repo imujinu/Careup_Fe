@@ -108,16 +108,6 @@ axios.interceptors.response.use(
     // ✅ RT가 없으면 리프레시 시도 금지 → 즉시 로그인 이동
     if (!tokenStorage.getRefreshToken()) {
       try { tokenStorage.clearTokens(); } catch {}
-
-      const reqUrl = (originalRequest?.url || '').toString();
-      
-      if (reqUrl.includes('/branch-service')) {
-        console.warn('[axiosConfig] branch-service 요청에서 refreshToken 없음 → 로그인 이동');
-        goLogin();
-      } else {
-        console.warn('[axiosConfig] 비-branch 요청 (쇼핑몰 등)은 goLogin() 스킵');
-      }
-
       goLogin();
       return Promise.reject(error);
     }
