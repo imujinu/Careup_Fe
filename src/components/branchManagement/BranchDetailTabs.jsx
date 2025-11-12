@@ -18,11 +18,13 @@ import LoyalCustomerManagement from "./LoyalCustomerManagement";
 function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
   // 지점/가맹점 관리자용 탭 (지점 상세 정보로 변경)
   const isBranchAdmin = userType === 'franchise';
+  // 관리자 권한 확인 (headquarters 또는 admin)
+  const isAdmin = userType === 'headquarters' || userType === 'admin';
   
   // 모든 권한에서 대시보드 탭을 기본으로 활성화
   const [activeTab, setActiveTab] = useState("dashboard");
   
-  const tabs = [
+  const allTabs = [
     {
       id: "dashboard",
       label: isBranchAdmin ? "지점 상세 정보" : "대시보드",
@@ -58,6 +60,9 @@ function BranchDetailTabs({ branchId, branch, userType, readOnly = false }) {
       component: <CustomerContent branchId={branchId} />,
     },
   ];
+
+  // 관리자 권한일 때 KPI 탭 제외
+  const tabs = isAdmin ? allTabs.filter(tab => tab.id !== 'kpi') : allTabs;
 
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);

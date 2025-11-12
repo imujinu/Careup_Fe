@@ -2,7 +2,7 @@ import axios from "../utils/axiosConfig";
 
 const BRANCH_API_BASE_URL = import.meta.env.VITE_BRANCH_URL;
 const ORDERING_API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
-const EXCEL_API_BASE_URL = import.meta.env.VITE_BRANCH_URL;
+const EXCEL_API_BASE_URL = import.meta.env.VITE_ORDERING_URL;
 
 // 엑셀 파일 다운로드 헬퍼 함수
 const downloadExcelFile = async (url, fileName) => {

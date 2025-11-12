@@ -181,7 +181,7 @@ function Sidebar({ isVisible, userType, branchId }) {
     if (!canManageStaff) return franchiseBase;
     const items = [...franchiseBase];
     const staffItem = { id: 'staff', label: '직원관리', icon: mdiAccountGroupOutline, path: MENU_PATH_MAP.staff };
-    items.splice(1, 0, staffItem);
+    items.splice(2, 0, staffItem);
     return items;
   })();
 
