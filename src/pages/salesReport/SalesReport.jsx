@@ -695,7 +695,8 @@ function SalesReport() {
         >
           지점 비교
         </Tab>
-        <Tab
+        {/* 예상 매출액 및 로열티 탭 숨김 (코드는 유지) */}
+        {/* <Tab
           $active={activeTab === "forecast"}
           onClick={() => setActiveTab("forecast")}
         >
@@ -706,7 +707,7 @@ function SalesReport() {
           onClick={() => setActiveTab("royalty")}
         >
           로열티
-        </Tab>
+        </Tab> */}
       </TabContainer>
 
       {activeTab !== "forecast" && activeTab !== "royalty" && (

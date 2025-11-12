@@ -53,6 +53,60 @@ function EmployeeModal({
 
   const isEdit = !!employee;
 
+  const formatPhoneNumber = (value = "") => {
+    const numbersOnly = value.replace(/\D/g, "");
+    if (!numbersOnly) {
+      return "";
+    }
+
+    const limitedNumbers = numbersOnly.slice(0, 11);
+
+    if (limitedNumbers.length <= 3) {
+      return limitedNumbers;
+    }
+
+    if (limitedNumbers.length <= 7) {
+      if (limitedNumbers.startsWith("02")) {
+        return `${limitedNumbers.slice(0, 2)}-${limitedNumbers.slice(2)}`;
+      }
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(3)}`;
+    }
+
+    if (limitedNumbers.startsWith("02")) {
+      const middleLength = limitedNumbers.length - 6;
+      if (middleLength === 3) {
+        return `${limitedNumbers.slice(0, 2)}-${limitedNumbers.slice(
+          2,
+          5
+        )}-${limitedNumbers.slice(5)}`;
+      }
+      return `${limitedNumbers.slice(0, 2)}-${limitedNumbers.slice(
+        2,
+        6
+      )}-${limitedNumbers.slice(6)}`;
+    }
+
+    if (limitedNumbers.startsWith("01")) {
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(
+        3,
+        7
+      )}-${limitedNumbers.slice(7)}`;
+    }
+
+    const middleLength = limitedNumbers.length - 7;
+    if (middleLength === 3) {
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(
+        3,
+        6
+      )}-${limitedNumbers.slice(6)}`;
+    }
+
+    return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(
+      3,
+      7
+    )}-${limitedNumbers.slice(7)}`;
+  };
+
   // 카카오 주소 API 로드
   useEffect(() => {
     const script = document.createElement("script");
@@ -79,8 +133,8 @@ function EmployeeModal({
           zipcode: employee.zipcode || "",
           address: employee.address || "",
           addressDetail: employee.addressDetail || "",
-          mobile: employee.mobile || "",
-          emergencyTel: employee.emergencyTel || "",
+          mobile: formatPhoneNumber(employee.mobile || ""),
+          emergencyTel: formatPhoneNumber(employee.emergencyTel || ""),
           emergencyName: employee.emergencyName || "",
           relationship: employee.relationship || "PARENT",
           hireDate: employee.hireDate || "",
@@ -132,9 +186,15 @@ function EmployeeModal({
   }, [isOpen, employee, branchId]);
 
   const handleInputChange = (field, value) => {
+    let formattedValue = value;
+
+    if (field === "mobile" || field === "emergencyTel") {
+      formattedValue = formatPhoneNumber(value);
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: formattedValue,
     }));
 
     // 에러 제거
@@ -311,8 +371,8 @@ function EmployeeModal({
       zipcode: "",
       address: "",
       addressDetail: "",
-      mobile: "",
-      emergencyTel: "",
+          mobile: "",
+          emergencyTel: "",
       emergencyName: "",
       relationship: "PARENT",
       hireDate: "",
@@ -397,10 +457,10 @@ function EmployeeModal({
               </FormGroup>
 
               <FormGroup>
-                <Label required>점주명</Label>
+                <Label required>직원 이름</Label>
                 <Input
                   type="text"
-                  placeholder="점주명을 입력하세요"
+                  placeholder="직원 이름을 입력하세요"
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   error={errors.name}

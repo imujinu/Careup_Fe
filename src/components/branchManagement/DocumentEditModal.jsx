@@ -66,6 +66,10 @@ function DocumentEditModal({ isOpen, onClose, document, onSuccess }) {
       newErrors.documentType = '문서 유형을 선택해주세요.';
     }
     
+    if (!formData.title || formData.title.trim() === '') {
+      newErrors.title = '문서명을 입력해주세요.';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -187,7 +191,9 @@ function DocumentEditModal({ isOpen, onClose, document, onSuccess }) {
           </FormGroup>
 
           <FormGroup>
-            <Label htmlFor="title">문서명</Label>
+            <Label htmlFor="title">
+              문서명 <Required>*</Required>
+            </Label>
             <Input
               type="text"
               id="title"
@@ -195,7 +201,9 @@ function DocumentEditModal({ isOpen, onClose, document, onSuccess }) {
               value={formData.title}
               onChange={handleInputChange}
               placeholder="문서명을 입력하세요"
+              hasError={!!errors.title}
             />
+            {errors.title && <ErrorMessage>{errors.title}</ErrorMessage>}
           </FormGroup>
 
           <FormGroup>
@@ -354,10 +362,12 @@ const CurrentFileInfo = styled.div`
   font-style: italic;
 `;
 
-const Input = styled.input`
+const Input = styled.input.withConfig({
+  shouldForwardProp: (prop) => prop !== 'hasError',
+})`
   width: 100%;
   padding: 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid ${props => props.hasError ? '#dc2626' : '#d1d5db'};
   border-radius: 8px;
   font-size: 14px;
   
@@ -369,8 +379,8 @@ const Input = styled.input`
   
   &:focus {
     outline: none;
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    border-color: ${props => props.hasError ? '#dc2626' : '#8b5cf6'};
+    box-shadow: 0 0 0 3px ${props => props.hasError ? '#fecaca' : 'rgba(139, 92, 246, 0.1)'};
   }
 `;
 

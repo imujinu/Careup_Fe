@@ -76,7 +76,7 @@ function EmployeeSearchAndFilter({
           </SearchIcon>
           <SearchInput
             type="text"
-            placeholder="점주명, 이메일, 전화번호로 검색..."
+            placeholder="직원 이름, 이메일, 전화번호로 검색..."
             value={localSearchTerm}
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
